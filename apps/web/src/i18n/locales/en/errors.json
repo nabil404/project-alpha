@@ -1,0 +1,29 @@
+{
+  "code": {
+    "AUTH_INVALID_CREDENTIALS": "Invalid email or password.",
+    "AUTH_UNAUTHENTICATED": "Please sign in to continue.",
+    "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again.",
+    "TENANT_NO_ACTIVE_MERCHANT": "This session has no active seller account.",
+    "VALIDATION_FAILED": "Please check the highlighted fields.",
+    "WEBHOOK_INVALID_SIGNATURE": "The webhook signature could not be verified.",
+    "WEBHOOK_MALFORMED_PAYLOAD": "The webhook payload could not be read.",
+    "WEBHOOK_MISSING_RAW_BODY": "The webhook request had no body.",
+    "WEBHOOK_VERIFICATION_FAILED": "The webhook verification request was rejected."
+  },
+  "field": {
+    "INVALID_FORMAT": "Enter a valid {{format}}.",
+    "INVALID_INPUT": "This value isn't valid.",
+    "INVALID_TYPE": "Expected {{expected}}.",
+    "INVALID_VALUE": "Must be one of: {{values}}.",
+    "MAX_ITEMS": "Select at most {{max}} items.",
+    "MAX_LENGTH": "Use at most {{max}} characters.",
+    "MAX_VALUE": "Must be at most {{max}}.",
+    "MIN_ITEMS": "Select at least {{min}} items.",
+    "MIN_LENGTH": "Use at least {{min}} characters.",
+    "MIN_VALUE": "Must be at least {{min}}.",
+    "NOT_MULTIPLE_OF": "Must be a multiple of {{divisor}}.",
+    "REQUIRED": "This field is required.",
+    "UNRECOGNIZED_KEYS": "Unexpected fields: {{keys}}."
+  },
+  "generic": "Something went wrong. Please try again."
+}

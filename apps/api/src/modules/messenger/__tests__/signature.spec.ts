@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { verifyMetaSignature } from './signature.js';
+import { verifyMetaSignature } from '../signature.js';
 
 const secret = 'app-secret';
 const body = Buffer.from(JSON.stringify({ object: 'page', entry: [] }));

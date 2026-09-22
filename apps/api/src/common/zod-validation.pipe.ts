@@ -1,5 +1,7 @@
-import { BadRequestException, type PipeTransform } from '@nestjs/common';
+import type { PipeTransform } from '@nestjs/common';
 import type { ZodType } from 'zod';
+import { CodedValidationException } from './errors/coded-exceptions.js';
+import { zodIssuesToFields } from './errors/validation-fields.js';
 
 /**
  * Validation is Zod everywhere: the same schemas from @app/shared back API
@@ -7,6 +9,9 @@ import type { ZodType } from 'zod';
  *
  *   @Post()
  *   create(@Body(new ZodValidationPipe(createProductSchema)) body: CreateProduct) {}
+ *
+ * A failure becomes VALIDATION_FAILED with a `fields` map, so the SPA can put
+ * each message on the form control it belongs to.
  */
 export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
   constructor(private readonly schema: ZodType<T>) {}
@@ -15,13 +20,7 @@ export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
     const result = this.schema.safeParse(value);
 
     if (!result.success) {
-      throw new BadRequestException({
-        message: 'Validation failed',
-        issues: result.error.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          message: issue.message,
-        })),
-      });
+      throw new CodedValidationException(zodIssuesToFields(result.error.issues));
     }
 
     return result.data;

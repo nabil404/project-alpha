@@ -184,9 +184,34 @@ product identification accuracy; ≥95% of orders with complete, correct fields;
 median first message → confirmed order under 10 minutes; zero wrongly created
 orders; signup → first connected Page under 10 minutes.
 
+## Commands
+
+- `pnpm dev` — api + web in parallel; worker separately via
+  `pnpm --filter api dev:worker`.
+- `pnpm test` / `pnpm typecheck` / `pnpm lint` / `pnpm format:check` — from
+  the root, recursive.
+- Schema loop: edit `apps/api/db/schema.sql` → `pnpm db:diff` → review the
+  migration → `pnpm --filter api db:lint` → `pnpm db:apply` → `pnpm db:types`.
+- `pnpm --filter api db:hash` — rehash after a reviewed migration edit.
+- `pnpm --filter api db:auth-schema` — regenerate Better Auth SQL, then paste
+  it into the auth section of `schema.sql`.
+- `apps/web` has no tests yet; `apps/api` Jest runs as ESM
+  (`--experimental-vm-modules`).
+
 ## Conventions for Claude Code
 
 - Commit messages: no co-author trailers.
-- Atlas is the only tool that changes the database schema; never hand-edit
-  migrations or apply DDL directly.
+- Atlas is the only tool that changes the database schema; never hand-edit a
+  _generated_ migration and never apply DDL directly. For DDL Atlas does not
+  diff on the free tier (RLS policies, roles, grants), author it with
+  `atlas migrate new` and rerun `db:hash` — Atlas still owns ordering,
+  integrity, and apply.
 - Never log tokens, secrets, or raw Page access tokens.
+- Errors leave the API as the coded envelope `{ error: { code, message, params } }`.
+  Throw a `Coded*Exception` from `apps/api/src/common/errors/`, never a bare NestJS
+  exception; the contract is in
+  `.claude/skills/rest-api-design/references/response-formats.md`.
+- Tests live in a colocated `__tests__/` directory, never as a sibling file.
+  This applies to both apps.
+- Project instructions live in `AGENTS.md` only. Do not create `CLAUDE.md` or
+  `CLAUDE.local.md`; either one stops Claude Code from loading this file.
