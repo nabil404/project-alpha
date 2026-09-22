@@ -7,7 +7,7 @@ file is the current version; update it here first.
 Timeline: 12 weeks, solo developer, Sep 21 – Dec 11, 2026.
 
 Per-app conventions live in `.claude/skills/`: **`backend-engineer`** (`apps/api`
-— Kysely, Atlas, queue, webhooks, LLM), **`frontend-engineer`** (`apps/web` —
+— Drizzle, queue, webhooks, LLM), **`frontend-engineer`** (`apps/web` —
 data layer, forms, i18n, Tailwind), **`rest-api-design`** (HTTP surface). Those
 are the authority on _how_; this file is the authority on _what_ and _why_, and
 wins on any conflict.
@@ -96,8 +96,9 @@ delivery address.
 
 - **Seller / User** — account and auth identities (password, Google, Facebook).
   The `user`, `session`, `account`, and `verification` tables are owned by
-  Better Auth, which uses Kysely natively. Their SQL is generated with the
-  Better Auth CLI and kept in the auth section of `apps/api/db/schema.sql`.
+  Better Auth. Their Drizzle schema is generated with the Better Auth CLI into
+  `apps/api/src/database/schema/auth.ts` and migrated through drizzle-kit like
+  any other table, so auth changes stay versioned and reviewed.
 - **Organization** (seller account / tenant) — via the Better Auth Organization
   plugin. One organization per seller for the MVP. Every business table carries
   `merchant_id` and all queries are scoped by it.
@@ -126,44 +127,44 @@ conversations is run after every prompt change. The mechanics of both are in
 
 ### Chosen stack
 
-| Area                | Decision                                                                                                                                                    |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend             | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`.                                                                 |
-| Frontend            | React 19 (Vite SPA), TanStack Router (code-based) + TanStack Query, Tailwind v4 (CSS-first), shadcn/ui (not initialized), react-hook-form, react-i18next.   |
-| Repo                | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`.                                                |
-| Validation          | Zod schemas in `packages/shared` for API input, forms, and LLM output.                                                                                      |
-| Database            | Postgres + Kysely, exact version pinned (pre-1.0; read release notes before upgrading). Global NestJS `DatabaseModule`; Better Auth shares the same pool.   |
-| Schema & migrations | Sectioned `apps/api/db/schema.sql` as desired state, migrations in `db/migrations/`, config in `atlas.hcl`. Atlas owns every change.                        |
-| Types               | kysely-codegen generates `apps/api/src/database/database.types.ts` from the migrated database; never hand-edited. CI fails on drift.                        |
-| Message ordering    | Kysely `.forUpdate()` on the conversation row inside a short transaction.                                                                                   |
-| Queue               | BullMQ + Redis (`noeviction`, AOF persistence).                                                                                                             |
-| Auth                | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy; tenant guard in NestJS.                                               |
-| Messenger           | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow.                                                  |
-| Secrets             | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var.                                                                                  |
-| LLM                 | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider.                |
-| Email               | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes.                                                               |
-| Hosting             | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis.                                                                                     |
-| Reverse proxy       | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages.                             |
-| Config & ops        | `@nestjs/config` + Zod-validated env, `@nestjs/throttler` (Redis), nestjs-pino, `@nestjs/terminus` health checks, Uptime Kuma, Sentry optional.             |
-| Backups             | Nightly `pg_dump`, multi-day retention, copied off the server.                                                                                              |
-| Server security     | SSH keys only, firewall allowing 80/443/SSH, automatic security updates.                                                                                    |
-| CI/CD               | GitHub Actions: lint, typecheck, test, codegen-drift check, build images, `atlas migrate apply`, deploy over SSH. Docker required for Atlas's dev database. |
-| Local development   | Cloudflare Tunnel for a public HTTPS webhook URL; Docker for Atlas's dev database.                                                                          |
-| Testing             | Jest in `apps/api`, Vitest in `apps/web` when its first test lands, plus an LLM evaluation script.                                                          |
-| Payments            | Cash on delivery. Payment links after the pilot.                                                                                                            |
+| Area                | Decision                                                                                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend             | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`.                                                               |
+| Frontend            | React 19 (Vite SPA), TanStack Router (code-based) + TanStack Query, Tailwind v4 (CSS-first), shadcn/ui (not initialized), react-hook-form, react-i18next. |
+| Repo                | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`.                                              |
+| Validation          | Zod schemas in `packages/shared` for API input, forms, and LLM output.                                                                                    |
+| Database            | Postgres + Drizzle. Global NestJS `DatabaseModule`; Better Auth shares the same instance through its Drizzle adapter.                                     |
+| Schema & migrations | TS schema in `apps/api/src/database/schema/` as desired state; drizzle-kit generates SQL into `db/migrations/`. `drizzle-kit push` is never used.         |
+| Types               | Inferred from the schema — no codegen step and no live database needed. CI fails if a schema change has no migration.                                     |
+| Message ordering    | Drizzle `.for('update')` on the conversation row inside a short transaction. Not available on the relational (`db.query.*`) API.                          |
+| Queue               | BullMQ + Redis (`noeviction`, AOF persistence).                                                                                                           |
+| Auth                | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy; tenant guard in NestJS.                                             |
+| Messenger           | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow.                                                |
+| Secrets             | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var.                                                                                |
+| LLM                 | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider.              |
+| Email               | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes.                                                             |
+| Hosting             | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis.                                                                                   |
+| Reverse proxy       | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages.                           |
+| Config & ops        | `@nestjs/config` + Zod-validated env, `@nestjs/throttler` (Redis), nestjs-pino, `@nestjs/terminus` health checks, Uptime Kuma, Sentry optional.           |
+| Backups             | Nightly `pg_dump`, multi-day retention, copied off the server.                                                                                            |
+| Server security     | SSH keys only, firewall allowing 80/443/SSH, automatic security updates.                                                                                  |
+| CI/CD               | GitHub Actions: lint, typecheck, test, migrate, RLS check, uncommitted-migration check, build images, deploy over SSH.                                    |
+| Local development   | Cloudflare Tunnel for a public HTTPS webhook URL. drizzle-kit diffs against snapshots, so no shadow database is needed.                                   |
+| Testing             | Jest in `apps/api`, Vitest in `apps/web` when its first test lands, plus an LLM evaluation script.                                                        |
+| Payments            | Cash on delivery. Payment links after the pilot.                                                                                                          |
 
 ### Database rules
 
 > Kept word for word from the project context.
 
 - Never call the LLM (or any slow external API) inside a database transaction. Read state, call the LLM outside, then open a short transaction that locks the row, re-checks state, and writes.
-- Inside a transaction, always use the transaction object. Repository methods take an executor parameter (Kysely<DB> | Transaction<DB>) instead of using this.db.
+- Inside a transaction, always use the transaction object. Repository methods take an executor parameter (`Executor`, i.e. `Database | Transaction`) instead of using this.db.
 - Every repository method that touches business data takes merchantId and filters by it. Tests with two merchants verify one can never read, update, or confirm the other's data.
 - Postgres lock_timeout and idle_in_transaction_session_timeout are set. BullMQ worker concurrency stays at or below the worker's pool size.
 - jsonb columns are parsed with Zod on read. Counts and bigint values are converted from strings explicitly.
 
 Worked examples, the executor pattern, and the two-merchant test shape:
-`backend-engineer` §"⚠️ Tenancy" and §"Database: Kysely and Atlas".
+`backend-engineer` §"⚠️ Tenancy" and §"Database: Drizzle".
 
 ### Considered and not chosen
 
@@ -195,11 +196,34 @@ orders; signup → first connected Page under 10 minutes.
   `pnpm --filter api dev:worker`.
 - `pnpm test` / `pnpm typecheck` / `pnpm lint` / `pnpm format:check` — from
   the root, recursive.
-- Schema loop: edit `apps/api/db/schema.sql` → `pnpm db:diff` → review the
-  migration → `pnpm --filter api db:lint` → `pnpm db:apply` → `pnpm db:types`.
-- `pnpm --filter api db:hash` — rehash after a reviewed migration edit.
+- Schema loop: edit `apps/api/src/database/schema/` → `pnpm --filter api
+db:generate` → **review the generated SQL by hand** → `pnpm --filter api
+db:migrate` → `pnpm --filter api db:verify-rls`.
+- `pnpm --filter api db:custom` — an empty migration for DDL drizzle-kit does
+  not model: `FORCE ROW LEVEL SECURITY`, roles, grants, default privileges,
+  functions, triggers.
+- `pnpm --filter api db:verify-rls` — fails if a table carrying `merchant_id`
+  lacks `ENABLE`/`FORCE` row-level security or a policy. Run after `db:migrate`;
+  CI runs it too, because drizzle-kit generates `ENABLE` and the policy but not
+  `FORCE`, so nothing else would catch a half-protected table.
 - `pnpm --filter api db:auth-schema` — regenerate Better Auth SQL, then paste
-  it into the auth section of `schema.sql`.
+  `src/database/schema/auth.ts`, then `db:generate` to migrate it.
+- **Two database URLs.** `DATABASE_URL` is the app's restricted, non-superuser
+  connection (`app_runtime`), so row-level security applies to it.
+  `DATABASE_ADMIN_URL` is the owner and is used only by schema tooling —
+  `db:generate`, `db:migrate`, `db:verify-rls`, and the CI deploy step. The api
+  and worker must
+  never receive the admin URL; it is deliberately absent from `env.schema.ts`.
+- **One env file.** `apps/api/.env` is the only one, for the app and both
+  compose stacks alike. Compose must be pointed at it — `docker compose
+--env-file apps/api/.env -f docker/compose.yml …`, wrapped as `pnpm dev:up` /
+  `pnpm dev:down` for local dependencies — because on its own it would look for
+  `docker/.env`, which no longer exists. The file is written for host
+  development, so `docker/compose.yml` overrides `DATABASE_URL`, `REDIS_URL` and
+  `APP_URL` with service hostnames and blanks `DATABASE_ADMIN_URL` and the
+  `POSTGRES_*` secrets for the api and worker. A new app variable needs no
+  compose change; a new one that must differ inside containers belongs in the
+  `x-app-env` anchor.
 - `apps/web` and `packages/shared` have no test runner yet; `apps/api` Jest runs
   as ESM (`--experimental-vm-modules`), configured in `apps/api/jest.config.mjs`.
 - `pnpm --filter @app/shared build` after changing a shared schema — `apps/api`
@@ -209,11 +233,12 @@ orders; signup → first connected Page under 10 minutes.
 ## Conventions for Claude Code
 
 - Commit messages: no co-author trailers.
-- Atlas is the only tool that changes the database schema; never hand-edit a
-  _generated_ migration and never apply DDL directly. For DDL Atlas does not
-  diff on the free tier (RLS policies, roles, grants), author it with
-  `atlas migrate new` and rerun `db:hash` — Atlas still owns ordering,
-  integrity, and apply.
+- drizzle-kit is the only tool that changes the database schema; never
+  hand-edit a _generated_ migration, never apply DDL directly, and never run
+  `drizzle-kit push`. For DDL drizzle-kit does not model (`FORCE` row-level
+  security, roles, grants, default privileges, functions, triggers), author it
+  with `pnpm --filter api db:custom` — drizzle-kit still owns ordering and
+  apply.
 - Never log tokens, secrets, or raw Page access tokens.
 - Errors leave the API as the coded envelope `{ error: { code, message, params } }`.
   Throw a `Coded*Exception` from `apps/api/src/common/errors/`, never a bare NestJS

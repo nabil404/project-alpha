@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, Module } from '@nestjs/common';
 import { HealthCheck, HealthCheckService, TerminusModule } from '@nestjs/terminus';
-import { sql } from 'kysely';
+import { sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
 
 @Controller('health')
@@ -15,7 +15,7 @@ export class HealthController {
   check() {
     return this.health.check([
       async () => {
-        await sql`select 1`.execute(this.db);
+        await this.db.execute(sql`select 1`);
         return { database: { status: 'up' as const } };
       },
     ]);

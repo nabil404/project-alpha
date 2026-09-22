@@ -34,10 +34,13 @@ jobs:
         image: redis:7-alpine
         ports: ['6379:6379']
     env:
+      # drizzle-kit, the migrate script and the Better Auth CLI connect as the owner.
+      DATABASE_ADMIN_URL: postgres://app:app@localhost:5432/app
+      # The application's restricted connection. It is the same superuser here
+      # only because app_runtime has no password until an environment sets one;
+      # nothing in this job queries as it, and db:verify-rls uses the admin URL.
       DATABASE_URL: postgres://app:app@localhost:5432/app
       REDIS_URL: redis://localhost:6379
-      # Set this secret to enable `atlas migrate lint`; see the step below.
-      ATLAS_TOKEN: ${{ secrets.ATLAS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -54,40 +57,24 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-      # Atlas needs Docker for its dev database; the runner provides it.
-      - uses: ariga/setup-atlas@v0
-
-      - name: Check for migrations
-        id: migrations
-        run: |
-          if [ -n "$(find apps/api/db/migrations -maxdepth 1 -name '*.sql' -print -quit)" ]; then
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'present=false' >> "$GITHUB_OUTPUT"
-            echo 'No migrations yet - skipping Atlas lint and apply.'
-          fi
-
-      # `atlas migrate lint` is an Atlas Pro feature as of v0.38, so it runs
-      # only once an ATLAS_TOKEN secret exists. Generated migrations are
-      # reviewed by hand either way.
-      - name: Lint migrations
-        if: steps.migrations.outputs.present == 'true' && env.ATLAS_TOKEN != ''
-        working-directory: apps/api
-        run: |
-          atlas login --token "$ATLAS_TOKEN"
-          atlas migrate lint --env ci --latest 1
-
       - name: Apply migrations to a fresh database
-        if: steps.migrations.outputs.present == 'true'
         working-directory: apps/api
-        run: atlas migrate apply --env ci
+        run: pnpm db:migrate
 
-      - name: Check generated types are current
+      # drizzle-kit generates ENABLE and CREATE POLICY from pgPolicy, but not
+      # FORCE, roles or grants - those are hand-authored, so nothing diffs them.
+      - name: Verify RLS coverage
+        working-directory: apps/api
+        run: pnpm db:verify-rls
+
+      # The schema is the source of truth for types, so there is no codegen to
+      # drift. This catches a schema edit committed without its migration.
+      - name: Check migrations are current
         working-directory: apps/api
         run: |
-          pnpm db:types
-          git diff --exit-code src/database/database.types.ts \
-            || { echo "::error::database.types.ts is stale - run 'pnpm --filter api db:types' and commit"; exit 1; }
+          pnpm db:generate
+          git diff --exit-code db/migrations \
+            || { echo "::error::A schema change has no migration - run 'pnpm --filter api db:generate' and commit"; exit 1; }
 
   build:
     name: Build images
@@ -134,15 +121,23 @@ jobs:
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
             git pull --ff-only
-            docker compose -f docker/compose.yml build
-            # Migrations run before the new code starts serving. The api image
-            # carries no Atlas binary, so Atlas runs from its own image on the
-            # stack's network.
+            # apps/api/.env is the only env file. Compose needs it passed
+            # explicitly - on its own it would look for docker/.env, which no
+            # longer exists - and the shell needs it for DATABASE_ADMIN_URL,
+            # which compose deliberately blanks for the api and worker.
+            COMPOSE="docker compose --env-file apps/api/.env -f docker/compose.yml"
+            $COMPOSE build
+            # Migrations run before the new code starts serving, as the owner.
             set -a; . ./apps/api/.env; set +a
-            if [ -n "$(find apps/api/db/migrations -maxdepth 1 -name '*.sql' -print -quit)" ]; then
-              docker run --rm --network app_default \
-                -v "$PWD/apps/api/db/migrations:/migrations" \
-                arigaio/atlas:latest migrate apply --dir file:///migrations --url "$DATABASE_URL"
+            # DATABASE_URL is the app's restricted role and cannot create tables,
+            # so fail clearly rather than letting `set -u` report an unbound
+            # variable halfway through a deploy.
+            if [ -z "${DATABASE_ADMIN_URL:-}" ]; then
+              echo "DATABASE_ADMIN_URL is not set in apps/api/.env - migrations cannot run." >&2
+              exit 1
             fi
-            docker compose -f docker/compose.yml up -d --remove-orphans
+            $COMPOSE run --rm \
+              -e DATABASE_ADMIN_URL="$DATABASE_ADMIN_URL" \
+              api node scripts/migrate.mjs
+            $COMPOSE up -d --remove-orphans
             docker image prune -f

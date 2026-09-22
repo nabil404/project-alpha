@@ -1,7 +1,28 @@
-# Production stack on the single VPS. Staging runs this same file with a
-# separate env file and project name:
-#   docker compose -p app-staging --env-file .env.staging -f docker/compose.yml up -d
+# Production stack on the single VPS.
+#
+# apps/api/.env is the repo's only env file, and compose needs it passed
+# explicitly - without --env-file it would look for docker/.env instead:
+#   docker compose --env-file apps/api/.env -f docker/compose.yml up -d
+#
+# Staging runs this same file with a separate env file and project name:
+#   docker compose -p app-staging --env-file apps/api/.env.staging -f docker/compose.yml up -d
 name: app
+
+# apps/api/.env is authored for the host, where localhost is Postgres and Redis;
+# in here localhost is the container itself. It also carries stack secrets the
+# app must never see. Both are corrected below - environment wins over env_file.
+x-app-env: &app-env
+  DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD}@postgres:5432/${POSTGRES_DB:-app}
+  REDIS_URL: redis://redis:6379
+  APP_URL: https://${DOMAIN:?set DOMAIN}
+  # The owner connection and the bootstrap secrets: schema tooling and postgres
+  # only. AGENTS.md: the api and worker must never receive the admin URL.
+  DATABASE_ADMIN_URL: ''
+  POSTGRES_USER: ''
+  POSTGRES_PASSWORD: ''
+  POSTGRES_DB: ''
+  APP_RUNTIME_PASSWORD: ''
+  DOMAIN: ''
 
 services:
   caddy:
@@ -37,6 +58,7 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     env_file: [../apps/api/.env]
+    environment: *app-env
     command: ['node', 'dist/main.js']
     depends_on:
       postgres: { condition: service_healthy }
@@ -59,6 +81,7 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     env_file: [../apps/api/.env]
+    environment: *app-env
     command: ['node', 'dist/worker.js']
     depends_on:
       postgres: { condition: service_healthy }
@@ -71,8 +94,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-app}
+      # Restricted role for the api and worker. Unset on an already-provisioned
+      # server, where the role is created by migration and given a password by
+      # hand instead - see apps/api/.env.example.
+      APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Runs only when the volume is empty, i.e. on a first-time provision.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app}']
       interval: 10s

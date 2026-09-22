@@ -23,5 +23,12 @@ export default tseslint.config(
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
+  {
+    // Standalone CLI scripts: run by node, not bundled into the app. Reporting
+    // to stdout is their purpose, and they never touch a token.
+    files: ['apps/api/scripts/**/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    rules: { 'no-console': 'off' },
+  },
   prettier,
 );

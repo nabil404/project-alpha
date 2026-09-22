@@ -1,5 +1,11 @@
 # Local dependencies only: the api, worker, and SPA run on the host with
-# `pnpm dev`. Atlas starts its own throwaway database over the Docker socket.
+# `pnpm dev`. drizzle-kit diffs against snapshots, so it needs no database.
+#
+# Interpolated from apps/api/.env, the repo's only env file, so the credentials
+# Postgres is created with and the ones the app connects with cannot drift
+# apart. Compose has to be told where that file is - use `pnpm dev:up` /
+# `pnpm dev:down`, or:
+#   docker compose --env-file apps/api/.env -f docker/compose.dev.yml up -d
 name: app-dev
 
 services:
@@ -7,13 +13,19 @@ services:
     image: postgres:17-alpine
     ports: ['5432:5432']
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: app
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      # The api and worker connect as this restricted role so that row-level
+      # security applies to them; the owner above is a superuser and bypasses it.
+      APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD}
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+      # Runs only on a fresh volume. After a `docker compose down -v` the role is
+      # recreated automatically; on an existing volume, see apps/api/.env.example.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U app']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app}']
       interval: 5s
       timeout: 5s
       retries: 10

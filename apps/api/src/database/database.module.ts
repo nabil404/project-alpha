@@ -1,11 +1,11 @@
 import { Global, Module, type OnModuleDestroy } from '@nestjs/common';
-import { Kysely, PostgresDialect } from 'kysely';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { AppConfig } from '../config/app.config.js';
-import type { DB } from './database.types.js';
+import * as schema from './schema/index.js';
 
 export const DATABASE = Symbol('DATABASE');
-export type Database = Kysely<DB>;
+export type Database = NodePgDatabase<typeof schema>;
 
 @Global()
 @Module({
@@ -14,6 +14,9 @@ export type Database = Kysely<DB>;
       provide: DATABASE,
       inject: [AppConfig],
       useFactory: (config: AppConfig): Database => {
+        // DATABASE_URL is the restricted, non-superuser role, so row-level
+        // security applies to it. Schema tooling uses DATABASE_ADMIN_URL and
+        // never reaches this provider.
         const pool = new Pool({
           connectionString: config.get('DATABASE_URL'),
           max: config.get('DATABASE_POOL_MAX'),
@@ -25,7 +28,7 @@ export type Database = Kysely<DB>;
           ].join(' '),
         });
 
-        return new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+        return drizzle(pool, { schema });
       },
     },
   ],
@@ -35,6 +38,6 @@ export class DatabaseModule implements OnModuleDestroy {
   constructor() {}
 
   async onModuleDestroy(): Promise<void> {
-    // Kysely owns the pool; Nest disposes it through the provider's lifetime.
+    // Drizzle owns the pool; Nest disposes it through the provider's lifetime.
   }
 }

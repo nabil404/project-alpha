@@ -1,18 +1,26 @@
 import { betterAuth } from 'better-auth';
+import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { organization } from 'better-auth/plugins';
-import { Kysely, PostgresDialect } from 'kysely';
-import type { DB } from '../database/database.types.js';
-import { Pool } from 'pg';
+import type { Database } from '../database/database.module.js';
+import * as schema from '../database/schema/index.js';
 
 /**
- * Sessions and users live in our own Postgres. Better Auth uses Kysely
- * natively and shares the API's pool at runtime; this standalone instance
- * exists so the Better Auth CLI can generate SQL into the auth section of
- * db/schema.sql.
+ * Sessions and users live in our own Postgres. Better Auth shares the API's
+ * Drizzle instance, so it queries as the restricted runtime role and needs
+ * GRANTs on its own tables (see db/migrations, the rls_runtime_role migration).
+ *
+ * Its tables carry no merchantId and must never get an RLS policy: the session
+ * lookup runs before any merchant context exists, so a policy there would lock
+ * out login itself.
+ *
+ * Their schema is generated into src/database/schema/auth.ts by
+ * `pnpm --filter api db:auth-schema` and flows through drizzle-kit like any
+ * other table, so auth changes are versioned and reviewed rather than applied
+ * out of band.
  */
-export function createAuth(db: Kysely<DB>) {
+export function createAuth(db: Database) {
   return betterAuth({
-    database: { db, type: 'postgres' },
+    database: drizzleAdapter(db, { provider: 'pg', schema }),
     baseURL: process.env.APP_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     emailAndPassword: {
@@ -45,12 +53,3 @@ export function createAuth(db: Kysely<DB>) {
     plugins: [organization()],
   });
 }
-
-/** Entry point for `better-auth generate`. */
-export const auth = createAuth(
-  new Kysely<DB>({
-    dialect: new PostgresDialect({
-      pool: new Pool({ connectionString: process.env.DATABASE_URL }),
-    }),
-  }),
-);

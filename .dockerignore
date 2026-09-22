@@ -1,0 +1,26 @@
+# The build stage copies whole app directories, so keep the context lean and,
+# above all, keep apps/api/.env - the repo's only env file, carrying every
+# secret - out of every image layer.
+.env
+.env.*
+!.env.example
+
+node_modules
+**/node_modules
+dist
+**/dist
+build
+coverage
+*.tsbuildinfo
+
+.git
+.github
+.claude
+docs
+*.md
+.DS_Store
+*.log
+caddy_data
+caddy_config
+backups
+dump.rdb
