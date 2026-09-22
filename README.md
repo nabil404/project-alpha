@@ -39,8 +39,14 @@ pnpm --filter api db:apply                # apply
 pnpm --filter api db:types                # regenerate database.types.ts, commit it
 ```
 
+`apps/api/src/database/database.types.ts` is generated: never edit it by hand.
 CI applies every migration to a fresh Postgres, reruns codegen, and fails on
 type drift.
+
+`atlas migrate lint` is an Atlas Pro feature as of v0.38, so `pnpm --filter api
+db:lint` needs `atlas login`. CI runs the lint step only when an `ATLAS_TOKEN`
+repository secret is set, and skips both Atlas steps entirely until the first
+migration exists. Generated migrations are reviewed by hand either way.
 
 ## Environments
 

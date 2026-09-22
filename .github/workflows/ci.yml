@@ -36,6 +36,8 @@ jobs:
     env:
       DATABASE_URL: postgres://app:app@localhost:5432/app
       REDIS_URL: redis://localhost:6379
+      # Set this secret to enable `atlas migrate lint`; see the step below.
+      ATLAS_TOKEN: ${{ secrets.ATLAS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -54,10 +56,29 @@ jobs:
 
       # Atlas needs Docker for its dev database; the runner provides it.
       - uses: ariga/setup-atlas@v0
+
+      - name: Check for migrations
+        id: migrations
+        run: |
+          if [ -n "$(find apps/api/db/migrations -maxdepth 1 -name '*.sql' -print -quit)" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'No migrations yet - skipping Atlas lint and apply.'
+          fi
+
+      # `atlas migrate lint` is an Atlas Pro feature as of v0.38, so it runs
+      # only once an ATLAS_TOKEN secret exists. Generated migrations are
+      # reviewed by hand either way.
       - name: Lint migrations
+        if: steps.migrations.outputs.present == 'true' && env.ATLAS_TOKEN != ''
         working-directory: apps/api
-        run: atlas migrate lint --env ci --latest 1
+        run: |
+          atlas login --token "$ATLAS_TOKEN"
+          atlas migrate lint --env ci --latest 1
+
       - name: Apply migrations to a fresh database
+        if: steps.migrations.outputs.present == 'true'
         working-directory: apps/api
         run: atlas migrate apply --env ci
 
@@ -114,7 +135,14 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             git pull --ff-only
             docker compose -f docker/compose.yml build
-            # Migrations run before the new code starts serving.
-            docker compose -f docker/compose.yml run --rm api sh -c 'cd /app/apps/api && atlas migrate apply --env ci'
+            # Migrations run before the new code starts serving. The api image
+            # carries no Atlas binary, so Atlas runs from its own image on the
+            # stack's network.
+            set -a; . ./apps/api/.env; set +a
+            if [ -n "$(find apps/api/db/migrations -maxdepth 1 -name '*.sql' -print -quit)" ]; then
+              docker run --rm --network app_default \
+                -v "$PWD/apps/api/db/migrations:/migrations" \
+                arigaio/atlas:latest migrate apply --dir file:///migrations --url "$DATABASE_URL"
+            fi
             docker compose -f docker/compose.yml up -d --remove-orphans
             docker image prune -f
