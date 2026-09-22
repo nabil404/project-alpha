@@ -1,20 +1,14 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Post,
-  Query,
-  Req,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Controller, Get, Headers, HttpCode, Post, Query, Req } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import {
+  CodedBadRequestException,
+  CodedUnauthorizedException,
+} from '../../common/errors/coded-exceptions.js';
 import { AppConfig } from '../../config/app.config.js';
 import { MESSENGER_QUEUE, type InboundMessageJob } from '../queue/queue.constants.js';
 import { verifyMetaSignature } from './signature.js';
-import { parseInboundJobs } from './webhook-payload.js';
+import { parseInboundJobs, parseWebhookBody } from './webhook-payload.js';
 import type { RawBodyRequest } from './raw-body.js';
 
 /**
@@ -35,7 +29,10 @@ export class MessengerController {
     @Query('hub.challenge') challenge: string,
   ): string {
     if (mode !== 'subscribe' || token !== this.config.get('META_VERIFY_TOKEN')) {
-      throw new UnauthorizedException();
+      throw new CodedUnauthorizedException(
+        'WEBHOOK_VERIFICATION_FAILED',
+        'Webhook verification failed',
+      );
     }
     return challenge;
   }
@@ -48,14 +45,22 @@ export class MessengerController {
   ): Promise<string> {
     const rawBody = request.rawBody;
     if (!rawBody) {
-      throw new BadRequestException('Missing raw body');
+      throw new CodedBadRequestException('WEBHOOK_MISSING_RAW_BODY', 'Missing raw body');
     }
 
     if (!verifyMetaSignature(rawBody, signature, this.config.get('META_APP_SECRET'))) {
-      throw new UnauthorizedException('Invalid signature');
+      throw new CodedUnauthorizedException('WEBHOOK_INVALID_SIGNATURE', 'Invalid signature');
     }
 
-    for (const job of parseInboundJobs(JSON.parse(rawBody.toString('utf8')))) {
+    const payload = parseWebhookBody(rawBody);
+    if (!payload) {
+      throw new CodedBadRequestException(
+        'WEBHOOK_MALFORMED_PAYLOAD',
+        'Webhook body is not a JSON object',
+      );
+    }
+
+    for (const job of parseInboundJobs(payload)) {
       await this.queue.add('inbound-message', job, { jobId: job.messageId });
     }
 

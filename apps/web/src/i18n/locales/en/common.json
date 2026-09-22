@@ -1,0 +1,52 @@
+{
+  "actions": {
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "save": "Save"
+  },
+  "app": {
+    "title": "Orders"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again."
+  },
+  "nav": {
+    "catalog": "Catalog",
+    "orders": "Orders"
+  },
+  "status": {
+    "conversation": {
+      "abandoned": "Abandoned",
+      "awaiting_confirmation": "Awaiting confirmation",
+      "browsing": "Browsing",
+      "collecting_details": "Collecting details",
+      "confirmed": "Confirmed",
+      "handed_off": "Handed off"
+    },
+    "intent": {
+      "ask_question": "Question",
+      "browse": "Browsing",
+      "complain": "Complaint",
+      "edit_order": "Order edit",
+      "order": "Order",
+      "other": "Other",
+      "request_human": "Wants a human"
+    },
+    "messageDirection": {
+      "inbound": "Customer",
+      "outbound": "Page"
+    },
+    "order": {
+      "cancelled": "Cancelled",
+      "confirmed": "Confirmed",
+      "delivered": "Delivered",
+      "new": "New",
+      "packed": "Packed",
+      "shipped": "Shipped"
+    },
+    "stock": {
+      "in_stock": "In stock",
+      "out_of_stock": "Out of stock"
+    }
+  }
+}

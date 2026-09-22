@@ -1,5 +1,6 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
+import { CodedForbiddenException } from './errors/coded-exceptions.js';
 
 export interface TenantRequest extends Request {
   merchantId?: string;
@@ -18,7 +19,10 @@ export class TenantGuard implements CanActivate {
     const merchantId = request.session?.activeOrganizationId;
 
     if (!merchantId) {
-      throw new ForbiddenException('No active merchant for this session');
+      throw new CodedForbiddenException(
+        'TENANT_NO_ACTIVE_MERCHANT',
+        'No active merchant for this session',
+      );
     }
 
     request.merchantId = merchantId;

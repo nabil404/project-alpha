@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
+import { configureApp } from './bootstrap.js';
 import { AppConfig } from './config/config.module.js';
 
 async function bootstrap(): Promise<void> {
@@ -11,8 +12,9 @@ async function bootstrap(): Promise<void> {
     rawBody: true,
   });
 
-  app.useLogger(app.get(Logger));
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  const logger = app.get(Logger);
+  app.useLogger(logger);
+  configureApp(app, logger);
   app.enableShutdownHooks();
 
   const config = app.get(AppConfig);

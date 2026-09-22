@@ -1,4 +1,4 @@
-import { parseInboundJobs } from './webhook-payload.js';
+import { parseInboundJobs } from '../webhook-payload.js';
 
 describe('parseInboundJobs', () => {
   it('maps a customer message to a job keyed by the Meta message ID', () => {

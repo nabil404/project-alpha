@@ -36,3 +36,17 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
   }
   return jobs;
 }
+
+/**
+ * A body that passed HMAC verification but isn't a JSON object is Meta sending
+ * something we don't understand, not a fault on our side. Parsing defensively
+ * here keeps it a 400 instead of an unhandled SyntaxError and a 500.
+ */
+export function parseWebhookBody(raw: Buffer): MetaWebhookBody | null {
+  try {
+    const parsed: unknown = JSON.parse(raw.toString('utf8'));
+    return typeof parsed === 'object' && parsed !== null ? (parsed as MetaWebhookBody) : null;
+  } catch {
+    return null;
+  }
+}
