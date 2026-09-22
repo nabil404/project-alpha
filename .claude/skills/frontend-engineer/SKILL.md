@@ -297,10 +297,8 @@ The rules, for whenever that happens:
 
 ## Related skills
 
-- **`backend-engineer`** — ⚠️ **currently stale.** It describes a TypeORM +
-  Postgres-RLS multi-tenant marketplace; this API is NestJS + Kysely + Atlas with
-  `merchant_id` scoping and a tenant guard. Until it is rewritten, treat
-  `AGENTS.md` as the authority for API contracts and data rules.
+- **`backend-engineer`** — `apps/api`, which serves these endpoints and owns the
+  error envelope, the shared Zod schemas and the `merchant_id` scoping rules.
 - **`rest-api-design`** — the endpoint shapes `features/*/queries.ts` calls
   against.
 

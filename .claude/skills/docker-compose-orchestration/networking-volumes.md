@@ -18,7 +18,7 @@ services:
 ### Custom Bridge Networks
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   frontend:
@@ -29,20 +29,20 @@ services:
   backend:
     image: api-server
     networks:
-      - public    # Accessible from frontend
-      - private   # Accessible from database
+      - public # Accessible from frontend
+      - private # Accessible from database
 
   database:
     image: postgres
     networks:
-      - private   # Isolated from frontend
+      - private # Isolated from frontend
 
 networks:
   public:
     driver: bridge
   private:
     driver: bridge
-    internal: true  # No internet access
+    internal: true # No internet access
 ```
 
 ### Network Aliases
@@ -69,7 +69,7 @@ networks:
 services:
   app:
     image: myapp
-    network_mode: "host"  # Use host network stack
+    network_mode: 'host' # Use host network stack
     # No port mapping needed, uses host ports directly
 ```
 
@@ -87,7 +87,7 @@ networks:
         - subnet: 172.28.0.0/16
           gateway: 172.28.0.1
     labels:
-      - "com.example.description=Custom network"
+      - 'com.example.description=Custom network'
 ```
 
 ## Volume Management
@@ -95,18 +95,18 @@ networks:
 ### Named Volumes
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   db:
     image: postgres:15
     volumes:
-      - postgres-data:/var/lib/postgresql/data  # Named volume
+      - postgres-data:/var/lib/postgresql/data # Named volume
 
   backup:
     image: postgres:15
     volumes:
-      - postgres-data:/backup:ro  # Read-only mount
+      - postgres-data:/backup:ro # Read-only mount
     command: pg_dump -U postgres > /backup/dump.sql
 
 volumes:
@@ -149,7 +149,7 @@ services:
       - type: tmpfs
         target: /app/cache
         tmpfs:
-          size: 1000000000  # 1GB
+          size: 1000000000 # 1GB
 ```
 
 ### Volume Sharing Between Services
@@ -182,19 +182,19 @@ volumes:
   data:
     driver: local
     driver_opts:
-      type: "nfs"
-      o: "addr=10.40.0.199,nolock,soft,rw"
-      device: ":/docker/example"
+      type: 'nfs'
+      o: 'addr=10.40.0.199,nolock,soft,rw'
+      device: ':/docker/example'
 
   cache:
     driver: local
     driver_opts:
       type: tmpfs
       device: tmpfs
-      o: "size=100m,uid=1000"
+      o: 'size=100m,uid=1000'
 
   external-volume:
-    external: true  # Volume created outside Compose
+    external: true # Volume created outside Compose
     name: my-existing-volume
 ```
 
@@ -207,7 +207,7 @@ services:
   web:
     image: nginx
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -221,7 +221,7 @@ services:
   postgres:
     image: postgres:15
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -230,7 +230,7 @@ services:
   mysql:
     image: mysql:8
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -238,7 +238,7 @@ services:
   mongodb:
     image: mongo:6
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -251,7 +251,7 @@ services:
   app:
     build: ./app
     healthcheck:
-      test: ["CMD", "node", "healthcheck.js"]
+      test: ['CMD', 'node', 'healthcheck.js']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -260,7 +260,8 @@ services:
   api:
     build: ./api
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"]
+      test:
+        ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -291,14 +292,14 @@ services:
     image: nginx
     depends_on:
       db:
-        condition: service_healthy  # Wait for health check
+        condition: service_healthy # Wait for health check
       redis:
-        condition: service_started  # Wait for start only
+        condition: service_started # Wait for start only
 
   db:
     image: postgres:15
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
       timeout: 5s
       retries: 5

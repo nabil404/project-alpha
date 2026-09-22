@@ -23,7 +23,7 @@ paths:
             type: integer
             default: 20
       responses:
-        "200":
+        '200':
           description: Successful response
           content:
             application/json:
@@ -33,7 +33,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/User"
+                      $ref: '#/components/schemas/User'
 
     post:
       summary: Create a new user
@@ -42,17 +42,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserInput"
+              $ref: '#/components/schemas/UserInput'
       responses:
-        "201":
+        '201':
           description: User created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
-        "400":
+                $ref: '#/components/schemas/User'
+        '400':
           description: Invalid input
-        "409":
+        '409':
           description: Email already exists
 
 components:

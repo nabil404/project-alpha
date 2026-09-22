@@ -113,12 +113,12 @@ services:
   debug:
     image: debug-tools
     profiles:
-      - debug  # Only starts with --profile debug
+      - debug # Only starts with --profile debug
 
   test:
     build: .
     profiles:
-      - test   # Only starts with --profile test
+      - test # Only starts with --profile test
 ```
 
 ```bash

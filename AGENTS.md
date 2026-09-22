@@ -6,6 +6,12 @@ file is the current version; update it here first.
 
 Timeline: 12 weeks, solo developer, Sep 21 – Dec 11, 2026.
 
+Per-app conventions live in `.claude/skills/`: **`backend-engineer`** (`apps/api`
+— Kysely, Atlas, queue, webhooks, LLM), **`frontend-engineer`** (`apps/web` —
+data layer, forms, i18n, Tailwind), **`rest-api-design`** (HTTP surface). Those
+are the authority on _how_; this file is the authority on _what_ and _why_, and
+wins on any conflict.
+
 ## 1. Problem and goal
 
 Sellers on Facebook Pages lose hours in Messenger answering the same questions,
@@ -71,6 +77,9 @@ follow-ups, repeat-customer recognition.
 - Page access tokens and secrets are encrypted at rest and never logged.
 - Every Meta webhook request is signature-verified and deduplicated.
 
+Backend enforcement of these: `.claude/skills/backend-engineer/SKILL.md`
+§"The non-negotiable invariants".
+
 ## 7. Conversation states
 
 `browsing → collecting_details → awaiting_confirmation → confirmed`, plus
@@ -108,43 +117,40 @@ Money is stored as integer minor units (e.g. paisa/cents), never floats or
 
 Principles: self-host where practical on free, open-source libraries; recurring
 costs limited to the VPS, the domain, and pay-per-use LLM calls; all user data
-stays in our own database. Webhook processing is queue-based — acknowledge
-immediately, process in background workers, use the Meta message ID as the job
-ID for deduplication, and hold a row lock on the conversation to keep each
-customer's messages in order. The LLM only parses, with structured JSON output
-(smaller model for intent/routing, larger only for extraction, provider and
-model set through env vars); a deterministic state machine drives the
-conversation and code validates every extracted item against the catalog. LLM
-cost is tracked per conversation. Tests are written alongside features, and the
-evaluation set of real conversations is run after every prompt change.
+stays in our own database. Webhook processing is queue-based and the LLM only
+parses — a deterministic state machine drives the conversation and code validates
+every extracted item against the catalog. LLM cost is tracked per conversation.
+Tests are written alongside features, and the evaluation set of real
+conversations is run after every prompt change. The mechanics of both are in
+`backend-engineer` (§"Queue and worker", §"LLM boundaries").
 
 ### Chosen stack
 
-| Area                | Decision                                                                                                                                                                                                                                                                            |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend             | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`.                                                                                                                                                                                         |
-| Frontend            | React (Vite SPA), React Router or TanStack Router, TanStack Query, Tailwind, shadcn/ui, react-hook-form.                                                                                                                                                                            |
-| Repo                | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`.                                                                                                                                                                        |
-| Validation          | Zod schemas in `packages/shared` for API input, forms, and LLM output.                                                                                                                                                                                                              |
-| Database            | Postgres + Kysely, exact version pinned (pre-1.0; read release notes before upgrading). Global NestJS `DatabaseModule`; Better Auth shares the same pool.                                                                                                                           |
-| Schema & migrations | One sectioned `apps/api/db/schema.sql` as desired state, migrations in `apps/api/db/migrations/`, config in `apps/api/atlas.hcl`. Atlas (`migrate diff` / `lint` / `apply`) is the only tool that changes the schema; generated migrations are always reviewed, especially renames. |
-| Types               | kysely-codegen generates `apps/api/src/database/database.types.ts` from the migrated database. CI applies migrations to a fresh Postgres, reruns codegen, and fails on drift.                                                                                                       |
-| Message ordering    | Kysely `.forUpdate()` on the conversation row inside a short transaction.                                                                                                                                                                                                           |
-| Queue               | BullMQ + Redis (`noeviction`, AOF persistence). Bull Board behind the auth guard.                                                                                                                                                                                                   |
-| Auth                | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy; tenant guard in NestJS.                                                                                                                                                                       |
-| Messenger           | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow.                                                                                                                                                                          |
-| Secrets             | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var.                                                                                                                                                                                                          |
-| LLM                 | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider.                                                                                                                                        |
-| Email               | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes.                                                                                                                                                                                       |
-| Hosting             | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis.                                                                                                                                                                                                             |
-| Reverse proxy       | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages.                                                                                                                                                     |
-| Config & ops        | `@nestjs/config` with Zod-validated env vars, `@nestjs/throttler` (Redis storage), nestjs-pino logs, `@nestjs/terminus` health checks, Uptime Kuma monitoring, Sentry free tier optional.                                                                                           |
-| Backups             | Nightly `pg_dump`, multi-day retention, copied off the server.                                                                                                                                                                                                                      |
-| Server security     | SSH keys only, firewall allowing 80/443/SSH, automatic security updates.                                                                                                                                                                                                            |
-| CI/CD               | GitHub Actions: test, check codegen drift, build images, run `atlas migrate apply`, deploy over SSH. Database scripts run from `apps/api` (e.g. `pnpm --filter api db:types`). Docker is required in CI for Atlas's dev database.                                                   |
-| Local development   | Cloudflare Tunnel for a public HTTPS webhook URL; Docker for Atlas's dev database.                                                                                                                                                                                                  |
-| Testing             | Jest plus an LLM evaluation script; focus on the state machine, tenant isolation, and extraction accuracy.                                                                                                                                                                          |
-| Payments            | Cash on delivery. Payment links after the pilot.                                                                                                                                                                                                                                    |
+| Area                | Decision                                                                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend             | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`.                                                                 |
+| Frontend            | React 19 (Vite SPA), TanStack Router (code-based) + TanStack Query, Tailwind v4 (CSS-first), shadcn/ui (not initialized), react-hook-form, react-i18next.   |
+| Repo                | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`.                                                |
+| Validation          | Zod schemas in `packages/shared` for API input, forms, and LLM output.                                                                                      |
+| Database            | Postgres + Kysely, exact version pinned (pre-1.0; read release notes before upgrading). Global NestJS `DatabaseModule`; Better Auth shares the same pool.   |
+| Schema & migrations | Sectioned `apps/api/db/schema.sql` as desired state, migrations in `db/migrations/`, config in `atlas.hcl`. Atlas owns every change.                        |
+| Types               | kysely-codegen generates `apps/api/src/database/database.types.ts` from the migrated database; never hand-edited. CI fails on drift.                        |
+| Message ordering    | Kysely `.forUpdate()` on the conversation row inside a short transaction.                                                                                   |
+| Queue               | BullMQ + Redis (`noeviction`, AOF persistence).                                                                                                             |
+| Auth                | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy; tenant guard in NestJS.                                               |
+| Messenger           | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow.                                                  |
+| Secrets             | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var.                                                                                  |
+| LLM                 | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider.                |
+| Email               | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes.                                                               |
+| Hosting             | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis.                                                                                     |
+| Reverse proxy       | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages.                             |
+| Config & ops        | `@nestjs/config` + Zod-validated env, `@nestjs/throttler` (Redis), nestjs-pino, `@nestjs/terminus` health checks, Uptime Kuma, Sentry optional.             |
+| Backups             | Nightly `pg_dump`, multi-day retention, copied off the server.                                                                                              |
+| Server security     | SSH keys only, firewall allowing 80/443/SSH, automatic security updates.                                                                                    |
+| CI/CD               | GitHub Actions: lint, typecheck, test, codegen-drift check, build images, `atlas migrate apply`, deploy over SSH. Docker required for Atlas's dev database. |
+| Local development   | Cloudflare Tunnel for a public HTTPS webhook URL; Docker for Atlas's dev database.                                                                          |
+| Testing             | Jest in `apps/api`, Vitest in `apps/web` when its first test lands, plus an LLM evaluation script.                                                          |
+| Payments            | Cash on delivery. Payment links after the pilot.                                                                                                            |
 
 ### Database rules
 
@@ -156,17 +162,16 @@ evaluation set of real conversations is run after every prompt change.
 - Postgres lock_timeout and idle_in_transaction_session_timeout are set. BullMQ worker concurrency stays at or below the worker's pool size.
 - jsonb columns are parsed with Zod on read. Counts and bigint values are converted from strings explicitly.
 
+Worked examples, the executor pattern, and the two-merchant test shape:
+`backend-engineer` §"⚠️ Tenancy" and §"Database: Kysely and Atlas".
+
 ### Considered and not chosen
 
-CrewAI (Python-only, multi-agent overhead), Clerk (user data stored
-externally), Keycloak (separate Java server to operate, higher RAM), Passport
-(session assumptions clash with our design, limited strategy maintenance),
-Arctic (deprecated by its author), pg-boss (BullMQ preferred), Prisma (replaced
-by Kysely for SQL control, built-in row locking, and native Better Auth
-support), TypeORM (Better Auth support only through a small community adapter),
-per-module schema files (extra build step and ordering file; one sectioned
-`schema.sql` is enough), Next.js (unneeded server layer once NestJS owns the
-backend), Anthropic SDK alone (replaced by AI SDK for provider independence).
+Eleven alternatives were evaluated and rejected — CrewAI, Clerk, Keycloak,
+Passport, Arctic, pg-boss, Prisma, TypeORM, per-module schema files, Next.js,
+and the Anthropic SDK alone. Reasons are in
+[docs/decisions.md](docs/decisions.md); read it before proposing any of them
+again.
 
 ## 11. Meta requirements
 
@@ -195,8 +200,11 @@ orders; signup → first connected Page under 10 minutes.
 - `pnpm --filter api db:hash` — rehash after a reviewed migration edit.
 - `pnpm --filter api db:auth-schema` — regenerate Better Auth SQL, then paste
   it into the auth section of `schema.sql`.
-- `apps/web` has no tests yet; `apps/api` Jest runs as ESM
-  (`--experimental-vm-modules`).
+- `apps/web` and `packages/shared` have no test runner yet; `apps/api` Jest runs
+  as ESM (`--experimental-vm-modules`), configured in `apps/api/jest.config.mjs`.
+- `pnpm --filter @app/shared build` after changing a shared schema — `apps/api`
+  tests and typecheck resolve `@app/shared` through its built `dist`, and CI
+  builds it before lint, typecheck and test.
 
 ## Conventions for Claude Code
 
@@ -211,6 +219,19 @@ orders; signup → first connected Page under 10 minutes.
   Throw a `Coded*Exception` from `apps/api/src/common/errors/`, never a bare NestJS
   exception; the contract is in
   `.claude/skills/rest-api-design/references/response-formats.md`.
+- Every relative import ends in `.js` (`"type": "module"` on NodeNext), including
+  inside specs and when the file on disk is `.ts`.
+- Adding a member to a `@app/shared` enum is a three-file change. A new
+  `ErrorCode` in `packages/shared/src/errors/codes.ts` also needs an entry in
+  `apps/web/src/i18n/error-keys.ts` and a string in
+  `apps/web/src/i18n/locales/en/errors.json`; likewise for order statuses,
+  conversation states and stock statuses against `status-keys.ts` and
+  `common.json`. The maps are `satisfies Record<Enum, ParseKeys<ns>>`, so a
+  missing entry fails `pnpm --filter web typecheck`, not runtime.
+- No user-facing string is hardcoded in `apps/web` JSX — copy resolves through
+  `t()`, money and dates through `useFormatters()` in `src/lib/format.ts`, which
+  delegates to `formatMinorUnits` from `@app/shared`. `packages/shared` must
+  never import i18next; the locale crosses that boundary as a BCP-47 string.
 - Tests live in a colocated `__tests__/` directory, never as a sibling file.
   This applies to both apps.
 - Project instructions live in `AGENTS.md` only. Do not create `CLAUDE.md` or

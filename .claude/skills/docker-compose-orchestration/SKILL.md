@@ -11,33 +11,33 @@ Docker Compose declares a multi-container application stack in YAML: services (c
 ## Core Concepts
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
-services:      # Individual containers and their configuration
+services: # Individual containers and their configuration
   service-name:
-    image: postgres:15-alpine       # or `build:` for a Dockerfile
+    image: postgres:15-alpine # or `build:` for a Dockerfile
     ports:
-      - "5432:5432"                 # host:container
+      - '5432:5432' # host:container
     environment:
       - KEY=value
     volumes:
-      - named-volume:/data          # persistent, or ./local:/path for bind mount
+      - named-volume:/data # persistent, or ./local:/path for bind mount
     networks:
       - backend
     depends_on:
       other-service:
-        condition: service_healthy  # wait for health check, not just start
+        condition: service_healthy # wait for health check, not just start
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
       timeout: 5s
       retries: 5
 
-networks:      # Communication channels between services
+networks: # Communication channels between services
   backend:
     driver: bridge
 
-volumes:        # Persistent storage and data sharing
+volumes: # Persistent storage and data sharing
   named-volume:
     driver: local
 ```

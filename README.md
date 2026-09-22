@@ -1,7 +1,7 @@
 # Messenger-to-Order
 
 Turns Facebook/Messenger conversations into confirmed orders. Project context,
-non-negotiable rules, and database rules live in [CLAUDE.md](./CLAUDE.md).
+non-negotiable rules, and database rules live in [AGENTS.md](./AGENTS.md).
 
 ## Layout
 

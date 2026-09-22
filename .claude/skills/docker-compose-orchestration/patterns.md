@@ -7,7 +7,7 @@ Full compose examples for common architectures. Adapt service names, ports, and 
 **Scenario:** React frontend + Node.js backend + PostgreSQL database + Redis cache
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   # Frontend React Application
@@ -17,13 +17,13 @@ services:
       dockerfile: Dockerfile
       target: development
     ports:
-      - "3000:3000"
+      - '3000:3000'
     volumes:
       - ./frontend/src:/app/src
       - /app/node_modules
     environment:
       - REACT_APP_API_URL=http://localhost:4000/api
-      - CHOKIDAR_USEPOLLING=true  # For hot reload
+      - CHOKIDAR_USEPOLLING=true # For hot reload
     networks:
       - frontend
     depends_on:
@@ -35,8 +35,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "4000:4000"
-      - "9229:9229"  # Debugger
+      - '4000:4000'
+      - '9229:9229' # Debugger
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -63,7 +63,7 @@ services:
     container_name: postgres-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - '5432:5432'
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
@@ -74,7 +74,7 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -85,14 +85,14 @@ services:
     container_name: redis-cache
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis-data:/data
     networks:
       - backend
     command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -115,7 +115,7 @@ volumes:
 **Scenario:** Multiple services with reverse proxy, service discovery, and a message broker
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   # NGINX Reverse Proxy
@@ -123,8 +123,8 @@ services:
     image: nginx:alpine
     container_name: reverse-proxy
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
@@ -142,7 +142,7 @@ services:
     build: ./services/auth
     container_name: auth-service
     expose:
-      - "8001"
+      - '8001'
     environment:
       - SERVICE_NAME=auth
       - DATABASE_URL=postgresql://db:5432/auth_db
@@ -154,7 +154,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8001/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -164,7 +164,7 @@ services:
     build: ./services/user
     container_name: user-service
     expose:
-      - "8002"
+      - '8002'
     environment:
       - SERVICE_NAME=user
       - DATABASE_URL=postgresql://db:5432/user_db
@@ -176,7 +176,7 @@ services:
       - auth-service
       - db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8002/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -186,7 +186,7 @@ services:
     build: ./services/order
     container_name: order-service
     expose:
-      - "8003"
+      - '8003'
     environment:
       - SERVICE_NAME=order
       - DATABASE_URL=postgresql://db:5432/order_db
@@ -200,7 +200,7 @@ services:
       - db
       - rabbitmq
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8003/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -218,7 +218,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -228,8 +228,8 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672" # Management UI
+      - '5672:5672' # AMQP
+      - '15672:15672' # Management UI
     environment:
       - RABBITMQ_DEFAULT_USER=admin
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
@@ -238,7 +238,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
       interval: 30s
       timeout: 10s
       retries: 5
@@ -248,7 +248,7 @@ networks:
     driver: bridge
   internal:
     driver: bridge
-    internal: true  # No external access
+    internal: true # No external access
 
 volumes:
   postgres-data:
@@ -260,7 +260,7 @@ volumes:
 **Scenario:** Development setup with live code reloading, debugging, and supporting tools (pgAdmin, MailHog)
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   # Development Frontend
@@ -269,12 +269,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.dev
     ports:
-      - "3000:3000"
-      - "9222:9222"  # Chrome DevTools
+      - '3000:3000'
+      - '9222:9222' # Chrome DevTools
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - /app/.next  # Next.js build cache
+      - /app/.next # Next.js build cache
     environment:
       - NODE_ENV=development
       - WATCHPACK_POLLING=true
@@ -291,8 +291,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile.dev
     ports:
-      - "4000:4000"
-      - "9229:9229"  # Node.js debugger
+      - '4000:4000'
+      - '9229:9229' # Node.js debugger
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -314,7 +314,7 @@ services:
       - POSTGRES_PASSWORD=dev
       - POSTGRES_DB=dev_db
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - dev-db-data:/var/lib/postgresql/data
     networks:
@@ -326,7 +326,7 @@ services:
       - PGADMIN_DEFAULT_EMAIL=admin@dev.local
       - PGADMIN_DEFAULT_PASSWORD=admin
     ports:
-      - "5050:80"
+      - '5050:80'
     networks:
       - dev-network
     depends_on:
@@ -336,8 +336,8 @@ services:
   mailhog:
     image: mailhog/mailhog:latest
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - '1025:1025' # SMTP
+      - '8025:8025' # Web UI
     networks:
       - dev-network
 
@@ -356,7 +356,7 @@ Split configuration across files and merge them with `-f` flags (see commands.md
 ### Base Configuration (compose.yaml)
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   web:
@@ -381,7 +381,7 @@ networks:
 Automatically merged with `compose.yaml` when running `docker compose up` with no `-f` flags.
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   web:
@@ -389,11 +389,11 @@ services:
       context: .
       target: development
     volumes:
-      - ./src:/app/src  # Live code reload
+      - ./src:/app/src # Live code reload
       - /app/node_modules
     ports:
-      - "3000:3000"     # Expose for local access
-      - "9229:9229"     # Debugger port
+      - '3000:3000' # Expose for local access
+      - '9229:9229' # Debugger port
     environment:
       - NODE_ENV=development
       - DEBUG=*
@@ -401,7 +401,7 @@ services:
 
   db:
     ports:
-      - "5432:5432"     # Expose for local tools
+      - '5432:5432' # Expose for local tools
     environment:
       - POSTGRES_PASSWORD=dev
     volumes:
@@ -411,7 +411,7 @@ services:
 ### Production Configuration (compose.prod.yaml)
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   web:
@@ -438,8 +438,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "10m"
-        max-file: "5"
+        max-size: '10m'
+        max-file: '5'
 
   db:
     image: postgres:15-alpine
@@ -460,8 +460,8 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./nginx/prod.conf:/etc/nginx/nginx.conf:ro
       - ssl-certs:/etc/nginx/ssl:ro
@@ -483,7 +483,7 @@ volumes:
 ### Staging Configuration (compose.staging.yaml)
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   web:

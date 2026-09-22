@@ -27,6 +27,7 @@ Do not nitpick pure style choices that a linter/formatter already enforces (chec
 ## Severity levels
 
 Tag every finding with one of:
+
 - **Blocker** — bug, security hole, or data-integrity risk; must fix before merge.
 - **Major** — real problem (poor error handling, missing tests for critical path, meaningful maintainability debt); should fix.
 - **Minor** — worth doing but not urgent (naming, small duplication, nice-to-have test).
