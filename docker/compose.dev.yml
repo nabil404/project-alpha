@@ -1,0 +1,30 @@
+# Local dependencies only: the api, worker, and SPA run on the host with
+# `pnpm dev`. Atlas starts its own throwaway database over the Docker socket.
+name: app-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports: ['5432:5432']
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+    command: ['redis-server', '--maxmemory-policy', 'noeviction', '--appendonly', 'yes']
+    volumes:
+      - redis_dev_data:/data
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:

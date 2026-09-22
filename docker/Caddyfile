@@ -1,0 +1,41 @@
+# Automatic HTTPS, SPA on the root, API on the same origin, and the static
+# pages Meta requires for App Review.
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle /health {
+		reverse_proxy api:3000
+	}
+
+	handle /privacy {
+		rewrite * /legal/privacy.html
+		file_server
+	}
+
+	handle /terms {
+		rewrite * /legal/terms.html
+		file_server
+	}
+
+	handle /data-deletion {
+		rewrite * /legal/data-deletion.html
+		file_server
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

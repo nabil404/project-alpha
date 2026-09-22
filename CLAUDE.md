@@ -120,31 +120,31 @@ evaluation set of real conversations is run after every prompt change.
 
 ### Chosen stack
 
-| Area | Decision |
-| --- | --- |
-| Backend | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`. |
-| Frontend | React (Vite SPA), React Router or TanStack Router, TanStack Query, Tailwind, shadcn/ui, react-hook-form. |
-| Repo | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`. |
-| Validation | Zod schemas in `packages/shared` for API input, forms, and LLM output. |
-| Database | Postgres + Kysely, exact version pinned (pre-1.0; read release notes before upgrading). Global NestJS `DatabaseModule`; Better Auth shares the same pool. |
+| Area                | Decision                                                                                                                                                                                                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend             | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`.                                                                                                                                                                                         |
+| Frontend            | React (Vite SPA), React Router or TanStack Router, TanStack Query, Tailwind, shadcn/ui, react-hook-form.                                                                                                                                                                            |
+| Repo                | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`.                                                                                                                                                                        |
+| Validation          | Zod schemas in `packages/shared` for API input, forms, and LLM output.                                                                                                                                                                                                              |
+| Database            | Postgres + Kysely, exact version pinned (pre-1.0; read release notes before upgrading). Global NestJS `DatabaseModule`; Better Auth shares the same pool.                                                                                                                           |
 | Schema & migrations | One sectioned `apps/api/db/schema.sql` as desired state, migrations in `apps/api/db/migrations/`, config in `apps/api/atlas.hcl`. Atlas (`migrate diff` / `lint` / `apply`) is the only tool that changes the schema; generated migrations are always reviewed, especially renames. |
-| Types | kysely-codegen generates `apps/api/src/database/database.types.ts` from the migrated database. CI applies migrations to a fresh Postgres, reruns codegen, and fails on drift. |
-| Message ordering | Kysely `.forUpdate()` on the conversation row inside a short transaction. |
-| Queue | BullMQ + Redis (`noeviction`, AOF persistence). Bull Board behind the auth guard. |
-| Auth | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy; tenant guard in NestJS. |
-| Messenger | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow. |
-| Secrets | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var. |
-| LLM | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider. |
-| Email | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes. |
-| Hosting | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis. |
-| Reverse proxy | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages. |
-| Config & ops | `@nestjs/config` with Zod-validated env vars, `@nestjs/throttler` (Redis storage), nestjs-pino logs, `@nestjs/terminus` health checks, Uptime Kuma monitoring, Sentry free tier optional. |
-| Backups | Nightly `pg_dump`, multi-day retention, copied off the server. |
-| Server security | SSH keys only, firewall allowing 80/443/SSH, automatic security updates. |
-| CI/CD | GitHub Actions: test, check codegen drift, build images, run `atlas migrate apply`, deploy over SSH. Database scripts run from `apps/api` (e.g. `pnpm --filter api db:types`). Docker is required in CI for Atlas's dev database. |
-| Local development | Cloudflare Tunnel for a public HTTPS webhook URL; Docker for Atlas's dev database. |
-| Testing | Jest plus an LLM evaluation script; focus on the state machine, tenant isolation, and extraction accuracy. |
-| Payments | Cash on delivery. Payment links after the pilot. |
+| Types               | kysely-codegen generates `apps/api/src/database/database.types.ts` from the migrated database. CI applies migrations to a fresh Postgres, reruns codegen, and fails on drift.                                                                                                       |
+| Message ordering    | Kysely `.forUpdate()` on the conversation row inside a short transaction.                                                                                                                                                                                                           |
+| Queue               | BullMQ + Redis (`noeviction`, AOF persistence). Bull Board behind the auth guard.                                                                                                                                                                                                   |
+| Auth                | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy; tenant guard in NestJS.                                                                                                                                                                       |
+| Messenger           | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow.                                                                                                                                                                          |
+| Secrets             | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var.                                                                                                                                                                                                          |
+| LLM                 | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider.                                                                                                                                        |
+| Email               | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes.                                                                                                                                                                                       |
+| Hosting             | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis.                                                                                                                                                                                                             |
+| Reverse proxy       | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages.                                                                                                                                                     |
+| Config & ops        | `@nestjs/config` with Zod-validated env vars, `@nestjs/throttler` (Redis storage), nestjs-pino logs, `@nestjs/terminus` health checks, Uptime Kuma monitoring, Sentry free tier optional.                                                                                           |
+| Backups             | Nightly `pg_dump`, multi-day retention, copied off the server.                                                                                                                                                                                                                      |
+| Server security     | SSH keys only, firewall allowing 80/443/SSH, automatic security updates.                                                                                                                                                                                                            |
+| CI/CD               | GitHub Actions: test, check codegen drift, build images, run `atlas migrate apply`, deploy over SSH. Database scripts run from `apps/api` (e.g. `pnpm --filter api db:types`). Docker is required in CI for Atlas's dev database.                                                   |
+| Local development   | Cloudflare Tunnel for a public HTTPS webhook URL; Docker for Atlas's dev database.                                                                                                                                                                                                  |
+| Testing             | Jest plus an LLM evaluation script; focus on the state machine, tenant isolation, and extraction accuracy.                                                                                                                                                                          |
+| Payments            | Cash on delivery. Payment links after the pilot.                                                                                                                                                                                                                                    |
 
 ### Database rules
 
