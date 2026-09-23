@@ -25,6 +25,10 @@ COPY --from=build /app/packages/shared/package.json packages/shared/package.json
 COPY --from=build /app/apps/api/node_modules apps/api/node_modules
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/api/package.json apps/api/package.json
+# Migrations and the migrate script ship with the image so the deploy can apply
+# them without pulling a separate tool onto the server.
+COPY --from=build /app/apps/api/db apps/api/db
+COPY --from=build /app/apps/api/scripts apps/api/scripts
 WORKDIR /app/apps/api
 USER node
 CMD ["node", "dist/main.js"]

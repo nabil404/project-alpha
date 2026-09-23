@@ -14,9 +14,8 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "dev": "pnpm --parallel --filter api --filter web dev",
-    "db:diff": "pnpm --filter api db:diff",
-    "db:apply": "pnpm --filter api db:apply",
-    "db:types": "pnpm --filter api db:types"
+    "dev:up": "docker compose --env-file apps/api/.env -f docker/compose.dev.yml up -d",
+    "dev:down": "docker compose --env-file apps/api/.env -f docker/compose.dev.yml down"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

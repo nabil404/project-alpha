@@ -1,6 +1,6 @@
 ---
 name: backend-engineer
-description: Backend engineering conventions for apps/api, the NestJS API and worker behind the Messenger-to-Order MVP (Kysely, Atlas migrations, BullMQ + Redis, Better Auth, Meta Messenger webhooks, LLM order extraction). Use this skill for ANY backend work — writing a repository or query, changing the schema, adding a module, wiring a queue job, handling a webhook, calling the LLM, or adding config. Trigger it even when the user doesn't name the stack explicitly. Calling the LLM inside a database transaction, or a repository method that forgets merchantId, is a stuck connection pool or a cross-seller data leak rather than a style nit, so consult this before writing code rather than after.
+description: Backend engineering conventions for apps/api, the NestJS API and worker behind the Messenger-to-Order MVP (Drizzle, drizzle-kit migrations, BullMQ + Redis, Better Auth, Meta Messenger webhooks, LLM order extraction). Use this skill for ANY backend work — writing a repository or query, changing the schema, adding a module, wiring a queue job, handling a webhook, calling the LLM, or adding config. Trigger it even when the user doesn't name the stack explicitly. Calling the LLM inside a database transaction, or a repository method that forgets merchantId, is a stuck connection pool or a cross-seller data leak rather than a style nit, so consult this before writing code rather than after.
 ---
 
 # Backend Engineer
@@ -8,7 +8,7 @@ description: Backend engineering conventions for apps/api, the NestJS API and wo
 Backend conventions for **`apps/api`** — the NestJS API and background worker
 behind the Messenger-to-Order MVP. Stack is **NestJS 12 · TypeScript · Postgres
 
-- Kysely · Atlas migrations · BullMQ + Redis · Better Auth · Zod**.
+- Drizzle · drizzle-kit migrations · BullMQ + Redis · Better Auth · Zod**.
 
 `AGENTS.md` at the repo root is the project's source of truth. This skill is the
 backend operating manual; where the two disagree, `AGENTS.md` wins.
@@ -26,8 +26,9 @@ and are marked ⚠️ below.
   **every relative import ends in `.js`** — `./foo.js`, not `./foo` — including
   in tests and including when the file on disk is `.ts`. This is the single
   easiest thing to get wrong.
-- **Kysely is pinned to an exact version** (pre-1.0). Read the release notes
-  before bumping it; minor releases carry breaking type changes.
+- **Drizzle infers types from the schema**, so there is no codegen step and no
+  live database needed to typecheck. A schema edit without its migration is what
+  CI catches, not stale types.
 - The global route prefix is `api`, with `/health` excluded (`src/main.ts`).
 - **There are no business endpoints yet.** The only controllers in the repo are
   health and the Messenger webhook, so there is no existing request → guard →
@@ -37,11 +38,11 @@ and are marked ⚠️ below.
 
 ### This codebase is still greenfield — expect empty files
 
-`db/schema.sql` is eight section headers with **no DDL yet**, `db/migrations/`
-holds only `.gitkeep`, and `src/database/database.types.ts` is literally
-`export interface DB {}`. Kysely's types only appear after the first
-`db:diff` → `db:apply` → `db:types` loop, so until then `DB` is empty and every
-table you reference has to come with the migration that creates it. Don't
+`src/database/schema/` contains only `auth.ts` — Better Auth's seven tables,
+generated, not hand-written. **No business table exists yet**, so every table you
+reference has to come with the schema file and migration that create it. The two
+migrations are `0000_auth_tables` and `0001_rls_runtime_role`; the latter creates
+no table. Don't
 hand-write types to work around this.
 
 ## The non-negotiable invariants
@@ -71,23 +72,39 @@ violates one, stop and fix the design rather than working around it.
   `session.activeOrganizationId` — the Better Auth Organization plugin's active
   org — and puts it on `request.merchantId`. **Never** derive the merchant from
   a body field, query parameter or header: accepting a client-supplied value
-  makes the whole boundary bypassable. One organization per seller for the MVP.
+  makes the whole boundary bypassable.
+
+- **The organization is created at signup**, by `ensureOrganizationForUser`
+  (`src/database/ensure-organization.ts`), called from the `user.create.after`
+  and `session.create.before` hooks in `src/auth/auth.config.ts`. It is
+  idempotent on purpose: `user.create.after` runs after the user row is
+  committed, so a failure there would otherwise strand a seller with no merchant
+  and the guard would answer every one of their requests with
+  `TENANT_NO_ACTIVE_MERCHANT`. The session hook calls the same function, so such
+  an account repairs itself at next login. It locks the seller's `user` row with
+  `.for('update')` before re-checking membership — at READ COMMITTED two racing
+  sign-ins cannot see each other's uncommitted `member` row, and a unique
+  constraint on `member.userId` is not available as a fix because it would
+  forbid the second organization. The MVP ships one organization per seller and
+  no switcher, but the model permits several.
 
 > **Current state — not wired yet.** `TenantGuard` is not registered: there is
 > no `APP_GUARD` binding and no `@UseGuards`, and the only occurrence of the
 > symbol is its own declaration. Nothing populates `request.session` either,
 > because **Better Auth has no HTTP handler mounted** — the `AUTH` provider is
 > built in `src/auth/auth.module.ts` and injected nowhere, so there is no
-> `/api/auth/*` and no session cookie. Wire all three before relying on
-> `request.merchantId`. Until then this section describes the intended
-> mechanism, not a running one.
+> `/api/auth/*` and no session cookie. The organization bootstrap below _is_
+> written and tested, but its hooks only fire on a real signup or session, so
+> nothing exercises them until the handler is mounted. Wire all three before
+> relying on `request.merchantId`. Until then this section describes the
+> intended mechanism, not a running one.
 
 - **The guard is a convenience, not the boundary.** Repositories still take
   `merchantId` explicitly and filter on it. The contract already exists in
   `src/database/base.repository.ts`:
 
 ```ts
-export type Executor = Kysely<DB> | Transaction<DB>;
+export type Executor = Database | Transaction;
 export interface TenantScope {
   merchantId: string;
 }
@@ -102,105 +119,165 @@ predicate is the leak to catch in review.**
   `merchant_id`; composite indexes lead with it (`(merchant_id, created_at)`,
   `(merchant_id, status)`); and **every uniqueness rule includes it** —
   `UNIQUE (merchant_id, sku)`, never a bare global `UNIQUE (sku)`, which is both
-  a cross-seller collision and an information leak.
+  a cross-seller collision and an information leak. Because a seller may hold
+  several organizations, this holds even within one seller: their two shops may
+  legitimately reuse a SKU, and the same person messaging both is correctly two
+  customer rows, so `UNIQUE (merchant_id, psid)` and not `UNIQUE (psid)`.
+
+  **The one deliberate exception is the connected Facebook Page**, which is
+  globally unique — `UNIQUE (page_id)`, with no `merchant_id`. The webhook
+  resolves `pageId → merchant` with no session to go on
+  (`src/modules/messenger/webhook-payload.ts`), so a Page claimed by two tenants
+  has no resolvable owner. Scoping that constraint by merchant would let the
+  second seller connect a Page the first already owns and silently split their
+  conversations. It is the exception, not a missed `merchant_id`.
 
 - **Required test, per AGENTS.md:** two merchants, proving one can never read,
   update, or confirm the other's data. Write it for every repository, not once.
 
-### Row-level security (the hardening layer — not yet active)
+### Row-level security (groundwork in place — policies still to come)
 
-RLS is the chosen defense-in-depth direction on top of the `merchant_id` filter.
-Because no tables exist yet, policies go into the first migration rather than
-being retrofitted. The shape, per business table:
+RLS is the defense-in-depth layer on top of the `merchant_id` filter. The
+machinery it needs now exists; **no policy does**, because no business table
+does. A policy is declared in the schema beside its table (see §"Authoring the
+policies" below) and so ships with the migration that creates it, never
+retrofitted. What that generates, per business table:
 
 ```sql
-ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE orders FORCE  ROW LEVEL SECURITY;
-CREATE POLICY orders_merchant_isolation ON orders
-  USING      (merchant_id = current_setting('app.current_merchant', true)::uuid)
-  WITH CHECK (merchant_id = current_setting('app.current_merchant', true)::uuid);
+ALTER TABLE "order" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "order_merchant_isolation" ON "order" AS PERMISSIVE FOR ALL TO public
+  USING      ("order"."merchant_id" = app_current_merchant())
+  WITH CHECK ("order"."merchant_id" = app_current_merchant());
+-- FORCE is NOT generated - add it in a db:custom migration:
+ALTER TABLE "order" FORCE ROW LEVEL SECURITY;
 ```
 
-> ⚠️ **RLS is inert today. Do not treat a policy as protection until all four
-> prerequisites below are in place — the real boundary is still the
-> application-level `merchant_id` filter.**
->
-> 0. **Auth and session wiring.** Without a session there is no `merchantId` to
->    put in `set_config`, so there is nothing to exercise RLS with. See the
->    current-state note above — this comes first.
-> 1. **The app must stop connecting as a superuser.** Local compose and CI both
->    use `POSTGRES_USER: app`, which is a superuser, and `DATABASE_URL` connects
->    as it. **Superusers bypass RLS unconditionally** — `FORCE` does not change
->    that. (`FORCE` closes the table _owner_ bypass, which is a different
->    thing.) A separate non-superuser runtime role is required — and that means
->    more than `CREATE ROLE`: `GRANT`s on every table **including Better Auth's**,
->    `USAGE` on sequences, and `ALTER DEFAULT PRIVILEGES` so future tables are
->    covered without a manual step each time.
-> 2. **Two connection strings.** Atlas keeps migrating as the owner while the app
->    connects restricted, so `.env.example`, `env.schema.ts`, the dev compose
->    file and CI all follow. Which one keeps the name `DATABASE_URL` is a
->    deliberate choice — `atlas.hcl` reads it today, so either Atlas keeps it and
->    the app gets a new variable, or the reverse. Pick once and be consistent.
-> 3. **A context gate.** The policy reads a transaction-local setting, so
->    something must run `set_config('app.current_merchant', $1, true)` on the
->    same pinned connection as the queries — a small `withMerchant(db, id, fn)`
->    helper wrapping `db.transaction().execute(...)`. It does not exist yet.
->
->    **Consequence worth deciding on deliberately:** `set_config(..., true)` is
->    transaction-local, so the gate must wrap **every business query, reads
->    included** — simple reads that need no transaction today would acquire one.
->    Setting it non-locally instead is not an option: pooled connections are
->    reused, so the value would bleed from one merchant's request into another's.
->    Budget for the extra concurrent transactions against `DATABASE_POOL_MAX` and
->    the already-configured `idle_in_transaction_session_timeout`.
+> ⚠️ **RLS still protects nothing today** — there is no table to protect. The
+> application-level `merchant_id` predicate remains the tenant boundary, and RLS
+> is the backstop for a query that forgets it, never a licence to omit it.
 
-### Authoring the policies (no Atlas Pro needed)
+**What is now in place** (`db/migrations/*_rls_runtime_role.sql`):
 
-**RLS is a plain PostgreSQL feature — free, built in, no vendor.** What _is_
-Pro-gated is only Atlas's ability to diff policies declaratively out of
-`schema.sql`. That splits the schema loop in two:
+- **`app_runtime`, a non-superuser role**, `NOBYPASSRLS`, with `GRANT`s on all
+  tables and sequences plus `ALTER DEFAULT PRIVILEGES` so future tables are
+  covered without a follow-up grant. This is the prerequisite everything else
+  rests on: **a superuser ignores every policy unconditionally**, and `FORCE`
+  does not change that (`FORCE` closes the table _owner_ bypass, a different
+  thing). Connecting as the bootstrap superuser makes every policy silently
+  inert — verified: with `ENABLE` + `FORCE` and no context set, the restricted
+  role sees 0 rows and the superuser sees all of them.
+  The role is created `NOLOGIN` and carries no password. `docker/postgres-init/`
+  gives it one on a fresh volume; on an existing cluster an operator runs
+  `ALTER ROLE app_runtime LOGIN PASSWORD '...'` once. Better Auth's tables need
+  these grants too — but **must never get a policy**: they carry no
+  `merchant_id`, and the session lookup runs before any merchant context exists.
+- **Two connection strings.** `DATABASE_URL` is the application's restricted
+  connection. `DATABASE_ADMIN_URL` is the owner, used only by schema tooling:
+  `db:generate`, `db:migrate`, `db:auth-schema` (via `src/auth/auth.cli.ts`), and the
+  CI deploy step. **Never give the admin URL to the api or worker** — it is
+  deliberately absent from `env.schema.ts` so it cannot be read through
+  `AppConfig`.
+- **`app_current_merchant()`**, the function policies read. **It returns `text`,
+  not `uuid`** — `merchant_id` references `organization(id)`, and the Better Auth
+  Organization plugin generates that id as a random string, so a uuid-returning
+  helper would not type-check against the column it guards. It wraps the setting
+  in `NULLIF(..., '')`, which is load-bearing rather than defensive: a
+  transaction-local `set_config` does not unset the GUC at commit, it reverts to
+  the empty string, so on a pooled connection every query after the first
+  `withMerchant()` sees `''`. Unguarded that is a real value a policy would
+  compare against; wrapped, it is NULL, the predicate is NULL, and the policy
+  exposes no rows. Pinned by `src/database/__tests__/with-merchant.spec.ts`.
+- **`withMerchant(db, merchantId, fn)`** in `src/database/with-merchant.ts` — the
+  context gate. It opens a transaction, runs
+  `set_config('app.current_merchant', $1, true)`, and hands the callback the
+  transaction.
 
-| Concern                        | Path                                                                              |
-| ------------------------------ | --------------------------------------------------------------------------------- |
-| Tables, columns, indexes       | `db/schema.sql` → `pnpm db:diff` (unchanged)                                      |
-| Policies, runtime role, grants | `atlas migrate new rls_<table>` → hand-authored SQL → `pnpm --filter api db:hash` |
+```ts
+await withMerchant(db, merchantId, (tx) => ordersRepo.listForMerchant(tx, { merchantId }));
+```
 
-`atlas migrate new` is the documented route for DDL Atlas doesn't model on the
-free tier (the same one used for triggers and views). Atlas still owns creation,
-ordering, `atlas.sum` integrity, and apply — so this is **not** the "hand-edit a
-generated migration" that `AGENTS.md` forbids.
+> **Two consequences to hold onto.** The setting is transaction-local by
+> necessity — pooled connections are reused, so a session-level value would bleed
+> one merchant's context into another's request — which means **every business
+> query, reads included, runs in a transaction**. Budget against
+> `DATABASE_POOL_MAX` and `idle_in_transaction_session_timeout`. And because it
+> opens a transaction, **never wrap an LLM or Graph API call in it** (invariant
+> #1): read state, call outside, then open it to write.
 
-**The tradeoff:** `schema.sql` stops being the complete desired state, so
-`migrate diff` can no longer detect policy drift. Cover that with a
-**`db:verify-rls` script** — query `pg_class` / `pg_policies` for every table
-carrying a `merchant_id` column and fail if any is missing `ENABLE`, `FORCE`, or
-a policy. Run it after `db:apply` and in CI. It is a backstop that catches a
-forgotten migration; it does not replace writing one.
+**Still open, to decide with the first tables:**
 
-## Database: Kysely and Atlas
+- **The webhook bootstrap path.** A job carries a Page id and must resolve it to
+  a merchant — a read that happens _before_ any merchant context exists, so a
+  policy on `page` would block the very query that establishes the context.
+  Prefer a narrow `SECURITY DEFINER` resolver owned by the schema owner, with
+  `EXECUTE` granted to `app_runtime`, returning only the merchant id. Do **not**
+  write a policy that permits reads when no context is set: that reopens the hole
+  for every table it touches.
+- **Policies themselves**, one per business table, declared in its schema file, plus the `FORCE` that `db:custom` must carry alongside.
 
-- **Atlas is the only tool that changes the schema.** Never hand-edit a
-  _generated_ migration, never apply DDL directly, never reach for a sync/push
-  mode. The loop is: edit `db/schema.sql` → `pnpm db:diff` → **review the
-  migration by hand** (especially renames) → `pnpm --filter api db:lint` →
-  `pnpm db:apply` → `pnpm db:types`.
-  The one sanctioned exception is DDL Atlas does not diff on the free tier —
-  RLS policies, roles, grants — which is authored with `atlas migrate new` and
-  then `pnpm --filter api db:hash`. Atlas still owns ordering, `atlas.sum`
-  integrity, and apply; see the RLS section above.
-- `src/database/database.types.ts` is **generated by kysely-codegen from the
-  migrated database** — never edited by hand. CI applies migrations to a fresh
-  Postgres, reruns codegen, and fails on drift.
-- `db:lint` is an Atlas Pro feature and needs `atlas login`; CI runs it only when
-  an `ATLAS_TOKEN` secret exists. **Hand review is the constant either way.**
-- **Better Auth owns the `user`, `session`, `account` and `verification` tables
-  and the organization tables.** Generate their SQL with
-  `pnpm --filter api db:auth-schema` and paste it into the auth section of
-  `schema.sql` — never hand-write or hand-edit those tables.
+### Authoring the policies
+
+**Policies live in the schema, beside the table they protect.** `pgPolicy` in a
+`pgTable` definition makes drizzle-kit emit `ENABLE ROW LEVEL SECURITY` and
+`CREATE POLICY`, so a table and its isolation rule are never separated:
+
+```ts
+export const order = pgTable(
+  'order',
+  {
+    id: text('id').primaryKey(),
+    merchantId: text('merchant_id')
+      .notNull()
+      .references(() => organization.id),
+  },
+  (table) => [
+    pgPolicy('order_merchant_isolation', {
+      for: 'all',
+      using: sql`${table.merchantId} = app_current_merchant()`,
+      withCheck: sql`${table.merchantId} = app_current_merchant()`,
+    }),
+  ],
+);
+```
+
+**What drizzle-kit does not model**, and so must be hand-authored with
+`pnpm --filter api db:custom`: `FORCE ROW LEVEL SECURITY`, roles, `GRANT`s,
+`ALTER DEFAULT PRIVILEGES`, functions and triggers. `FORCE` is the one to
+remember — drizzle-kit emits `ENABLE` and the policy but not `FORCE`, so a table
+can look protected and still be bypassable by its owner.
+
+That gap is exactly what **`pnpm --filter api db:verify-rls`** exists to catch: it
+fails if any table carrying `merchant_id` is missing `ENABLE`, `FORCE`, or a
+policy. Run it after `db:migrate`; CI runs it too. It is a backstop for a
+forgotten migration; it does not check that a policy is _correct_. That is what
+the two-merchant repository tests are for.
+
+## Database: Drizzle
+
+- **drizzle-kit is the only tool that changes the schema.** Never hand-edit a
+  _generated_ migration, never apply DDL directly, and **never run
+  `drizzle-kit push`** — it syncs without a reviewable migration. The loop is:
+  edit `src/database/schema/` → `pnpm --filter api db:generate` → **review the
+  generated SQL by hand** → `pnpm --filter api db:migrate` →
+  `pnpm --filter api db:verify-rls`.
+  The one sanctioned exception is DDL drizzle-kit does not model, authored with
+  `pnpm --filter api db:custom`. drizzle-kit still owns ordering and apply.
+- **Migrations are applied by `scripts/migrate.mjs`**, drizzle-orm's programmatic
+  migrator, so the same command works locally and in the production image — which
+  carries `db/migrations` but not drizzle-kit. `db:generate` still needs
+  drizzle-kit, but only ever on a developer's machine or in CI.
+- **drizzle-kit diffs against JSON snapshots in `db/migrations/meta`**, not a
+  shadow database, so no Docker is needed to generate a migration. Commit the
+  snapshot with the migration; CI fails if a schema change has none.
+- **Better Auth owns `user`, `session`, `account`, `verification` and the
+  organization tables.** Regenerate with `pnpm --filter api db:auth-schema`,
+  which overwrites `src/database/schema/auth.ts` — never hand-edit it. Its tables
+  then flow through `db:generate` like any other, so auth changes are versioned
+  and reviewed rather than applied out of band.
 - **Money is integer minor units** (paisa/cents), never a float or `numeric`.
   Use the `@app/shared` helpers rather than dividing inline.
-- **`jsonb` columns are parsed with Zod on read.** A column typed `unknown` by
-  codegen is not validation.
+- **`jsonb` columns are parsed with Zod on read.** An inferred `unknown` is not
+  validation.
 - **Counts and `bigint` values come back as strings** from Postgres — convert
   them explicitly rather than letting a string reach arithmetic.
 - Pool-level `lock_timeout` and `idle_in_transaction_session_timeout` are
@@ -213,8 +290,9 @@ forgotten migration; it does not replace writing one.
   (`src/modules/queue/queue.constants.ts`), which is what makes a redelivered
   webhook a no-op — this is invariant #5's dedupe half, and it only works if you
   keep passing `{ jobId: job.messageId }`.
-- **Per-customer message ordering** comes from a Kysely `.forUpdate()` row lock
-  on the conversation inside a short transaction. Combined with invariant #1:
+- **Per-customer message ordering** comes from a Drizzle `.for('update')` row
+  lock on the conversation inside a short transaction. Note it is available on
+  the query builder but **not** on the relational `db.query.*` API. Combined with invariant #1:
   lock, re-check state, write, commit — with the LLM call already done outside.
 - **`WORKER_CONCURRENCY` must stay at or below `DATABASE_POOL_MAX`** (5 and 10
   today). Concurrency above the pool size just queues workers on connections and
@@ -313,7 +391,7 @@ or the API typechecks against the stale build.
       inside a transaction.
 - [ ] New business tables carry `merchant_id`; composite indexes lead with it;
       every unique constraint includes it.
-- [ ] Schema changed only through the Atlas loop; migration reviewed by hand;
+- [ ] Schema changed only through the drizzle-kit loop; migration reviewed by hand;
       `database.types.ts` regenerated, not edited; Better Auth tables generated.
 - [ ] Money is integer minor units; `jsonb` parsed with Zod on read; counts and
       `bigint` converted from strings explicitly.
