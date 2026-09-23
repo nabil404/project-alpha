@@ -72,16 +72,32 @@ violates one, stop and fix the design rather than working around it.
   `session.activeOrganizationId` — the Better Auth Organization plugin's active
   org — and puts it on `request.merchantId`. **Never** derive the merchant from
   a body field, query parameter or header: accepting a client-supplied value
-  makes the whole boundary bypassable. One organization per seller for the MVP.
+  makes the whole boundary bypassable.
+
+- **The organization is created at signup**, by `ensureOrganizationForUser`
+  (`src/database/ensure-organization.ts`), called from the `user.create.after`
+  and `session.create.before` hooks in `src/auth/auth.config.ts`. It is
+  idempotent on purpose: `user.create.after` runs after the user row is
+  committed, so a failure there would otherwise strand a seller with no merchant
+  and the guard would answer every one of their requests with
+  `TENANT_NO_ACTIVE_MERCHANT`. The session hook calls the same function, so such
+  an account repairs itself at next login. It locks the seller's `user` row with
+  `.for('update')` before re-checking membership — at READ COMMITTED two racing
+  sign-ins cannot see each other's uncommitted `member` row, and a unique
+  constraint on `member.userId` is not available as a fix because it would
+  forbid the second organization. The MVP ships one organization per seller and
+  no switcher, but the model permits several.
 
 > **Current state — not wired yet.** `TenantGuard` is not registered: there is
 > no `APP_GUARD` binding and no `@UseGuards`, and the only occurrence of the
 > symbol is its own declaration. Nothing populates `request.session` either,
 > because **Better Auth has no HTTP handler mounted** — the `AUTH` provider is
 > built in `src/auth/auth.module.ts` and injected nowhere, so there is no
-> `/api/auth/*` and no session cookie. Wire all three before relying on
-> `request.merchantId`. Until then this section describes the intended
-> mechanism, not a running one.
+> `/api/auth/*` and no session cookie. The organization bootstrap below _is_
+> written and tested, but its hooks only fire on a real signup or session, so
+> nothing exercises them until the handler is mounted. Wire all three before
+> relying on `request.merchantId`. Until then this section describes the
+> intended mechanism, not a running one.
 
 - **The guard is a convenience, not the boundary.** Repositories still take
   `merchantId` explicitly and filter on it. The contract already exists in
@@ -103,7 +119,18 @@ predicate is the leak to catch in review.**
   `merchant_id`; composite indexes lead with it (`(merchant_id, created_at)`,
   `(merchant_id, status)`); and **every uniqueness rule includes it** —
   `UNIQUE (merchant_id, sku)`, never a bare global `UNIQUE (sku)`, which is both
-  a cross-seller collision and an information leak.
+  a cross-seller collision and an information leak. Because a seller may hold
+  several organizations, this holds even within one seller: their two shops may
+  legitimately reuse a SKU, and the same person messaging both is correctly two
+  customer rows, so `UNIQUE (merchant_id, psid)` and not `UNIQUE (psid)`.
+
+  **The one deliberate exception is the connected Facebook Page**, which is
+  globally unique — `UNIQUE (page_id)`, with no `merchant_id`. The webhook
+  resolves `pageId → merchant` with no session to go on
+  (`src/modules/messenger/webhook-payload.ts`), so a Page claimed by two tenants
+  has no resolvable owner. Scoping that constraint by merchant would let the
+  second seller connect a Page the first already owns and silently split their
+  conversations. It is the exception, not a missed `merchant_id`.
 
 - **Required test, per AGENTS.md:** two merchants, proving one can never read,
   update, or confirm the other's data. Write it for every repository, not once.
