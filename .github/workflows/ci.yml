@@ -55,11 +55,13 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
-      - run: pnpm test
 
+      # Before the tests: the database-backed specs need the schema in place.
       - name: Apply migrations to a fresh database
         working-directory: apps/api
         run: pnpm db:migrate
+
+      - run: pnpm test
 
       # drizzle-kit generates ENABLE and CREATE POLICY from pgPolicy, but not
       # FORCE, roles or grants - those are hand-authored, so nothing diffs them.
