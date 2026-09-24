@@ -94,7 +94,7 @@ jobs:
   #         context: .
   #         file: apps/api/Dockerfile
   #         push: false
-  #         tags: app-api:${{ github.sha }}
+  #         tags: app-api:${{ github.sha }}  # matches image: in docker/compose.app.yml
   #         cache-from: type=gha
   #         cache-to: type=gha,mode=max
   #     - name: Build web image
@@ -103,7 +103,7 @@ jobs:
   #         context: .
   #         file: apps/web/Dockerfile
   #         push: false
-  #         tags: app-web:${{ github.sha }}
+  #         tags: app-web:${{ github.sha }}  # matches image: in docker/compose.web.yml
   #         cache-from: type=gha
   #         cache-to: type=gha,mode=max
   #
@@ -127,21 +127,26 @@ jobs:
   #           git pull --ff-only
   #           # apps/api/.env is the only env file. Compose needs it passed
   #           # explicitly - on its own it would look for docker/.env, which no
-  #           # longer exists - and the shell needs it for DATABASE_ADMIN_URL,
-  #           # which compose deliberately blanks for the api and worker.
+  #           # longer exists - and the shell needs it for the Postgres owner
+  #           # credentials, which compose deliberately blanks for the api and
+  #           # worker.
   #           COMPOSE="docker compose --env-file apps/api/.env -f docker/compose.yml"
   #           $COMPOSE build
   #           # Migrations run before the new code starts serving, as the owner.
   #           set -a; . ./apps/api/.env; set +a
   #           # DATABASE_URL is the app's restricted role and cannot create tables,
-  #           # so fail clearly rather than letting `set -u` report an unbound
-  #           # variable halfway through a deploy.
-  #           if [ -z "${DATABASE_ADMIN_URL:-}" ]; then
-  #             echo "DATABASE_ADMIN_URL is not set in apps/api/.env - migrations cannot run." >&2
-  #             exit 1
-  #           fi
+  #           # so the migration connects as the owner. DATABASE_ADMIN_URL in the
+  #           # env file points at the host's localhost, which inside the api
+  #           # container is the container itself, so build the owner URL from
+  #           # the same parts compose.app.yml uses for DATABASE_URL.
+  #           for v in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB; do
+  #             if [ -z "${!v:-}" ]; then
+  #               echo "$v is not set in apps/api/.env - migrations cannot run." >&2
+  #               exit 1
+  #             fi
+  #           done
   #           $COMPOSE run --rm \
-  #             -e DATABASE_ADMIN_URL="$DATABASE_ADMIN_URL" \
+  #             -e DATABASE_ADMIN_URL="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@${DB_HOST:-postgres}:5432/$POSTGRES_DB" \
   #             api node scripts/migrate.mjs
   #           $COMPOSE up -d --remove-orphans
   #           docker image prune -f

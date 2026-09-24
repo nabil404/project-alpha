@@ -1,0 +1,9 @@
+# Worker role: the BullMQ consumer. Takes no inbound traffic, so it publishes
+# nothing. Runs alone on a worker server once split out:
+#   docker compose --env-file apps/api/.env -f docker/compose.worker.yml up -d
+name: app
+
+services:
+  worker:
+    extends: { file: compose.app.yml, service: app }
+    command: ['node', 'dist/worker.js']

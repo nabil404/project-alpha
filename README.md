@@ -34,10 +34,10 @@ credentials. Compose has to be pointed at it, since it would otherwise look for
 docker compose --env-file apps/api/.env -f docker/compose.dev.yml up -d
 ```
 
-The file is written for host development. `docker/compose.yml` overrides
-`DATABASE_URL`, `REDIS_URL` and `APP_URL` with service hostnames for the
-containers, and blanks `DATABASE_ADMIN_URL` and the Postgres secrets so the api
-and worker never receive them.
+The file is written for host development. For the containers,
+`docker/compose.app.yml` rebuilds `DATABASE_URL`, `REDIS_URL` and `APP_URL` from
+the stack variables, and blanks `DATABASE_ADMIN_URL`, `REDIS_PASSWORD` and the
+Postgres secrets so the api and worker never receive them.
 
 Webhooks need a public HTTPS URL: `cloudflared tunnel --url http://localhost:3000`.
 
@@ -79,4 +79,6 @@ Schema tooling connects as the owner through `DATABASE_ADMIN_URL`.
 
 - **local** — dependencies in `docker/compose.dev.yml`, apps on the host.
 - **staging** — `docker compose -p app-staging --env-file apps/api/.env.staging -f docker/compose.yml up -d`
-- **production** — `docker/compose.yml` on the VPS, deployed by CI over SSH.
+- **production** — `docker/compose.yml` on the VPS, deployed by CI over SSH. It
+  includes one compose file per role (web, api, worker, data), so a role can
+  move to its own server later — see [docs/deployment.md](docs/deployment.md).

@@ -1,0 +1,28 @@
+# Web role: Caddy, with the SPA, the Caddyfile and the Meta compliance pages
+# baked into the image. Terminates HTTPS and proxies /api to API_UPSTREAM, so
+# the browser always sees one origin. Runs alone on a web server once split out:
+#   docker compose --env-file apps/api/.env -f docker/compose.web.yml up -d
+name: app
+
+services:
+  caddy:
+    image: app-web:${IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+      # The api service on one host; the api server's private address:3000 once
+      # split out.
+      API_UPSTREAM: ${API_UPSTREAM:-api:3000}
+
+volumes:
+  caddy_data:
+  caddy_config:

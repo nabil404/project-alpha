@@ -1,0 +1,32 @@
+# Base service for the api and worker, which run the same image with different
+# commands. Pulled in through `extends`, never included, so `app` itself never
+# starts.
+#
+# apps/api/.env is authored for the host, where localhost is Postgres and Redis;
+# in a container localhost is the container itself. It also carries stack
+# secrets the app must never see. Both are corrected below - environment wins
+# over env_file.
+services:
+  app:
+    image: app-api:${IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: [../apps/api/.env]
+    environment:
+      # DB_HOST and REDIS_HOST default to the service names in compose.data.yml;
+      # set them to the data server's private address once it is split out.
+      DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD}@${DB_HOST:-postgres}:5432/${POSTGRES_DB:-app}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@${REDIS_HOST:-redis}:6379
+      APP_URL: https://${DOMAIN:?set DOMAIN}
+      # The owner connection and the bootstrap secrets: schema tooling and the
+      # data role only. AGENTS.md: the api and worker must never receive the
+      # admin URL.
+      DATABASE_ADMIN_URL: ''
+      POSTGRES_USER: ''
+      POSTGRES_PASSWORD: ''
+      POSTGRES_DB: ''
+      APP_RUNTIME_PASSWORD: ''
+      REDIS_PASSWORD: ''
+      DOMAIN: ''

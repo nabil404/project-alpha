@@ -1,0 +1,65 @@
+# Data role: Postgres and Redis. Runs alone on a data server once split out:
+#   docker compose --env-file apps/api/.env -f docker/compose.data.yml up -d
+#
+# Ports are published on BIND_IP - loopback on a single host, where only the
+# host itself (pg_dump, psql) reaches them; the private address once the api and
+# worker live elsewhere. Never 0.0.0.0 on a public interface: Docker writes its
+# own iptables rules, so a ufw deny does not cover a published port.
+name: app
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      # Restricted role for the api and worker. Unset on an already-provisioned
+      # server, where the role is created by migration and given a password by
+      # hand instead - see apps/api/.env.example.
+      APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-}
+    ports:
+      - '${BIND_IP:-127.0.0.1}:5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Runs only when the volume is empty, i.e. on a first-time provision.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Read by the healthcheck only.
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    # BullMQ requires that jobs are never evicted, and AOF keeps them across
+    # restarts. The password is required even on one host, so moving Redis to
+    # its own server changes nothing here.
+    command:
+      [
+        'redis-server',
+        '--maxmemory-policy',
+        'noeviction',
+        '--appendonly',
+        'yes',
+        '--requirepass',
+        '${REDIS_PASSWORD:?set REDIS_PASSWORD}',
+      ]
+    ports:
+      - '${BIND_IP:-127.0.0.1}:6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

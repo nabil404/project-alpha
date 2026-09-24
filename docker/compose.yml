@@ -1,4 +1,4 @@
-# Production stack on the single VPS.
+# Production stack on a single VPS: every role, one compose project.
 #
 # apps/api/.env is the repo's only env file, and compose needs it passed
 # explicitly - without --env-file it would look for docker/.env instead:
@@ -6,124 +6,33 @@
 #
 # Staging runs this same file with a separate env file and project name:
 #   docker compose -p app-staging --env-file apps/api/.env.staging -f docker/compose.yml up -d
+#
+# Each role lives in its own file so it can move to its own server later by
+# running that file alone there - see docs/deployment.md. Nothing in a role file
+# assumes the others are present; this file adds only the wiring that holds
+# when they share a host.
 name: app
 
-# apps/api/.env is authored for the host, where localhost is Postgres and Redis;
-# in here localhost is the container itself. It also carries stack secrets the
-# app must never see. Both are corrected below - environment wins over env_file.
-x-app-env: &app-env
-  DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD}@postgres:5432/${POSTGRES_DB:-app}
-  REDIS_URL: redis://redis:6379
-  APP_URL: https://${DOMAIN:?set DOMAIN}
-  # The owner connection and the bootstrap secrets: schema tooling and postgres
-  # only. AGENTS.md: the api and worker must never receive the admin URL.
-  DATABASE_ADMIN_URL: ''
-  POSTGRES_USER: ''
-  POSTGRES_PASSWORD: ''
-  POSTGRES_DB: ''
-  APP_RUNTIME_PASSWORD: ''
-  DOMAIN: ''
+include:
+  - compose.data.yml
+  - compose.api.yml
+  - compose.worker.yml
+  - compose.web.yml
 
+# Startup ordering, valid only when every role is in this one project. A role
+# file cannot declare it: compose rejects a dependency on a service it does not
+# define, even with `required: false`.
 services:
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - web_dist:/srv:ro
-      - ../static:/srv/legal:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      DOMAIN: ${DOMAIN}
-    depends_on:
-      - api
-
-  web:
-    build:
-      context: ..
-      dockerfile: apps/web/Dockerfile
-    # Builds the SPA into the shared volume Caddy serves, then exits.
-    command: ['sh', '-c', 'cp -r /srv/. /dist/ && echo "spa published"']
-    volumes:
-      - web_dist:/dist
-    restart: 'no'
-
   api:
-    build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
-    restart: unless-stopped
-    env_file: [../apps/api/.env]
-    environment: *app-env
-    command: ['node', 'dist/main.js']
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
 
   worker:
-    build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
-    restart: unless-stopped
-    env_file: [../apps/api/.env]
-    environment: *app-env
-    command: ['node', 'dist/worker.js']
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      # Restricted role for the api and worker. Unset on an already-provisioned
-      # server, where the role is created by migration and given a password by
-      # hand instead - see apps/api/.env.example.
-      APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      # Runs only when the volume is empty, i.e. on a first-time provision.
-      - ./postgres-init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    # BullMQ requires that jobs are never evicted, and AOF keeps them across restarts.
-    command: ['redis-server', '--maxmemory-policy', 'noeviction', '--appendonly', 'yes']
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data:
-  redis_data:
-  caddy_data:
-  caddy_config:
-  web_dist:
+  caddy:
+    depends_on:
+      - api

@@ -1,14 +1,15 @@
 # Automatic HTTPS, SPA on the root, API on the same origin, and the static
-# pages Meta requires for App Review.
+# pages Meta requires for App Review. Baked into the web image; API_UPSTREAM is
+# the api service on one host, or the api server's private address:port.
 {$DOMAIN} {
 	encode zstd gzip
 
 	handle /api/* {
-		reverse_proxy api:3000
+		reverse_proxy {$API_UPSTREAM}
 	}
 
 	handle /health {
-		reverse_proxy api:3000
+		reverse_proxy {$API_UPSTREAM}
 	}
 
 	handle /privacy {

@@ -135,31 +135,31 @@ conversations is run after every prompt change. The mechanics of both are in
 
 ### Chosen stack
 
-| Area                | Decision                                                                                                                                                                                                           |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Backend             | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`.                                                                                                                        |
-| Frontend            | React 19 (Vite SPA), TanStack Router (code-based) + TanStack Query, Tailwind v4 (CSS-first), shadcn/ui (not initialized), react-hook-form, react-i18next.                                                          |
-| Repo                | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`.                                                                                                       |
-| Validation          | Zod schemas in `packages/shared` for API input, forms, and LLM output.                                                                                                                                             |
-| Database            | Postgres + Drizzle. Global NestJS `DatabaseModule`; Better Auth shares the same instance through its Drizzle adapter.                                                                                              |
-| Schema & migrations | TS schema in `apps/api/src/database/schema/` as desired state; drizzle-kit generates SQL into `db/migrations/`. `drizzle-kit push` is never used.                                                                  |
-| Types               | Inferred from the schema — no codegen step and no live database needed. CI fails if a schema change has no migration.                                                                                              |
-| Message ordering    | Drizzle `.for('update')` on the conversation row inside a short transaction. Not available on the relational (`db.query.*`) API.                                                                                   |
-| Queue               | BullMQ + Redis (`noeviction`, AOF persistence).                                                                                                                                                                    |
-| Auth                | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy, the seller's organization created at signup and resolved onto the session as `activeOrganizationId`; tenant guard in NestJS. |
-| Messenger           | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow.                                                                                                         |
-| Secrets             | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var.                                                                                                                                         |
-| LLM                 | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider.                                                                       |
-| Email               | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes.                                                                                                                      |
-| Hosting             | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis.                                                                                                                                            |
-| Reverse proxy       | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages.                                                                                    |
-| Config & ops        | `@nestjs/config` + Zod-validated env, `@nestjs/throttler` (Redis), nestjs-pino, `@nestjs/terminus` health checks, Uptime Kuma, Sentry optional.                                                                    |
-| Backups             | Nightly `pg_dump`, multi-day retention, copied off the server.                                                                                                                                                     |
-| Server security     | SSH keys only, firewall allowing 80/443/SSH, automatic security updates.                                                                                                                                           |
-| CI/CD               | GitHub Actions: lint, typecheck, test, migrate, RLS check, uncommitted-migration check, build images, deploy over SSH.                                                                                             |
-| Local development   | Cloudflare Tunnel for a public HTTPS webhook URL. drizzle-kit diffs against snapshots, so no shadow database is needed.                                                                                            |
-| Testing             | Jest in `apps/api`, Vitest in `apps/web` when its first test lands, plus an LLM evaluation script.                                                                                                                 |
-| Payments            | Cash on delivery. Payment links after the pilot.                                                                                                                                                                   |
+| Area                | Decision                                                                                                                                                                                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend             | NestJS. API and worker share one codebase; the worker boots via `createApplicationContext`.                                                                                                                                                                                                  |
+| Frontend            | React 19 (Vite SPA), TanStack Router (code-based) + TanStack Query, Tailwind v4 (CSS-first), shadcn/ui (not initialized), react-hook-form, react-i18next.                                                                                                                                    |
+| Repo                | pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`. Everything database-related lives in `apps/api`.                                                                                                                                                                                 |
+| Validation          | Zod schemas in `packages/shared` for API input, forms, and LLM output.                                                                                                                                                                                                                       |
+| Database            | Postgres + Drizzle. Global NestJS `DatabaseModule`; Better Auth shares the same instance through its Drizzle adapter.                                                                                                                                                                        |
+| Schema & migrations | TS schema in `apps/api/src/database/schema/` as desired state; drizzle-kit generates SQL into `db/migrations/`. `drizzle-kit push` is never used.                                                                                                                                            |
+| Types               | Inferred from the schema — no codegen step and no live database needed. CI fails if a schema change has no migration.                                                                                                                                                                        |
+| Message ordering    | Drizzle `.for('update')` on the conversation row inside a short transaction. Not available on the relational (`db.query.*`) API.                                                                                                                                                             |
+| Queue               | BullMQ + Redis (`noeviction`, AOF persistence).                                                                                                                                                                                                                                              |
+| Auth                | Better Auth: email/password, Google, Facebook; Organization plugin for multi-tenancy, the seller's organization created at signup and resolved onto the session as `activeOrganizationId`; tenant guard in NestJS.                                                                           |
+| Messenger           | Graph API via `fetch`, pinned API version, raw-body HMAC signature verification, own Page connection flow.                                                                                                                                                                                   |
+| Secrets             | Page tokens encrypted with AES-256-GCM (Node `crypto`); key in an env var.                                                                                                                                                                                                                   |
+| LLM                 | AI SDK behind an `extractOrder()` wrapper, structured output with Zod schemas. Evaluation set of 100–200 real messages, scored per provider.                                                                                                                                                 |
+| Email               | Nodemailer over SMTP on a transactional provider's free tier; swappable without code changes.                                                                                                                                                                                                |
+| Hosting             | Single VPS running Docker Compose: Caddy, api, worker, Postgres, Redis. The stack is split into per-role files (web, api, worker, data) that `docker/compose.yml` includes, so any role can move to its own server by setting host variables — see [docs/deployment.md](docs/deployment.md). |
+| Reverse proxy       | Caddy with automatic HTTPS; serves the SPA and proxies `/api` on the same domain. Also serves the static Meta compliance pages.                                                                                                                                                              |
+| Config & ops        | `@nestjs/config` + Zod-validated env, `@nestjs/throttler` (Redis), nestjs-pino, `@nestjs/terminus` health checks, Uptime Kuma, Sentry optional.                                                                                                                                              |
+| Backups             | Nightly `pg_dump`, multi-day retention, copied off the server.                                                                                                                                                                                                                               |
+| Server security     | SSH keys only, firewall allowing 80/443/SSH, automatic security updates.                                                                                                                                                                                                                     |
+| CI/CD               | GitHub Actions: lint, typecheck, test, migrate, RLS check, uncommitted-migration check, build images, deploy over SSH.                                                                                                                                                                       |
+| Local development   | Cloudflare Tunnel for a public HTTPS webhook URL. drizzle-kit diffs against snapshots, so no shadow database is needed.                                                                                                                                                                      |
+| Testing             | Jest in `apps/api`, Vitest in `apps/web` when its first test lands, plus an LLM evaluation script.                                                                                                                                                                                           |
+| Payments            | Cash on delivery. Payment links after the pilot.                                                                                                                                                                                                                                             |
 
 ### Database rules
 
@@ -227,11 +227,14 @@ db:migrate` → `pnpm --filter api db:verify-rls`.
 --env-file apps/api/.env -f docker/compose.yml …`, wrapped as `pnpm dev:up` /
   `pnpm dev:down` for local dependencies — because on its own it would look for
   `docker/.env`, which no longer exists. The file is written for host
-  development, so `docker/compose.yml` overrides `DATABASE_URL`, `REDIS_URL` and
-  `APP_URL` with service hostnames and blanks `DATABASE_ADMIN_URL` and the
-  `POSTGRES_*` secrets for the api and worker. A new app variable needs no
-  compose change; a new one that must differ inside containers belongs in the
-  `x-app-env` anchor.
+  development, so the `app` base in `docker/compose.app.yml` overrides
+  `DATABASE_URL`, `REDIS_URL` and `APP_URL` for the api and worker — pointing at
+  `DB_HOST` / `REDIS_HOST`, which default to the compose service names — and
+  blanks `DATABASE_ADMIN_URL`, `REDIS_PASSWORD` and the `POSTGRES_*` secrets. A
+  new app variable needs no compose change; a new one that must differ inside
+  containers belongs in that base. Once a role runs on its own server, that
+  server's copy of the file is cut down to what the role needs
+  (`docs/deployment.md`).
 - `apps/web` and `packages/shared` have no test runner yet; `apps/api` Jest runs
   as ESM (`--experimental-vm-modules`), configured in `apps/api/jest.config.mjs`.
 - `pnpm --filter @app/shared build` after changing a shared schema — `apps/api`
