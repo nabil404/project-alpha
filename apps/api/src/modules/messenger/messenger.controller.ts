@@ -1,6 +1,7 @@
 import { Controller, Get, Headers, HttpCode, Post, Query, Req } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import {
   CodedBadRequestException,
   CodedUnauthorizedException,
@@ -14,7 +15,11 @@ import type { RawBodyRequest } from './raw-body.js';
 /**
  * Acknowledge immediately, process in a background worker. The Meta message ID
  * is the job ID, so a redelivered webhook never produces a second job.
+ *
+ * Meta carries no session: the verify token and the HMAC signature are this
+ * controller's authentication, hence @AllowAnonymous().
  */
+@AllowAnonymous()
 @Controller('webhooks/messenger')
 export class MessengerController {
   constructor(

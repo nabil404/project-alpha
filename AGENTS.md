@@ -232,6 +232,9 @@ db:migrate` → `pnpm --filter api db:verify-rls`.
   `POSTGRES_*` secrets for the api and worker. A new app variable needs no
   compose change; a new one that must differ inside containers belongs in the
   `x-app-env` anchor.
+- **Local email.** `pnpm dev:up` also starts Mailpit: the dev `SMTP_URL` is
+  `smtp://localhost:1025`, and verification and password-reset emails land at
+  http://localhost:8025.
 - `apps/web` and `packages/shared` have no test runner yet; `apps/api` Jest runs
   as ESM (`--experimental-vm-modules`), configured in `apps/api/jest.config.mjs`.
 - `pnpm --filter @app/shared build` after changing a shared schema — `apps/api`
@@ -248,6 +251,10 @@ db:migrate` → `pnpm --filter api db:verify-rls`.
   with `pnpm --filter api db:custom` — drizzle-kit still owns ordering and
   apply.
 - Never log tokens, secrets, or raw Page access tokens.
+- Every API route needs a signed-in session: `SessionGuard` is global. A route
+  that must stay public (health, Meta webhooks) says so with `@AllowAnonymous()`
+  from `@thallesp/nestjs-better-auth`; Better Auth itself is mounted at
+  `/api/auth/*` by `apps/api/src/auth/auth.module.ts`.
 - Errors leave the API as the coded envelope `{ error: { code, message, params } }`.
   Throw a `Coded*Exception` from `apps/api/src/common/errors/`, never a bare NestJS
   exception; the contract is in

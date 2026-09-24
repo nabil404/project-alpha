@@ -1,6 +1,8 @@
 {
   "code": {
+    "AUTH_EMAIL_NOT_VERIFIED": "Please verify your email first. We've sent you a new link.",
     "AUTH_INVALID_CREDENTIALS": "Invalid email or password.",
+    "AUTH_INVALID_TOKEN": "This link is invalid or has expired. Please request a new one.",
     "AUTH_UNAUTHENTICATED": "Please sign in to continue.",
     "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again.",
     "TENANT_NO_ACTIVE_MERCHANT": "This session has no active seller account.",

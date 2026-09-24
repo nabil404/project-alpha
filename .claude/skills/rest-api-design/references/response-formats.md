@@ -112,9 +112,28 @@ issue already carries its raw constraint argument (`too_small` has `minimum`,
 `invalid_format` has `format`) — so a new validated endpoint needs no per-field
 error wiring.
 
-### Known gap: Better Auth
+### Better Auth (`/api/auth/*`)
 
-The Better Auth handler is not mounted yet. When it is, it writes its own
-`{ message, code }` JSON straight to the response and **bypasses
-`AllExceptionsFilter` entirely**, so the `AUTH_*` codes coming out of it will
-need a mapping layer at that point. Whoever mounts the handler owns that.
+Better Auth writes its responses straight to the socket and **bypasses
+`AllExceptionsFilter` entirely**. A global `hooks.after` in
+`apps/api/src/auth/auth.config.ts` rewrites every error it returns (status
+≥ 400; its 302 redirects pass through) into this same envelope, using the pure
+mapping in `apps/api/src/auth/auth-errors.ts`:
+
+| Better Auth                         | Envelope                                                    |
+| ----------------------------------- | ----------------------------------------------------------- |
+| `INVALID_EMAIL_OR_PASSWORD`         | `AUTH_INVALID_CREDENTIALS`                                  |
+| `EMAIL_NOT_VERIFIED`                | `AUTH_EMAIL_NOT_VERIFIED`                                   |
+| `INVALID_TOKEN`, `TOKEN_EXPIRED`    | `AUTH_INVALID_TOKEN`                                        |
+| `PASSWORD_TOO_SHORT` / `_TOO_LONG`  | `VALIDATION_FAILED`, `fields.password` (or `newPassword`)   |
+| `INVALID_EMAIL`                     | `VALIDATION_FAILED`, `fields.email` = `INVALID_FORMAT`      |
+| `VALIDATION_ERROR` (request schema) | `VALIDATION_FAILED`, one `INVALID_INPUT` per reported field |
+| any other 401                       | `AUTH_UNAUTHENTICATED`                                      |
+| anything else                       | `HTTP_<status>`                                             |
+
+A rejection by Better Auth's own rate limiter is answered before any hook runs,
+so it still arrives in Better Auth's shape; the SPA's parser degrades it to
+`HTTP_429`.
+
+The global `SessionGuard` answers a route without a session as
+`AUTH_UNAUTHENTICATED`, rather than the bare 401 the library's guard throws.
