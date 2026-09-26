@@ -33,11 +33,11 @@
     "hasPrev": true
   },
   "links": {
-    "self": "/api/products?page=2&limit=20",
-    "first": "/api/products?page=1&limit=20",
-    "prev": "/api/products?page=1&limit=20",
-    "next": "/api/products?page=3&limit=20",
-    "last": "/api/products?page=8&limit=20"
+    "self": "/api/v1/products?page=2&limit=20",
+    "first": "/api/v1/products?page=1&limit=20",
+    "prev": "/api/v1/products?page=1&limit=20",
+    "next": "/api/v1/products?page=3&limit=20",
+    "last": "/api/v1/products?page=8&limit=20"
   }
 }
 ```
@@ -112,7 +112,7 @@ issue already carries its raw constraint argument (`too_small` has `minimum`,
 `invalid_format` has `format`) — so a new validated endpoint needs no per-field
 error wiring.
 
-### Better Auth (`/api/auth/*`)
+### Better Auth (`/api/v1/auth/*`)
 
 Better Auth writes its responses straight to the socket and **bypasses
 `AllExceptionsFilter` entirely**. A global `hooks.after` in

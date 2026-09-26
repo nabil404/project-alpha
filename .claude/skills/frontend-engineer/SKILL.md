@@ -76,11 +76,11 @@ component owns its own data needs.
 
 - **Every server read and write goes through `apiFetch` from `@/lib/api`,
   wrapped in TanStack Query.** No raw `fetch` in a component, no axios, no
-  second base URL. `apiFetch` is same-origin `/api` with
+  second base URL. `apiFetch` is same-origin `/api/v1` with
   `credentials: 'include'` — Caddy proxies `/api` to NestJS on one domain, and
   Better Auth authenticates with a session cookie. Anything that bypasses it
   loses the cookie or the proxy path.
-  **Auth endpoints** are Better Auth's, at `/api/auth/*`, and they answer
+  **Auth endpoints** are Better Auth's, at `/api/v1/auth/*`, and they answer
   errors in the same coded envelope as every other route (`AUTH_*` codes), so
   call them through `apiFetch` too rather than Better Auth's own client. Any
   other route answers `AUTH_UNAUTHENTICATED` (401) without a session. The email
@@ -88,7 +88,7 @@ component owns its own data needs.
   redirects to the sign-up's `callbackURL` (send `'/'`), or to
   `/?error=INVALID_TOKEN|TOKEN_EXPIRED`; the reset link redirects to the
   forgot-password `redirectTo` (send `'/reset-password'`) with `?token=` or
-  `?error=INVALID_TOKEN`, and that page POSTs `/api/auth/reset-password`.
+  `?error=INVALID_TOKEN`, and that page POSTs `/api/v1/auth/reset-password`.
   Password rules come from `passwordSchema` in `@app/shared`.
 - **Query keys are domain-namespaced arrays**: `['orders', 'list', filters]`,
   `['orders', 'detail', orderId]`. After a mutation, invalidate by prefix

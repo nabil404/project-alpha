@@ -70,7 +70,7 @@ Detailed implementations in the `references/` directory:
 - Return appropriate HTTP status codes
 - Include pagination for collections
 - Provide filtering and sorting options
-- Version your API
+- Version your API — see "Versioning in this repo" below
 - Document thoroughly with OpenAPI
 - Use HTTPS
 - Implement rate limiting
@@ -87,3 +87,19 @@ Detailed implementations in the `references/` directory:
 - Forget authentication
 - Return sensitive data
 - Break backward compatibility without versioning
+
+### Versioning in this repo
+
+Routes live at `/api/v1/...` through Nest URI versioning (`configureApp` in
+`apps/api/src/bootstrap.ts`, `defaultVersion: '1'`).
+
+- **Additive changes stay in v1:** a new route, a new optional request field, a
+  new response field.
+- **A breaking change versions one route, not the API.** Add a
+  `@Version('2')` handler for the affected route beside the existing one,
+  which keeps serving v1. Never copy the whole API into a v2.
+- **Pinned paths:** Better Auth's `basePath` (`/api/v1/auth`) and the Meta
+  webhook (`/api/v1/webhooks/messenger`) follow contracts we don't own. They
+  are not bumped with our versions. `/health` is `VERSION_NEUTRAL`.
+- **Deferred:** deprecation windows and `Deprecation`/`Sunset` headers wait
+  until an outside consumer exists.

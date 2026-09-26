@@ -29,12 +29,15 @@ and are marked ⚠️ below.
 - **Drizzle infers types from the schema**, so there is no codegen step and no
   live database needed to typecheck. A schema edit without its migration is what
   CI catches, not stale types.
-- The global route prefix is `api`, with `/health` excluded (`src/bootstrap.ts`).
+- Routes are served at `/api/v1/...`: global prefix `api` plus Nest URI
+  versioning with `defaultVersion: '1'` (`src/bootstrap.ts`). `/health` is
+  excluded from the prefix and marked `VERSION_NEUTRAL`. Versioning policy:
+  `rest-api-design`.
 - **Every route needs a session by default.** `SessionGuard`
   (`src/auth/session.guard.ts`) is a global `APP_GUARD`; a route that must stay
   public is marked `@AllowAnonymous()` from `@thallesp/nestjs-better-auth`, as
   health and the Messenger webhook are. Better Auth itself is mounted at
-  `/api/auth/*` by `src/auth/auth.module.ts`, which also turns Nest's body
+  `/api/v1/auth/*` by `src/auth/auth.module.ts`, which also turns Nest's body
   parser off: JSON parsing and `req.rawBody` now come from that module's
   `bodyParser` option, so `rawBody: true` on `NestFactory` does nothing.
 - **There are no business endpoints yet.** The only controllers in the repo are
@@ -95,7 +98,7 @@ violates one, stop and fix the design rather than working around it.
   forbid the second organization. The MVP ships one organization per seller and
   no switcher, but the model permits several.
 
-> **Current state.** Better Auth is mounted at `/api/auth/*` and the global
+> **Current state.** Better Auth is mounted at `/api/v1/auth/*` and the global
 > `SessionGuard` puts Better Auth's `{ session, user }` on `request.session`,
 > so the organization bootstrap now runs on every real signup and login
 > (exercised by `src/auth/__tests__/email-password.e2e.spec.ts`). `TenantGuard`
@@ -380,7 +383,7 @@ or the API typechecks against the stale build.
 ## Related skills
 
 - **`frontend-engineer`** — `apps/web`, which consumes these endpoints through a
-  same-origin `/api` client and the shared Zod schemas.
+  same-origin `/api/v1` client and the shared Zod schemas.
 - **`rest-api-design`** — resource naming, status codes, pagination and
   versioning for the HTTP surface built on these conventions.
 

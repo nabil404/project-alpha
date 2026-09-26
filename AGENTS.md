@@ -254,7 +254,7 @@ db:migrate` → `pnpm --filter api db:verify-rls`.
 - Every API route needs a signed-in session: `SessionGuard` is global. A route
   that must stay public (health, Meta webhooks) says so with `@AllowAnonymous()`
   from `@thallesp/nestjs-better-auth`; Better Auth itself is mounted at
-  `/api/auth/*` by `apps/api/src/auth/auth.module.ts`.
+  `/api/v1/auth/*` by `apps/api/src/auth/auth.module.ts`.
 - Errors leave the API as the coded envelope `{ error: { code, message, params } }`.
   Throw a `Coded*Exception` from `apps/api/src/common/errors/`, never a bare NestJS
   exception; the contract is in
