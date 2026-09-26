@@ -217,7 +217,7 @@ describeDb('email/password auth over HTTP', () => {
         expect.arrayContaining([expect.stringContaining('better-auth.session_token=')]),
       );
 
-      const me = await agent.get('/api/demo/me').expect(200);
+      const me = await agent.get('/api/v1/demo/me').expect(200);
       expect(me.body).toEqual({ merchantId: expect.any(String), email: address });
 
       const [user] = await db.select().from(schema.user).where(eq(schema.user.email, address));
@@ -292,17 +292,17 @@ describeDb('email/password auth over HTTP', () => {
       await post(agent, '/api/auth/sign-in/email', { email: address, password: PASSWORD }).expect(
         200,
       );
-      await agent.get('/api/demo/me').expect(200);
+      await agent.get('/api/v1/demo/me').expect(200);
 
       await post(agent, '/api/auth/sign-out', {}).expect(200);
 
-      const after = await agent.get('/api/demo/me');
+      const after = await agent.get('/api/v1/demo/me');
       expect(after.status).toBe(401);
       expect(after.body.error.code).toBe('AUTH_UNAUTHENTICATED');
     });
 
     it('turns away a request with no session', async () => {
-      const response = await request(server()).get('/api/demo/me');
+      const response = await request(server()).get('/api/v1/demo/me');
 
       expect(response.status).toBe(401);
       expect(response.body).toEqual({
@@ -335,7 +335,7 @@ describeDb('email/password auth over HTTP', () => {
     it('sets the new password, revokes old sessions and burns the token', async () => {
       const address = email('reset');
       const oldSession = await verifiedSeller(address);
-      await oldSession.get('/api/demo/me').expect(200);
+      await oldSession.get('/api/v1/demo/me').expect(200);
 
       const token = await resetToken(address);
       const newPassword = 'a brand new passphrase';
@@ -343,7 +343,7 @@ describeDb('email/password auth over HTTP', () => {
       await post(request(server()), '/api/auth/reset-password', { token, newPassword }).expect(200);
 
       // Every session from before the reset is gone.
-      const revoked = await oldSession.get('/api/demo/me');
+      const revoked = await oldSession.get('/api/v1/demo/me');
       expect(revoked.body.error.code).toBe('AUTH_UNAUTHENTICATED');
 
       const withOld = await post(request(server()), '/api/auth/sign-in/email', {
@@ -413,7 +413,7 @@ describeDb('email/password auth over HTTP', () => {
     it('still parse JSON and keep the raw body for signature checks', async () => {
       const payload = { object: 'page', entry: [] };
       const response = await request(server())
-        .post('/api/demo/raw')
+        .post('/api/v1/demo/raw')
         .set('content-type', 'application/json')
         .send(JSON.stringify(payload))
         .expect(201);
