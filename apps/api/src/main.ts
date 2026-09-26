@@ -1,9 +1,12 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { AuthService } from '@thallesp/nestjs-better-auth';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
 import { configureApp, NEST_APP_OPTIONS } from './bootstrap.js';
+import type { Auth } from './auth/auth.module.js';
 import { AppConfig } from './config/config.module.js';
+import { setupOpenApi } from './openapi/openapi.js';
 
 async function bootstrap(): Promise<void> {
   // The Meta webhook HMAC is computed over the unparsed body; AuthModule
@@ -16,6 +19,12 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   const config = app.get(AppConfig);
+  // A map of the whole auth surface is a development aid, not something to
+  // hand to anyone who asks in production.
+  if (config.get('NODE_ENV') !== 'production') {
+    await setupOpenApi(app, app.get<AuthService<Auth>>(AuthService).instance);
+  }
+
   await app.listen(config.get('PORT'), '0.0.0.0');
 }
 

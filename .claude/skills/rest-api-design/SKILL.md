@@ -58,7 +58,7 @@ Detailed implementations in the `references/` directory:
 | [Query Parameters](references/query-parameters.md)           | Query Parameters                                                                    |
 | [Response Formats](references/response-formats.md)           | Response Formats                                                                    |
 | [HTTP Status Codes](references/http-status-codes.md)         | HTTP Status Codes, API Versioning, Authentication & Security, Rate Limiting Headers |
-| [OpenAPI Documentation](references/openapi-documentation.md) | OpenAPI Documentation                                                               |
+| [OpenAPI Documentation](references/openapi-documentation.md) | Generic OpenAPI example — in this repo, see "OpenAPI in this repo" below            |
 
 ## Best Practices
 
@@ -103,3 +103,34 @@ Routes live at `/api/v1/...` through Nest URI versioning (`configureApp` in
   are not bumped with our versions. `/health` is `VERSION_NEUTRAL`.
 - **Deferred:** deprecation windows and `Deprecation`/`Sunset` headers wait
   until an outside consumer exists.
+
+### OpenAPI in this repo
+
+The spec is generated at boot from the controllers, never written by hand, and
+served in development only: Swagger UI at `/api/docs`, JSON at
+`/api/docs/openapi.json` (`apps/api/src/openapi/openapi.ts`). Better Auth's
+routes are merged in from its `openAPI()` plugin by `mergeAuthDocument`.
+
+- **Every route is annotated:** `@ApiTags` on the controller, and
+  `@ApiOperation({ summary })` plus a success response on each handler.
+- **Zod schemas document themselves.** Pass the shared schema to the parameter
+  decorator and to the response. `@nestjs/swagger` converts it through Standard
+  Schema, so there is no hand-written JSON Schema and no DTO class:
+
+  ```ts
+  @Post()
+  @ApiCreatedResponse({ standardSchema: productSchema })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  create(
+    @Body({ schema: createProductSchema, pipes: [new ZodValidationPipe(createProductSchema)] })
+    body: CreateProduct,
+  ) {}
+  ```
+
+- **Errors use `@ApiCodedError(status, codes)`** (`src/openapi/api-coded-error.ts`),
+  which references the `ErrorResponse` component derived from the shared
+  envelope schema. Its codes are typed against `ErrorCode`, so list the codes
+  the handler actually throws.
+- **Security defaults to the session cookie**, mirroring the global
+  `SessionGuard`. A route marked `@AllowAnonymous()` also declares
+  `security: []` in its `@ApiOperation`, or the docs claim it needs a login.

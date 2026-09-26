@@ -176,9 +176,9 @@ Worked examples, the executor pattern, and the two-merchant test shape:
 
 ### Considered and not chosen
 
-Eleven alternatives were evaluated and rejected — CrewAI, Clerk, Keycloak,
+Twelve alternatives were evaluated and rejected — CrewAI, Clerk, Keycloak,
 Passport, Arctic, pg-boss, Prisma, TypeORM, per-module schema files, Next.js,
-and the Anthropic SDK alone. Reasons are in
+the Anthropic SDK alone, and nestjs-zod. Reasons are in
 [docs/decisions.md](docs/decisions.md); read it before proposing any of them
 again.
 
@@ -235,6 +235,12 @@ db:migrate` → `pnpm --filter api db:verify-rls`.
 - **Local email.** `pnpm dev:up` also starts Mailpit: the dev `SMTP_URL` is
   `smtp://localhost:1025`, and verification and password-reset emails land at
   http://localhost:8025.
+- **API docs (dev only).** Swagger UI at http://localhost:5173/api/docs, JSON at
+  `/api/docs/openapi.json`: our controllers plus Better Auth's routes, built at
+  boot by `apps/api/src/openapi/openapi.ts`. Not mounted when
+  `NODE_ENV=production`. Open it through the Vite proxy, not the API's own
+  port: Better Auth trusts only `APP_URL`, so "Try it out" from
+  `localhost:3000` fails every auth call with `INVALID_ORIGIN`.
 - `apps/web` and `packages/shared` have no test runner yet; `apps/api` Jest runs
   as ESM (`--experimental-vm-modules`), configured in `apps/api/jest.config.mjs`.
 - `pnpm --filter @app/shared build` after changing a shared schema — `apps/api`

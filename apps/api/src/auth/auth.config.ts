@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
-import { organization } from 'better-auth/plugins';
+import { openAPI, organization } from 'better-auth/plugins';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@app/shared';
 import type { AppConfig } from '../config/app.config.js';
 import type { Database } from '../database/database.module.js';
@@ -152,7 +152,13 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
         trustedProviders: ['google'],
       },
     },
-    plugins: [organization()],
+    // openAPI() supplies auth.api.generateOpenAPISchema(), which setupOpenApi
+    // (src/openapi/openapi.ts) merges into our own document in development.
+    // Its HTTP surface stays shut in every environment: the Scalar page is
+    // off, and the schema endpoint is disabled below - disabledPaths is
+    // enforced by the router only, so the in-process call still works.
+    plugins: [organization(), openAPI({ disableDefaultReference: true })],
+    disabledPaths: ['/open-api/generate-schema'],
     hooks: {
       // Every error an auth endpoint returns leaves in the API's coded
       // envelope. Redirects are APIErrors too (302), so only real failures are

@@ -410,6 +410,8 @@ or the API typechecks against the stale build.
       `redact` list.
 - [ ] Request bodies validated with `ZodValidationPipe` against `@app/shared`;
       no parallel hand-written DTO.
+- [ ] New or changed routes carry OpenAPI decorators (`rest-api-design`
+      §"OpenAPI in this repo"); anonymous routes declare `security: []`.
 - [ ] New/changed code has specs under a `__tests__/` directory, including a
       two-merchant isolation test where business data is involved.
 - [ ] Every relative import ends in `.js`.
