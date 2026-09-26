@@ -37,6 +37,13 @@ services:
     volumes:
       - redis_dev_data:/data
 
+  # Catches every email the api sends - verification and password-reset links
+  # included - so auth flows work locally without a real provider. Point
+  # SMTP_URL at smtp://localhost:1025 and read the mail at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1
+    ports: ['1025:1025', '8025:8025']
+
 volumes:
   postgres_dev_data:
   redis_dev_data:

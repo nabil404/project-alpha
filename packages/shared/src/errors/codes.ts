@@ -16,6 +16,8 @@ export const errorCodes = [
   // Auth
   'AUTH_INVALID_CREDENTIALS',
   'AUTH_UNAUTHENTICATED',
+  'AUTH_EMAIL_NOT_VERIFIED',
+  'AUTH_INVALID_TOKEN',
 
   // Tenancy
   'TENANT_NO_ACTIVE_MERCHANT',

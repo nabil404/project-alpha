@@ -1,9 +1,9 @@
 import { errorResponseBodySchema } from '@app/shared';
 import { ApiError } from './api-error';
 
-/** Same-origin API client: Caddy proxies /api to the NestJS app. */
+/** Same-origin API client: Caddy proxies /api to the NestJS app, which serves /api/v1. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`/api/v1${path}`, {
     ...init,
     credentials: 'include',
     headers: { 'content-type': 'application/json', ...init?.headers },

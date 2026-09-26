@@ -3,4 +3,5 @@ export * from './schemas/conversation.js';
 export * from './schemas/order.js';
 export * from './schemas/catalog.js';
 export * from './schemas/llm.js';
+export * from './schemas/auth.js';
 export * from './errors/index.js';

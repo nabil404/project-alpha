@@ -9,15 +9,16 @@ Frontend conventions for **`apps/web`**, the seller dashboard of the
 Messenger-to-Order MVP. Stack is **React 19 · Vite · TypeScript · TanStack Router
 · TanStack Query · Tailwind CSS v4 · shadcn/ui · react-hook-form + Zod**.
 
-`AGENTS.md` at the repo root is the project's source of truth. This skill is the
-frontend operating manual; where the two disagree, `AGENTS.md` wins.
+`AGENTS.md` at the repo root and the current MVP under `docs/mvp/` are the
+project's source of truth. This skill is the frontend operating manual; where they
+disagree, they win.
 
 ## Platform facts
 
 - **This dashboard is for sellers only.** Customers never open it — they only
   ever talk to the Page in Messenger. Every screen here is something a seller
   does: watch orders arrive, fix them, manage the catalog, take over a chat.
-- **Surfaces in scope** (AGENTS.md §4): orders list and detail with transcript,
+- **Surfaces in scope** (`docs/mvp/01-messenger-to-order/scope.md`): orders list and detail with transcript,
   status changes, edits and notes, a Needs Attention queue, a conversation
   viewer, the bot on/off toggle, CSV import/export, catalog management, and Page
   connection. **Responsive is a requirement**, not a nice-to-have.
@@ -76,14 +77,20 @@ component owns its own data needs.
 
 - **Every server read and write goes through `apiFetch` from `@/lib/api`,
   wrapped in TanStack Query.** No raw `fetch` in a component, no axios, no
-  second base URL. `apiFetch` is same-origin `/api` with
+  second base URL. `apiFetch` is same-origin `/api/v1` with
   `credentials: 'include'` — Caddy proxies `/api` to NestJS on one domain, and
   Better Auth authenticates with a session cookie. Anything that bypasses it
   loses the cookie or the proxy path.
-  **Current state:** Better Auth is not mounted on the API yet — no
-  `/api/auth/*`, no session cookie — so `credentials: 'include'` is the right
-  shape for when it lands, but there is no session to send today. Don't build UI
-  that assumes an authenticated user until the API exposes one.
+  **Auth endpoints** are Better Auth's, at `/api/v1/auth/*`, and they answer
+  errors in the same coded envelope as every other route (`AUTH_*` codes), so
+  call them through `apiFetch` too rather than Better Auth's own client. Any
+  other route answers `AUTH_UNAUTHENTICATED` (401) without a session. The email
+  flows land on SPA routes this app has to provide: the verification link
+  redirects to the sign-up's `callbackURL` (send `'/'`), or to
+  `/?error=INVALID_TOKEN|TOKEN_EXPIRED`; the reset link redirects to the
+  forgot-password `redirectTo` (send `'/reset-password'`) with `?token=` or
+  `?error=INVALID_TOKEN`, and that page POSTs `/api/v1/auth/reset-password`.
+  Password rules come from `passwordSchema` in `@app/shared`.
 - **Query keys are domain-namespaced arrays**: `['orders', 'list', filters]`,
   `['orders', 'detail', orderId]`. After a mutation, invalidate by prefix
   (`['orders']`) instead of refetching by hand.
@@ -181,7 +188,7 @@ These are correctness bugs, not style preferences.
 
 ## Security rules the UI must honor
 
-From AGENTS.md §6 — these bind the frontend too:
+From `docs/mvp/01-messenger-to-order/rules.md` — these bind the frontend too:
 
 - **Never render, log, or put a Page access token or secret in the DOM, a query
   string, or the console.** If a token would be visible in a seller-facing

@@ -50,7 +50,7 @@ describe('error envelope over HTTP', () => {
   });
 
   it('sends a thrown code with its status', async () => {
-    const response = await request(app.getHttpServer()).get('/api/demo/coded');
+    const response = await request(app.getHttpServer()).get('/api/v1/demo/coded');
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({
@@ -63,7 +63,7 @@ describe('error envelope over HTTP', () => {
   });
 
   it('attributes a validation failure to the field that failed', async () => {
-    const response = await request(app.getHttpServer()).get('/api/demo/validated?quantity=-1');
+    const response = await request(app.getHttpServer()).get('/api/v1/demo/validated?quantity=-1');
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_FAILED');
@@ -81,7 +81,7 @@ describe('error envelope over HTTP', () => {
   });
 
   it('reduces an unexpected error to INTERNAL_SERVER_ERROR with nothing leaked', async () => {
-    const response = await request(app.getHttpServer()).get('/api/demo/bug');
+    const response = await request(app.getHttpServer()).get('/api/v1/demo/bug');
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
@@ -91,7 +91,7 @@ describe('error envelope over HTTP', () => {
   });
 
   it('passes a healthy response through untouched', async () => {
-    const response = await request(app.getHttpServer()).get('/api/demo/validated?quantity=3');
+    const response = await request(app.getHttpServer()).get('/api/v1/demo/validated?quantity=3');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ quantity: 3 });
