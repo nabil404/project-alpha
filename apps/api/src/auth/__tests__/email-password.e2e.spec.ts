@@ -98,7 +98,7 @@ describeDb('email/password auth over HTTP', () => {
     agent.post(path).set('Origin', APP_URL).send(body);
 
   const signUp = (address: string, password = PASSWORD) =>
-    post(request(server()), '/api/auth/sign-up/email', {
+    post(request(server()), '/api/v1/auth/sign-up/email', {
       email: address,
       password,
       name: 'Nadia Rahman',
@@ -180,7 +180,7 @@ describeDb('email/password auth over HTTP', () => {
 
       expect(mailer.lastTo(address).subject).toBe('Verify your email address');
 
-      const signIn = await post(request(server()), '/api/auth/sign-in/email', {
+      const signIn = await post(request(server()), '/api/v1/auth/sign-in/email', {
         email: address,
         password: PASSWORD,
       });
@@ -196,7 +196,7 @@ describeDb('email/password auth over HTTP', () => {
       await signUp(address).expect(200);
       const before = mailer.sent.filter((mail) => mail.to === address).length;
 
-      await post(request(server()), '/api/auth/sign-in/email', {
+      await post(request(server()), '/api/v1/auth/sign-in/email', {
         email: address,
         password: PASSWORD,
       }).expect(403);
@@ -207,6 +207,7 @@ describeDb('email/password auth over HTTP', () => {
     it('verifies, signs the seller in and resolves their organization', async () => {
       const address = email('verified');
       await signUp(address).expect(200);
+      expect(mailer.linkTo(address)).toMatch(/^\/api\/v1\/auth\/verify-email\?token=/);
 
       const agent = request.agent(server());
       const verify = await agent.get(mailer.linkTo(address));
@@ -226,7 +227,7 @@ describeDb('email/password auth over HTTP', () => {
 
     it('redirects a tampered link back to the SPA with an error', async () => {
       const response = await request(server()).get(
-        '/api/auth/verify-email?token=not-a-token&callbackURL=%2F',
+        '/api/v1/auth/verify-email?token=not-a-token&callbackURL=%2F',
       );
 
       expect(response.status).toBe(302);
@@ -234,7 +235,7 @@ describeDb('email/password auth over HTTP', () => {
     });
 
     it('answers a tampered link without a callback in the envelope', async () => {
-      const response = await request(server()).get('/api/auth/verify-email?token=not-a-token');
+      const response = await request(server()).get('/api/v1/auth/verify-email?token=not-a-token');
 
       expect(response.body).toEqual({
         error: { code: 'AUTH_INVALID_TOKEN', message: expect.any(String), params: {} },
@@ -275,7 +276,7 @@ describeDb('email/password auth over HTTP', () => {
       const address = email('wrong-password');
       await verifiedSeller(address);
 
-      const response = await post(request(server()), '/api/auth/sign-in/email', {
+      const response = await post(request(server()), '/api/v1/auth/sign-in/email', {
         email: address,
         password: 'not the password',
       });
@@ -289,12 +290,13 @@ describeDb('email/password auth over HTTP', () => {
       await verifiedSeller(address);
 
       const agent = request.agent(server());
-      await post(agent, '/api/auth/sign-in/email', { email: address, password: PASSWORD }).expect(
-        200,
-      );
+      await post(agent, '/api/v1/auth/sign-in/email', {
+        email: address,
+        password: PASSWORD,
+      }).expect(200);
       await agent.get('/api/v1/demo/me').expect(200);
 
-      await post(agent, '/api/auth/sign-out', {}).expect(200);
+      await post(agent, '/api/v1/auth/sign-out', {}).expect(200);
 
       const after = await agent.get('/api/v1/demo/me');
       expect(after.status).toBe(401);
@@ -314,12 +316,13 @@ describeDb('email/password auth over HTTP', () => {
   describe('password reset', () => {
     /** Requests a reset and follows the emailed link to the SPA's token. */
     const resetToken = async (address: string): Promise<string> => {
-      await post(request(server()), '/api/auth/request-password-reset', {
+      await post(request(server()), '/api/v1/auth/request-password-reset', {
         email: address,
         redirectTo: '/reset-password',
       }).expect(200);
 
       expect(mailer.lastTo(address).subject).toBe('Reset your password');
+      expect(mailer.linkTo(address)).toMatch(/^\/api\/v1\/auth\/reset-password\/[^/?]+/);
 
       const landing = await request(server()).get(mailer.linkTo(address)).expect(302);
       const location = new URL(landing.headers.location as string, APP_URL);
@@ -340,25 +343,27 @@ describeDb('email/password auth over HTTP', () => {
       const token = await resetToken(address);
       const newPassword = 'a brand new passphrase';
 
-      await post(request(server()), '/api/auth/reset-password', { token, newPassword }).expect(200);
+      await post(request(server()), '/api/v1/auth/reset-password', { token, newPassword }).expect(
+        200,
+      );
 
       // Every session from before the reset is gone.
       const revoked = await oldSession.get('/api/v1/demo/me');
       expect(revoked.body.error.code).toBe('AUTH_UNAUTHENTICATED');
 
-      const withOld = await post(request(server()), '/api/auth/sign-in/email', {
+      const withOld = await post(request(server()), '/api/v1/auth/sign-in/email', {
         email: address,
         password: PASSWORD,
       });
       expect(withOld.body.error.code).toBe('AUTH_INVALID_CREDENTIALS');
 
-      await post(request(server()), '/api/auth/sign-in/email', {
+      await post(request(server()), '/api/v1/auth/sign-in/email', {
         email: address,
         password: newPassword,
       }).expect(200);
 
       // The token is single-use.
-      const replay = await post(request(server()), '/api/auth/reset-password', {
+      const replay = await post(request(server()), '/api/v1/auth/reset-password', {
         token,
         newPassword: 'yet another passphrase',
       });
@@ -376,7 +381,7 @@ describeDb('email/password auth over HTTP', () => {
         .set({ expiresAt: new Date(Date.now() - 60_000) })
         .where(eq(schema.verification.identifier, `reset-password:${token}`));
 
-      const response = await post(request(server()), '/api/auth/reset-password', {
+      const response = await post(request(server()), '/api/v1/auth/reset-password', {
         token,
         newPassword: 'a brand new passphrase',
       });
@@ -386,7 +391,7 @@ describeDb('email/password auth over HTTP', () => {
     });
 
     it('rejects a short new password against the `newPassword` field', async () => {
-      const response = await post(request(server()), '/api/auth/reset-password', {
+      const response = await post(request(server()), '/api/v1/auth/reset-password', {
         token: 'irrelevant',
         newPassword: 'short',
       });
@@ -400,12 +405,22 @@ describeDb('email/password auth over HTTP', () => {
     it('answers an unknown email exactly like a known one', async () => {
       const unknown = email('nobody');
 
-      await post(request(server()), '/api/auth/request-password-reset', {
+      await post(request(server()), '/api/v1/auth/request-password-reset', {
         email: unknown,
         redirectTo: '/reset-password',
       }).expect(200);
 
       expect(mailer.sent.some((mail) => mail.to === unknown)).toBe(false);
+    });
+  });
+
+  describe('mount point', () => {
+    it('serves Better Auth under /api/v1/auth only', async () => {
+      await request(server()).get('/api/v1/auth/ok').expect(200, { ok: true });
+
+      const legacy = await request(server()).get('/api/auth/ok');
+      expect(legacy.status).toBe(404);
+      expect(legacy.body.error.code).toBe('HTTP_404');
     });
   });
 

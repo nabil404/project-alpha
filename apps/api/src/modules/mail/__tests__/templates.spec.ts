@@ -1,6 +1,6 @@
 import { existingAccountEmail, resetPasswordEmail, verificationEmail } from '../templates.js';
 
-const url = 'https://orders.example.com/api/auth/verify-email?token=abc.def&callbackURL=%2F';
+const url = 'https://orders.example.com/api/v1/auth/verify-email?token=abc.def&callbackURL=%2F';
 
 describe.each([
   ['verificationEmail', verificationEmail],

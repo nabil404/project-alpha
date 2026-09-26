@@ -67,13 +67,13 @@ export const RESET_PASSWORD_TOKEN_TTL = 60 * 60;
  * other table, so auth changes are versioned and reviewed rather than applied
  * out of band.
  *
- * The HTTP surface is mounted at /api/auth by AuthModule (auth.module.ts). The
- * SPA drives the email flows with these callback paths:
+ * The HTTP surface is mounted at /api/v1/auth by AuthModule (auth.module.ts).
+ * The SPA drives the email flows with these callback paths:
  *   - sign-up sends `callbackURL: '/'`; the emailed link verifies, signs the
  *     seller in and redirects there, or to `/?error=INVALID_TOKEN|TOKEN_EXPIRED`;
  *   - forgot-password sends `redirectTo: '/reset-password'`; the emailed link
  *     lands on `/reset-password?token=...` (or `?error=INVALID_TOKEN`), and that
- *     page POSTs /api/auth/reset-password with the token and new password.
+ *     page POSTs /api/v1/auth/reset-password with the token and new password.
  */
 export function createAuth({ db, settings, mailer }: AuthDependencies) {
   const logger = new Logger('BetterAuth');
@@ -94,7 +94,9 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     },
     database: drizzleAdapter(db, { provider: 'pg', schema }),
     baseURL: settings.appUrl,
-    basePath: '/api/auth',
+    // A literal, not derived from the API version: this is Better Auth's
+    // contract, not ours, and it does not move with a future /api/v2.
+    basePath: '/api/v1/auth',
     secret: settings.secret,
     emailAndPassword: {
       enabled: true,

@@ -9,10 +9,11 @@ import { AllExceptionsFilter } from './common/errors/index.js';
 /**
  * Options for NestFactory.create, shared by main.ts and the supertest runs.
  *
- * Nest's body parser is off because Better Auth has to read /api/auth request
- * bodies itself. AuthModule re-adds JSON and urlencoded parsing for every other
- * route, and attaches req.rawBody for the Messenger signature check - which is
- * why there is no `rawBody: true` here: with the parser off it does nothing.
+ * Nest's body parser is off because Better Auth has to read /api/v1/auth
+ * request bodies itself. AuthModule re-adds JSON and urlencoded parsing for
+ * every other route, and attaches req.rawBody for the Messenger signature
+ * check - which is why there is no `rawBody: true` here: with the parser off it
+ * does nothing.
  */
 export const NEST_APP_OPTIONS = {
   bufferLogs: true,

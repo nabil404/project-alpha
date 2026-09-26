@@ -2,30 +2,30 @@ import { redactUrl } from '../redact-url.js';
 
 describe('redactUrl', () => {
   it('masks the email verification token', () => {
-    expect(redactUrl('/api/auth/verify-email?token=eyJhbGciOi.abc.def&callbackURL=%2F')).toBe(
-      '/api/auth/verify-email?token=[REDACTED]&callbackURL=%2F',
+    expect(redactUrl('/api/v1/auth/verify-email?token=eyJhbGciOi.abc.def&callbackURL=%2F')).toBe(
+      '/api/v1/auth/verify-email?token=[REDACTED]&callbackURL=%2F',
     );
   });
 
   it('masks the reset token in the path', () => {
-    expect(redactUrl('/api/auth/reset-password/Xk29sQ01abc?callbackURL=%2Freset-password')).toBe(
-      '/api/auth/reset-password/[REDACTED]?callbackURL=%2Freset-password',
+    expect(redactUrl('/api/v1/auth/reset-password/Xk29sQ01abc?callbackURL=%2Freset-password')).toBe(
+      '/api/v1/auth/reset-password/[REDACTED]?callbackURL=%2Freset-password',
     );
   });
 
   it('masks an OAuth code and state', () => {
-    expect(redactUrl('/api/auth/callback/google?state=s1&code=c2&scope=email')).toBe(
-      '/api/auth/callback/google?state=[REDACTED]&code=[REDACTED]&scope=email',
+    expect(redactUrl('/api/v1/auth/callback/google?state=s1&code=c2&scope=email')).toBe(
+      '/api/v1/auth/callback/google?state=[REDACTED]&code=[REDACTED]&scope=email',
     );
   });
 
   it("masks Meta's webhook verify token", () => {
     expect(
       redactUrl(
-        '/api/webhooks/messenger?hub.mode=subscribe&hub.verify_token=s3cret&hub.challenge=42',
+        '/api/v1/webhooks/messenger?hub.mode=subscribe&hub.verify_token=s3cret&hub.challenge=42',
       ),
     ).toBe(
-      '/api/webhooks/messenger?hub.mode=subscribe&hub.verify_token=[REDACTED]&hub.challenge=42',
+      '/api/v1/webhooks/messenger?hub.mode=subscribe&hub.verify_token=[REDACTED]&hub.challenge=42',
     );
   });
 
@@ -34,8 +34,8 @@ describe('redactUrl', () => {
   });
 
   it('leaves URLs without credentials alone', () => {
-    expect(redactUrl('/api/orders?page=2&status=new')).toBe('/api/orders?page=2&status=new');
+    expect(redactUrl('/api/v1/orders?page=2&status=new')).toBe('/api/v1/orders?page=2&status=new');
     expect(redactUrl('/health')).toBe('/health');
-    expect(redactUrl('/api/auth/reset-password')).toBe('/api/auth/reset-password');
+    expect(redactUrl('/api/v1/auth/reset-password')).toBe('/api/v1/auth/reset-password');
   });
 });

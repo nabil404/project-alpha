@@ -10,7 +10,7 @@ import {
 /**
  * Better Auth writes its own `{ code, message }` JSON straight to the response,
  * past AllExceptionsFilter. This turns that into the API's coded envelope, so
- * the SPA reads /api/auth/* errors exactly as it reads every other endpoint's.
+ * the SPA reads /api/v1/auth/* errors exactly as it reads every other endpoint's.
  *
  * Pure on purpose: the after-hook in auth.config.ts is the only caller, and
  * the mapping can be tested without booting Better Auth.

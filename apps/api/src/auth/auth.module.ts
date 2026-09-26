@@ -8,9 +8,9 @@ import { authSettingsFrom, createAuth } from './auth.config.js';
 export type Auth = ReturnType<typeof createAuth>;
 
 /**
- * Mounts Better Auth at /api/auth through @thallesp/nestjs-better-auth, which
- * also provides AuthService, the @Session() and @AllowAnonymous() decorators,
- * and the AuthGuard that SessionGuard extends.
+ * Mounts Better Auth at /api/v1/auth through @thallesp/nestjs-better-auth,
+ * which also provides AuthService, the @Session() and @AllowAnonymous()
+ * decorators, and the AuthGuard that SessionGuard extends.
  *
  * Two things this changes app-wide:
  *   - Nest's own body parser is off (NEST_APP_OPTIONS in bootstrap.ts): Better
