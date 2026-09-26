@@ -1,7 +1,8 @@
 # Messenger-to-Order
 
-Turns Facebook/Messenger conversations into confirmed orders. Project context,
-non-negotiable rules, and database rules live in [AGENTS.md](./AGENTS.md).
+Turns Facebook/Messenger conversations into confirmed orders. Product context,
+non-negotiable rules, and database rules live in [docs/mvp/](./docs/mvp/README.md);
+commands and coding conventions in [AGENTS.md](./AGENTS.md).
 
 ## Layout
 

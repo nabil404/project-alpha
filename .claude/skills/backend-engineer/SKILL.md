@@ -10,8 +10,9 @@ behind the Messenger-to-Order MVP. Stack is **NestJS 12 · TypeScript · Postgre
 
 - Drizzle · drizzle-kit migrations · BullMQ + Redis · Better Auth · Zod**.
 
-`AGENTS.md` at the repo root is the project's source of truth. This skill is the
-backend operating manual; where the two disagree, `AGENTS.md` wins.
+`AGENTS.md` at the repo root and the current MVP under `docs/mvp/` are the
+project's source of truth. This skill is the backend operating manual; where they
+disagree, they win.
 
 Two areas are load-bearing — a mistake is a **leak or an outage**, not a bug —
 and are marked ⚠️ below.
@@ -138,7 +139,7 @@ predicate is the leak to catch in review.**
   second seller connect a Page the first already owns and silently split their
   conversations. It is the exception, not a missed `merchant_id`.
 
-- **Required test, per AGENTS.md:** two merchants, proving one can never read,
+- **Required test, per `docs/mvp/01-messenger-to-order/rules.md`:** two merchants, proving one can never read,
   update, or confirm the other's data. Write it for every repository, not once.
 
 ### Row-level security (groundwork in place — policies still to come)
@@ -370,7 +371,7 @@ or the API typechecks against the stale build.
 - Jest runs as **ESM** (`NODE_OPTIONS=--experimental-vm-modules`, ts-jest ESM
   preset). Keep `.js` extensions on relative imports inside specs.
 - **Specs live in a colocated `__tests__/` directory**, never as a sibling file.
-- **Focus, per AGENTS.md: the state machine, tenant isolation, and extraction
+- **Focus, per `docs/architecture/tech-stack.md`: the state machine, tenant isolation, and extraction
   accuracy** — not coverage for its own sake.
 - **Prefer pure functions tested without the Nest container.**
   `src/modules/messenger/__tests__/signature.spec.ts` and

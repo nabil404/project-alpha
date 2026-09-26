@@ -9,15 +9,16 @@ Frontend conventions for **`apps/web`**, the seller dashboard of the
 Messenger-to-Order MVP. Stack is **React 19 · Vite · TypeScript · TanStack Router
 · TanStack Query · Tailwind CSS v4 · shadcn/ui · react-hook-form + Zod**.
 
-`AGENTS.md` at the repo root is the project's source of truth. This skill is the
-frontend operating manual; where the two disagree, `AGENTS.md` wins.
+`AGENTS.md` at the repo root and the current MVP under `docs/mvp/` are the
+project's source of truth. This skill is the frontend operating manual; where they
+disagree, they win.
 
 ## Platform facts
 
 - **This dashboard is for sellers only.** Customers never open it — they only
   ever talk to the Page in Messenger. Every screen here is something a seller
   does: watch orders arrive, fix them, manage the catalog, take over a chat.
-- **Surfaces in scope** (AGENTS.md §4): orders list and detail with transcript,
+- **Surfaces in scope** (`docs/mvp/01-messenger-to-order/scope.md`): orders list and detail with transcript,
   status changes, edits and notes, a Needs Attention queue, a conversation
   viewer, the bot on/off toggle, CSV import/export, catalog management, and Page
   connection. **Responsive is a requirement**, not a nice-to-have.
@@ -187,7 +188,7 @@ These are correctness bugs, not style preferences.
 
 ## Security rules the UI must honor
 
-From AGENTS.md §6 — these bind the frontend too:
+From `docs/mvp/01-messenger-to-order/rules.md` — these bind the frontend too:
 
 - **Never render, log, or put a Page access token or secret in the DOM, a query
   string, or the console.** If a token would be visible in a seller-facing
