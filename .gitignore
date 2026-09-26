@@ -18,3 +18,6 @@ caddy_data/
 caddy_config/
 backups/
 dump.rdb
+
+# Superpowers plugin plans and specs (local only)
+docs/superpowers/
