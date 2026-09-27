@@ -5,6 +5,7 @@ import {
   type S3Client,
 } from '@aws-sdk/client-s3';
 import { HttpException, Logger } from '@nestjs/common';
+import { jest } from '@jest/globals';
 import { S3ObjectStorage } from '../s3-object-storage.js';
 
 /** Stands in for S3Client: records each command and answers with `respond`. */
@@ -101,6 +102,30 @@ describe('S3ObjectStorage', () => {
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(503);
     expect((error as HttpException).getResponse()).toMatchObject({ code: 'STORAGE_UNAVAILABLE' });
+  });
+
+  it('logs the HTTP status and error code, but never the error message', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const sender = new FakeSender(() => {
+      throw Object.assign(new Error('AccessDenied for key-id'), {
+        name: 'AccessDenied',
+        $metadata: { httpStatusCode: 403 },
+      });
+    });
+
+    try {
+      await storageWith(sender)
+        .put('m/a/1.jpg', Buffer.from('x'), { contentType: 'image/jpeg', cacheControl: 'x' })
+        .catch(() => undefined);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      const [message] = warn.mock.calls[0] as [string];
+      expect(message).toContain('AccessDenied');
+      expect(message).toContain('403');
+      expect(message).not.toContain('key-id');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it.each(['https://media.example.com', 'https://media.example.com/'])(

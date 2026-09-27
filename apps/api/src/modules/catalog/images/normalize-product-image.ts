@@ -3,7 +3,7 @@ import sharp from 'sharp';
 
 const logger = new Logger('normalizeProductImage');
 
-function describe(error: unknown): string {
+function describeError(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
@@ -53,7 +53,7 @@ export async function normalizeProductImage(
   try {
     ({ format, width, height } = await sharp(input).metadata());
   } catch (error) {
-    logger.warn(`Rejected image as invalid: ${describe(error)}`);
+    logger.warn(`Rejected image as invalid: ${describeError(error)}`);
     return invalid;
   }
 
@@ -98,7 +98,7 @@ export async function normalizeProductImage(
       byteSize: full.data.length,
     };
   } catch (error) {
-    logger.warn(`Rejected image as invalid: ${describe(error)}`);
+    logger.warn(`Rejected image as invalid: ${describeError(error)}`);
     return invalid;
   }
 }
