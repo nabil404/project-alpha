@@ -3,7 +3,12 @@ import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { openAPI, organization } from 'better-auth/plugins';
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, signUpSchema } from '@app/shared';
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  RESET_PASSWORD_TOKEN_TTL,
+  signUpSchema,
+} from '@app/shared';
 import { zodIssuesToFields } from '../common/errors/validation-fields.js';
 import type { AppConfig } from '../config/app.config.js';
 import type { Database } from '../database/database.module.js';
@@ -50,9 +55,12 @@ export interface AuthDependencies {
   mailer: Mailer;
 }
 
-/** Seconds. The reset link is the more dangerous one, so it lives shorter. */
+/**
+ * Seconds. The reset link is the more dangerous one, so it lives shorter:
+ * RESET_PASSWORD_TOKEN_TTL, in @app/shared because the SPA tells the seller
+ * when it expires.
+ */
 export const VERIFICATION_TOKEN_TTL = 24 * 60 * 60;
-export const RESET_PASSWORD_TOKEN_TTL = 60 * 60;
 
 /**
  * Sessions and users live in our own Postgres. Better Auth shares the API's

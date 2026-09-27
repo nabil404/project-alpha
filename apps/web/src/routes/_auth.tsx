@@ -5,9 +5,17 @@ import { useTranslation } from 'react-i18next';
 import { ThemeSelect } from '@/components/ThemeSelect';
 import { sessionQueryOptions } from '@/features/auth';
 
-/** Sign-in and sign-up. A seller who is already signed in has no business here. */
+/**
+ * Sign-in, sign-up and password reset. A seller who is already signed in is
+ * sent to the dashboard - except from an emailed reset link, which has to work
+ * on a device that is still signed in: resetting is how a seller takes back an
+ * account, and the reset ends every session anyway.
+ */
 export const Route = createFileRoute('/_auth')({
-  beforeLoad: async ({ context }) => {
+  beforeLoad: async ({ context, location }) => {
+    if (location.pathname === '/reset-password') {
+      return;
+    }
     const session = await context.queryClient.ensureQueryData(sessionQueryOptions());
     if (session) {
       throw redirect({ to: '/' });

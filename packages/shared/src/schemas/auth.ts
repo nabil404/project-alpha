@@ -62,3 +62,21 @@ export const signInSchema = z.object({
   rememberMe: z.boolean(),
 });
 export type SignInInput = z.infer<typeof signInSchema>;
+
+/**
+ * Seconds a password-reset link stays valid. Better Auth enforces it, and the
+ * SPA quotes it ("It expires in 60 minutes"), so both read it from here.
+ */
+export const RESET_PASSWORD_TOKEN_TTL = 60 * 60;
+
+/** Forgot password: an unknown email gets the same answer as a known one. */
+export const requestPasswordResetSchema = z.object({
+  email: z.email(),
+});
+export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
+
+/** The new password sent with the emailed token, under Better Auth's field name. */
+export const resetPasswordSchema = z.object({
+  newPassword: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

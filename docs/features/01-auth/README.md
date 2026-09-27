@@ -6,9 +6,10 @@ Scope comes from the MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
 describes how it is built.
 
 **Status (Sep 2026):** the API side is implemented and covered by an HTTP-level
-e2e spec. The SPA has sign-in (`/sign-in`) and sign-up (`/sign-up`). Not built
-yet: the reset screens, the explicit Facebook linking UI in account settings,
-and the Facebook Page connection flow (see [Not yet built](#not-yet-built)).
+e2e spec. The SPA has sign-in (`/sign-in`), sign-up (`/sign-up`), forgot
+password (`/forgot-password`) and reset password (`/reset-password`). Not built
+yet: the explicit Facebook linking UI in account settings, and the Facebook
+Page connection flow (see [Not yet built](#not-yet-built)).
 
 ## At a glance
 
@@ -102,7 +103,7 @@ pointing to `/sign-in`.
    `redirectTo: '/reset-password'`. An unknown email gets exactly the same
    answer as a known one.
 2. The **"Reset your password"** mail link is valid for **1 hour**
-   (`RESET_PASSWORD_TOKEN_TTL`, shorter than verification because this link is
+   (`RESET_PASSWORD_TOKEN_TTL` in `@app/shared`, which the SPA also quotes; shorter than verification because this link is
    more dangerous) and works once.
 3. The link lands on `/reset-password?token=…` (or `?error=INVALID_TOKEN`).
    That page sends `POST /api/v1/auth/reset-password` with `{ token,
@@ -303,9 +304,9 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- auth
 
 ## Not yet built
 
-- **SPA screens:** forgot password and `/reset-password`. Sign-in has no
-  "Forgot password?" link until they exist. A failed verification link
-  (`/?error=…`) lands on sign-in with an error banner.
+- **Email verified screen.** A successful verification link lands on `/`
+  with no confirmation; a failed one (`/?error=…`) lands on sign-in with an
+  error banner.
 - **Terms and privacy pages.** Sign-up requires agreeing to them, but
   `apps/web/src/features/auth/legal.ts` points at placeholder paths, and the
   agreement is not recorded server-side.

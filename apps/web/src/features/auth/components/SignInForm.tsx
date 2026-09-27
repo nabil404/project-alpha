@@ -82,7 +82,15 @@ export function SignInForm({
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('fields.password')}</FormLabel>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <FormLabel>{t('fields.password')}</FormLabel>
+                    <Link
+                      to="/forgot-password"
+                      className="text-small font-medium text-link hover:underline"
+                    >
+                      {t('signIn.forgotPassword')}
+                    </Link>
+                  </div>
                   <FormControl>
                     <PasswordInput autoComplete="current-password" {...field} />
                   </FormControl>

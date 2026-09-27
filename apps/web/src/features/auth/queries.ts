@@ -1,5 +1,10 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { SignInInput, SignUpInput } from '@app/shared';
+import type {
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  SignInInput,
+  SignUpInput,
+} from '@app/shared';
 
 import { apiFetch } from '@/lib/api';
 
@@ -30,6 +35,9 @@ export interface Session {
 
 /** Where the emailed verification link sends the seller once it has signed them in. */
 const VERIFIED_CALLBACK_URL = '/';
+
+/** Where the emailed reset link lands, with `?token=` (or `?error=INVALID_TOKEN`). */
+const RESET_PASSWORD_URL = '/reset-password';
 
 /** The signed-in seller, or null. Better Auth answers 200 with `null` when there is no session. */
 export const sessionQueryOptions = () =>
@@ -70,6 +78,32 @@ export function useResendVerificationEmail() {
         method: 'POST',
         body: JSON.stringify({ email, callbackURL: VERIFIED_CALLBACK_URL }),
       }),
+  });
+}
+
+/** Answers the same for an unknown email, so the form can't be used to probe for accounts. */
+export function useRequestPasswordReset() {
+  return useMutation({
+    mutationFn: ({ email }: RequestPasswordResetInput) =>
+      apiFetch<unknown>('/auth/request-password-reset', {
+        method: 'POST',
+        body: JSON.stringify({ email, redirectTo: RESET_PASSWORD_URL }),
+      }),
+  });
+}
+
+export function useResetPassword() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: ResetPasswordInput & { token: string }) =>
+      apiFetch<unknown>('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    // A reset signs the account out everywhere, this browser included, so a
+    // cached session would now be a lie.
+    onSuccess: () => queryClient.clear(),
   });
 }
 

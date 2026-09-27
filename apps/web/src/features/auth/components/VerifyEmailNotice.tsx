@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
 
 import { useResendVerificationEmail } from '../queries';
-import { AuthCard, AuthCardFooter } from './AuthCard';
+import { AuthCard, AuthCardFooter, AuthCardIcon } from './AuthCard';
 
 /** Shown once a sign-up is accepted: the account exists, but not until the emailed link is opened. */
 export function VerifyEmailNotice({
@@ -22,11 +22,7 @@ export function VerifyEmailNotice({
 
   return (
     <AuthCard
-      icon={
-        <div className="flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent">
-          <Mail aria-hidden className="size-6" strokeWidth={1.5} />
-        </div>
-      }
+      icon={<AuthCardIcon icon={Mail} />}
       title={t('verifyEmail.title')}
       description={
         <Trans

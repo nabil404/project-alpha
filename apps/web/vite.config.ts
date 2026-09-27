@@ -9,7 +9,15 @@ export default defineConfig({
   // from the files in src/routes and splits each route into its own chunk.
   plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // The SPA bundles @app/shared from its TypeScript source rather than its
+      // built dist/. dist/ is CommonJS (the API consumes it), which a browser
+      // can't read named exports from in dev, and a pre-bundled copy of it goes
+      // stale on every rebuild. Typecheck still reads dist/'s declarations, so
+      // `pnpm --filter @app/shared build` after a schema change still applies.
+      '@app/shared': fileURLToPath(new URL('../../packages/shared/src/index.ts', import.meta.url)),
+    },
   },
   server: {
     port: 5173,
@@ -17,10 +25,5 @@ export default defineConfig({
     // dev proxy keeps local development identical.
     proxy: { '/api': { target: 'http://localhost:3000', changeOrigin: true } },
   },
-  // @app/shared builds to CommonJS (the API consumes it too). Vite serves a
-  // linked workspace package raw in dev, where a browser can't read named
-  // exports from CJS, so it has to be pre-bundled like any npm dependency.
-  // After changing a shared schema: rebuild it, and restart `pnpm dev`.
-  optimizeDeps: { include: ['@app/shared'] },
   build: { outDir: 'dist', sourcemap: true },
 });

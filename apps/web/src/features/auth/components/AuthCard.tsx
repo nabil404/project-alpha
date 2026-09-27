@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -37,4 +38,24 @@ export function AuthCard({
 /** The hairline-separated line at the bottom of an auth card: "New here? Create an account". */
 export function AuthCardFooter({ children }: { children: ReactNode }) {
   return <p className="border-t border-border pt-6 text-center text-ink-muted">{children}</p>;
+}
+
+/** The round icon above a step card's title: accent while waiting on the seller, success once done. */
+export function AuthCardIcon({
+  icon: Icon,
+  tone = 'accent',
+}: {
+  icon: LucideIcon;
+  tone?: 'accent' | 'success';
+}) {
+  return (
+    <div
+      className={cn(
+        'flex size-12 items-center justify-center rounded-full',
+        tone === 'accent' ? 'bg-accent-soft text-accent' : 'bg-success-soft text-success',
+      )}
+    >
+      <Icon aria-hidden className="size-6" strokeWidth={1.5} />
+    </div>
+  );
 }
