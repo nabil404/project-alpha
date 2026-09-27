@@ -9,8 +9,10 @@
 - Connect Facebook Page: a separate step after sign-in that requests Page
   permissions. Facebook sign-in itself requests only `public_profile` and
   `email`.
-- Product catalog: products, aliases, variants, prices, images, stock status,
-  delivery charges, CSV import.
+- Product catalog: products (draft / active / archived), aliases, variants with
+  SKUs, prices and stock counts, images, delivery charges, nested categories (up
+  to 3 levels, a product in several), CSV import. Sellers organize by category;
+  the AI browses by it.
 - AI: intent classification, product matching, slot-filling, confirmation,
   mid-flow edits.
 - Automatic order creation with the order ID sent to the customer.

@@ -27,8 +27,16 @@ delivery address.
   references `organization(id)` and never `user(id)`, and all queries are scoped
   by it.
 - **Page** — connected Facebook Page, encrypted token, bot on/off.
-- **Product / Variant** — name, aliases, price, images, stock status, delivery
-  charge.
+- **Product / Variant** — product: name, aliases, description, images,
+  delivery charge, status (`draft`, `active`, `archived`). Variant: name, SKU
+  (unique per seller among live variants), price, stock count. A product always
+  has at least one live variant; one sold without options has a single unnamed
+  default variant. Variants are archived, never deleted, so orders keep pointing
+  at them. The AI sees only active products and their live variants. Stock is
+  decremented when an order is confirmed and restored if it is cancelled.
+- **Category** — a seller's tree, at most 3 levels deep; names unique per seller.
+  A product can sit in several categories. Deleting one is a soft delete, refused
+  while it has subcategories, and removes it from its products.
 - **Customer** — Messenger PSID, name, phone, address.
 - **Conversation** — customer, Page, state, collected slots, bot paused flag.
 - **Message** — direction, content, timestamps, Meta message ID.
