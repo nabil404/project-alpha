@@ -31,6 +31,18 @@ export const errorCodes = [
   // Object storage
   'STORAGE_UNAVAILABLE',
 
+  // Catalog
+  'PRODUCT_NOT_FOUND',
+  'VARIANT_NOT_FOUND',
+  'CATEGORY_NOT_FOUND',
+  'CATEGORY_CYCLE',
+  'CATEGORY_TOO_DEEP',
+  'CATEGORY_HAS_CHILDREN',
+  'CATEGORY_NAME_TAKEN',
+  'PRODUCT_NEEDS_VARIANT',
+  'VARIANT_NAME_REQUIRED',
+  'SKU_TAKEN',
+
   // Field-level, derived from Zod issues
   'REQUIRED',
   'INVALID_TYPE',
