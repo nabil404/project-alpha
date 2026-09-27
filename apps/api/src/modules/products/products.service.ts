@@ -8,7 +8,6 @@ import type {
   UpdateVariant,
 } from '@app/shared';
 import type { TenantScope, Transaction } from '../../database/base.repository.js';
-import { CodedConflictException } from '../../common/errors/index.js';
 import { DATABASE, type Database } from '../../database/database.module.js';
 import { withMerchant } from '../../database/with-merchant.js';
 import { toCategory } from '../categories/category-mappers.js';
@@ -16,6 +15,7 @@ import { CategoriesRepository } from '../categories/categories.repository.js';
 import { categoryNotFound } from '../categories/category-errors.js';
 import {
   guardSku,
+  productNeedsVariant,
   productNotFound,
   variantNameRequired,
   variantNotFound,
@@ -41,6 +41,9 @@ export class ProductsService {
   create(merchantId: string, input: CreateProduct): Promise<Product> {
     return withMerchant(this.db, merchantId, async (tx) => {
       const scope = { merchantId };
+      // A product with no live variant cannot exist; the schema refines this too,
+      // but the service holds the rule for any caller that bypasses it.
+      if (input.variants.length === 0) throw productNeedsVariant();
       // The shared schema refines this too; the service holds the rule for any caller.
       if (input.variants.length > 1 && input.variants.some((v) => v.name === null)) {
         throw variantNameRequired();
@@ -174,15 +177,7 @@ export class ProductsService {
 
       const live = await this.products.liveVariants(tx, scope, [productId]);
       if (!live.some((v) => v.id === variantId)) throw variantNotFound(variantId);
-      if (live.length === 1) {
-        throw new CodedConflictException(
-          'PRODUCT_NEEDS_VARIANT',
-          'A product needs at least one variant',
-          {
-            id: productId,
-          },
-        );
-      }
+      if (live.length === 1) throw productNeedsVariant(productId);
 
       await this.products.archiveVariant(tx, scope, variantId);
       return this.load(tx, scope, productId);

@@ -137,6 +137,15 @@ describeDb('ProductsService — products and category links', () => {
         'CATEGORY_NOT_FOUND',
       );
     });
+
+    it('refuses a product with no variants, before any insert, even past the schema', async () => {
+      const name = `No Variants ${++n}`;
+      const unchecked: CreateProduct = { ...input({ name }), variants: [] };
+      await expectCoded(service.create(t.merchantA, unchecked), 'PRODUCT_NEEDS_VARIANT');
+      await expect(
+        t.db.select().from(schema.product).where(eq(schema.product.name, name)),
+      ).resolves.toHaveLength(0);
+    });
   });
 
   describe('get, update, remove', () => {

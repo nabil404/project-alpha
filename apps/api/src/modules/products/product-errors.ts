@@ -18,6 +18,14 @@ export const variantNameRequired = () =>
     'Every variant needs a name when a product has more than one',
   );
 
+/** Spec rule: "A product with no live variant cannot exist." */
+export const productNeedsVariant = (id?: string) =>
+  new CodedConflictException(
+    'PRODUCT_NEEDS_VARIANT',
+    'A product needs at least one variant',
+    id ? { id } : {},
+  );
+
 /**
  * Maps the live-SKU unique index to SKU_TAKEN for a SKU the seller typed.
  * Generated SKUs never reach here: the repository retries those with ON
