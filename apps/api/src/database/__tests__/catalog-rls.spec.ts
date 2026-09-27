@@ -6,6 +6,7 @@ import {
   describeDb,
   openCatalogTestDb,
   pgErrorOf,
+  seedImage,
   seedProduct,
   type CatalogTestDb,
 } from './catalog-test-db.js';
@@ -59,5 +60,21 @@ describeDb('catalog row-level security (as app_runtime)', () => {
         ),
       ),
     ).resolves.toMatchObject({ code: '42501' });
+  });
+
+  it("hides a merchant's product images from another merchant", async () => {
+    const product = await seedProduct(t.db, t.merchantA);
+    const image = await seedImage(t.db, t.merchantA, product.id);
+    const byId = eq(schema.productImage.id, image.id);
+
+    await expect(
+      asRuntime(t.merchantA, (tx) => tx.select().from(schema.productImage).where(byId)),
+    ).resolves.toHaveLength(1);
+    await expect(
+      asRuntime(t.merchantB, (tx) => tx.select().from(schema.productImage).where(byId)),
+    ).resolves.toHaveLength(0);
+    await expect(
+      asRuntime(t.merchantB, (tx) => tx.delete(schema.productImage).where(byId).returning()),
+    ).resolves.toHaveLength(0);
   });
 });

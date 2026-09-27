@@ -175,7 +175,8 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     // enforced by the router only, so the in-process call still works.
     // Organization deletion is off: every catalog table references
     // organization(id) with ON DELETE NO ACTION, so the delete would fail on
-    // the first seller with products. It comes back with account deletion.
+    // the first seller with products. It comes back with account deletion,
+    // which must also delete every product image object under m/{merchantId}/.
     plugins: [
       organization({ disableOrganizationDeletion: true }),
       openAPI({ disableDefaultReference: true }),

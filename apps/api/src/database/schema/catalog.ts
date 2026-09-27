@@ -92,6 +92,14 @@ export const productVariant = pgTable(
     price: integer('price').notNull(),
     stock: integer('stock').notNull().default(0),
     isDefault: boolean('is_default').notNull().default(false),
+    /**
+     * One of the product's own images, or null for the product's cover. Its
+     * foreign key, (merchant_id, image_id) -> product_image ON DELETE SET NULL
+     * (image_id), lives in migration 0006: drizzle-kit cannot model the column
+     * list, and a plain composite SET NULL would null merchant_id too. The
+     * service enforces the same product.
+     */
+    imageId: text('image_id'),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -116,6 +124,41 @@ export const productVariant = pgTable(
     merchantIsolation('product_variant_merchant_isolation', t.merchantId),
   ],
 );
+
+/**
+ * A product's photo gallery. The objects live in object storage at keys built
+ * from (merchant_id, id); storage_key is the full image's, and the thumbnail's
+ * is derived. position is dense (0..n-1) and 0 is the cover; it is deliberately
+ * not unique, so a reorder rewrites positions without deferral.
+ */
+export const productImage = pgTable(
+  'product_image',
+  {
+    // Set by the service, which needs the id to build the storage key first.
+    id: text('id').primaryKey(),
+    merchantId: merchantId(),
+    productId: text('product_id').notNull(),
+    storageKey: text('storage_key').notNull(),
+    position: integer('position').notNull(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    byteSize: integer('byte_size').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('product_image_merchant_id_uq').on(t.merchantId, t.id),
+    unique('product_image_storage_key_uq').on(t.storageKey),
+    foreignKey({
+      name: 'product_image_product_fk',
+      columns: [t.merchantId, t.productId],
+      foreignColumns: [product.merchantId, product.id],
+    }).onDelete('cascade'),
+    index('product_image_merchant_product_position_idx').on(t.merchantId, t.productId, t.position),
+    merchantIsolation('product_image_merchant_isolation', t.merchantId),
+  ],
+);
+
+export type ProductImageRow = typeof productImage.$inferSelect;
 
 export const category = pgTable(
   'category',

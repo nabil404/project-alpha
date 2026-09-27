@@ -5,6 +5,7 @@ import {
   openCatalogTestDb,
   pgErrorOf,
   seedCategory,
+  seedImage,
   seedProduct,
   seedVariant,
   type CatalogTestDb,
@@ -172,5 +173,50 @@ describeDb('catalog schema constraints', () => {
           ),
         ),
     ).resolves.toHaveLength(0);
+  });
+
+  describe('product images', () => {
+    it("rejects an image on another merchant's product", async () => {
+      const productOfA = await seedProduct(t.db, t.merchantA);
+      await expect(pgErrorOf(seedImage(t.db, t.merchantB, productOfA.id))).resolves.toEqual({
+        code: '23503',
+        constraint: 'product_image_product_fk',
+      });
+    });
+
+    it("rejects a variant pointing at another merchant's image", async () => {
+      const productOfA = await seedProduct(t.db, t.merchantA);
+      const productOfB = await seedProduct(t.db, t.merchantB);
+      const imageOfB = await seedImage(t.db, t.merchantB, productOfB.id);
+      await expect(
+        pgErrorOf(seedVariant(t.db, t.merchantA, productOfA.id, { imageId: imageOfB.id })),
+      ).resolves.toEqual({ code: '23503', constraint: 'product_variant_image_fk' });
+    });
+
+    it('clears only image_id on a variant when its image is deleted', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      const image = await seedImage(t.db, t.merchantA, product.id);
+      const variant = await seedVariant(t.db, t.merchantA, product.id, { imageId: image.id });
+
+      await t.db.delete(schema.productImage).where(eq(schema.productImage.id, image.id));
+
+      const [after] = await t.db
+        .select()
+        .from(schema.productVariant)
+        .where(eq(schema.productVariant.id, variant.id));
+      expect(after).toMatchObject({ imageId: null, merchantId: t.merchantA });
+    });
+
+    it('removes images with their product', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      const image = await seedImage(t.db, t.merchantA, product.id);
+      await seedVariant(t.db, t.merchantA, product.id, { imageId: image.id });
+
+      await t.db.delete(schema.product).where(eq(schema.product.id, product.id));
+
+      await expect(
+        t.db.select().from(schema.productImage).where(eq(schema.productImage.id, image.id)),
+      ).resolves.toHaveLength(0);
+    });
   });
 });
