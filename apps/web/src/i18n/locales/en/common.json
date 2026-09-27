@@ -48,5 +48,11 @@
       "in_stock": "In stock",
       "out_of_stock": "Out of stock"
     }
+  },
+  "theme": {
+    "dark": "Dark",
+    "label": "Theme",
+    "light": "Light",
+    "system": "System"
   }
 }

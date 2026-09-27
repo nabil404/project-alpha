@@ -1,5 +1,163 @@
 @import 'tailwindcss';
 
-:root {
-  color-scheme: light dark;
+/*
+ * Design tokens — the Messenger-to-Order design system.
+ *
+ * Components use the semantic names below (bg-surface, text-ink-muted,
+ * bg-accent …), never raw colours and never `dark:` variants. A theme is one
+ * more [data-theme] block with a value for every colour token; the active one
+ * is the `data-theme` attribute on <html>, set by src/lib/theme.ts (and before
+ * first paint by the inline script in index.html). No attribute = Light.
+ *
+ * Every theme must keep: ink / ink-muted on bg, surface, surface-sunken and
+ * surface-hover ≥ 4.5:1; accent, success, warning, danger on surface and on
+ * their own -soft ground ≥ 4.5:1; on-accent on accent and accent-hover ≥ 4.5:1;
+ * border-strong and focus-ring on surface and bg ≥ 3:1.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f5f2;
+  --surface: #ffffff;
+  --surface-sunken: #efefeb;
+  --surface-hover: #e9e9e4;
+  --border: #e2e2dc;
+  --border-strong: #8c8c84;
+  --ink: #1b1c1e;
+  --ink-muted: #5c5e63;
+  --ink-disabled: #a4a59f;
+  --accent: #1f6b70;
+  --accent-hover: #185a5e;
+  --accent-soft: #e6f1f1;
+  --on-accent: #ffffff;
+  --success: #2d6b4a;
+  --success-soft: #e7f3ec;
+  --warning: #855410;
+  --warning-soft: #f8efe0;
+  --danger: #a93b36;
+  --danger-soft: #f8e9e7;
+  --focus-ring: var(--accent);
+  --link: var(--accent);
+  --overlay: rgb(20 21 23 / 0.4);
+  --elevation-sm: 0 1px 2px rgb(20 21 23 / 0.05);
+  --elevation-md: 0 8px 24px rgb(20 21 23 / 0.08);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #131416;
+  --surface: #1b1c1f;
+  --surface-sunken: #161719;
+  --surface-hover: #25272b;
+  --border: #2c2e33;
+  --border-strong: #6e7179;
+  --ink: #ececea;
+  --ink-muted: #a2a4aa;
+  --ink-disabled: #5b5d63;
+  --accent: #7fcacd;
+  --accent-hover: #9ad8da;
+  --accent-soft: #17302f;
+  --on-accent: #131416;
+  --success: #86cfa3;
+  --success-soft: #1b3326;
+  --warning: #e4b56e;
+  --warning-soft: #3a2c14;
+  --danger: #f0a097;
+  --danger-soft: #3d201e;
+  --focus-ring: var(--accent);
+  --link: var(--accent);
+  --overlay: rgb(0 0 0 / 0.6);
+  --elevation-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elevation-md: 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+/* Colours and shadows follow the active theme, so they are mapped `inline`. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-disabled: var(--ink-disabled);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-focus-ring: var(--focus-ring);
+  --color-link: var(--link);
+  --color-overlay: var(--overlay);
+
+  /* shadow-card under resting cards and tables; shadow-popover for menus, popovers, dialogs. */
+  --shadow-card: var(--elevation-sm);
+  --shadow-popover: var(--elevation-md);
+}
+
+/* Theme-independent scales. Spacing uses Tailwind's default 4px steps (p-6 = 24px). */
+@theme {
+  --font-sans:
+    'Figtree Variable', Figtree, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:
+    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Titles lead, body follows: text-display → text-title → text-heading → text-body. */
+  --text-display: 30px;
+  --text-display--line-height: 38px;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.02em;
+  --text-title: 21px;
+  --text-title--line-height: 28px;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.01em;
+  --text-heading: 16px;
+  --text-heading--line-height: 24px;
+  --text-heading--font-weight: 600;
+  --text-stat: 28px;
+  --text-stat--line-height: 36px;
+  --text-stat--font-weight: 600;
+  --text-stat--letter-spacing: -0.02em;
+  --text-body: 15px;
+  --text-body--line-height: 24px;
+  --text-small: 13px;
+  --text-small--line-height: 20px;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-label--font-weight: 500;
+  --text-code: 13px;
+  --text-code--line-height: 20px;
+
+  /* Soft, never sharp: controls md, cards and tables lg, dialogs xl, badges full. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+}
+
+@layer base {
+  html {
+    background-color: var(--bg);
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
 }

@@ -218,9 +218,10 @@ From `docs/mvp/01-messenger-to-order/rules.md` — these bind the frontend too:
   The pieces are in place — `cn()` in `@/lib/utils`, plus `cva`, `clsx`,
   `tailwind-merge` and `lucide-react` are all installed. Add components with the
   shadcn CLI into `src/components/ui/`; don't hand-copy them in.
-- Dark mode is `color-scheme: light dark` plus `dark:` utilities — there is no
-  theme provider or toggle. Match the existing `dark:` pairs when adding a new
-  surface so it doesn't go white in dark mode.
+
+## Design system
+
+Follow [`docs/DESIGN.md`](../../../docs/DESIGN.md) for all UI styling.
 
 ## Copy
 
