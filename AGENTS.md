@@ -55,6 +55,9 @@ the SQL by hand → `db:migrate` → `db:verify-rls`.
   `db:generate`, `db:migrate`, `db:verify-rls`, and the CI deploy step. The api
   and worker must
   never receive the admin URL; it is deliberately absent from `env.schema.ts`.
+- **Object storage.** Product images live in Cloudflare R2, reached only
+  through the S3 API with the `STORAGE_*` variables. Development uses its own
+  bucket and token; never point a local `.env` at the production bucket.
 - **One env file.** `apps/api/.env` is the only one, for the app and both
   compose stacks alike. Compose must be pointed at it — `docker compose
 --env-file apps/api/.env -f docker/compose.yml …`, wrapped as `pnpm dev:up` /
