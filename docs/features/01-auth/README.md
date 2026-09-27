@@ -6,9 +6,9 @@ Scope comes from the MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
 describes how it is built.
 
 **Status (Sep 2026):** the API side is implemented and covered by an HTTP-level
-e2e spec. Not built yet: the SPA's sign-in, sign-up and reset screens, the
-explicit Facebook linking UI in account settings, and the Facebook Page
-connection flow (see [Not yet built](#not-yet-built)).
+e2e spec. The SPA has sign-in (`/sign-in`) and sign-up (`/sign-up`). Not built
+yet: the reset screens, the explicit Facebook linking UI in account settings,
+and the Facebook Page connection flow (see [Not yet built](#not-yet-built)).
 
 ## At a glance
 
@@ -64,9 +64,15 @@ the templates in
 
 ### Sign-up and verification
 
-1. SPA → `POST /api/v1/auth/sign-up/email` with `callbackURL: '/'`.
-2. The user row is created (which creates the seller's organization, see
-   [below](#the-sellers-organization)) and a **"Verify your email address"**
+1. SPA → `POST /api/v1/auth/sign-up/email` with `name`, `shopName`, `email`,
+   `phone`, `password` and `callbackURL: '/'`. A `before` hook validates the
+   body against `signUpSchema` from `@app/shared` (the same schema as the SPA's
+   form) and answers `VALIDATION_FAILED` with per-field errors before Better
+   Auth sees it. Better Auth only checks the fields it knows about.
+2. The user row is created with `phone` (a Better Auth `additionalFields`
+   column, nullable because a social sign-up has none) and the seller's
+   organization is created **named after `shopName`** (see
+   [below](#the-sellers-organization)). A **"Verify your email address"**
    mail is sent. The link is valid for 24 hours (`VERIFICATION_TOKEN_TTL`).
 3. The link hits `GET /api/v1/auth/verify-email?token=…`, which marks the email
    verified, **signs the seller in** (`autoSignInAfterVerification`) and
@@ -113,10 +119,10 @@ Every business table's `merchant_id` references `organization(id)`, never
 they make would be rejected. Two Better Auth database hooks in `auth.config.ts`
 make sure that can't happen:
 
-| Hook                    | Calls                                     | Effect                                                                                                                                                                                                                         |
-| ----------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `user.create.after`     | `ensureOrganizationForUser(db, user)`     | Creates the seller's organization (name = seller's name, slug = its id) and a `member` row with role `owner`. Runs only on user **creation**, so a Google sign-in that links to an existing account reuses that seller's shop. |
-| `session.create.before` | `ensureOrganizationForUserId(db, userId)` | Puts `activeOrganizationId` on every new session. The plugin marks that field `input: false`, so a client can't set it. It has to be resolved here, or it stays null.                                                          |
+| Hook                    | Calls                                           | Effect                                                                                                                                                                                                                                                                               |
+| ----------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `user.create.after`     | `ensureOrganizationForUser(db, user, shopName)` | Creates the seller's organization (name = the sign-up's `shopName`, or the seller's name for a social sign-up; slug = its id) and a `member` row with role `owner`. Runs only on user **creation**, so a Google sign-in that links to an existing account reuses that seller's shop. |
+| `session.create.before` | `ensureOrganizationForUserId(db, userId)`       | Puts `activeOrganizationId` on every new session. The plugin marks that field `input: false`, so a client can't set it. It has to be resolved here, or it stays null.                                                                                                                |
 
 Both functions live in
 [`database/ensure-organization.ts`](../../../apps/api/src/database/ensure-organization.ts)
@@ -297,9 +303,13 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- auth
 
 ## Not yet built
 
-- **SPA screens:** sign-in, sign-up, forgot password, `/reset-password`, and
-  handling of `/?error=…` after a verification link. `apps/web` has no auth
-  routes yet.
+- **SPA screens:** forgot password and `/reset-password`. Sign-in has no
+  "Forgot password?" link until they exist. A failed verification link
+  (`/?error=…`) lands on sign-in with an error banner.
+- **Terms and privacy pages.** Sign-up requires agreeing to them, but
+  `apps/web/src/features/auth/legal.ts` points at placeholder paths, and the
+  agreement is not recorded server-side.
+- **Shop name and phone for social sign-ups**, which arrive without either.
 - **Account settings:** explicit Facebook linking, and change password (the
   error mapping already handles `/change-password`).
 - **Page connection:** the separate step that requests Page permissions and

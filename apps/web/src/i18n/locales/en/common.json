@@ -2,9 +2,11 @@
   "actions": {
     "cancel": "Cancel",
     "retry": "Retry",
-    "save": "Save"
+    "save": "Save",
+    "signOut": "Sign out"
   },
   "app": {
+    "name": "Messenger-to-Order",
     "title": "Orders"
   },
   "errors": {

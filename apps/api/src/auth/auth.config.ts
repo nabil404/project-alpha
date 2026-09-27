@@ -3,7 +3,8 @@ import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { openAPI, organization } from 'better-auth/plugins';
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@app/shared';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, signUpSchema } from '@app/shared';
+import { zodIssuesToFields } from '../common/errors/validation-fields.js';
 import type { AppConfig } from '../config/app.config.js';
 import type { Database } from '../database/database.module.js';
 import {
@@ -98,6 +99,13 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     // contract, not ours, and it does not move with a future /api/v2.
     basePath: '/api/v1/auth',
     secret: settings.secret,
+    user: {
+      additionalFields: {
+        // Collected at email sign-up (signUpSchema makes it required there),
+        // but nullable: a Google or Facebook sign-up has no phone to give.
+        phone: { type: 'string', required: false, input: true },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
@@ -160,6 +168,28 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     plugins: [organization(), openAPI({ disableDefaultReference: true })],
     disabledPaths: ['/open-api/generate-schema'],
     hooks: {
+      // Email sign-up is validated against the same signUpSchema as the SPA's
+      // form, before Better Auth reads the body: Better Auth checks only the
+      // fields it knows, and would store a blank phone or drop a shop name.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== SIGN_UP_EMAIL_PATH) {
+          return;
+        }
+        const parsed = signUpSchema.safeParse(ctx.body);
+        if (!parsed.success) {
+          throw new APIError('BAD_REQUEST', {
+            error: {
+              code: 'VALIDATION_FAILED',
+              message: 'Validation failed',
+              params: {},
+              fields: zodIssuesToFields(parsed.error.issues),
+            },
+          });
+        }
+        // Merged over the body, so callbackURL and rememberMe pass through
+        // and the trimmed values are what gets stored.
+        return { context: { body: { ...ctx.body, ...parsed.data } } };
+      }),
       // Every error an auth endpoint returns leaves in the API's coded
       // envelope. Redirects are APIErrors too (302), so only real failures are
       // rewritten; the email links' redirects pass through untouched.
@@ -183,8 +213,11 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
           // fires on user *creation* only, so a Google sign-in that links to an
           // existing account under the trustedProviders rule above reuses that
           // seller's organization instead of opening a second one.
-          after: async (createdUser) => {
-            await ensureOrganizationForUser(db, createdUser);
+          //
+          // An email sign-up names the shop; a social one has no shop name
+          // to give, so its organization starts out under the seller's name.
+          after: async (createdUser, ctx) => {
+            await ensureOrganizationForUser(db, createdUser, shopNameFrom(ctx));
           },
         },
       },
@@ -205,6 +238,23 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
       },
     },
   });
+}
+
+const SIGN_UP_EMAIL_PATH = '/sign-up/email';
+
+/**
+ * The shop name from an email sign-up's body, which the before hook has
+ * already validated. Read on that path only: no other endpoint that creates a
+ * user validates a shopName, so one sent there is ignored.
+ */
+function shopNameFrom(ctx: { path?: string; body?: unknown } | null): string | undefined {
+  if (ctx?.path !== SIGN_UP_EMAIL_PATH) {
+    return undefined;
+  }
+  const parsed = signUpSchema.shape.shopName.safeParse(
+    (ctx.body as { shopName?: unknown } | undefined)?.shopName,
+  );
+  return parsed.success ? parsed.data : undefined;
 }
 
 /** An endpoint calling another through the API would otherwise be wrapped twice. */

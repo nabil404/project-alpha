@@ -59,6 +59,30 @@ describe('zodIssuesToFields', () => {
     expect(Object.keys(fields)).toEqual(['_root']);
   });
 
+  it('reports a blank string against min(1) as REQUIRED, not a length', () => {
+    const fields = fieldsFor(z.object({ name: z.string().trim().min(1) }), { name: '  ' });
+
+    expect(fields.name).toEqual([{ code: 'REQUIRED', message: expect.any(String), params: {} }]);
+  });
+
+  it('takes the code a refinement names when it is a known ErrorCode', () => {
+    const fields = fieldsFor(
+      z.object({ phone: z.string().refine(() => false, { params: { code: 'INVALID_PHONE' } }) }),
+      { phone: 'abc' },
+    );
+
+    expect(fields.phone?.[0]?.code).toBe('INVALID_PHONE');
+  });
+
+  it('ignores a refinement code that is not an ErrorCode', () => {
+    const fields = fieldsFor(
+      z.object({ phone: z.string().refine(() => false, { params: { code: 'MADE_UP' } }) }),
+      { phone: 'abc' },
+    );
+
+    expect(fields.phone?.[0]?.code).toBe('INVALID_INPUT');
+  });
+
   it('degrades an unmapped issue to INVALID_INPUT instead of throwing', () => {
     const schema = z.object({ name: z.string() }).refine(() => false, { message: 'nope' });
 

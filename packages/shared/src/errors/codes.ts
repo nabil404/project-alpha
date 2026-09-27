@@ -42,6 +42,7 @@ export const errorCodes = [
   'NOT_MULTIPLE_OF',
   'UNRECOGNIZED_KEYS',
   'INVALID_INPUT',
+  'INVALID_PHONE',
 ] as const;
 
 export const errorCodeSchema = z.enum(errorCodes);

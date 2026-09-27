@@ -9,6 +9,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/node_modules/**',
       'apps/api/src/database/database.types.ts',
+      'apps/web/src/routeTree.gen.ts',
     ],
   },
   js.configs.recommended,
