@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { AppConfigModule } from '../../config/config.module.js';
 import { AppConfig } from '../../config/app.config.js';
-import { MESSENGER_QUEUE } from './queue.constants.js';
+import { MESSENGER_QUEUE, STORAGE_QUEUE } from './queue.constants.js';
 
 @Module({
   imports: [
@@ -19,7 +19,7 @@ import { MESSENGER_QUEUE } from './queue.constants.js';
         },
       }),
     }),
-    BullModule.registerQueue({ name: MESSENGER_QUEUE }),
+    BullModule.registerQueue({ name: MESSENGER_QUEUE }, { name: STORAGE_QUEUE }),
   ],
   exports: [BullModule],
 })

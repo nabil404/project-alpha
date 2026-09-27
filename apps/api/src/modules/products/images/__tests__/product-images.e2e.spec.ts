@@ -8,8 +8,6 @@ import {
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { productImageSchema } from '@app/shared';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
 import sharp from 'sharp';
 import request from 'supertest';
 import { AuthModule } from '../../../../auth/auth.module.js';
@@ -17,10 +15,10 @@ import { configureApp, NEST_APP_OPTIONS } from '../../../../bootstrap.js';
 import { TenantGuard } from '../../../../common/tenant.guard.js';
 import { AppConfig } from '../../../../config/app.config.js';
 import { DATABASE } from '../../../../database/database.module.js';
-import * as schema from '../../../../database/schema/index.js';
 import {
   describeDb,
   openCatalogTestDb,
+  openRuntimeDb,
   seedProduct,
   type CatalogTestDb,
 } from '../../../../database/__tests__/catalog-test-db.js';
@@ -41,7 +39,7 @@ const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unkno
 describeDb('product image routes over HTTP', () => {
   let app: INestApplication;
   let t: CatalogTestDb;
-  let runtimePool: Pool;
+  let runtime: ReturnType<typeof openRuntimeDb>;
   let merchantId: string;
   let productId: string;
   const storage = new InMemoryObjectStorage();
@@ -56,11 +54,7 @@ describeDb('product image routes over HTTP', () => {
     t = await openCatalogTestDb();
     productId = (await seedProduct(t.db, t.merchantA)).id;
 
-    runtimePool = new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 4 });
-    runtimePool.on('connect', (client) => {
-      // pg queues queries per client, so this runs before anything the app sends.
-      void client.query('set role app_runtime');
-    });
+    runtime = openRuntimeDb();
     const env: Record<string, string> = {
       APP_URL: 'http://localhost:5173',
       BETTER_AUTH_SECRET: 'x'.repeat(32),
@@ -69,7 +63,7 @@ describeDb('product image routes over HTTP', () => {
     @Global()
     @Module({
       providers: [
-        { provide: DATABASE, useValue: drizzle(runtimePool, { schema }) },
+        { provide: DATABASE, useValue: runtime.db },
         { provide: AppConfig, useValue: { get: (key: string) => env[key] } },
       ],
       exports: [DATABASE, AppConfig],
@@ -107,7 +101,7 @@ describeDb('product image routes over HTTP', () => {
 
   afterAll(async () => {
     await app?.close();
-    await runtimePool?.end();
+    await runtime?.close();
     await t.close();
   });
 
