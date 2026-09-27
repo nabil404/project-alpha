@@ -1,9 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AddVariant, CreateProduct, Product, UpdateProduct, UpdateVariant } from '@app/shared';
+import type {
+  AddVariant,
+  Category,
+  CreateProduct,
+  Product,
+  UpdateProduct,
+  UpdateVariant,
+} from '@app/shared';
 import type { TenantScope, Transaction } from '../../database/base.repository.js';
 import { CodedConflictException } from '../../common/errors/index.js';
 import { DATABASE, type Database } from '../../database/database.module.js';
 import { withMerchant } from '../../database/with-merchant.js';
+import { toCategory } from '../categories/category-mappers.js';
 import { CategoriesRepository } from '../categories/categories.repository.js';
 import { categoryNotFound } from '../categories/category-errors.js';
 import {
@@ -15,6 +23,12 @@ import {
 import { toProduct } from './product-mappers.js';
 import { ProductsRepository } from './products.repository.js';
 import { normalizeSku } from './sku.js';
+
+/** What the AI may quote from: nothing a seller has drafted, archived or deleted. */
+export interface SellableCatalog {
+  products: Product[];
+  categories: Category[];
+}
 
 @Injectable()
 export class ProductsService {
@@ -172,6 +186,29 @@ export class ProductsService {
 
       await this.products.archiveVariant(tx, scope, variantId);
       return this.load(tx, scope, productId);
+    });
+  }
+
+  /** The AI's read. Active products only, with their live variants and live categories. */
+  findSellableCatalog(merchantId: string): Promise<SellableCatalog> {
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const scope = { merchantId };
+      const rows = await this.products.listSellable(tx, scope);
+      const ids = rows.map((row) => row.id);
+      const variants = await this.products.liveVariants(tx, scope, ids);
+      const categoryIds = await this.products.categoryIdsByProduct(tx, scope, ids);
+      const categories = await this.categories.listLive(tx, scope);
+
+      return {
+        products: rows.map((row) =>
+          toProduct(
+            row,
+            variants.filter((v) => v.productId === row.id),
+            categoryIds.get(row.id) ?? [],
+          ),
+        ),
+        categories: categories.map(toCategory),
+      };
     });
   }
 
