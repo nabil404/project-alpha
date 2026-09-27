@@ -25,6 +25,12 @@ pnpm --filter api db:migrate                # apply migrations
 pnpm dev                                    # api on :3000, web on :5173
 ```
 
+The api and worker validate their environment at startup and refuse to run
+without the `STORAGE_*` object-storage variables. Use the development R2
+bucket and its own bucket-scoped API token (see the Object storage block in
+`apps/api/.env.example`); nothing contacts the bucket at boot, but the values
+must be present and well-formed.
+
 `apps/api/.env` is the only env file in the repo: the api and worker read it
 through `@nestjs/config`, the schema tooling loads it for `DATABASE_ADMIN_URL`,
 and the compose stacks interpolate it for `DOMAIN` and the Postgres
