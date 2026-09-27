@@ -36,6 +36,15 @@ export const envSchema = z.object({
   SMTP_URL: z.string().url(),
   MAIL_FROM: z.string().min(1),
 
+  /** S3 API endpoint of the object store (Cloudflare R2 today). */
+  STORAGE_ENDPOINT: z.string().url(),
+  STORAGE_REGION: z.string().min(1).default('auto'),
+  STORAGE_BUCKET: z.string().min(1),
+  STORAGE_ACCESS_KEY_ID: z.string().min(1),
+  STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
+  /** Where the bucket is served publicly; object keys are appended after a slash. */
+  STORAGE_PUBLIC_BASE_URL: z.string().url(),
+
   LLM_PROVIDER: z.string().default('anthropic'),
   LLM_MODEL_ROUTING: z.string().default('claude-haiku-4-5-20251001'),
   LLM_MODEL_EXTRACTION: z.string().default('claude-sonnet-5'),

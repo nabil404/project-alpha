@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { SessionGuard } from './auth/session.guard.js';
 import { HealthModule } from './health/health.module.js';
 import { QueueModule } from './modules/queue/queue.module.js';
+import { StorageModule } from './modules/storage/storage.module.js';
 import { MessengerModule } from './modules/messenger/messenger.module.js';
 import { CryptoService } from './common/crypto.service.js';
 import { redactUrl } from './common/redact-url.js';
@@ -35,6 +36,7 @@ import { redactUrl } from './common/redact-url.js';
             '*.password',
             '*.newPassword',
             '*.token',
+            '*.secretAccessKey',
           ],
           // Email links and OAuth callbacks carry their credential in the URL.
           serializers: {
@@ -57,6 +59,7 @@ import { redactUrl } from './common/redact-url.js';
     DatabaseModule,
     AuthModule,
     QueueModule,
+    StorageModule,
     HealthModule,
     MessengerModule,
   ],
