@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { zodIssuesToFields } from '../validation-fields.js';
+import { zodIssuesToFields } from '../validation-fields';
 
 /** Returns the fields map a failing parse would produce. */
 function fieldsFor(schema: z.ZodType, value: unknown) {

@@ -1,5 +1,5 @@
 import { isNull, type SQL } from 'drizzle-orm';
-import { category } from '../../database/schema/index.js';
+import { category } from '../../database/schema/index';
 
 /**
  * Drizzle has no automatic soft-delete filter (TypeORM's @DeleteDateColumn

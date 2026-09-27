@@ -1,4 +1,4 @@
-import { redactUrl } from '../redact-url.js';
+import { redactUrl } from '../redact-url';
 
 describe('redactUrl', () => {
   it('masks the email verification token', () => {

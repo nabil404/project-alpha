@@ -1,5 +1,5 @@
 import type { OpenAPIObject, OperationObject, PathItemObject } from '@nestjs/swagger';
-import { ERROR_RESPONSE_REF } from './api-coded-error.js';
+import { ERROR_RESPONSE_REF } from './api-coded-error';
 
 export const SESSION_COOKIE_SCHEME = 'sessionCookie';
 

@@ -19,5 +19,5 @@
  * Section files are added as their tables land: auth and catalog exist today.
  */
 
-export * from './auth.js';
-export * from './catalog.js';
+export * from './auth';
+export * from './catalog';

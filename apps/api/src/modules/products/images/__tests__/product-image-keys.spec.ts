@@ -1,4 +1,4 @@
-import { parseProductImageKey, productImageKeys } from '../product-image-keys.js';
+import { parseProductImageKey, productImageKeys } from '../product-image-keys';
 
 const merchantId = 'Xk3nQ8vB2mLp9wRtYs4dFgHj6cZa1eNu';
 const imageId = '3f1c2b7a-9d4e-4c61-8a2f-5b7e9c0d1a23';

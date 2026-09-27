@@ -1,15 +1,15 @@
 import { createProductSchema } from '@app/shared';
-import { CategoriesRepository } from '../../categories/categories.repository.js';
-import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage.js';
-import { ProductImageRepository } from '../images/product-image.repository.js';
-import { CategoriesService } from '../../categories/categories.service.js';
-import { ProductsRepository } from '../products.repository.js';
-import { ProductsService } from '../products.service.js';
+import { CategoriesRepository } from '../../categories/categories.repository';
+import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
+import { ProductImageRepository } from '../images/product-image.repository';
+import { CategoriesService } from '../../categories/categories.service';
+import { ProductsRepository } from '../products.repository';
+import { ProductsService } from '../products.service';
 import {
   describeDb,
   openCatalogTestDb,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db.js';
+} from '../../../database/__tests__/catalog-test-db';
 
 describeDb('ProductsService.findSellableCatalog', () => {
   let t: CatalogTestDb;

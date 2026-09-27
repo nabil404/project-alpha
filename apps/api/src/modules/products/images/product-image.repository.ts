@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
-import type { Executor, TenantScope } from '../../../database/base.repository.js';
-import { one } from '../../../database/rows.js';
-import { productImage, type ProductImageRow } from '../../../database/schema/index.js';
+import type { Executor, TenantScope } from '../../../database/base.repository';
+import { one } from '../../../database/rows';
+import { productImage, type ProductImageRow } from '../../../database/schema/index';
 
 export type NewProductImage = Pick<
   typeof productImage.$inferInsert,

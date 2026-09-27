@@ -1,6 +1,6 @@
-import { CodedConflictException, CodedNotFoundException } from '../../common/errors/index.js';
-import { uniqueViolationConstraint } from '../../database/pg-errors.js';
-import { CATEGORY_NAME_LIVE_UIDX } from '../../database/schema/index.js';
+import { CodedConflictException, CodedNotFoundException } from '../../common/errors/index';
+import { uniqueViolationConstraint } from '../../database/pg-errors';
+import { CATEGORY_NAME_LIVE_UIDX } from '../../database/schema/index';
 
 export const categoryNotFound = (id?: string) =>
   new CodedNotFoundException('CATEGORY_NOT_FOUND', 'Category not found', id ? { id } : {});

@@ -1,5 +1,5 @@
-import { createAuth } from '../../auth/auth.config.js';
-import type { Auth } from '../../auth/auth.module.js';
+import { createAuth } from '../../auth/auth.config';
+import type { Auth } from '../../auth/auth.module';
 
 export const STUB_APP_URL = 'http://localhost:5173';
 

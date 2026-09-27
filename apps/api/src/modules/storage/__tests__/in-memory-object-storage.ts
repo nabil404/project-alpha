@@ -1,10 +1,5 @@
-import { CodedServiceUnavailableException } from '../../../common/errors/coded-exceptions.js';
-import {
-  joinPublicUrl,
-  ObjectStorage,
-  type ObjectPage,
-  type PutOptions,
-} from '../object-storage.js';
+import { CodedServiceUnavailableException } from '../../../common/errors/coded-exceptions';
+import { joinPublicUrl, ObjectStorage, type ObjectPage, type PutOptions } from '../object-storage';
 
 export const TEST_PUBLIC_BASE_URL = 'https://media.example.test';
 

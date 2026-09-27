@@ -9,21 +9,21 @@ import {
   RESET_PASSWORD_TOKEN_TTL,
   signUpSchema,
 } from '@app/shared';
-import { zodIssuesToFields } from '../common/errors/validation-fields.js';
-import type { AppConfig } from '../config/app.config.js';
-import type { Database } from '../database/database.module.js';
+import { zodIssuesToFields } from '../common/errors/validation-fields';
+import type { AppConfig } from '../config/app.config';
+import type { Database } from '../database/database.module';
 import {
   ensureOrganizationForUser,
   ensureOrganizationForUserId,
-} from '../database/ensure-organization.js';
-import * as schema from '../database/schema/index.js';
-import type { Mailer } from '../modules/mail/mail.service.js';
+} from '../database/ensure-organization';
+import * as schema from '../database/schema/index';
+import type { Mailer } from '../modules/mail/mail.service';
 import {
   existingAccountEmail,
   resetPasswordEmail,
   verificationEmail,
-} from '../modules/mail/templates.js';
-import { toAuthErrorBody } from './auth-errors.js';
+} from '../modules/mail/templates';
+import { toAuthErrorBody } from './auth-errors';
 
 /** The settings createAuth reads, so nothing here touches process.env. */
 export interface AuthSettings {

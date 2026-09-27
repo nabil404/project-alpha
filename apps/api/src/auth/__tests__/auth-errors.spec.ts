@@ -1,5 +1,5 @@
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@app/shared';
-import { toAuthErrorBody } from '../auth-errors.js';
+import { toAuthErrorBody } from '../auth-errors';
 
 const betterAuthError = (statusCode: number, code: string, message = `${code} message`) => ({
   statusCode,

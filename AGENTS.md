@@ -90,8 +90,11 @@ the SQL by hand → `db:migrate` → `db:verify-rls`.
   Throw a `Coded*Exception` from `apps/api/src/common/errors/`, never a bare NestJS
   exception; the contract is in
   `.claude/skills/rest-api-design/references/response-formats.md`.
-- Every relative import ends in `.js` (`"type": "module"` on NodeNext), including
-  inside specs and when the file on disk is `.ts`.
+- Relative imports carry no file extension — `./foo`, never `./foo.js` or
+  `./foo.ts`, specs included; `no-restricted-imports` in `eslint.config.js`
+  enforces it. `apps/api` resolves with `moduleResolution: Bundler` and builds
+  with SWC (`.swcrc`, `resolveFully`), which writes the `.js` Node's ESM loader
+  needs into `dist`; `nest build` still type-checks.
 - Adding a member to a `@app/shared` enum is a three-file change. A new
   `ErrorCode` in `packages/shared/src/errors/codes.ts` also needs an entry in
   `apps/web/src/i18n/error-keys.ts` and a string in

@@ -1,8 +1,8 @@
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
 import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
-import type { Database } from './database.module.js';
-import type * as schema from './schema/index.js';
+import type { Database } from './database.module';
+import type * as schema from './schema/index';
 
 /** The transaction object Drizzle hands to a db.transaction() callback. */
 export type Transaction = PgTransaction<

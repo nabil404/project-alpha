@@ -1,5 +1,5 @@
-import type { ObjectStorage } from '../../storage/object-storage.js';
-import { parseProductImageKey, PRODUCT_IMAGE_KEY_ROOT } from './product-image-keys.js';
+import type { ObjectStorage } from '../../storage/object-storage';
+import { parseProductImageKey, PRODUCT_IMAGE_KEY_ROOT } from './product-image-keys';
 
 export interface SweepDependencies {
   storage: ObjectStorage;

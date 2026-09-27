@@ -15,7 +15,7 @@ import {
   uniqueIndex,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { organization } from './auth.js';
+import { organization } from './auth';
 
 /**
  * The catalog: products, their variants, a category tree, and product↔category

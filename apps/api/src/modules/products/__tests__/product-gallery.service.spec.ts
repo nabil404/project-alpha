@@ -1,10 +1,10 @@
 import { createProductSchema } from '@app/shared';
-import { CategoriesRepository } from '../../categories/categories.repository.js';
-import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage.js';
-import { productImageKeys } from '../images/product-image-keys.js';
-import { ProductImageRepository } from '../images/product-image.repository.js';
-import { ProductsRepository } from '../products.repository.js';
-import { ProductsService } from '../products.service.js';
+import { CategoriesRepository } from '../../categories/categories.repository';
+import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
+import { productImageKeys } from '../images/product-image-keys';
+import { ProductImageRepository } from '../images/product-image.repository';
+import { ProductsRepository } from '../products.repository';
+import { ProductsService } from '../products.service';
 import {
   describeDb,
   expectCoded,
@@ -12,7 +12,7 @@ import {
   seedImages,
   seedProduct,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db.js';
+} from '../../../database/__tests__/catalog-test-db';
 
 // How the catalog's own operations treat a product's images.
 describeDb('ProductsService — images', () => {

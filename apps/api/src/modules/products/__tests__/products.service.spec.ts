@@ -1,18 +1,18 @@
 import { eq } from 'drizzle-orm';
 import { createProductSchema, type CreateProduct } from '@app/shared';
-import * as schema from '../../../database/schema/index.js';
-import { CategoriesRepository } from '../../categories/categories.repository.js';
-import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage.js';
-import { ProductImageRepository } from '../images/product-image.repository.js';
-import { ProductsRepository } from '../products.repository.js';
-import { ProductsService } from '../products.service.js';
+import * as schema from '../../../database/schema/index';
+import { CategoriesRepository } from '../../categories/categories.repository';
+import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
+import { ProductImageRepository } from '../images/product-image.repository';
+import { ProductsRepository } from '../products.repository';
+import { ProductsService } from '../products.service';
 import {
   describeDb,
   expectCoded,
   openCatalogTestDb,
   seedCategory,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db.js';
+} from '../../../database/__tests__/catalog-test-db';
 
 describeDb('ProductsService — products and category links', () => {
   let t: CatalogTestDb;

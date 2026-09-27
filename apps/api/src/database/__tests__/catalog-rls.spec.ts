@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
-import type { Transaction } from '../base.repository.js';
-import * as schema from '../schema/index.js';
-import { withMerchant } from '../with-merchant.js';
+import type { Transaction } from '../base.repository';
+import * as schema from '../schema/index';
+import { withMerchant } from '../with-merchant';
 import {
   describeDb,
   openCatalogTestDb,
@@ -9,7 +9,7 @@ import {
   seedImage,
   seedProduct,
   type CatalogTestDb,
-} from './catalog-test-db.js';
+} from './catalog-test-db';
 
 // The test connection is a superuser, which ignores every policy. SET LOCAL
 // ROLE drops to the runtime role for one transaction, which is how the api and

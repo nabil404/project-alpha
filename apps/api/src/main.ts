@@ -2,11 +2,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import { Logger } from 'nestjs-pino';
-import { AppModule } from './app.module.js';
-import { configureApp, NEST_APP_OPTIONS } from './bootstrap.js';
-import type { Auth } from './auth/auth.module.js';
-import { AppConfig } from './config/config.module.js';
-import { setupOpenApi } from './openapi/openapi.js';
+import { AppModule } from './app.module';
+import { configureApp, NEST_APP_OPTIONS } from './bootstrap';
+import type { Auth } from './auth/auth.module';
+import { AppConfig } from './config/config.module';
+import { setupOpenApi } from './openapi/openapi';
 
 async function bootstrap(): Promise<void> {
   // The Meta webhook HMAC is computed over the unparsed body; AuthModule

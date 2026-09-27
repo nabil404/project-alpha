@@ -6,7 +6,7 @@ import {
   normalizeProductImage,
   type NormalizedImage,
   type NormalizeResult,
-} from '../normalize-product-image.js';
+} from '../normalize-product-image';
 
 /** Inputs are generated here rather than committed as binary fixtures. */
 const solid = (width: number, height: number) =>

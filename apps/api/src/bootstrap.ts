@@ -4,7 +4,7 @@ import {
   type LoggerService,
   type NestApplicationOptions,
 } from '@nestjs/common';
-import { AllExceptionsFilter } from './common/errors/index.js';
+import { AllExceptionsFilter } from './common/errors/index';
 
 /**
  * Options for NestFactory.create, shared by main.ts and the supertest runs.

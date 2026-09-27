@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { AppConfigModule } from '../../config/config.module.js';
-import { AppConfig } from '../../config/app.config.js';
-import { MESSENGER_QUEUE, STORAGE_QUEUE } from './queue.constants.js';
+import { AppConfigModule } from '../../config/config.module';
+import { AppConfig } from '../../config/app.config';
+import { MESSENGER_QUEUE, STORAGE_QUEUE } from './queue.constants';
 
 @Module({
   imports: [

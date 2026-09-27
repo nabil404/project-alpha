@@ -2,9 +2,9 @@ import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule, type SchemaObject } from '@nestjs/swagger';
 import { errorResponseBodySchema } from '@app/shared';
 import { z } from 'zod';
-import type { Auth } from '../auth/auth.module.js';
-import { ERROR_RESPONSE_SCHEMA } from './api-coded-error.js';
-import { mergeAuthDocument, SESSION_COOKIE_SCHEME } from './merge-auth-document.js';
+import type { Auth } from '../auth/auth.module';
+import { ERROR_RESPONSE_SCHEMA } from './api-coded-error';
+import { mergeAuthDocument, SESSION_COOKIE_SCHEME } from './merge-auth-document';
 
 export const OPENAPI_UI_PATH = 'api/docs';
 export const OPENAPI_JSON_PATH = 'api/docs/openapi.json';

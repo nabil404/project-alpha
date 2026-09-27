@@ -1,8 +1,8 @@
 import { Global, Module, type OnModuleDestroy } from '@nestjs/common';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { AppConfig } from '../config/app.config.js';
-import * as schema from './schema/index.js';
+import { AppConfig } from '../config/app.config';
+import * as schema from './schema/index';
 
 export const DATABASE = Symbol('DATABASE');
 export type Database = NodePgDatabase<typeof schema>;

@@ -1,6 +1,6 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors';
-import { uniqueViolationConstraint } from '../pg-errors.js';
-import { one } from '../rows.js';
+import { uniqueViolationConstraint } from '../pg-errors';
+import { one } from '../rows';
 
 const pgError = (code: string, constraint?: string) =>
   Object.assign(new Error('pg'), { code, constraint });

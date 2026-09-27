@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from '../database/schema/index.js';
-import { createAuth } from './auth.config.js';
+import * as schema from '../database/schema/index';
+import { createAuth } from './auth.config';
 
 /**
  * Entry point for `better-auth generate` only - never imported by the api or

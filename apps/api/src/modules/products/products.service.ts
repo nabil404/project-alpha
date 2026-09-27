@@ -7,15 +7,15 @@ import type {
   UpdateProduct,
   UpdateVariant,
 } from '@app/shared';
-import type { TenantScope, Transaction } from '../../database/base.repository.js';
-import { DATABASE, type Database } from '../../database/database.module.js';
-import { withMerchant } from '../../database/with-merchant.js';
-import { toCategory } from '../categories/category-mappers.js';
-import { CategoriesRepository } from '../categories/categories.repository.js';
-import { categoryNotFound } from '../categories/category-errors.js';
-import { ObjectStorage } from '../storage/object-storage.js';
-import { deleteObjectsQuietly, objectKeysFor } from './images/product-image-objects.js';
-import { ProductImageRepository } from './images/product-image.repository.js';
+import type { TenantScope, Transaction } from '../../database/base.repository';
+import { DATABASE, type Database } from '../../database/database.module';
+import { withMerchant } from '../../database/with-merchant';
+import { toCategory } from '../categories/category-mappers';
+import { CategoriesRepository } from '../categories/categories.repository';
+import { categoryNotFound } from '../categories/category-errors';
+import { ObjectStorage } from '../storage/object-storage';
+import { deleteObjectsQuietly, objectKeysFor } from './images/product-image-objects';
+import { ProductImageRepository } from './images/product-image.repository';
 import {
   guardSku,
   productNeedsVariant,
@@ -23,10 +23,10 @@ import {
   productNotFound,
   variantNameRequired,
   variantNotFound,
-} from './product-errors.js';
-import { toProduct, toProductImage } from './product-mappers.js';
-import { ProductsRepository } from './products.repository.js';
-import { normalizeSku } from './sku.js';
+} from './product-errors';
+import { toProduct, toProductImage } from './product-mappers';
+import { ProductsRepository } from './products.repository';
+import { normalizeSku } from './sku';
 
 /** What the AI may quote from: nothing a seller has drafted, archived or deleted. */
 export interface SellableCatalog {

@@ -4,9 +4,9 @@ import { inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import type { ErrorCode } from '@app/shared';
-import type { Database } from '../database.module.js';
-import { productImageKeys } from '../../modules/products/images/product-image-keys.js';
-import * as schema from '../schema/index.js';
+import type { Database } from '../database.module';
+import { productImageKeys } from '../../modules/products/images/product-image-keys';
+import * as schema from '../schema/index';
 
 // Needs a real Postgres: constraints, locks and policies are server behaviour.
 // CI sets DATABASE_ADMIN_URL; locally, load apps/api/.env first. The admin role

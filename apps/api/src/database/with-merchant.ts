@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
-import type { Database } from './database.module.js';
-import type { Transaction } from './base.repository.js';
+import type { Database } from './database.module';
+import type { Transaction } from './base.repository';
 
 /**
  * Runs `fn` with the tenant context row-level security policies read.

@@ -1,7 +1,7 @@
 import type { PipeTransform } from '@nestjs/common';
 import type { ZodType } from 'zod';
-import { CodedValidationException } from './errors/coded-exceptions.js';
-import { zodIssuesToFields } from './errors/validation-fields.js';
+import { CodedValidationException } from './errors/coded-exceptions';
+import { zodIssuesToFields } from './errors/validation-fields';
 
 /**
  * Validation is Zod everywhere: the same schemas from @app/shared back API

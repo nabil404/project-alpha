@@ -3,12 +3,12 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { Test } from '@nestjs/testing';
 import { TerminusModule } from '@nestjs/terminus';
 import request from 'supertest';
-import { configureApp } from '../bootstrap.js';
-import { AppConfig } from '../config/app.config.js';
-import { DATABASE } from '../database/database.module.js';
-import { HealthController } from '../health/health.module.js';
-import { MessengerController } from '../modules/messenger/messenger.controller.js';
-import { MESSENGER_QUEUE } from '../modules/queue/queue.constants.js';
+import { configureApp } from '../bootstrap';
+import { AppConfig } from '../config/app.config';
+import { DATABASE } from '../database/database.module';
+import { HealthController } from '../health/health.module';
+import { MessengerController } from '../modules/messenger/messenger.controller';
+import { MESSENGER_QUEUE } from '../modules/queue/queue.constants';
 
 const VERIFY_TOKEN = 'verify-me';
 

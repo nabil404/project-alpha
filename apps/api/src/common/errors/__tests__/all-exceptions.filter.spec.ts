@@ -6,8 +6,8 @@ import {
   type LoggerService,
 } from '@nestjs/common';
 import type { ErrorResponseBody } from '@app/shared';
-import { AllExceptionsFilter } from '../all-exceptions.filter.js';
-import { CodedUnauthorizedException, CodedValidationException } from '../coded-exceptions.js';
+import { AllExceptionsFilter } from '../all-exceptions.filter';
+import { CodedUnauthorizedException, CodedValidationException } from '../coded-exceptions';
 
 function capture() {
   const sent: { status?: number; body?: ErrorResponseBody } = {};

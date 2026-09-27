@@ -2,13 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import type { Database } from '../database.module.js';
+import type { Database } from '../database.module';
 import {
   ensureOrganizationForUser,
   ensureOrganizationForUserId,
   findEarliestOrganizationId,
-} from '../ensure-organization.js';
-import * as schema from '../schema/index.js';
+} from '../ensure-organization';
+import * as schema from '../schema/index';
 
 // Needs a real Postgres: the uniqueness of organization.slug and the
 // transaction the helper opens are server behaviours, not something a fake can

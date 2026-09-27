@@ -3,8 +3,8 @@ import { ApiOkResponse, ApiOperation, ApiTags, type SchemaObject } from '@nestjs
 import { HealthCheck, HealthCheckService, TerminusModule } from '@nestjs/terminus';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { sql } from 'drizzle-orm';
-import { DATABASE, type Database } from '../database/database.module.js';
-import { ApiCodedError } from '../openapi/api-coded-error.js';
+import { DATABASE, type Database } from '../database/database.module';
+import { ApiCodedError } from '../openapi/api-coded-error';
 
 const indicators: SchemaObject = {
   type: 'object',

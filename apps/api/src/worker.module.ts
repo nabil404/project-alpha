@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { AppModule } from './app.module.js';
-import { StorageMaintenanceModule } from './modules/products/images/storage-maintenance.module.js';
+import { AppModule } from './app.module';
+import { StorageMaintenanceModule } from './modules/products/images/storage-maintenance.module';
 
 /**
  * Everything the API has, plus the queue processors. The API boots AppModule

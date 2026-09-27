@@ -1,4 +1,4 @@
-import type { PutOptions } from '../../storage/object-storage.js';
+import type { PutOptions } from '../../storage/object-storage';
 
 /** Every product image object lives under this prefix; the cleanup job lists only it. */
 export const PRODUCT_IMAGE_KEY_ROOT = 'm/';

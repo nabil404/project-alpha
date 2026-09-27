@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { CategoriesModule } from '../categories/categories.module.js';
-import { StorageModule } from '../storage/storage.module.js';
-import { ProductImageRepository } from './images/product-image.repository.js';
-import { ProductImagesController } from './images/product-images.controller.js';
-import { ProductImagesService } from './images/product-images.service.js';
-import { ProductsRepository } from './products.repository.js';
-import { ProductsService } from './products.service.js';
+import { CategoriesModule } from '../categories/categories.module';
+import { StorageModule } from '../storage/storage.module';
+import { ProductImageRepository } from './images/product-image.repository';
+import { ProductImagesController } from './images/product-images.controller';
+import { ProductImagesService } from './images/product-images.service';
+import { ProductsRepository } from './products.repository';
+import { ProductsService } from './products.service';
 
 /**
  * Depends on categories, never the reverse. The image routes are the first

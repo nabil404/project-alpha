@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type { ErrorBody, ErrorResponseBody } from '@app/shared';
-import { isCodedErrorBody } from './coded-exceptions.js';
+import { isCodedErrorBody } from './coded-exceptions';
 
 /**
  * The only place a thrown error becomes a response body, so every error the
