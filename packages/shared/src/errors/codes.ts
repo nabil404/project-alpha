@@ -28,6 +28,9 @@ export const errorCodes = [
   'WEBHOOK_INVALID_SIGNATURE',
   'WEBHOOK_MALFORMED_PAYLOAD',
 
+  // Object storage
+  'STORAGE_UNAVAILABLE',
+
   // Field-level, derived from Zod issues
   'REQUIRED',
   'INVALID_TYPE',

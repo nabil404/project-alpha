@@ -5,6 +5,7 @@
     "AUTH_INVALID_TOKEN": "This link is invalid or has expired. Please request a new one.",
     "AUTH_UNAUTHENTICATED": "Please sign in to continue.",
     "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again.",
+    "STORAGE_UNAVAILABLE": "We couldn't save the file right now. Please try again in a moment.",
     "TENANT_NO_ACTIVE_MERCHANT": "This session has no active seller account.",
     "VALIDATION_FAILED": "Please check the highlighted fields.",
     "WEBHOOK_INVALID_SIGNATURE": "The webhook signature could not be verified.",

@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@app/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.1141.0",
     "@better-auth/core": "^1.7.5",
     "@better-auth/drizzle-adapter": "^1.7.5",
     "@nest-lab/throttler-storage-redis": "^1.2.0",

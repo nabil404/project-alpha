@@ -11,6 +11,11 @@ const base = {
   TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString('base64'),
   SMTP_URL: 'smtp://user:pass@smtp.example.com:587',
   MAIL_FROM: 'Orders <orders@example.com>',
+  STORAGE_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+  STORAGE_BUCKET: 'project-alpha-dev',
+  STORAGE_ACCESS_KEY_ID: 'key-id',
+  STORAGE_SECRET_ACCESS_KEY: 'secret',
+  STORAGE_PUBLIC_BASE_URL: 'https://pub-example.r2.dev',
 };
 
 describe('validateEnv', () => {
@@ -35,5 +40,20 @@ describe('validateEnv', () => {
   it('rejects a missing secret instead of starting', () => {
     const { META_APP_SECRET: _omitted, ...withoutSecret } = base;
     expect(() => validateEnv(withoutSecret)).toThrow(/META_APP_SECRET/);
+  });
+
+  it('defaults the storage region to auto', () => {
+    expect(validateEnv(base).STORAGE_REGION).toBe('auto');
+  });
+
+  it('refuses to start without the storage bucket', () => {
+    const { STORAGE_BUCKET: _omitted, ...withoutBucket } = base;
+    expect(() => validateEnv(withoutBucket)).toThrow(/STORAGE_BUCKET/);
+  });
+
+  it('rejects a public base URL that is not a URL', () => {
+    expect(() => validateEnv({ ...base, STORAGE_PUBLIC_BASE_URL: 'media' })).toThrow(
+      /STORAGE_PUBLIC_BASE_URL/,
+    );
   });
 });

@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { isErrorCode, type ErrorCode, type ErrorParams, type FieldError } from '@app/shared';
@@ -67,6 +68,12 @@ export class CodedNotFoundException extends NotFoundException {
 }
 
 export class CodedConflictException extends ConflictException {
+  constructor(code: ErrorCode, message: string, params: ErrorParams = {}) {
+    super({ code, message, params } satisfies CodedErrorBody);
+  }
+}
+
+export class CodedServiceUnavailableException extends ServiceUnavailableException {
   constructor(code: ErrorCode, message: string, params: ErrorParams = {}) {
     super({ code, message, params } satisfies CodedErrorBody);
   }
