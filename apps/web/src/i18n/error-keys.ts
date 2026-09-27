@@ -41,6 +41,7 @@ export const errorCodeKeys = {
   NOT_MULTIPLE_OF: 'field.NOT_MULTIPLE_OF',
   UNRECOGNIZED_KEYS: 'field.UNRECOGNIZED_KEYS',
   INVALID_INPUT: 'field.INVALID_INPUT',
+  INVALID_PHONE: 'field.INVALID_PHONE',
 } as const satisfies Record<ErrorCode, ParseKeys<'errors'>>;
 
 /**

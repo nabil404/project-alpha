@@ -15,6 +15,7 @@
   "field": {
     "INVALID_FORMAT": "Enter a valid {{format}}.",
     "INVALID_INPUT": "This value isn't valid.",
+    "INVALID_PHONE": "Enter a phone number, like 01712-345678.",
     "INVALID_TYPE": "Expected {{expected}}.",
     "INVALID_VALUE": "Must be one of: {{values}}.",
     "MAX_ITEMS": "Select at most {{max}} items.",

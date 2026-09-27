@@ -97,12 +97,15 @@ describeDb('email/password auth over HTTP', () => {
   const post = (agent: request.Agent | ReturnType<typeof request>, path: string, body: object) =>
     agent.post(path).set('Origin', APP_URL).send(body);
 
-  const signUp = (address: string, password = PASSWORD) =>
+  const signUp = (address: string, password = PASSWORD, overrides: object = {}) =>
     post(request(server()), '/api/v1/auth/sign-up/email', {
       email: address,
       password,
       name: 'Nadia Rahman',
+      shopName: "Nadia's Kitchen",
+      phone: '01712-345678',
       callbackURL: '/',
+      ...overrides,
     });
 
   /** Signs up and follows the verification link, leaving the agent signed in. */
@@ -259,6 +262,48 @@ describeDb('email/password auth over HTTP', () => {
       expect(response.body.error).toMatchObject({
         code: 'VALIDATION_FAILED',
         fields: { password: [{ code: 'MIN_LENGTH', params: { min: 8 } }] },
+      });
+    });
+
+    it('names the organization after the shop and stores the phone', async () => {
+      const address = email('shop');
+      await signUp(address, PASSWORD, {
+        shopName: "  Rahim's Kitchen ",
+        phone: ' +880 1712 345678 ',
+      }).expect(200);
+
+      const [row] = await db
+        .select({ phone: schema.user.phone, shopName: schema.organization.name })
+        .from(schema.user)
+        .innerJoin(schema.member, eq(schema.member.userId, schema.user.id))
+        .innerJoin(schema.organization, eq(schema.organization.id, schema.member.organizationId))
+        .where(eq(schema.user.email, address));
+
+      expect(row).toEqual({ phone: '+880 1712 345678', shopName: "Rahim's Kitchen" });
+    });
+
+    it('rejects a sign-up missing the shop name and phone, field by field', async () => {
+      const address = email('incomplete');
+      const response = await signUp(address, PASSWORD, { shopName: ' ', phone: undefined });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatchObject({
+        code: 'VALIDATION_FAILED',
+        fields: {
+          shopName: [{ code: 'REQUIRED' }],
+          phone: [{ code: 'REQUIRED' }],
+        },
+      });
+      const users = await db.select().from(schema.user).where(eq(schema.user.email, address));
+      expect(users).toHaveLength(0);
+    });
+
+    it('rejects a phone that is not a phone number', async () => {
+      const response = await signUp(email('bad-phone'), PASSWORD, { phone: 'call me' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.fields).toEqual({
+        phone: [{ code: 'INVALID_PHONE', message: expect.any(String), params: {} }],
       });
     });
 

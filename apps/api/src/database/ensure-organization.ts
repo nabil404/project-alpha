@@ -25,6 +25,10 @@ export interface OrganizationOwner {
  * re-checks membership first, the session hook can call it again at next login
  * and repair the account rather than 403 forever.
  *
+ * `organizationName` is the shop name an email sign-up gives. Without one - a
+ * social sign-up, or the session hook repairing an account - the shop is named
+ * after the seller, and can be renamed once there is a settings screen.
+ *
  * One organization per seller today - nothing creates a second - but the model
  * permits many: membership is a table, not a column, so a switcher later needs
  * no migration. Hence "the earliest membership" rather than "the membership".
@@ -32,6 +36,7 @@ export interface OrganizationOwner {
 export async function ensureOrganizationForUser(
   db: Database,
   user: OrganizationOwner,
+  organizationName: string = user.name,
 ): Promise<string> {
   const existing = await findEarliestOrganizationId(db, user.id);
   if (existing) {
@@ -63,7 +68,7 @@ export async function ensureOrganizationForUser(
 
     await tx.insert(organization).values({
       id: organizationId,
-      name: user.name,
+      name: organizationName,
       // slug is NOT NULL and uniquely indexed. Deriving it from the seller's
       // name would collide on the second seller trading as "Shop", and that
       // collision would surface as a failed signup. The id is unique by
