@@ -22,6 +22,20 @@
       "when": 1790493414887,
       "tag": "0002_user_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790534862948,
+      "tag": "0003_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790534880826,
+      "tag": "0004_catalog_force_rls",
+      "breakpoints": true
     }
   ]
 }
