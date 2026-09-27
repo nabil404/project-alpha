@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import type { ErrorCode } from '@app/shared';
 import type { Database } from '../database.module.js';
+import { productImageKeys } from '../../modules/products/images/product-image-keys.js';
 import * as schema from '../schema/index.js';
 
 // Needs a real Postgres: constraints, locks and policies are server behaviour.
@@ -32,7 +33,7 @@ async function insertMerchant(db: Database): Promise<string> {
 
 async function purge(db: Database, merchantIds: string[]): Promise<void> {
   // Junction and variants first; categories in one statement so the self-FK is
-  // checked only once they are all gone.
+  // checked only once they are all gone. Images cascade from their product.
   await db
     .delete(schema.productCategory)
     .where(inArray(schema.productCategory.merchantId, merchantIds));
@@ -94,6 +95,46 @@ export async function seedVariant(
     .returning();
   if (!row) throw new Error('seedVariant returned no row');
   return row;
+}
+
+/** A row only - nothing in object storage. */
+export async function seedImage(
+  db: Database,
+  merchantId: string,
+  productId: string,
+  overrides: Partial<typeof schema.productImage.$inferInsert> = {},
+) {
+  const id = overrides.id ?? randomUUID();
+  const [row] = await db
+    .insert(schema.productImage)
+    .values({
+      id,
+      merchantId,
+      productId,
+      storageKey: productImageKeys(merchantId, id).full,
+      position: 0,
+      width: 100,
+      height: 100,
+      byteSize: 1000,
+      ...overrides,
+    })
+    .returning();
+  if (!row) throw new Error('seedImage returned no row');
+  return row;
+}
+
+/** Rows at positions 0..count-1, cover first. */
+export async function seedImages(
+  db: Database,
+  merchantId: string,
+  productId: string,
+  count: number,
+) {
+  const rows = [];
+  for (let position = 0; position < count; position++) {
+    rows.push(await seedImage(db, merchantId, productId, { position }));
+  }
+  return rows;
 }
 
 export async function seedCategory(
