@@ -33,8 +33,12 @@ async function insertMerchant(db: Database): Promise<string> {
 async function purge(db: Database, merchantIds: string[]): Promise<void> {
   // Junction and variants first; categories in one statement so the self-FK is
   // checked only once they are all gone.
-  await db.delete(schema.productCategory).where(inArray(schema.productCategory.merchantId, merchantIds));
-  await db.delete(schema.productVariant).where(inArray(schema.productVariant.merchantId, merchantIds));
+  await db
+    .delete(schema.productCategory)
+    .where(inArray(schema.productCategory.merchantId, merchantIds));
+  await db
+    .delete(schema.productVariant)
+    .where(inArray(schema.productVariant.merchantId, merchantIds));
   await db.delete(schema.product).where(inArray(schema.product.merchantId, merchantIds));
   await db.delete(schema.category).where(inArray(schema.category.merchantId, merchantIds));
   await db.delete(schema.organization).where(inArray(schema.organization.id, merchantIds));

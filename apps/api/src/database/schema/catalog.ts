@@ -58,7 +58,10 @@ export const product = pgTable(
     merchantId: merchantId(),
     name: text('name').notNull(),
     description: text('description'),
-    aliases: text('aliases').array().notNull().default(sql`'{}'::text[]`),
+    aliases: text('aliases')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     status: text('status', { enum: ['draft', 'active', 'archived'] })
       .notNull()
       .default('draft'),
@@ -102,7 +105,9 @@ export const productVariant = pgTable(
     check('product_variant_price_ck', sql`${t.price} >= 0`),
     check('product_variant_stock_ck', sql`${t.stock} >= 0`),
     check('product_variant_default_unnamed_ck', sql`${t.isDefault} = (${t.name} is null)`),
-    uniqueIndex(VARIANT_SKU_LIVE_UIDX).on(t.merchantId, t.sku).where(sql`${t.archivedAt} is null`),
+    uniqueIndex(VARIANT_SKU_LIVE_UIDX)
+      .on(t.merchantId, t.sku)
+      .where(sql`${t.archivedAt} is null`),
     uniqueIndex(VARIANT_DEFAULT_LIVE_UIDX)
       .on(t.productId)
       .where(sql`${t.isDefault} and ${t.archivedAt} is null`),

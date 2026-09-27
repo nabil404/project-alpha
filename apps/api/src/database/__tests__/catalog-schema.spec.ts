@@ -55,7 +55,10 @@ describeDb('catalog schema constraints', () => {
       const cat = await seedCategory(t.db, t.merchantA);
       await expect(
         pgErrorOf(
-          t.db.update(schema.category).set({ parentId: cat.id }).where(eq(schema.category.id, cat.id)),
+          t.db
+            .update(schema.category)
+            .set({ parentId: cat.id })
+            .where(eq(schema.category.id, cat.id)),
         ),
       ).resolves.toEqual({ code: '23514', constraint: 'category_not_own_parent_ck' });
     });
@@ -64,15 +67,21 @@ describeDb('catalog schema constraints', () => {
   describe('checks', () => {
     it('rejects a negative price, stock or delivery charge', async () => {
       const product = await seedProduct(t.db, t.merchantA);
-      await expect(pgErrorOf(seedVariant(t.db, t.merchantA, product.id, { price: -1 }))).resolves.toEqual({
+      await expect(
+        pgErrorOf(seedVariant(t.db, t.merchantA, product.id, { price: -1 })),
+      ).resolves.toEqual({
         code: '23514',
         constraint: 'product_variant_price_ck',
       });
-      await expect(pgErrorOf(seedVariant(t.db, t.merchantA, product.id, { stock: -1 }))).resolves.toEqual({
+      await expect(
+        pgErrorOf(seedVariant(t.db, t.merchantA, product.id, { stock: -1 })),
+      ).resolves.toEqual({
         code: '23514',
         constraint: 'product_variant_stock_ck',
       });
-      await expect(pgErrorOf(seedProduct(t.db, t.merchantA, { deliveryCharge: -1 }))).resolves.toEqual({
+      await expect(
+        pgErrorOf(seedProduct(t.db, t.merchantA, { deliveryCharge: -1 })),
+      ).resolves.toEqual({
         code: '23514',
         constraint: 'product_delivery_charge_ck',
       });
@@ -147,7 +156,10 @@ describeDb('catalog schema constraints', () => {
     await t.db.delete(schema.product).where(eq(schema.product.id, product.id));
 
     await expect(
-      t.db.select().from(schema.productVariant).where(eq(schema.productVariant.productId, product.id)),
+      t.db
+        .select()
+        .from(schema.productVariant)
+        .where(eq(schema.productVariant.productId, product.id)),
     ).resolves.toHaveLength(0);
     await expect(
       t.db
