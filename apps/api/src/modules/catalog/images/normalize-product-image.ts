@@ -1,4 +1,11 @@
+import { Logger } from '@nestjs/common';
 import sharp from 'sharp';
+
+const logger = new Logger('normalizeProductImage');
+
+function describe(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
 
 export interface NormalizeLimits {
   /** Refuse inputs above this many pixels before decoding them fully. */
@@ -45,7 +52,8 @@ export async function normalizeProductImage(
   let height: number | undefined;
   try {
     ({ format, width, height } = await sharp(input).metadata());
-  } catch {
+  } catch (error) {
+    logger.warn(`Rejected image as invalid: ${describe(error)}`);
     return invalid;
   }
 
@@ -89,7 +97,8 @@ export async function normalizeProductImage(
       height: full.info.height,
       byteSize: full.data.length,
     };
-  } catch {
+  } catch (error) {
+    logger.warn(`Rejected image as invalid: ${describe(error)}`);
     return invalid;
   }
 }
