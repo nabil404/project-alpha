@@ -14,6 +14,7 @@
     "PRODUCT_IMAGE_LIMIT_REACHED": "A product can have up to {{max}} photos. Remove one to add another.",
     "PRODUCT_IMAGE_NOT_FOUND": "That photo no longer exists. Refresh the page and try again.",
     "PRODUCT_IMAGE_ORDER_MISMATCH": "The photos changed while you were reordering them. Refresh and try again.",
+    "PRODUCT_IMAGE_TOO_LARGE": "That photo is over 10 MB. Choose a smaller one.",
     "PRODUCT_IMAGE_UNSUPPORTED_TYPE": "Upload a JPEG, PNG or WebP photo.",
     "PRODUCT_NEEDS_VARIANT": "A product needs at least one variant.",
     "PRODUCT_NOT_FOUND": "That product no longer exists.",

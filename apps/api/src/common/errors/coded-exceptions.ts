@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  PayloadTooLargeException,
   ServiceUnavailableException,
   UnauthorizedException,
   UnsupportedMediaTypeException,
@@ -75,6 +76,12 @@ export class CodedConflictException extends ConflictException {
 }
 
 export class CodedServiceUnavailableException extends ServiceUnavailableException {
+  constructor(code: ErrorCode, message: string, params: ErrorParams = {}) {
+    super({ code, message, params } satisfies CodedErrorBody);
+  }
+}
+
+export class CodedPayloadTooLargeException extends PayloadTooLargeException {
   constructor(code: ErrorCode, message: string, params: ErrorParams = {}) {
     super({ code, message, params } satisfies CodedErrorBody);
   }
