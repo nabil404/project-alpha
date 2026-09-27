@@ -7,6 +7,8 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    // CommonJS that require()s ESM; see the stub for why.
+    '^@nestjs/throttler$': '<rootDir>/src/__tests__/stubs/nestjs-throttler.ts',
   },
   transform: {
     '^.+\\.ts$': [
