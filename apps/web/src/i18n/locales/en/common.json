@@ -13,8 +13,15 @@
     "generic": "Something went wrong. Please try again."
   },
   "nav": {
-    "catalog": "Catalog",
-    "orders": "Orders"
+    "catalog": "Products",
+    "closeMenu": "Close menu",
+    "conversations": "Conversations",
+    "label": "Main",
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "orders": "Orders",
+    "overview": "Overview",
+    "settings": "Settings"
   },
   "status": {
     "conversation": {
