@@ -1,11 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { CreateProduct, Product, UpdateProduct } from '@app/shared';
+import type { AddVariant, CreateProduct, Product, UpdateProduct, UpdateVariant } from '@app/shared';
 import type { TenantScope, Transaction } from '../../database/base.repository.js';
+import { CodedConflictException } from '../../common/errors/index.js';
 import { DATABASE, type Database } from '../../database/database.module.js';
 import { withMerchant } from '../../database/with-merchant.js';
 import { CategoriesRepository } from '../categories/categories.repository.js';
 import { categoryNotFound } from '../categories/category-errors.js';
-import { guardSku, productNotFound, variantNameRequired } from './product-errors.js';
+import {
+  guardSku,
+  productNotFound,
+  variantNameRequired,
+  variantNotFound,
+} from './product-errors.js';
 import { toProduct } from './product-mappers.js';
 import { ProductsRepository } from './products.repository.js';
 import { normalizeSku } from './sku.js';
@@ -75,6 +81,97 @@ export class ProductsService {
   remove(merchantId: string, id: string): Promise<void> {
     return withMerchant(this.db, merchantId, async (tx) => {
       if (!(await this.products.deleteProduct(tx, { merchantId }, id))) throw productNotFound(id);
+    });
+  }
+
+  /**
+   * Adding to a product sold without options turns it into one with options,
+   * so its unnamed default variant must be named in the same call.
+   */
+  addVariant(merchantId: string, productId: string, input: AddVariant): Promise<Product> {
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const scope = { merchantId };
+      if (!(await this.products.findProduct(tx, scope, productId, { lock: true }))) {
+        throw productNotFound(productId);
+      }
+
+      const live = await this.products.liveVariants(tx, scope, [productId]);
+      const defaultVariant = live.find((v) => v.isDefault);
+      if (defaultVariant) {
+        if (input.defaultVariantName === undefined) throw variantNameRequired();
+        await this.products.updateVariant(tx, scope, defaultVariant.id, {
+          name: input.defaultVariantName,
+        });
+      }
+
+      const sku = normalizeSku(input.sku);
+      await guardSku(sku, () =>
+        this.products.insertVariant(tx, scope, {
+          productId,
+          name: input.name,
+          sku,
+          price: input.price,
+          stock: input.stock,
+        }),
+      );
+      return this.load(tx, scope, productId);
+    });
+  }
+
+  /** `name: null` is allowed only on the single live variant, which then becomes the default. */
+  updateVariant(
+    merchantId: string,
+    productId: string,
+    variantId: string,
+    input: UpdateVariant,
+  ): Promise<Product> {
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const scope = { merchantId };
+      if (!(await this.products.findProduct(tx, scope, productId, { lock: true }))) {
+        throw productNotFound(productId);
+      }
+
+      const live = await this.products.liveVariants(tx, scope, [productId]);
+      const target = live.find((v) => v.id === variantId);
+      if (!target) throw variantNotFound(variantId);
+      if (input.name === null && live.length > 1) throw variantNameRequired();
+
+      const sku = input.sku === undefined ? undefined : (normalizeSku(input.sku) ?? target.sku);
+      const values = { name: input.name, sku, price: input.price, stock: input.stock };
+      if (Object.values(values).some((value) => value !== undefined)) {
+        await guardSku(sku, () => this.products.updateVariant(tx, scope, variantId, values));
+      }
+      return this.load(tx, scope, productId);
+    });
+  }
+
+  /**
+   * Archived rather than deleted: order lines will reference variants, and an
+   * archived variant releases its SKU. The product row lock serializes this
+   * with other variant changes, so two archives cannot both pass the
+   * last-variant check.
+   */
+  archiveVariant(merchantId: string, productId: string, variantId: string): Promise<Product> {
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const scope = { merchantId };
+      if (!(await this.products.findProduct(tx, scope, productId, { lock: true }))) {
+        throw productNotFound(productId);
+      }
+
+      const live = await this.products.liveVariants(tx, scope, [productId]);
+      if (!live.some((v) => v.id === variantId)) throw variantNotFound(variantId);
+      if (live.length === 1) {
+        throw new CodedConflictException(
+          'PRODUCT_NEEDS_VARIANT',
+          'A product needs at least one variant',
+          {
+            id: productId,
+          },
+        );
+      }
+
+      await this.products.archiveVariant(tx, scope, variantId);
+      return this.load(tx, scope, productId);
     });
   }
 
