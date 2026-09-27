@@ -41,9 +41,11 @@ and are marked ⚠️ below.
   `/api/v1/auth/*` by `src/auth/auth.module.ts`, which also turns Nest's body
   parser off: JSON parsing and `req.rawBody` now come from that module's
   `bodyParser` option, so `rawBody: true` on `NestFactory` does nothing.
-- **There are no business endpoints yet.** The only controllers in the repo are
-  health and the Messenger webhook, so there is no existing request → guard →
-  repository path to copy. The conventions below are the pattern to establish.
+- **The first business controller is `ProductImagesController`**
+  (`src/modules/products/images/`): `@UseGuards(TenantGuard)`, `uuid` params
+  through `ZodValidationPipe`, the merchant from `request.merchantId`, coded
+  errors and OpenAPI decorators on every route. Copy its request → guard →
+  service → repository path.
 - **`no-console` is an eslint rule** with `warn`/`error` allowed. It exists
   because tokens must never reach the logs — see Config and secrets.
 
@@ -313,6 +315,28 @@ the two-merchant repository tests are for.
 - **A job carries a Page id, not a merchant.** Resolve the merchant from the
   Page first, then pass `merchantId` explicitly into every repository call, the
   same as an HTTP request would.
+
+## Object storage
+
+- **Everything goes through `ObjectStorage`** (`src/modules/storage/`); nothing
+  else imports `@aws-sdk/*`. Tests use `InMemoryObjectStorage` from
+  `src/modules/storage/__tests__/`.
+- **Keys are built only by `productImageKeys()`**, from the session's merchant
+  id and a server-made uuid — never from a request. Objects are immutable; a
+  new photo is a new key.
+- **Storage calls follow invariant #1**: never inside a transaction. Store the
+  object first, then open the short transaction that writes the row; on
+  failure, delete the object best-effort and let the daily sweep catch misses.
+  Deleting a row works the other way round: commit first, then delete objects.
+- **Processors live in `WorkerModule`** (`src/worker.module.ts`), never in a
+  module `AppModule` imports, or the API process would consume jobs.
+- **A job without a request still needs merchant context.** Under `FORCE` RLS
+  the runtime role sees no rows without `withMerchant`, so "no row" is not
+  evidence of anything until the query ran under the right merchant.
+- **A composite `ON DELETE SET NULL` must name its column**
+  (`SET NULL (image_id)`), or it nulls `merchant_id` too. drizzle-kit cannot
+  model the list, so such a key lives in a `db:custom` migration, as
+  `product_variant_image_fk` does.
 
 ## Messenger webhooks
 
