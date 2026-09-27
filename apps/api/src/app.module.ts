@@ -11,6 +11,7 @@ import { HealthModule } from './health/health.module.js';
 import { QueueModule } from './modules/queue/queue.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
 import { CategoriesModule } from './modules/categories/categories.module.js';
+import { ProductsModule } from './modules/products/products.module.js';
 import { MessengerModule } from './modules/messenger/messenger.module.js';
 import { CryptoService } from './common/crypto.service.js';
 import { redactUrl } from './common/redact-url.js';
@@ -62,6 +63,7 @@ import { redactUrl } from './common/redact-url.js';
     QueueModule,
     StorageModule,
     CategoriesModule,
+    ProductsModule,
     HealthModule,
     MessengerModule,
   ],
