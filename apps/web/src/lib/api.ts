@@ -3,14 +3,23 @@ import { ApiError } from './api-error';
 
 /** Same-origin API client: Caddy proxies /api to the NestJS app, which serves /api/v1. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  // A FormData body needs the browser's own multipart content type, boundary
+  // included; setting JSON here would overwrite it and the upload would not parse.
+  const isFormData = init?.body instanceof FormData;
+
   const response = await fetch(`/api/v1${path}`, {
     ...init,
     credentials: 'include',
-    headers: { 'content-type': 'application/json', ...init?.headers },
+    headers: isFormData ? init?.headers : { 'content-type': 'application/json', ...init?.headers },
   });
 
   if (!response.ok) {
     throw await toApiError(response);
+  }
+
+  // 204 has no body to parse; callers of a 204 route type T as void.
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;
