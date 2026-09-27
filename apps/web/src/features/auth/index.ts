@@ -1,3 +1,4 @@
+export { AccountCard } from './components/AccountCard';
 export { ForgotPasswordForm } from './components/ForgotPasswordForm';
 export { ResetLinkSentNotice } from './components/ResetLinkSentNotice';
 export { ResetPasswordForm } from './components/ResetPasswordForm';
