@@ -24,7 +24,11 @@ describe('parseProductImageKey', () => {
   it('round-trips both kinds', () => {
     const keys = productImageKeys(merchantId, imageId);
     expect(parseProductImageKey(keys.full)).toEqual({ merchantId, imageId, kind: 'full' });
-    expect(parseProductImageKey(keys.thumbnail)).toEqual({ merchantId, imageId, kind: 'thumbnail' });
+    expect(parseProductImageKey(keys.thumbnail)).toEqual({
+      merchantId,
+      imageId,
+      kind: 'thumbnail',
+    });
   });
 
   it.each([
