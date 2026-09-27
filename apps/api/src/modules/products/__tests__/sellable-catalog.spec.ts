@@ -1,5 +1,7 @@
 import { createProductSchema } from '@app/shared';
 import { CategoriesRepository } from '../../categories/categories.repository.js';
+import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage.js';
+import { ProductImageRepository } from '../images/product-image.repository.js';
 import { CategoriesService } from '../../categories/categories.service.js';
 import { ProductsRepository } from '../products.repository.js';
 import { ProductsService } from '../products.service.js';
@@ -17,7 +19,13 @@ describeDb('ProductsService.findSellableCatalog', () => {
   beforeAll(async () => {
     t = await openCatalogTestDb();
     const categoriesRepository = new CategoriesRepository();
-    products = new ProductsService(t.db, new ProductsRepository(), categoriesRepository);
+    products = new ProductsService(
+      t.db,
+      new ProductsRepository(),
+      categoriesRepository,
+      new ProductImageRepository(),
+      new InMemoryObjectStorage(),
+    );
     categories = new CategoriesService(t.db, categoriesRepository);
   });
 

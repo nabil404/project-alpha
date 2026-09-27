@@ -1,5 +1,7 @@
 import { createProductSchema } from '@app/shared';
 import { CategoriesRepository } from '../../categories/categories.repository.js';
+import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage.js';
+import { ProductImageRepository } from '../images/product-image.repository.js';
 import { ProductsRepository } from '../products.repository.js';
 import { ProductsService } from '../products.service.js';
 import {
@@ -39,7 +41,13 @@ describeDb('ProductsService — variants', () => {
 
   beforeAll(async () => {
     t = await openCatalogTestDb();
-    service = new ProductsService(t.db, new ProductsRepository(), new CategoriesRepository());
+    service = new ProductsService(
+      t.db,
+      new ProductsRepository(),
+      new CategoriesRepository(),
+      new ProductImageRepository(),
+      new InMemoryObjectStorage(),
+    );
   });
 
   afterAll(async () => {

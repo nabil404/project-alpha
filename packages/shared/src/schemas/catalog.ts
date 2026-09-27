@@ -142,6 +142,8 @@ export const updateVariantSchema = z.object({
   sku: z.string().trim().min(1).max(64).optional(),
   price: moneySchema.optional(),
   stock: stockSchema.optional(),
+  /** One of the product's own images; null shows the product's cover. */
+  imageId: z.string().uuid().nullable().optional(),
 });
 export type UpdateVariant = z.infer<typeof updateVariantSchema>;
 

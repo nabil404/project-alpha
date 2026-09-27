@@ -164,7 +164,13 @@ export class ProductsRepository {
     executor: Executor,
     { merchantId }: TenantScope,
     variantId: string,
-    values: { name?: string | null; sku?: string; price?: number; stock?: number },
+    values: {
+      name?: string | null;
+      sku?: string;
+      price?: number;
+      stock?: number;
+      imageId?: string | null;
+    },
   ): Promise<void> {
     const set = values.name === undefined ? values : { ...values, isDefault: values.name === null };
     await executor

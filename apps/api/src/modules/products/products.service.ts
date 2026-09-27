@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type {
   AddVariant,
   Category,
@@ -13,14 +13,18 @@ import { withMerchant } from '../../database/with-merchant.js';
 import { toCategory } from '../categories/category-mappers.js';
 import { CategoriesRepository } from '../categories/categories.repository.js';
 import { categoryNotFound } from '../categories/category-errors.js';
+import { ObjectStorage } from '../storage/object-storage.js';
+import { deleteObjectsQuietly, objectKeysFor } from './images/product-image-objects.js';
+import { ProductImageRepository } from './images/product-image.repository.js';
 import {
   guardSku,
   productNeedsVariant,
+  productImageNotFound,
   productNotFound,
   variantNameRequired,
   variantNotFound,
 } from './product-errors.js';
-import { toProduct } from './product-mappers.js';
+import { toProduct, toProductImage } from './product-mappers.js';
 import { ProductsRepository } from './products.repository.js';
 import { normalizeSku } from './sku.js';
 
@@ -32,10 +36,14 @@ export interface SellableCatalog {
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly products: ProductsRepository,
     private readonly categories: CategoriesRepository,
+    private readonly images: ProductImageRepository,
+    private readonly storage: ObjectStorage,
   ) {}
 
   create(merchantId: string, input: CreateProduct): Promise<Product> {
@@ -94,11 +102,18 @@ export class ProductsService {
     });
   }
 
-  /** The database refuses this once an order references a variant; the seller archives instead. */
-  remove(merchantId: string, id: string): Promise<void> {
-    return withMerchant(this.db, merchantId, async (tx) => {
-      if (!(await this.products.deleteProduct(tx, { merchantId }, id))) throw productNotFound(id);
+  /**
+   * The database refuses this once an order references a variant; the seller
+   * archives instead. Image rows cascade; their objects go after commit.
+   */
+  async remove(merchantId: string, id: string): Promise<void> {
+    const keys = await withMerchant(this.db, merchantId, async (tx) => {
+      const scope = { merchantId };
+      const images = await this.images.listForProducts(tx, scope, [id]);
+      if (!(await this.products.deleteProduct(tx, scope, id))) throw productNotFound(id);
+      return objectKeysFor(images);
     });
+    await deleteObjectsQuietly(this.storage, this.logger, keys);
   }
 
   /**
@@ -152,9 +167,22 @@ export class ProductsService {
       const target = live.find((v) => v.id === variantId);
       if (!target) throw variantNotFound(variantId);
       if (input.name === null && live.length > 1) throw variantNameRequired();
+      // The foreign key keeps the image within the merchant; this keeps it within the product.
+      if (input.imageId) {
+        const own = await this.images.listForProducts(tx, scope, [productId]);
+        if (!own.some((image) => image.id === input.imageId)) {
+          throw productImageNotFound(input.imageId);
+        }
+      }
 
       const sku = input.sku === undefined ? undefined : (normalizeSku(input.sku) ?? target.sku);
-      const values = { name: input.name, sku, price: input.price, stock: input.stock };
+      const values = {
+        name: input.name,
+        sku,
+        price: input.price,
+        stock: input.stock,
+        imageId: input.imageId,
+      };
       if (Object.values(values).some((value) => value !== undefined)) {
         await guardSku(sku, () => this.products.updateVariant(tx, scope, variantId, values));
       }
@@ -192,6 +220,7 @@ export class ProductsService {
       const ids = rows.map((row) => row.id);
       const variants = await this.products.liveVariants(tx, scope, ids);
       const categoryIds = await this.products.categoryIdsByProduct(tx, scope, ids);
+      const images = await this.images.listForProducts(tx, scope, ids);
       const categories = await this.categories.listLive(tx, scope);
 
       return {
@@ -200,6 +229,9 @@ export class ProductsService {
             row,
             variants.filter((v) => v.productId === row.id),
             categoryIds.get(row.id) ?? [],
+            images
+              .filter((image) => image.productId === row.id)
+              .map((image) => toProductImage(image, this.storage)),
           ),
         ),
         categories: categories.map(toCategory),
@@ -213,7 +245,13 @@ export class ProductsService {
     if (!row) throw productNotFound(id);
     const variants = await this.products.liveVariants(tx, scope, [id]);
     const categoryIds = await this.products.categoryIdsByProduct(tx, scope, [id]);
-    return toProduct(row, variants, categoryIds.get(id) ?? []);
+    const images = await this.images.listForProducts(tx, scope, [id]);
+    return toProduct(
+      row,
+      variants,
+      categoryIds.get(id) ?? [],
+      images.map((image) => toProductImage(image, this.storage)),
+    );
   }
 
   private async linkCategories(
