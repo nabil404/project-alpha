@@ -22,6 +22,9 @@ import { S3ObjectStorage } from './s3-object-storage.js';
             // such as R2 have lagged the SDK's newer default checksum headers.
             requestChecksumCalculation: 'WHEN_REQUIRED',
             responseChecksumValidation: 'WHEN_REQUIRED',
+            // Bounded failure instead of a hung request; the SDK's default
+            // retries still apply on top of these.
+            requestHandler: { connectionTimeout: 5_000, requestTimeout: 30_000 },
           }),
           config.get('STORAGE_BUCKET'),
           config.get('STORAGE_PUBLIC_BASE_URL'),

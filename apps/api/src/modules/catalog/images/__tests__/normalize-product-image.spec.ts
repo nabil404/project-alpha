@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { jest } from '@jest/globals';
 import sharp from 'sharp';
 import {
+  DEFAULT_NORMALIZE_LIMITS,
   normalizeProductImage,
   type NormalizedImage,
   type NormalizeResult,
@@ -21,12 +22,22 @@ function ok(result: NormalizeResult): NormalizedImage {
 describe('normalizeProductImage', () => {
   beforeAll(() => Logger.overrideLogger(false));
 
-  it('drops EXIF from both outputs', async () => {
+  it('drops EXIF (GPS included), XMP and ICC from both outputs', async () => {
     const input = await solid(64, 64)
-      .withExif({ IFD0: { Artist: 'Seller', Copyright: 'Home studio' } })
+      .withExif({
+        IFD0: { Artist: 'Seller', Copyright: 'Home studio' },
+        IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '51/1 30/1 0/1' },
+      })
+      .withXmp(
+        '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/></x:xmpmeta>',
+      )
+      .withIccProfile('p3')
       .jpeg()
       .toBuffer();
-    expect((await sharp(input).metadata()).exif).toBeDefined();
+    const inputMetadata = await sharp(input).metadata();
+    expect(inputMetadata.exif).toBeDefined();
+    expect(inputMetadata.xmp).toBeDefined();
+    expect(inputMetadata.icc).toBeDefined();
 
     const result = ok(await normalizeProductImage(input));
 
@@ -34,7 +45,13 @@ describe('normalizeProductImage', () => {
       const metadata = await sharp(output).metadata();
       expect(metadata.format).toBe('jpeg');
       expect(metadata.exif).toBeUndefined();
+      expect(metadata.xmp).toBeUndefined();
+      expect(metadata.icc).toBeUndefined();
     }
+  });
+
+  it('defaults the input limit to 40 megapixels', () => {
+    expect(DEFAULT_NORMALIZE_LIMITS.maxInputPixels).toBe(40_000_000);
   });
 
   it('applies EXIF orientation before dropping it, so the photo is upright', async () => {

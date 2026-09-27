@@ -74,13 +74,33 @@ export class S3ObjectStorage extends ObjectStorage {
     return joinPublicUrl(this.publicBaseUrl, key);
   }
 
-  /** SDK errors can carry request details, so only the operation and the error name are logged. */
+  /**
+   * SDK errors can carry request details, so only the operation, the error
+   * name, the HTTP status and an error code are logged - never
+   * `error.message`, which can echo back request content such as a key.
+   */
   private async run<T>(operation: string, call: () => Promise<T>): Promise<T> {
     try {
       return await call();
     } catch (error) {
       const name = error instanceof Error ? error.name : 'UnknownError';
-      this.logger.warn(`Object storage ${operation} failed: ${name}`);
+      const status =
+        error && typeof error === 'object' && '$metadata' in error
+          ? (error as { $metadata?: { httpStatusCode?: unknown } }).$metadata?.httpStatusCode
+          : undefined;
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+
+      const details = [
+        typeof status === 'number' ? `status ${status}` : undefined,
+        typeof code === 'string' ? `code ${code}` : undefined,
+      ].filter((detail): detail is string => detail !== undefined);
+
+      this.logger.warn(
+        `Object storage ${operation} failed: ${name}${details.length > 0 ? ` (${details.join(', ')})` : ''}`,
+      );
       throw new CodedServiceUnavailableException(
         'STORAGE_UNAVAILABLE',
         'Object storage is unavailable',
