@@ -31,8 +31,9 @@ delivery address.
   delivery charge, status (`draft`, `active`, `archived`). Variant: name, SKU
   (unique per seller among live variants), price, stock count. A product always
   has at least one live variant; one sold without options has a single unnamed
-  default variant. Variants are archived, never deleted, so orders keep pointing
-  at them. The AI sees only active products and their live variants. Stock is
+  default variant. Variants are archived, never deleted individually, so orders
+  keep pointing at them (a product hard delete cascades to its variants). The
+  AI sees only active products and their live variants. Stock is
   decremented when an order is confirmed and restored if it is cancelled.
 - **Category** — a seller's tree, at most 3 levels deep; names unique per seller.
   A product can sit in several categories. Deleting one is a soft delete, refused
