@@ -123,20 +123,24 @@ export class CategoriesRepository {
     );
   }
 
+  /**
+   * `undefined` when the row lost a race to a concurrent delete: a rename-only
+   * update takes no tree lock, so its UPDATE can wait on the row lock behind a
+   * `remove`, then re-check `deleted_at IS NULL` and match nothing. The caller
+   * maps that to `CATEGORY_NOT_FOUND`.
+   */
   async update(
     executor: Executor,
     { merchantId }: TenantScope,
     id: string,
     values: { name?: string; parentId?: string | null },
-  ): Promise<CategoryRow> {
-    return one(
-      await executor
-        .update(category)
-        .set(values)
-        .where(and(eq(category.merchantId, merchantId), eq(category.id, id), liveCategory()))
-        .returning(),
-      'category update',
-    );
+  ): Promise<CategoryRow | undefined> {
+    const [row] = await executor
+      .update(category)
+      .set(values)
+      .where(and(eq(category.merchantId, merchantId), eq(category.id, id), liveCategory()))
+      .returning();
+    return row;
   }
 
   /** Soft-deletes and unlinks, so no junction join can reach a deleted category. */

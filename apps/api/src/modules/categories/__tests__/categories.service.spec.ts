@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../database/schema/index.js';
+import { withMerchant } from '../../../database/with-merchant.js';
 import { CategoriesRepository } from '../categories.repository.js';
 import { CategoriesService } from '../categories.service.js';
 import {
@@ -170,6 +171,52 @@ describeDb('CategoriesService', () => {
         service.update(t.merchantB, ofA.id, { name: fresh('Theirs') }),
         'CATEGORY_NOT_FOUND',
       );
+    });
+
+    it("rejects a rename to another live category's name, case-insensitively", async () => {
+      const taken = await service.create(t.merchantA, { name: fresh('Taken'), parentId: null });
+      const cat = await service.create(t.merchantA, { name: fresh('Renamer'), parentId: null });
+      await expectCoded(
+        service.update(t.merchantA, cat.id, { name: taken.name.toUpperCase() }),
+        'CATEGORY_NAME_TAKEN',
+      );
+    });
+
+    it('returns CATEGORY_NOT_FOUND, not a bare error, for a rename target already deleted', async () => {
+      const cat = await service.create(t.merchantA, { name: fresh('AlreadyGone'), parentId: null });
+      await service.remove(t.merchantA, cat.id);
+      await expectCoded(
+        service.update(t.merchantA, cat.id, { name: fresh('X') }),
+        'CATEGORY_NOT_FOUND',
+      );
+    });
+
+    it('CategoriesRepository.update returns undefined when the row lost the race to a delete', async () => {
+      const cat = await service.create(t.merchantA, { name: fresh('RaceLoser'), parentId: null });
+      await service.remove(t.merchantA, cat.id);
+
+      const repo = new CategoriesRepository();
+      await withMerchant(t.db, t.merchantA, async (tx) => {
+        const result = await repo.update(tx, { merchantId: t.merchantA }, cat.id, {
+          name: fresh('WontApply'),
+        });
+        expect(result).toBeUndefined();
+      });
+    });
+
+    it('never surfaces a bare Error when a rename races a concurrent remove', async () => {
+      const cat = await service.create(t.merchantA, { name: fresh('Racer'), parentId: null });
+
+      const results = await Promise.allSettled([
+        service.update(t.merchantA, cat.id, { name: fresh('RenamedDuringRace') }),
+        service.remove(t.merchantA, cat.id),
+      ]);
+
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          await expectCoded(Promise.reject(result.reason), 'CATEGORY_NOT_FOUND');
+        }
+      }
     });
   });
 

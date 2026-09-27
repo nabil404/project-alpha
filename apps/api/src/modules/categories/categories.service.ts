@@ -60,6 +60,8 @@ export class CategoriesService {
       const row = await guardCategoryName(name, () =>
         this.categories.update(tx, scope, id, { name, parentId: input.parentId }),
       );
+      // Lost a race to a concurrent delete: the row existed above but not by now.
+      if (!row) throw categoryNotFound(id);
       return toCategory(row);
     });
   }
