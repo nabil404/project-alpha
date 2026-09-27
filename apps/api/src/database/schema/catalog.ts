@@ -26,8 +26,9 @@ import { organization } from './auth.js';
 
 /** Index names the services map unique violations from. */
 export const VARIANT_SKU_LIVE_UIDX = 'product_variant_merchant_sku_live_uidx';
-export const VARIANT_DEFAULT_LIVE_UIDX = 'product_variant_default_live_uidx';
 export const CATEGORY_NAME_LIVE_UIDX = 'category_merchant_name_live_uidx';
+/** Named for readability in `\d`/pg_indexes; fixed by migration 0003, not mapped by any service. */
+const VARIANT_DEFAULT_LIVE_UIDX = 'product_variant_default_live_uidx';
 
 const id = () =>
   text('id')
