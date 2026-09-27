@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+import { jest } from '@jest/globals';
 import sharp from 'sharp';
 import {
   normalizeProductImage,
@@ -17,6 +19,8 @@ function ok(result: NormalizeResult): NormalizedImage {
 }
 
 describe('normalizeProductImage', () => {
+  beforeAll(() => Logger.overrideLogger(false));
+
   it('drops EXIF from both outputs', async () => {
     const input = await solid(64, 64)
       .withExif({ IFD0: { Artist: 'Seller', Copyright: 'Home studio' } })
@@ -109,6 +113,19 @@ describe('normalizeProductImage', () => {
       ok: false,
       reason: 'invalid',
     });
+  });
+
+  it('logs why an image was rejected as invalid', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    try {
+      const result = await normalizeProductImage(Buffer.from('not an image'));
+
+      expect(result).toEqual({ ok: false, reason: 'invalid' });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Rejected image as invalid'));
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('rejects a truncated JPEG as invalid rather than returning a partial image', async () => {
