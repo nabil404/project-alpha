@@ -2,9 +2,9 @@ import { Controller, Get, Query, type INestApplication, type LoggerService } fro
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { z } from 'zod';
-import { configureApp } from '../bootstrap.js';
-import { CodedUnauthorizedException } from '../common/errors/coded-exceptions.js';
-import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { configureApp } from '../bootstrap';
+import { CodedUnauthorizedException } from '../common/errors/coded-exceptions';
+import { ZodValidationPipe } from '../common/zod-validation.pipe';
 
 const querySchema = z.object({ quantity: z.coerce.number().int().positive() });
 

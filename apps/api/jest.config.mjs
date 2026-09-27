@@ -6,7 +6,6 @@ export default {
   testRegex: '.*\\.spec\\.ts$',
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
     // CommonJS that require()s ESM; see the stub for why.
     '^@nestjs/throttler$': '<rootDir>/src/__tests__/stubs/nestjs-throttler.ts',
   },
@@ -16,8 +15,6 @@ export default {
       {
         useESM: true,
         tsconfig: '<rootDir>/tsconfig.json',
-        // NodeNext without isolatedModules is fine here; nest build owns emit.
-        diagnostics: { ignoreCodes: [151002] },
       },
     ],
   },

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
-import { CodedForbiddenException } from './errors/coded-exceptions.js';
+import { CodedForbiddenException } from './errors/coded-exceptions';
 
 export interface TenantRequest extends Request {
   merchantId?: string;

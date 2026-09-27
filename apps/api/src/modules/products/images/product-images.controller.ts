@@ -30,13 +30,13 @@ import {
   type ReorderProductImages,
 } from '@app/shared';
 import { z } from 'zod';
-import { CodedValidationException } from '../../../common/errors/coded-exceptions.js';
-import { TenantGuard, type TenantRequest } from '../../../common/tenant.guard.js';
-import { ZodValidationPipe } from '../../../common/zod-validation.pipe.js';
-import type { TenantScope } from '../../../database/base.repository.js';
-import { ApiCodedError } from '../../../openapi/api-coded-error.js';
-import { ProductImageUploadInterceptor } from './product-image-upload.interceptor.js';
-import { ProductImagesService } from './product-images.service.js';
+import { CodedValidationException } from '../../../common/errors/coded-exceptions';
+import { TenantGuard, type TenantRequest } from '../../../common/tenant.guard';
+import { ZodValidationPipe } from '../../../common/zod-validation.pipe';
+import type { TenantScope } from '../../../database/base.repository';
+import { ApiCodedError } from '../../../openapi/api-coded-error';
+import { ProductImageUploadInterceptor } from './product-image-upload.interceptor';
+import { ProductImagesService } from './product-images.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
 const imageSchema = z.toJSONSchema(productImageSchema, {

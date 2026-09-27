@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { QueueModule } from '../../queue/queue.module.js';
-import { StorageModule } from '../../storage/storage.module.js';
-import { ProductsModule } from '../products.module.js';
-import { StorageSweepProcessor } from './storage-sweep.processor.js';
+import { QueueModule } from '../../queue/queue.module';
+import { StorageModule } from '../../storage/storage.module';
+import { ProductsModule } from '../products.module';
+import { StorageSweepProcessor } from './storage-sweep.processor';
 
 /** Worker-only: imported by WorkerModule, never by AppModule. */
 @Module({

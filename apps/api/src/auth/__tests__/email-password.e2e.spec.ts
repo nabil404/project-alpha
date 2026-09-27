@@ -18,16 +18,16 @@ import { eq, inArray, like } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import request from 'supertest';
-import { configureApp, NEST_APP_OPTIONS } from '../../bootstrap.js';
-import { TenantGuard, type TenantRequest } from '../../common/tenant.guard.js';
-import { AppConfig } from '../../config/app.config.js';
-import { DATABASE, type Database } from '../../database/database.module.js';
-import * as schema from '../../database/schema/index.js';
-import { MailService, type Mailer } from '../../modules/mail/mail.service.js';
-import type { MailMessage } from '../../modules/mail/templates.js';
-import type { RawBodyRequest } from '../../modules/messenger/raw-body.js';
-import { AuthModule } from '../auth.module.js';
-import { SessionGuard } from '../session.guard.js';
+import { configureApp, NEST_APP_OPTIONS } from '../../bootstrap';
+import { TenantGuard, type TenantRequest } from '../../common/tenant.guard';
+import { AppConfig } from '../../config/app.config';
+import { DATABASE, type Database } from '../../database/database.module';
+import * as schema from '../../database/schema/index';
+import { MailService, type Mailer } from '../../modules/mail/mail.service';
+import type { MailMessage } from '../../modules/mail/templates';
+import type { RawBodyRequest } from '../../modules/messenger/raw-body';
+import { AuthModule } from '../auth.module';
+import { SessionGuard } from '../session.guard';
 
 // Needs a real Postgres: Better Auth, the organization bootstrap and the token
 // tables are all server behaviour. CI sets DATABASE_ADMIN_URL; locally, export

@@ -1,3 +1,3 @@
-export * from './codes.js';
-export * from './envelope.js';
-export * from './zod-issue.js';
+export * from './codes';
+export * from './envelope';
+export * from './zod-issue';

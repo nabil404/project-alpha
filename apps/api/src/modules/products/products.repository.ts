@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { ProductStatus } from '@app/shared';
-import type { Executor, TenantScope } from '../../database/base.repository.js';
-import { one } from '../../database/rows.js';
-import { category, product, productCategory, productVariant } from '../../database/schema/index.js';
-import { generateSku } from './sku.js';
-import { liveCategory } from '../categories/category-visibility.js';
-import { liveVariant, sellableProduct } from './product-visibility.js';
+import type { Executor, TenantScope } from '../../database/base.repository';
+import { one } from '../../database/rows';
+import { category, product, productCategory, productVariant } from '../../database/schema/index';
+import { generateSku } from './sku';
+import { liveCategory } from '../categories/category-visibility';
+import { liveVariant, sellableProduct } from './product-visibility';
 
 export type ProductRow = typeof product.$inferSelect;
 export type VariantRow = typeof productVariant.$inferSelect;

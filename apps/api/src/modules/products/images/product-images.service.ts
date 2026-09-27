@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PRODUCT_IMAGE_MAX_COUNT, type ProductImage } from '@app/shared';
-import type { TenantScope, Transaction } from '../../../database/base.repository.js';
-import { DATABASE, type Database } from '../../../database/database.module.js';
-import { withMerchant } from '../../../database/with-merchant.js';
-import { ObjectStorage } from '../../storage/object-storage.js';
+import type { TenantScope, Transaction } from '../../../database/base.repository';
+import { DATABASE, type Database } from '../../../database/database.module';
+import { withMerchant } from '../../../database/with-merchant';
+import { ObjectStorage } from '../../storage/object-storage';
 import {
   productImageInvalid,
   productImageLimitReached,
@@ -12,13 +12,13 @@ import {
   productImageOrderMismatch,
   productImageUnsupported,
   productNotFound,
-} from '../product-errors.js';
-import { toProductImage } from '../product-mappers.js';
-import { ProductsRepository } from '../products.repository.js';
-import { normalizeProductImage, type NormalizedImage } from './normalize-product-image.js';
-import { deleteObjectsQuietly, objectKeysFor } from './product-image-objects.js';
-import { PRODUCT_IMAGE_OBJECT_OPTIONS, productImageKeys } from './product-image-keys.js';
-import { ProductImageRepository } from './product-image.repository.js';
+} from '../product-errors';
+import { toProductImage } from '../product-mappers';
+import { ProductsRepository } from '../products.repository';
+import { normalizeProductImage, type NormalizedImage } from './normalize-product-image';
+import { deleteObjectsQuietly, objectKeysFor } from './product-image-objects';
+import { PRODUCT_IMAGE_OBJECT_OPTIONS, productImageKeys } from './product-image-keys';
+import { ProductImageRepository } from './product-image.repository';
 
 /**
  * The upload order is load-bearing (backend invariant #1): check, process,

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { asc, eq } from 'drizzle-orm';
-import type { Database } from './database.module.js';
-import type { Executor } from './base.repository.js';
-import { member, organization, user as userTable } from './schema/index.js';
+import type { Database } from './database.module';
+import type { Executor } from './base.repository';
+import { member, organization, user as userTable } from './schema/index';
 
 /** The fields of a Better Auth user this needs; narrower than the full row. */
 export interface OrganizationOwner {

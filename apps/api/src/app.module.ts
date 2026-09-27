@@ -3,18 +3,18 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { LoggerModule } from 'nestjs-pino';
-import { AppConfig, AppConfigModule } from './config/config.module.js';
-import { DatabaseModule } from './database/database.module.js';
-import { AuthModule } from './auth/auth.module.js';
-import { SessionGuard } from './auth/session.guard.js';
-import { HealthModule } from './health/health.module.js';
-import { QueueModule } from './modules/queue/queue.module.js';
-import { StorageModule } from './modules/storage/storage.module.js';
-import { CategoriesModule } from './modules/categories/categories.module.js';
-import { ProductsModule } from './modules/products/products.module.js';
-import { MessengerModule } from './modules/messenger/messenger.module.js';
-import { CryptoService } from './common/crypto.service.js';
-import { redactUrl } from './common/redact-url.js';
+import { AppConfig, AppConfigModule } from './config/config.module';
+import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './auth/auth.module';
+import { SessionGuard } from './auth/session.guard';
+import { HealthModule } from './health/health.module';
+import { QueueModule } from './modules/queue/queue.module';
+import { StorageModule } from './modules/storage/storage.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ProductsModule } from './modules/products/products.module';
+import { MessengerModule } from './modules/messenger/messenger.module';
+import { CryptoService } from './common/crypto.service';
+import { redactUrl } from './common/redact-url';
 
 @Module({
   imports: [

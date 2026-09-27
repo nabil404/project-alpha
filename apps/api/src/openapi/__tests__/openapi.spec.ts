@@ -4,16 +4,16 @@ import type { OpenAPIObject } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { TerminusModule } from '@nestjs/terminus';
 import request from 'supertest';
-import { configureApp } from '../../bootstrap.js';
-import { AppConfig } from '../../config/app.config.js';
-import { DATABASE } from '../../database/database.module.js';
-import { HealthController } from '../../health/health.module.js';
-import { MessengerController } from '../../modules/messenger/messenger.controller.js';
-import { MESSENGER_QUEUE } from '../../modules/queue/queue.constants.js';
-import { ERROR_RESPONSE_SCHEMA } from '../api-coded-error.js';
-import { SESSION_COOKIE_SCHEME } from '../merge-auth-document.js';
-import { OPENAPI_JSON_PATH, OPENAPI_UI_PATH, setupOpenApi } from '../openapi.js';
-import { STUB_APP_URL, stubAuth } from './stub-auth.js';
+import { configureApp } from '../../bootstrap';
+import { AppConfig } from '../../config/app.config';
+import { DATABASE } from '../../database/database.module';
+import { HealthController } from '../../health/health.module';
+import { MessengerController } from '../../modules/messenger/messenger.controller';
+import { MESSENGER_QUEUE } from '../../modules/queue/queue.constants';
+import { ERROR_RESPONSE_SCHEMA } from '../api-coded-error';
+import { SESSION_COOKIE_SCHEME } from '../merge-auth-document';
+import { OPENAPI_JSON_PATH, OPENAPI_UI_PATH, setupOpenApi } from '../openapi';
+import { STUB_APP_URL, stubAuth } from './stub-auth';
 
 const silentLogger = { error: () => {} } as unknown as LoggerService;
 

@@ -1,5 +1,5 @@
-import { CryptoService } from '../crypto.service.js';
-import type { AppConfig } from '../../config/app.config.js';
+import { CryptoService } from '../crypto.service';
+import type { AppConfig } from '../../config/app.config';
 
 const config = {
   get: () => Buffer.alloc(32, 7).toString('base64'),

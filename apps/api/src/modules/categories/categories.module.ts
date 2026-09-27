@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { CategoriesRepository } from './categories.repository.js';
-import { CategoriesService } from './categories.service.js';
+import { CategoriesRepository } from './categories.repository';
+import { CategoriesService } from './categories.service';
 
 /**
  * No controllers yet; the catalog API design adds them. CategoriesRepository

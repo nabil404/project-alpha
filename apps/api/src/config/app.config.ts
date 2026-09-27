@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import type { Env } from './env.schema.js';
+import type { Env } from './env.schema';
 
 /**
  * Typed accessor so no module reads process.env directly. It lives apart from

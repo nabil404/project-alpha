@@ -25,6 +25,24 @@ export default tseslint.config(
     },
   },
   {
+    // Relative imports are extensionless; the build (SWC in apps/api, tsc in
+    // packages/shared, Vite in apps/web) owns what Node or the browser sees.
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.{1,2}/.*\\.(js|ts|tsx|mjs|cjs)$',
+              message: 'Drop the file extension from relative imports.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Standalone CLI scripts: run by node, not bundled into the app. Reporting
     // to stdout is their purpose, and they never touch a token.
     files: ['apps/api/scripts/**/*.mjs'],

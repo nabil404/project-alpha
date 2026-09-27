@@ -13,13 +13,13 @@ import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import {
   CodedBadRequestException,
   CodedUnauthorizedException,
-} from '../../common/errors/coded-exceptions.js';
-import { AppConfig } from '../../config/app.config.js';
-import { ApiCodedError } from '../../openapi/api-coded-error.js';
-import { MESSENGER_QUEUE, type InboundMessageJob } from '../queue/queue.constants.js';
-import { verifyMetaSignature } from './signature.js';
-import { parseInboundJobs, parseWebhookBody } from './webhook-payload.js';
-import type { RawBodyRequest } from './raw-body.js';
+} from '../../common/errors/coded-exceptions';
+import { AppConfig } from '../../config/app.config';
+import { ApiCodedError } from '../../openapi/api-coded-error';
+import { MESSENGER_QUEUE, type InboundMessageJob } from '../queue/queue.constants';
+import { verifyMetaSignature } from './signature';
+import { parseInboundJobs, parseWebhookBody } from './webhook-payload';
+import type { RawBodyRequest } from './raw-body';
 
 /**
  * Acknowledge immediately, process in a background worker. The Meta message ID

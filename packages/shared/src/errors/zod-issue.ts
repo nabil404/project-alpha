@@ -1,6 +1,6 @@
 import type { core } from 'zod';
-import { isErrorCode, type ErrorCode } from './codes.js';
-import type { ErrorParams } from './envelope.js';
+import { isErrorCode, type ErrorCode } from './codes';
+import type { ErrorParams } from './envelope';
 
 /**
  * Turns one Zod issue into the code and params the envelope carries.

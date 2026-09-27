@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import * as schema from '../schema/index.js';
+import * as schema from '../schema/index';
 import {
   describeDb,
   openCatalogTestDb,
@@ -9,7 +9,7 @@ import {
   seedProduct,
   seedVariant,
   type CatalogTestDb,
-} from './catalog-test-db.js';
+} from './catalog-test-db';
 
 describeDb('catalog schema constraints', () => {
   let t: CatalogTestDb;

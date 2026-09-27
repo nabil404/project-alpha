@@ -10,22 +10,22 @@ import { Test } from '@nestjs/testing';
 import { productImageSchema } from '@app/shared';
 import sharp from 'sharp';
 import request from 'supertest';
-import { AuthModule } from '../../../../auth/auth.module.js';
-import { configureApp, NEST_APP_OPTIONS } from '../../../../bootstrap.js';
-import { TenantGuard } from '../../../../common/tenant.guard.js';
-import { AppConfig } from '../../../../config/app.config.js';
-import { DATABASE } from '../../../../database/database.module.js';
+import { AuthModule } from '../../../../auth/auth.module';
+import { configureApp, NEST_APP_OPTIONS } from '../../../../bootstrap';
+import { TenantGuard } from '../../../../common/tenant.guard';
+import { AppConfig } from '../../../../config/app.config';
+import { DATABASE } from '../../../../database/database.module';
 import {
   describeDb,
   openCatalogTestDb,
   openRuntimeDb,
   seedProduct,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db.js';
-import { MailService } from '../../../mail/mail.service.js';
-import { ObjectStorage } from '../../../storage/object-storage.js';
-import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage.js';
-import { ProductsModule } from '../../products.module.js';
+} from '../../../../database/__tests__/catalog-test-db';
+import { MailService } from '../../../mail/mail.service';
+import { ObjectStorage } from '../../../storage/object-storage';
+import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
+import { ProductsModule } from '../../products.module';
 
 const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
 

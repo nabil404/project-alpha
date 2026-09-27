@@ -1,7 +1,7 @@
 import type { Logger } from '@nestjs/common';
-import type { ProductImageRow } from '../../../database/schema/index.js';
-import type { ObjectStorage } from '../../storage/object-storage.js';
-import { productImageKeys } from './product-image-keys.js';
+import type { ProductImageRow } from '../../../database/schema/index';
+import type { ObjectStorage } from '../../storage/object-storage';
+import { productImageKeys } from './product-image-keys';
 
 /** Both objects of each row: the full image and its thumbnail. */
 export function objectKeysFor(rows: ProductImageRow[]): string[] {

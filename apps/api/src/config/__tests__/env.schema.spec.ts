@@ -1,4 +1,4 @@
-import { validateEnv } from '../env.schema.js';
+import { validateEnv } from '../env.schema';
 
 const base = {
   APP_URL: 'http://localhost:5173',

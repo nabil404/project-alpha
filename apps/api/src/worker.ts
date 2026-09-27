@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
-import { WorkerModule } from './worker.module.js';
+import { WorkerModule } from './worker.module';
 
 /**
  * The worker shares the API codebase and boots without an HTTP server, so

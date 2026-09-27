@@ -1,12 +1,12 @@
 import { Inject, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job, Queue } from 'bullmq';
-import { DATABASE, type Database } from '../../../database/database.module.js';
-import { withMerchant } from '../../../database/with-merchant.js';
-import { STORAGE_QUEUE, SWEEP_JOB } from '../../queue/queue.constants.js';
-import { ObjectStorage } from '../../storage/object-storage.js';
-import { ProductImageRepository } from './product-image.repository.js';
-import { sweepOrphanedImages, type SweepReport } from './sweep-orphaned-images.js';
+import { DATABASE, type Database } from '../../../database/database.module';
+import { withMerchant } from '../../../database/with-merchant';
+import { STORAGE_QUEUE, SWEEP_JOB } from '../../queue/queue.constants';
+import { ObjectStorage } from '../../storage/object-storage';
+import { ProductImageRepository } from './product-image.repository';
+import { sweepOrphanedImages, type SweepReport } from './sweep-orphaned-images';
 
 /** Daily at 03:00 UTC. */
 const SWEEP_SCHEDULE = '0 3 * * *';

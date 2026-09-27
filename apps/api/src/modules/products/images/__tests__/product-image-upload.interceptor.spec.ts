@@ -5,8 +5,8 @@ import {
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { PRODUCT_IMAGE_MAX_BYTES } from '@app/shared';
-import { CodedNotFoundException } from '../../../../common/errors/coded-exceptions.js';
-import { translateUploadError } from '../product-image-upload.interceptor.js';
+import { CodedNotFoundException } from '../../../../common/errors/coded-exceptions';
+import { translateUploadError } from '../product-image-upload.interceptor';
 
 const bodyOf = (error: unknown) => (error as HttpException).getResponse();
 

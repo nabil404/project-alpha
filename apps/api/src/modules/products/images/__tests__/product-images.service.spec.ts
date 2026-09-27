@@ -2,19 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import * as schema from '../../../../database/schema/index.js';
+import * as schema from '../../../../database/schema/index';
 import {
   describeDb,
   openCatalogTestDb,
   seedImages,
   seedProduct,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db.js';
-import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage.js';
-import { ProductsRepository } from '../../products.repository.js';
-import { productImageKeys } from '../product-image-keys.js';
-import { ProductImageRepository } from '../product-image.repository.js';
-import { ProductImagesService } from '../product-images.service.js';
+} from '../../../../database/__tests__/catalog-test-db';
+import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
+import { ProductsRepository } from '../../products.repository';
+import { productImageKeys } from '../product-image-keys';
+import { ProductImageRepository } from '../product-image.repository';
+import { ProductImagesService } from '../product-images.service';
 
 const jpeg = (width = 64, height = 48) =>
   sharp({ create: { width, height, channels: 3, background: '#3a6' } })

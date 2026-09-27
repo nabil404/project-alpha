@@ -1,4 +1,4 @@
-import { existingAccountEmail, resetPasswordEmail, verificationEmail } from '../templates.js';
+import { existingAccountEmail, resetPasswordEmail, verificationEmail } from '../templates';
 
 const url = 'https://orders.example.com/api/v1/auth/verify-email?token=abc.def&callbackURL=%2F';
 

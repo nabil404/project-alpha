@@ -1,7 +1,7 @@
 import type { OpenAPIObject } from '@nestjs/swagger';
-import { ERROR_RESPONSE_REF } from '../api-coded-error.js';
-import { mergeAuthDocument, SESSION_COOKIE_SCHEME } from '../merge-auth-document.js';
-import { stubAuth } from './stub-auth.js';
+import { ERROR_RESPONSE_REF } from '../api-coded-error';
+import { mergeAuthDocument, SESSION_COOKIE_SCHEME } from '../merge-auth-document';
+import { stubAuth } from './stub-auth';
 
 const BASE_PATH = '/api/v1/auth';
 

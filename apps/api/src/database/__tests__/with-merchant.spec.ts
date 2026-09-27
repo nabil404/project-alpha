@@ -1,10 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import type { Database } from '../database.module.js';
-import type { Executor } from '../base.repository.js';
-import * as schema from '../schema/index.js';
-import { withMerchant } from '../with-merchant.js';
+import type { Database } from '../database.module';
+import type { Executor } from '../base.repository';
+import * as schema from '../schema/index';
+import { withMerchant } from '../with-merchant';
 
 // Better Auth's Organization plugin generates organization.id as TEXT - a
 // random string, not a uuid - and merchant_id references it. Shaped like the

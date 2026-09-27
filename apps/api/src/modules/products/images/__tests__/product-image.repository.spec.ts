@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
-import type { Transaction } from '../../../../database/base.repository.js';
-import * as schema from '../../../../database/schema/index.js';
-import { withMerchant } from '../../../../database/with-merchant.js';
+import type { Transaction } from '../../../../database/base.repository';
+import * as schema from '../../../../database/schema/index';
+import { withMerchant } from '../../../../database/with-merchant';
 import {
   describeDb,
   openCatalogTestDb,
@@ -10,9 +10,9 @@ import {
   seedImages,
   seedProduct,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db.js';
-import { productImageKeys } from '../product-image-keys.js';
-import { ProductImageRepository } from '../product-image.repository.js';
+} from '../../../../database/__tests__/catalog-test-db';
+import { productImageKeys } from '../product-image-keys';
+import { ProductImageRepository } from '../product-image.repository';
 
 // Runs as app_runtime so row-level security applies exactly as in production;
 // every call also passes a scope, so each test proves the filter, not the policy.

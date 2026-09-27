@@ -1,4 +1,4 @@
-import { generateSku, normalizeSku } from '../sku.js';
+import { generateSku, normalizeSku } from '../sku';
 
 describe('normalizeSku', () => {
   it('trims and upper-cases', () => {

@@ -5,13 +5,8 @@ import {
   type S3Client,
 } from '@aws-sdk/client-s3';
 import { Logger } from '@nestjs/common';
-import { CodedServiceUnavailableException } from '../../common/errors/coded-exceptions.js';
-import {
-  joinPublicUrl,
-  ObjectStorage,
-  type ObjectPage,
-  type PutOptions,
-} from './object-storage.js';
+import { CodedServiceUnavailableException } from '../../common/errors/coded-exceptions';
+import { joinPublicUrl, ObjectStorage, type ObjectPage, type PutOptions } from './object-storage';
 
 type S3Sender = Pick<S3Client, 'send'>;
 

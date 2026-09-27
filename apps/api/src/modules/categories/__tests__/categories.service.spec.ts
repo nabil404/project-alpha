@@ -1,15 +1,15 @@
 import { eq } from 'drizzle-orm';
-import * as schema from '../../../database/schema/index.js';
-import { withMerchant } from '../../../database/with-merchant.js';
-import { CategoriesRepository } from '../categories.repository.js';
-import { CategoriesService } from '../categories.service.js';
+import * as schema from '../../../database/schema/index';
+import { withMerchant } from '../../../database/with-merchant';
+import { CategoriesRepository } from '../categories.repository';
+import { CategoriesService } from '../categories.service';
 import {
   describeDb,
   expectCoded,
   openCatalogTestDb,
   seedProduct,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db.js';
+} from '../../../database/__tests__/catalog-test-db';
 
 describeDb('CategoriesService', () => {
   let t: CatalogTestDb;

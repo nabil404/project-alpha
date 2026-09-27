@@ -6,7 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { HttpException, Logger } from '@nestjs/common';
 import { jest } from '@jest/globals';
-import { S3ObjectStorage } from '../s3-object-storage.js';
+import { S3ObjectStorage } from '../s3-object-storage';
 
 /** Stands in for S3Client: records each command and answers with `respond`. */
 class FakeSender {

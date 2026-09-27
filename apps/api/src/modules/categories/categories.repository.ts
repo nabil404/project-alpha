@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import type { Executor, TenantScope } from '../../database/base.repository.js';
-import { one } from '../../database/rows.js';
-import { category, productCategory } from '../../database/schema/index.js';
-import { liveCategory } from './category-visibility.js';
+import type { Executor, TenantScope } from '../../database/base.repository';
+import { one } from '../../database/rows';
+import { category, productCategory } from '../../database/schema/index';
+import { liveCategory } from './category-visibility';
 
 export type CategoryRow = typeof category.$inferSelect;
 

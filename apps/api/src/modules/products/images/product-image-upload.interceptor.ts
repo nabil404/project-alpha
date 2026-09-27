@@ -13,7 +13,7 @@ import {
   CodedBadRequestException,
   CodedPayloadTooLargeException,
   isCodedErrorBody,
-} from '../../../common/errors/coded-exceptions.js';
+} from '../../../common/errors/coded-exceptions';
 
 /**
  * Memory storage (the default without `dest`), one file in the `file` field,

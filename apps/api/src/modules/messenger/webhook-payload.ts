@@ -1,4 +1,4 @@
-import type { InboundMessageJob } from '../queue/queue.constants.js';
+import type { InboundMessageJob } from '../queue/queue.constants';
 
 export interface MetaWebhookBody {
   object?: string;

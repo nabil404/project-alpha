@@ -23,10 +23,13 @@ and are marked ⚠️ below.
   `AppModule` through `NestFactory.createApplicationContext` (`src/worker.ts`),
   with no HTTP server, so config, repositories and the queue behave identically
   in both processes. Anything you register in a module is live in both.
-- **NestJS 12 is ESM-only.** The package is `"type": "module"` on NodeNext, so
-  **every relative import ends in `.js`** — `./foo.js`, not `./foo` — including
-  in tests and including when the file on disk is `.ts`. This is the single
-  easiest thing to get wrong.
+- **NestJS 12 is ESM-only, but imports are extensionless.** The package is
+  `"type": "module"`, and TypeScript resolves with `moduleResolution: Bundler`,
+  so write `./foo`, never `./foo.js`. `nest build` compiles with SWC
+  (`builder: "swc"`, `typeCheck: true`), and `.swcrc` sets `resolveFully` with a
+  `baseUrl` — without the `baseUrl` SWC silently skips the rewrite and `dist`
+  fails at runtime with `ERR_MODULE_NOT_FOUND`. Decorator metadata comes from
+  `.swcrc` `decoratorMetadata`, which Nest DI depends on.
 - **Drizzle infers types from the schema**, so there is no codegen step and no
   live database needed to typecheck. A schema edit without its migration is what
   CI catches, not stale types.
@@ -397,7 +400,7 @@ or the API typechecks against the stale build.
 ## Testing
 
 - Jest runs as **ESM** (`NODE_OPTIONS=--experimental-vm-modules`, ts-jest ESM
-  preset). Keep `.js` extensions on relative imports inside specs.
+  preset). Relative imports in specs are extensionless too.
 - **Specs live in a colocated `__tests__/` directory**, never as a sibling file.
 - **Focus, per `docs/architecture/tech-stack.md`: the state machine, tenant isolation, and extraction
   accuracy** — not coverage for its own sake.
@@ -443,4 +446,4 @@ or the API typechecks against the stale build.
       §"OpenAPI in this repo"); anonymous routes declare `security: []`.
 - [ ] New/changed code has specs under a `__tests__/` directory, including a
       two-merchant isolation test where business data is involved.
-- [ ] Every relative import ends in `.js`.
+- [ ] Relative imports carry no file extension.

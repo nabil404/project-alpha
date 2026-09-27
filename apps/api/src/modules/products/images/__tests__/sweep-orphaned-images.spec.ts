@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage.js';
-import { productImageKeys } from '../product-image-keys.js';
-import { sweepOrphanedImages, SWEEP_DEFAULTS } from '../sweep-orphaned-images.js';
+import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
+import { productImageKeys } from '../product-image-keys';
+import { sweepOrphanedImages, SWEEP_DEFAULTS } from '../sweep-orphaned-images';
 
 const now = new Date('2026-09-27T03:00:00Z');
 const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
