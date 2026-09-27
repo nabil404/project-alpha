@@ -15,6 +15,6 @@ import { ProductsService } from './products.service.js';
   imports: [CategoriesModule, StorageModule],
   controllers: [ProductImagesController],
   providers: [ProductsRepository, ProductsService, ProductImageRepository, ProductImagesService],
-  exports: [ProductsService, ProductImagesService],
+  exports: [ProductsService, ProductImagesService, ProductImageRepository],
 })
 export class ProductsModule {}
