@@ -5,6 +5,7 @@ import type {
   CustomerIntent,
   MessageDirection,
   OrderStatus,
+  ProductStatus,
   StockStatus,
 } from '@app/shared';
 
@@ -39,6 +40,12 @@ export const stockStatusKeys = {
   out_of_stock: 'status.stock.out_of_stock',
 } as const satisfies Record<StockStatus, ParseKeys<'common'>>;
 
+export const productStatusKeys = {
+  draft: 'status.product.draft',
+  active: 'status.product.active',
+  archived: 'status.product.archived',
+} as const satisfies Record<ProductStatus, ParseKeys<'common'>>;
+
 export const messageDirectionKeys = {
   inbound: 'status.messageDirection.inbound',
   outbound: 'status.messageDirection.outbound',
@@ -62,6 +69,7 @@ export function useStatusLabels() {
     orderStatus: (status: OrderStatus): string => t(orderStatusKeys[status]),
     conversationState: (state: ConversationState): string => t(conversationStateKeys[state]),
     stockStatus: (status: StockStatus): string => t(stockStatusKeys[status]),
+    productStatus: (status: ProductStatus): string => t(productStatusKeys[status]),
     messageDirection: (direction: MessageDirection): string => t(messageDirectionKeys[direction]),
     customerIntent: (intent: CustomerIntent): string => t(customerIntentKeys[intent]),
   };

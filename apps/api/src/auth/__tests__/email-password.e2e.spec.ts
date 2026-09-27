@@ -358,6 +358,29 @@ describeDb('email/password auth over HTTP', () => {
     });
   });
 
+  describe('organization', () => {
+    // Catalog rows reference organization(id) with ON DELETE NO ACTION, so a
+    // deletion would fail half-way once a seller has products. It stays off
+    // until account deletion is designed.
+    it('refuses to delete the seller organization', async () => {
+      const agent = await verifiedSeller(email('delete-org'));
+      const { merchantId } = (await agent.get('/api/v1/demo/me').expect(200)).body as {
+        merchantId: string;
+      };
+
+      const response = await post(agent, '/api/v1/auth/organization/delete', {
+        organizationId: merchantId,
+      });
+
+      expect(response.status).toBe(404);
+      const remaining = await db
+        .select({ id: schema.organization.id })
+        .from(schema.organization)
+        .where(eq(schema.organization.id, merchantId));
+      expect(remaining).toHaveLength(1);
+    });
+  });
+
   describe('password reset', () => {
     /** Requests a reset and follows the emailed link to the SPA's token. */
     const resetToken = async (address: string): Promise<string> => {

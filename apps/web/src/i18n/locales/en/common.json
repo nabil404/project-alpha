@@ -53,6 +53,11 @@
       "packed": "Packed",
       "shipped": "Shipped"
     },
+    "product": {
+      "active": "Active",
+      "archived": "Archived",
+      "draft": "Draft"
+    },
     "stock": {
       "in_stock": "In stock",
       "out_of_stock": "Out of stock"

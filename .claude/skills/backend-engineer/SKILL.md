@@ -49,12 +49,16 @@ and are marked ⚠️ below.
 
 ### This codebase is still greenfield — expect empty files
 
-`src/database/schema/` contains only `auth.ts` — Better Auth's seven tables,
-generated, not hand-written. **No business table exists yet**, so every table you
-reference has to come with the schema file and migration that create it. The two
-migrations are `0000_auth_tables` and `0001_rls_runtime_role`; the latter creates
-no table. Don't
-hand-write types to work around this.
+`src/database/schema/` contains `auth.ts` — Better Auth's tables, generated,
+not hand-written — and `catalog.ts`: `product`, `product_variant`, `category`
+and `product_category`, the first business tables. Every other business table
+you reference has to come with the schema file and migration that create it.
+`src/modules/categories/` and `src/modules/products/` are the pattern to copy:
+repositories take `(Executor, TenantScope)`, services open `withMerchant`,
+children point at parents through composite `(merchant_id, id)` foreign keys,
+soft-delete filters come from each module's `*-visibility.ts`, and module
+dependencies run one way (products imports categories, never the reverse). Don't hand-write types to work around a
+missing table.
 
 ## The non-negotiable invariants
 
@@ -159,7 +163,7 @@ CREATE POLICY "order_merchant_isolation" ON "order" AS PERMISSIVE FOR ALL TO pub
 ALTER TABLE "order" FORCE ROW LEVEL SECURITY;
 ```
 
-> ⚠️ **RLS still protects nothing today** — there is no table to protect. The
+> ⚠️ **RLS protects the catalog tables today** (`0004_catalog_force_rls`). The
 > application-level `merchant_id` predicate remains the tenant boundary, and RLS
 > is the backstop for a query that forgets it, never a licence to omit it.
 

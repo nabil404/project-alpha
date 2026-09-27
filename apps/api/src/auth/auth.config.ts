@@ -173,7 +173,13 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     // Its HTTP surface stays shut in every environment: the Scalar page is
     // off, and the schema endpoint is disabled below - disabledPaths is
     // enforced by the router only, so the in-process call still works.
-    plugins: [organization(), openAPI({ disableDefaultReference: true })],
+    // Organization deletion is off: every catalog table references
+    // organization(id) with ON DELETE NO ACTION, so the delete would fail on
+    // the first seller with products. It comes back with account deletion.
+    plugins: [
+      organization({ disableOrganizationDeletion: true }),
+      openAPI({ disableDefaultReference: true }),
+    ],
     disabledPaths: ['/open-api/generate-schema'],
     hooks: {
       // Email sign-up is validated against the same signUpSchema as the SPA's
