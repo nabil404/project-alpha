@@ -120,7 +120,13 @@ describeDb('email/password auth over HTTP', () => {
     pool = new Pool({ connectionString: url, max: 4 });
     db = drizzle(pool, { schema });
 
-    const env: Record<string, string> = { APP_URL, BETTER_AUTH_SECRET: 'x'.repeat(32) };
+    const env: Record<string, string> = {
+      APP_URL,
+      BETTER_AUTH_SECRET: 'x'.repeat(32),
+      // Enough for Better Auth to build Facebook's consent URL; nothing here calls Facebook.
+      FACEBOOK_CLIENT_ID: 'test-client-id',
+      FACEBOOK_CLIENT_SECRET: 'test-client-secret',
+    };
 
     @Global()
     @Module({
@@ -479,6 +485,67 @@ describeDb('email/password auth over HTTP', () => {
       }).expect(200);
 
       expect(mailer.sent.some((mail) => mail.to === unknown)).toBe(false);
+    });
+  });
+
+  describe('linking Facebook from account settings', () => {
+    it('sends the seller back with a coded error when they cancel on Facebook', async () => {
+      const agent = await verifiedSeller(email('link'));
+
+      const start = await post(agent, '/api/v1/auth/link-social', {
+        provider: 'facebook',
+        callbackURL: '/settings/account',
+        errorCallbackURL: '/settings/account',
+      }).expect(200);
+      const state = new URL(start.body.url).searchParams.get('state');
+      expect(state).toEqual(expect.any(String));
+
+      // What Facebook sends back when the seller presses Cancel.
+      const callback = await agent
+        .get('/api/v1/auth/callback/facebook')
+        .query({ state, error: 'access_denied', error_description: 'Permissions error' })
+        .expect(302);
+
+      expect(callback.headers.location).toBe('/settings/account?error=AUTH_SOCIAL_CANCELLED');
+    });
+  });
+
+  describe('unlinking a sign-in method', () => {
+    /** The seller's account rows, as Settings > Account lists them. */
+    const accounts = async (agent: request.Agent) =>
+      (await agent.get('/api/v1/auth/list-accounts').expect(200)).body as {
+        id: string;
+        providerId: string;
+      }[];
+
+    it('removes a linked Google sign-in and keeps the password', async () => {
+      const address = email('unlink');
+      const agent = await verifiedSeller(address);
+      const [user] = await db.select().from(schema.user).where(eq(schema.user.email, address));
+      // Stands in for a finished Google link: nothing here calls Google.
+      await db.insert(schema.account).values({
+        id: randomUUID(),
+        accountId: 'google-subject',
+        providerId: 'google',
+        userId: user!.id,
+        updatedAt: new Date(),
+      });
+      const google = (await accounts(agent)).find((account) => account.providerId === 'google');
+
+      await post(agent, '/api/v1/auth/unlink-account', { accountId: google!.id }).expect(200);
+
+      expect((await accounts(agent)).map((account) => account.providerId)).toEqual(['credential']);
+    });
+
+    it('refuses the last sign-in method with a coded error', async () => {
+      const agent = await verifiedSeller(email('unlink-last'));
+      const [credential] = await accounts(agent);
+
+      const res = await post(agent, '/api/v1/auth/unlink-account', {
+        accountId: credential!.id,
+      }).expect(400);
+
+      expect(res.body.error.code).toBe('AUTH_LAST_SIGN_IN_METHOD');
     });
   });
 

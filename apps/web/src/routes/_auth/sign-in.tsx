@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useTranslation } from 'react-i18next';
 
 import { safeRedirect, SignInForm } from '@/features/auth';
-import { errorCodeKeys } from '@/i18n/error-keys';
+import { useErrorMessages } from '@/i18n/error-keys';
 
 interface SignInSearch {
   /** Where to go once signed in; a same-origin path only. */
@@ -19,17 +18,17 @@ export const Route = createFileRoute('/_auth/sign-in')({
   component: SignInPage,
 });
 
-/** Better Auth's redirect error values for a dead email link; anything else reads as generic. */
+/** Better Auth's redirect error values for a dead email link. */
 const tokenErrors: ReadonlySet<string> = new Set(['INVALID_TOKEN', 'TOKEN_EXPIRED']);
 
 function SignInPage() {
   const { redirect, error } = Route.useSearch();
-  const { t } = useTranslation('errors');
+  const { forCode } = useErrorMessages();
 
+  // A failed Google/Facebook sign-in arrives already coded by the API; an
+  // unknown value reads as the generic message.
   const initialError = error
-    ? tokenErrors.has(error)
-      ? t(errorCodeKeys.AUTH_INVALID_TOKEN)
-      : t('generic')
+    ? forCode(tokenErrors.has(error) ? 'AUTH_INVALID_TOKEN' : error)
     : undefined;
 
   return <SignInForm redirectTo={redirect ?? '/'} initialError={initialError} />;

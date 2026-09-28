@@ -18,6 +18,15 @@ export const errorCodes = [
   'AUTH_UNAUTHENTICATED',
   'AUTH_EMAIL_NOT_VERIFIED',
   'AUTH_INVALID_TOKEN',
+  // Google/Facebook round trip, from the ?error= Better Auth's callback redirects with
+  'AUTH_ACCOUNT_NOT_LINKED',
+  'AUTH_SOCIAL_CANCELLED',
+  'AUTH_SOCIAL_EMAIL_MISMATCH',
+  'AUTH_SOCIAL_ACCOUNT_TAKEN',
+  'AUTH_SOCIAL_FAILED',
+  // Unlinking a sign-in method
+  'AUTH_LAST_SIGN_IN_METHOD',
+  'AUTH_SESSION_NOT_FRESH',
 
   // Tenancy
   'TENANT_NO_ACTIVE_MERCHANT',

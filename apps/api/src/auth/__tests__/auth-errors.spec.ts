@@ -1,5 +1,5 @@
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@app/shared';
-import { toAuthErrorBody } from '../auth-errors';
+import { toAuthErrorBody, toOAuthErrorLocation } from '../auth-errors';
 
 const betterAuthError = (statusCode: number, code: string, message = `${code} message`) => ({
   statusCode,
@@ -12,6 +12,8 @@ describe('toAuthErrorBody', () => {
     ['EMAIL_NOT_VERIFIED', 403, 'AUTH_EMAIL_NOT_VERIFIED'],
     ['INVALID_TOKEN', 400, 'AUTH_INVALID_TOKEN'],
     ['TOKEN_EXPIRED', 401, 'AUTH_INVALID_TOKEN'],
+    ['FAILED_TO_UNLINK_LAST_ACCOUNT', 400, 'AUTH_LAST_SIGN_IN_METHOD'],
+    ['SESSION_NOT_FRESH', 403, 'AUTH_SESSION_NOT_FRESH'],
   ])('maps %s to %s', (code, status, expected) => {
     expect(toAuthErrorBody(betterAuthError(status, code), '/sign-in/email')).toEqual({
       code: expected,
@@ -106,5 +108,36 @@ describe('toAuthErrorBody', () => {
       message: 'Request failed with status 500',
       params: {},
     });
+  });
+});
+
+describe('toOAuthErrorLocation', () => {
+  it.each([
+    ['account_not_linked', 'AUTH_ACCOUNT_NOT_LINKED'],
+    ['access_denied', 'AUTH_SOCIAL_CANCELLED'],
+    ['email_does_not_match', 'AUTH_SOCIAL_EMAIL_MISMATCH'],
+    ['account_already_linked_to_different_user', 'AUTH_SOCIAL_ACCOUNT_TAKEN'],
+    ['unable_to_link_account', 'AUTH_SOCIAL_FAILED'],
+    ['state_mismatch', 'AUTH_SOCIAL_FAILED'],
+  ])('rewrites %s to %s', (error, expected) => {
+    expect(toOAuthErrorLocation(`/sign-in?error=${error}`)).toBe(`/sign-in?error=${expected}`);
+  });
+
+  it('drops the English error_description', () => {
+    expect(
+      toOAuthErrorLocation(
+        '/settings/account?error=access_denied&error_description=Permissions+error',
+      ),
+    ).toBe('/settings/account?error=AUTH_SOCIAL_CANCELLED');
+  });
+
+  it('keeps an absolute Location absolute', () => {
+    expect(toOAuthErrorLocation('http://localhost:5173/sign-in?error=account_not_linked')).toBe(
+      'http://localhost:5173/sign-in?error=AUTH_ACCOUNT_NOT_LINKED',
+    );
+  });
+
+  it('leaves a successful redirect alone', () => {
+    expect(toOAuthErrorLocation('/settings/account')).toBeUndefined();
   });
 });

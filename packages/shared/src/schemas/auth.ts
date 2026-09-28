@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { errorCodeSchema } from '../errors/codes';
 
 /**
  * Better Auth enforces these on sign-up and password reset, and the API reads
@@ -80,3 +81,15 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/**
+ * Settings > Account, where a seller links Google or Facebook to the account
+ * they are signed in to. Better Auth's callback lands a failed link here with
+ * `error=<ErrorCode>`.
+ */
+export const ACCOUNT_SETTINGS_PATH = '/settings/account';
+
+export const accountSettingsSearchSchema = z.object({
+  error: errorCodeSchema.optional().catch(undefined),
+});
+export type AccountSettingsSearch = z.infer<typeof accountSettingsSearchSchema>;
