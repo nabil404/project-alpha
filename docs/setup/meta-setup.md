@@ -56,14 +56,14 @@ their Facebook sign-in identity.
 
 ## What the apps expect
 
-| App       | Purpose                      | URL (local dev)                                              | URL (production)                                             |
-| --------- | ---------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Sign-in   | Facebook Login redirect URI  | `http://localhost:5173/api/v1/auth/callback/facebook`        | `https://<your-domain>/api/v1/auth/callback/facebook`        |
-| Messenger | Page connection redirect URI | `http://localhost:5173/api/v1/messenger/page/oauth/callback` | `https://<your-domain>/api/v1/messenger/page/oauth/callback` |
-| Messenger | Messenger webhook callback   | `https://<tunnel-host>/api/v1/webhooks/messenger`            | `https://<your-domain>/api/v1/webhooks/messenger`            |
-| Both      | Privacy policy               | —                                                            | `https://<your-domain>/privacy`                              |
-| Both      | Terms of service             | —                                                            | `https://<your-domain>/terms`                                |
-| Both      | Data deletion instructions   | —                                                            | `https://<your-domain>/data-deletion`                        |
+| App       | Purpose                      | URL (local dev)                                   | URL (production)                                             |
+| --------- | ---------------------------- | ------------------------------------------------- | ------------------------------------------------------------ |
+| Sign-in   | Facebook Login redirect URI  | none: localhost is allowed in Development mode    | `https://<your-domain>/api/v1/auth/callback/facebook`        |
+| Messenger | Page connection redirect URI | none: localhost is allowed in Development mode    | `https://<your-domain>/api/v1/messenger/page/oauth/callback` |
+| Messenger | Messenger webhook callback   | `https://<tunnel-host>/api/v1/webhooks/messenger` | `https://<your-domain>/api/v1/webhooks/messenger`            |
+| Both      | Privacy policy               | —                                                 | `https://<your-domain>/privacy`                              |
+| Both      | Terms of service             | —                                                 | `https://<your-domain>/terms`                                |
+| Both      | Data deletion instructions   | —                                                 | `https://<your-domain>/data-deletion`                        |
 
 - Better Auth is mounted on the SPA's origin (`APP_URL`) under `/api/v1/auth`.
   Use the Vite origin `:5173` locally, never the API's `:3000`, or Better Auth
@@ -126,13 +126,17 @@ Login → Customize** (older dashboards: **Facebook Login → Settings**).
 2. **Settings:**
    - **Client OAuth login:** Yes.
    - **Web OAuth login:** Yes.
-   - **Enforce HTTPS:** Yes (localhost is exempt while the app is in
-     Development mode).
+   - **Enforce HTTPS:** Yes. It can't be turned off.
    - **Use Strict Mode for redirect URIs:** Yes.
-   - **Valid OAuth Redirect URIs:**
-     `http://localhost:5173/api/v1/auth/callback/facebook` (add the production
-     URI to the production app).
+   - **Valid OAuth Redirect URIs:** leave it **empty** on the dev app. The
+     field refuses any `http://` URI, `http://localhost:5173/…` included, but
+     Meta accepts `http://localhost` redirects without an entry while the app
+     is in **Development** mode. The production app lists
+     `https://<your-domain>/api/v1/auth/callback/facebook`.
 3. **Save changes.**
+
+If Facebook still answers "URL blocked" locally, see
+[HTTPS through a tunnel](#https-through-a-tunnel).
 
 ### 4. Create the Messenger app
 
@@ -160,8 +164,9 @@ it needs its own redirect URI and the Page permissions.
    in the sidebar; older dashboards: **Facebook Login → Settings**) and set
    - **Client OAuth login** and **Web OAuth login:** Yes,
    - **Use Strict Mode for redirect URIs:** Yes,
-   - **Valid OAuth Redirect URIs:**
-     `http://localhost:5173/api/v1/messenger/page/oauth/callback`.
+   - **Valid OAuth Redirect URIs:** empty on the dev app, for the same reason
+     as in [step 3](#3-configure-facebook-login-sign-in-app); the production
+     app lists `https://<your-domain>/api/v1/messenger/page/oauth/callback`.
 3. **Save changes.**
 
 ### 6. Generate `META_VERIFY_TOKEN`
@@ -207,9 +212,9 @@ internet over HTTPS, so locally you need a tunnel to your machine.
    Note the `https://…` host it prints. Free tunnels change host on each
    restart; resubscribe when that happens.
 
-   If Vite rejects the tunnel host ("Blocked request. This host is not
-   allowed"), point the tunnel at the API directly instead
-   (`http://localhost:3000`); the webhook path is the same.
+   `vite.config.ts` allows `*.trycloudflare.com` and `*.ngrok-free.app`
+   hosts; for any other tunnel, add its domain to `server.allowedHosts` or
+   point the tunnel at the API directly (`http://localhost:3000`).
 
 3. In the dashboard, open **Use cases → Engage with customers on Messenger
    from Meta → Customize → Messenger API Settings** (older dashboards:
@@ -283,21 +288,44 @@ Restart the API and the worker after any change.
    the worker log shows the `inbound-message` job. The dashboard's **Test**
    button next to a webhook field sends a sample payload too.
 
+## HTTPS through a tunnel
+
+The fallback when Facebook won't redirect to `http://localhost`, for example
+because the app has left Development mode. It puts the whole dashboard behind
+one HTTPS host, so the redirect URI can be a real `https://` entry.
+
+1. Start a tunnel to the Vite dev server:
+   `cloudflared tunnel --url http://localhost:5173` (or `ngrok http 5173`).
+   `vite.config.ts` already allows `*.trycloudflare.com` and
+   `*.ngrok-free.app` hosts.
+2. In `apps/api/.env`, set `APP_URL=https://<tunnel-host>` and restart the API.
+   Better Auth trusts only `APP_URL`, and the Page connection derives its
+   redirect URI from it.
+3. Add `https://<tunnel-host>/api/v1/auth/callback/facebook` to the sign-in
+   app, and `https://<tunnel-host>/api/v1/messenger/page/oauth/callback` to the
+   Messenger app.
+4. Open the dashboard at `https://<tunnel-host>`, not `localhost`: the session
+   cookie is set on the host you sign in on.
+
+Free tunnel hosts change on every restart, so steps 2 and 3 repeat each time.
+A named Cloudflare tunnel keeps one host.
+
 ## Troubleshooting
 
-| Symptom                                                                         | Cause and fix                                                                                                                                                                                                            |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| "Some use cases can't be combined on the same app"                              | Facebook Login and Messenger were selected on one app. Create two apps ([Two apps, not one](#two-apps-not-one)).                                                                                                         |
-| "URL blocked: This redirect failed because the redirect URI is not whitelisted" | On sign-in: the sign-in app lacks `${APP_URL}/api/v1/auth/callback/facebook`. On Page connection: the Messenger app lacks `${APP_URL}/api/v1/messenger/page/oauth/callback`. With Strict Mode on, it must match exactly. |
-| "App not active" / "Feature unavailable"                                        | The app is in Development mode and your account has no role on **that** app. Add it in [step 9](#9-roles-and-testers).                                                                                                   |
-| `INVALID_ORIGIN` from the API                                                   | The flow was started from `localhost:3000`. Use `localhost:5173`.                                                                                                                                                        |
-| Sign-in succeeds but no email arrives on the user                               | The Facebook account has no confirmed email, or `email` was not granted. Check the permission in [step 3](#3-configure-facebook-login-sign-in-app).                                                                      |
-| Connecting a Page answers `MESSENGER_NOT_CONFIGURED`                            | `META_APP_ID` is unset. Fill it with the Messenger app's App ID and restart the API.                                                                                                                                     |
-| The Page connection dialog rejects the permissions ("Invalid Scopes")           | The Messenger app does not have `pages_show_list`, `pages_messaging` and `pages_manage_metadata` added ([step 5](#5-configure-the-page-connection-messenger-app)), or `META_APP_ID` is the sign-in app's ID.             |
-| "The callback URL or verify token couldn't be validated"                        | Tunnel down or wrong host, or the API answered 401 `WEBHOOK_VERIFICATION_FAILED` because the token differs from `META_VERIFY_TOKEN`. Restart the API after editing `.env`.                                               |
-| Every webhook POST answers 401 `WEBHOOK_INVALID_SIGNATURE`                      | `META_APP_SECRET` is not the Messenger app's App Secret (the sign-in app's, another environment's, or reset since). Copy it again from the Messenger app's **App settings → Basic**.                                     |
-| Handshake works but no messages arrive                                          | The Page is not connected ([step 8.6](#8-subscribe-the-messenger-webhook)), `messages` is not subscribed, or the sender has no role on the Messenger app while it is in Development mode.                                |
-| API refuses to boot: `META_GRAPH_VERSION`                                       | The value is not in `vNN.N` form.                                                                                                                                                                                        |
+| Symptom                                                                         | Cause and fix                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Some use cases can't be combined on the same app"                              | Facebook Login and Messenger were selected on one app. Create two apps ([Two apps, not one](#two-apps-not-one)).                                                                                                                                                                                                                                                |
+| Valid OAuth Redirect URIs refuses `http://localhost:5173/…`                     | Expected: Enforce HTTPS rejects every `http://` entry. Leave the field empty; localhost works while the app is in Development mode.                                                                                                                                                                                                                             |
+| "URL blocked: This redirect failed because the redirect URI is not whitelisted" | Locally: the app is no longer in Development mode, or `APP_URL` isn't `localhost`; use [a tunnel](#https-through-a-tunnel). Otherwise, on sign-in: the sign-in app lacks `${APP_URL}/api/v1/auth/callback/facebook`. On Page connection: the Messenger app lacks `${APP_URL}/api/v1/messenger/page/oauth/callback`. With Strict Mode on, it must match exactly. |
+| "App not active" / "Feature unavailable"                                        | The app is in Development mode and your account has no role on **that** app. Add it in [step 9](#9-roles-and-testers).                                                                                                                                                                                                                                          |
+| `INVALID_ORIGIN` from the API                                                   | The flow was started from `localhost:3000`. Use `localhost:5173`.                                                                                                                                                                                                                                                                                               |
+| Sign-in succeeds but no email arrives on the user                               | The Facebook account has no confirmed email, or `email` was not granted. Check the permission in [step 3](#3-configure-facebook-login-sign-in-app).                                                                                                                                                                                                             |
+| Connecting a Page answers `MESSENGER_NOT_CONFIGURED`                            | `META_APP_ID` is unset. Fill it with the Messenger app's App ID and restart the API.                                                                                                                                                                                                                                                                            |
+| The Page connection dialog rejects the permissions ("Invalid Scopes")           | The Messenger app does not have `pages_show_list`, `pages_messaging` and `pages_manage_metadata` added ([step 5](#5-configure-the-page-connection-messenger-app)), or `META_APP_ID` is the sign-in app's ID.                                                                                                                                                    |
+| "The callback URL or verify token couldn't be validated"                        | Tunnel down or wrong host, or the API answered 401 `WEBHOOK_VERIFICATION_FAILED` because the token differs from `META_VERIFY_TOKEN`. Restart the API after editing `.env`.                                                                                                                                                                                      |
+| Every webhook POST answers 401 `WEBHOOK_INVALID_SIGNATURE`                      | `META_APP_SECRET` is not the Messenger app's App Secret (the sign-in app's, another environment's, or reset since). Copy it again from the Messenger app's **App settings → Basic**.                                                                                                                                                                            |
+| Handshake works but no messages arrive                                          | The Page is not connected ([step 8.6](#8-subscribe-the-messenger-webhook)), `messages` is not subscribed, or the sender has no role on the Messenger app while it is in Development mode.                                                                                                                                                                       |
+| API refuses to boot: `META_GRAPH_VERSION`                                       | The value is not in `vNN.N` form.                                                                                                                                                                                                                                                                                                                               |
 
 ## Secrets
 
