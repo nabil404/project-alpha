@@ -13,10 +13,13 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppCatalogRouteImport } from './routes/_app/catalog'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-password'
 import { Route as AuthResetPasswordRouteImport } from './routes/_auth/reset-password'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -34,6 +37,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppCatalogRoute = AppCatalogRouteImport.update({
   id: '/catalog',
   path: '/catalog',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
@@ -56,14 +64,27 @@ const AuthSignUpRoute = AuthSignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => AuthRoute,
 } as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsMessengerRoute = AppSettingsMessengerRouteImport.update({
+  id: '/messenger',
+  path: '/messenger',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/catalog': typeof AppCatalogRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/reset-password': typeof AuthResetPasswordRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -72,27 +93,35 @@ export interface FileRoutesByTo {
   '/reset-password': typeof AuthResetPasswordRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
   '/_app/catalog': typeof AppCatalogRoute
+  '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_auth/forgot-password': typeof AuthForgotPasswordRoute
   '/_auth/reset-password': typeof AuthResetPasswordRoute
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/settings/messenger': typeof AppSettingsMessengerRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/catalog'
+    | '/settings'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/settings/messenger'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -101,16 +130,21 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/settings/messenger'
+    | '/settings'
   id:
     | '__root__'
     | '/_app'
     | '/_auth'
     | '/_app/catalog'
+    | '/_app/settings'
     | '/_auth/forgot-password'
     | '/_auth/reset-password'
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_app/'
+    | '/_app/settings/messenger'
+    | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -148,6 +182,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCatalogRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_auth/forgot-password': {
       id: '/_auth/forgot-password'
       path: '/forgot-password'
@@ -176,16 +217,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignUpRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/messenger': {
+      id: '/_app/settings/messenger'
+      path: '/messenger'
+      fullPath: '/settings/messenger'
+      preLoaderRoute: typeof AppSettingsMessengerRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
   }
 }
 
+interface AppSettingsRouteChildren {
+  AppSettingsMessengerRoute: typeof AppSettingsMessengerRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+}
+
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsMessengerRoute: AppSettingsMessengerRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+}
+
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
+)
+
 interface AppRouteChildren {
   AppCatalogRoute: typeof AppCatalogRoute
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppCatalogRoute: AppCatalogRoute,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
 }
 

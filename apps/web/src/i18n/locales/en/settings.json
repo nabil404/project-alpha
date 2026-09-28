@@ -1,0 +1,64 @@
+{
+  "header": {
+    "description": "Your shop, your Messenger Page and how the order assistant works.",
+    "title": "Settings"
+  },
+  "messenger": {
+    "choose": {
+      "cancel": "Cancel",
+      "connect": "Connect",
+      "description": "Pick the Page customers message to order from you.",
+      "empty": "Facebook didn't give us access to any Page. Start again and select your Page on Facebook.",
+      "noMessaging": "Your role on this Page doesn't include messaging.",
+      "startAgain": "Start again",
+      "title": "Choose your Page"
+    },
+    "connect": {
+      "action": "Connect Facebook Page",
+      "description": "Once connected, chats on your Page turn into drafted orders here.",
+      "privacy": "You need to be an admin of the Page. We never post on your Page or read chats from before you connect.",
+      "steps": {
+        "allow": {
+          "description": "Lets us read new messages and reply for you.",
+          "title": "Allow messaging access"
+        },
+        "choose": {
+          "description": "Pick the Page customers message to order from you.",
+          "title": "Choose your Page"
+        },
+        "signIn": {
+          "description": "Use the account that manages your business Page.",
+          "title": "Sign in with Facebook"
+        }
+      },
+      "title": "Connect your Facebook Page"
+    },
+    "connected": {
+      "badge": "Connected",
+      "connectedOn": "Connected on {{date}}",
+      "description": "The Page whose Messenger chats become orders.",
+      "disconnect": "Disconnect",
+      "openPage": "Open Page",
+      "reconnect": "Reconnect",
+      "title": "Facebook Page"
+    },
+    "disconnect": {
+      "confirm": "Disconnect Page",
+      "description": "The assistant stops reading and answering chats on {{name}}. Orders already created stay here.",
+      "title": "Disconnect this Page?"
+    },
+    "notConnected": {
+      "body": "The assistant can't read or answer Messenger chats until you connect one.",
+      "title": "No Facebook Page connected."
+    }
+  },
+  "nav": {
+    "account": "Account",
+    "assistant": "Order assistant",
+    "delivery": "Delivery and payment",
+    "general": "General",
+    "label": "Settings sections",
+    "messenger": "Messenger",
+    "notifications": "Notifications"
+  }
+}

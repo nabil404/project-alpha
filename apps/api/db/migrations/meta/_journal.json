@@ -50,6 +50,20 @@
       "when": 1790537949590,
       "tag": "0006_product_image_fk_force_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790570975161,
+      "tag": "0007_facebook_page",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790570976394,
+      "tag": "0008_facebook_page_force_rls",
+      "breakpoints": true
     }
   ]
 }
