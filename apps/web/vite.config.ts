@@ -23,7 +23,7 @@ export default defineConfig({
     port: 5173,
     // HTTPS tunnels for Facebook's redirects and the Messenger webhook in
     // development; see docs/setup/meta-setup.md, "HTTPS through a tunnel".
-    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app','.ngrok-free.dev'],
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok-free.dev'],
     // Caddy serves /api on the same origin in every deployed environment; the
     // dev proxy keeps local development identical.
     proxy: { '/api': { target: 'http://localhost:3000', changeOrigin: true } },
