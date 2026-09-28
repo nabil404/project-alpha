@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
-import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getOAuthState, isAPIError } from 'better-auth/api';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { openAPI, organization } from 'better-auth/plugins';
 import {
@@ -23,7 +23,7 @@ import {
   resetPasswordEmail,
   verificationEmail,
 } from '../modules/mail/templates';
-import { toAuthErrorBody } from './auth-errors';
+import { toAuthErrorBody, toOAuthErrorLocation } from './auth-errors';
 
 /** The settings createAuth reads, so nothing here touches process.env. */
 export interface AuthSettings {
@@ -158,6 +158,15 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
         // Sign-in asks for public_profile and email only. Page permissions are
         // requested later, in the separate Page connection flow.
         scopes: ['public_profile', 'email'],
+        // Graph's /me has no email_verified, so Better Auth reads every Facebook
+        // email as unverified - and its link callback refuses an unverified
+        // email from an untrusted provider, which would make linking from
+        // account settings impossible. `link` is set server-side, from the
+        // session, only by /link-social: there the seller is signed in to both
+        // accounts, and Better Auth still requires the emails to match. A plain
+        // Facebook sign-in has no `link`, so it still never auto-links.
+        mapProfileToUser: async () =>
+          (await getOAuthState())?.link ? { emailVerified: true } : {},
       },
     },
     account: {
@@ -210,6 +219,18 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
       // rewritten; the email links' redirects pass through untouched.
       after: createAuthMiddleware(async (ctx) => {
         const returned = ctx.context.returned;
+        // A failed Google/Facebook round trip redirects rather than answering
+        // with an error body; its ?error= gets the same coded treatment.
+        if (ctx.path.startsWith(OAUTH_CALLBACK_PATH) && isAPIError(returned)) {
+          const location = returned.headers?.get('location');
+          const rewritten = location ? toOAuthErrorLocation(location) : undefined;
+          if (rewritten) {
+            const headers = new Headers(returned.headers);
+            headers.set('location', rewritten);
+            throw new APIError(returned.status, returned.body, headers, returned.statusCode);
+          }
+          return;
+        }
         if (!isAPIError(returned) || returned.statusCode < 400 || isEnveloped(returned.body)) {
           return;
         }
@@ -256,6 +277,9 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
 }
 
 const SIGN_UP_EMAIL_PATH = '/sign-up/email';
+
+/** Where Google and Facebook send the browser back to: `/callback/:id`. */
+const OAUTH_CALLBACK_PATH = '/callback/';
 
 /**
  * The shop name from an email sign-up's body, which the before hook has

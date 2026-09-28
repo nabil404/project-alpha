@@ -1,9 +1,16 @@
 {
   "code": {
+    "AUTH_ACCOUNT_NOT_LINKED": "You already have an account with this email. Sign in with your password or Google, then link Facebook in Settings > Account.",
     "AUTH_EMAIL_NOT_VERIFIED": "Please verify your email first. We've sent you a new link.",
     "AUTH_INVALID_CREDENTIALS": "Invalid email or password.",
     "AUTH_INVALID_TOKEN": "This link is invalid or has expired. Please request a new one.",
+    "AUTH_LAST_SIGN_IN_METHOD": "This is your only way to sign in, so it can't be removed. Link another method first.",
+    "AUTH_SESSION_NOT_FRESH": "For your security, sign out and sign in again before removing a sign-in method.",
     "AUTH_UNAUTHENTICATED": "Please sign in to continue.",
+    "AUTH_SOCIAL_ACCOUNT_TAKEN": "That account is already linked to a different seller account.",
+    "AUTH_SOCIAL_CANCELLED": "You cancelled before finishing, so nothing changed.",
+    "AUTH_SOCIAL_EMAIL_MISMATCH": "That account uses a different email. Use the one with the same email you sign in with here.",
+    "AUTH_SOCIAL_FAILED": "We couldn't finish that. Please try again.",
     "CATEGORY_CYCLE": "A category can't be moved inside itself or one of its subcategories.",
     "CATEGORY_HAS_CHILDREN": "Move or delete this category's subcategories first.",
     "CATEGORY_NAME_TAKEN": "You already have a category called {{name}}.",

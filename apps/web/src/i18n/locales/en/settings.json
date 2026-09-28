@@ -1,4 +1,23 @@
 {
+  "account": {
+    "signInMethods": {
+      "description": "Ways you can sign in to this account. Link Google or Facebook to sign in with them too, or unlink one you no longer use.",
+      "link": "Link",
+      "linked": "Linked",
+      "providers": {
+        "credential": "Email and password",
+        "facebook": "Facebook",
+        "google": "Google"
+      },
+      "title": "Sign-in methods",
+      "unlink": "Unlink"
+    },
+    "unlink": {
+      "confirm": "Unlink",
+      "description": "You won't be able to sign in with {{name}} until you link it again. Your connected Facebook Page isn't affected.",
+      "title": "Unlink {{name}}?"
+    }
+  },
   "header": {
     "description": "Your shop, your Messenger Page and how the order assistant works.",
     "title": "Settings"

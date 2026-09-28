@@ -21,7 +21,7 @@ const SECTIONS: readonly SettingsSection[] = [
   { id: 'assistant', label: 'nav.assistant', icon: Bot },
   { id: 'delivery', label: 'nav.delivery', icon: Truck },
   { id: 'notifications', label: 'nav.notifications', icon: Bell },
-  { id: 'account', label: 'nav.account', icon: CircleUser },
+  { id: 'account', label: 'nav.account', icon: CircleUser, to: '/settings/account' },
 ];
 
 const itemClass =

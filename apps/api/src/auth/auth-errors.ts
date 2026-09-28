@@ -27,6 +27,9 @@ const direct: Readonly<Record<string, ErrorCode>> = {
   EMAIL_NOT_VERIFIED: 'AUTH_EMAIL_NOT_VERIFIED',
   INVALID_TOKEN: 'AUTH_INVALID_TOKEN',
   TOKEN_EXPIRED: 'AUTH_INVALID_TOKEN',
+  // /unlink-account: the seller's only sign-in method, or a session older than freshAge.
+  FAILED_TO_UNLINK_LAST_ACCOUNT: 'AUTH_LAST_SIGN_IN_METHOD',
+  SESSION_NOT_FRESH: 'AUTH_SESSION_NOT_FRESH',
 };
 
 /** Endpoints whose password field is `newPassword` rather than `password`. */
@@ -104,4 +107,43 @@ export function toAuthErrorBody(error: AuthErrorLike, path: string): ErrorBody {
   // Whatever Better Auth adds later degrades to the same fallback the global
   // filter uses for any uncoded HttpException.
   return { code: `HTTP_${status}`, message, params: {} };
+}
+
+/**
+ * Better Auth's OAuth callback reports failure by redirecting to the error URL
+ * the SPA gave it, with `?error=<snake_case>` and an English
+ * `error_description`. These are the values a seller can cause; the rest are
+ * misconfiguration or tampering, and read as one generic failure.
+ */
+const oauthRedirect: Readonly<Record<string, ErrorCode>> = {
+  // Signing in with an untrusted provider (Facebook) whose email already has an account.
+  account_not_linked: 'AUTH_ACCOUNT_NOT_LINKED',
+  // The seller said no on the provider's consent screen.
+  access_denied: 'AUTH_SOCIAL_CANCELLED',
+  // Linking a provider account whose email isn't the signed-in seller's.
+  email_does_not_match: 'AUTH_SOCIAL_EMAIL_MISMATCH',
+  // Linking a provider account another seller already signs in with.
+  account_already_linked_to_different_user: 'AUTH_SOCIAL_ACCOUNT_TAKEN',
+};
+
+/** Any origin works: it only lets a relative Location parse, and is dropped again. */
+const RELATIVE_BASE = 'http://relative.invalid';
+
+/**
+ * The OAuth callback's redirect Location with its `error` rewritten to an
+ * ErrorCode and `error_description` dropped, so the SPA reads it through
+ * `errorCodeSchema` like every other redirect the API sends. Undefined when
+ * the Location carries no error - a successful sign-in or link.
+ */
+export function toOAuthErrorLocation(location: string): string | undefined {
+  const url = new URL(location, RELATIVE_BASE);
+  const error = url.searchParams.get('error');
+  if (error === null) {
+    return undefined;
+  }
+
+  url.searchParams.set('error', oauthRedirect[error] ?? 'AUTH_SOCIAL_FAILED');
+  url.searchParams.delete('error_description');
+
+  return url.origin === RELATIVE_BASE ? `${url.pathname}${url.search}${url.hash}` : url.toString();
 }

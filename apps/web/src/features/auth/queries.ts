@@ -1,9 +1,10 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import type {
-  RequestPasswordResetInput,
-  ResetPasswordInput,
-  SignInInput,
-  SignUpInput,
+import {
+  ACCOUNT_SETTINGS_PATH,
+  type RequestPasswordResetInput,
+  type ResetPasswordInput,
+  type SignInInput,
+  type SignUpInput,
 } from '@app/shared';
 
 import { apiFetch } from '@/lib/api';
@@ -17,6 +18,7 @@ import { apiFetch } from '@/lib/api';
 export const authKeys = {
   all: ['auth'] as const,
   session: () => [...authKeys.all, 'session'] as const,
+  accounts: () => [...authKeys.all, 'accounts'] as const,
 };
 
 export interface SessionUser {
@@ -132,5 +134,56 @@ export function useSocialSignIn() {
         body: JSON.stringify({ provider, callbackURL, errorCallbackURL: '/sign-in' }),
       }),
     onSuccess: ({ url }) => window.location.assign(url),
+  });
+}
+
+/** One way the seller can sign in: `credential` is email and password. */
+export interface LinkedAccount {
+  id: string;
+  providerId: SocialProvider | 'credential';
+  createdAt: string;
+}
+
+export const linkedAccountsQueryOptions = () =>
+  queryOptions({
+    queryKey: authKeys.accounts(),
+    queryFn: () => apiFetch<LinkedAccount[]>('/auth/list-accounts'),
+  });
+
+/**
+ * Adds a Google or Facebook sign-in to the signed-in seller's account. Like
+ * useSocialSignIn it leaves for the provider, and comes back to Settings >
+ * Account, with `?error=<ErrorCode>` if the link was refused.
+ */
+export function useLinkSocial() {
+  return useMutation({
+    mutationFn: (provider: SocialProvider) =>
+      apiFetch<{ url: string }>('/auth/link-social', {
+        method: 'POST',
+        body: JSON.stringify({
+          provider,
+          callbackURL: ACCOUNT_SETTINGS_PATH,
+          errorCallbackURL: ACCOUNT_SETTINGS_PATH,
+        }),
+      }),
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+}
+
+/**
+ * Removes a Google or Facebook sign-in from the seller's account, by the
+ * account row's `id`. Better Auth refuses the seller's last method, and a
+ * session older than a day (`AUTH_SESSION_NOT_FRESH`).
+ */
+export function useUnlinkAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (accountId: string) =>
+      apiFetch<{ status: boolean }>('/auth/unlink-account', {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: authKeys.accounts() }),
   });
 }
