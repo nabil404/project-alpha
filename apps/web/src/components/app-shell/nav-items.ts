@@ -24,5 +24,5 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'orders', label: 'nav.orders', icon: ShoppingBag, to: '/', exact: true },
   { id: 'conversations', label: 'nav.conversations', icon: MessageCircle },
   { id: 'catalog', label: 'nav.catalog', icon: Package, to: '/catalog' },
-  { id: 'settings', label: 'nav.settings', icon: SlidersHorizontal },
+  { id: 'settings', label: 'nav.settings', icon: SlidersHorizontal, to: '/settings' },
 ];

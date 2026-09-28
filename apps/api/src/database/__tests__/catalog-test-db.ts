@@ -42,6 +42,7 @@ async function purge(db: Database, merchantIds: string[]): Promise<void> {
     .where(inArray(schema.productVariant.merchantId, merchantIds));
   await db.delete(schema.product).where(inArray(schema.product.merchantId, merchantIds));
   await db.delete(schema.category).where(inArray(schema.category.merchantId, merchantIds));
+  await db.delete(schema.facebookPage).where(inArray(schema.facebookPage.merchantId, merchantIds));
   await db.delete(schema.organization).where(inArray(schema.organization.id, merchantIds));
 }
 

@@ -28,6 +28,16 @@ export const errorCodeKeys = {
   WEBHOOK_MISSING_RAW_BODY: 'code.WEBHOOK_MISSING_RAW_BODY',
   WEBHOOK_INVALID_SIGNATURE: 'code.WEBHOOK_INVALID_SIGNATURE',
   WEBHOOK_MALFORMED_PAYLOAD: 'code.WEBHOOK_MALFORMED_PAYLOAD',
+  MESSENGER_NOT_CONFIGURED: 'code.MESSENGER_NOT_CONFIGURED',
+  FACEBOOK_AUTH_CANCELLED: 'code.FACEBOOK_AUTH_CANCELLED',
+  FACEBOOK_AUTH_EXPIRED: 'code.FACEBOOK_AUTH_EXPIRED',
+  FACEBOOK_AUTH_FAILED: 'code.FACEBOOK_AUTH_FAILED',
+  FACEBOOK_PERMISSIONS_DECLINED: 'code.FACEBOOK_PERMISSIONS_DECLINED',
+  FACEBOOK_UNAVAILABLE: 'code.FACEBOOK_UNAVAILABLE',
+  FACEBOOK_PAGE_NOT_FOUND: 'code.FACEBOOK_PAGE_NOT_FOUND',
+  FACEBOOK_PAGE_NO_MESSAGING_ACCESS: 'code.FACEBOOK_PAGE_NO_MESSAGING_ACCESS',
+  FACEBOOK_PAGE_TAKEN: 'code.FACEBOOK_PAGE_TAKEN',
+  FACEBOOK_PAGE_ALREADY_CONNECTED: 'code.FACEBOOK_PAGE_ALREADY_CONNECTED',
   STORAGE_UNAVAILABLE: 'code.STORAGE_UNAVAILABLE',
   PRODUCT_NOT_FOUND: 'code.PRODUCT_NOT_FOUND',
   PRODUCT_IMAGE_UNSUPPORTED_TYPE: 'code.PRODUCT_IMAGE_UNSUPPORTED_TYPE',
@@ -74,6 +84,9 @@ export function useErrorMessages() {
     isErrorCode(code) ? t(errorCodeKeys[code], params) : t('generic');
 
   return {
+    /** The message for a bare code, such as one a redirect put in the URL. */
+    forCode,
+
     /** The headline message for a failed request. */
     forError: (error: unknown): string =>
       error instanceof ApiError ? forCode(error.code, error.params) : t('generic'),

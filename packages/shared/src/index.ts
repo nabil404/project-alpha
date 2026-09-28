@@ -4,4 +4,5 @@ export * from './schemas/order';
 export * from './schemas/catalog';
 export * from './schemas/llm';
 export * from './schemas/auth';
+export * from './schemas/messenger';
 export * from './errors/index';

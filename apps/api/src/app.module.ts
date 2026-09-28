@@ -35,6 +35,7 @@ import { redactUrl } from './common/redact-url';
             'res.headers["set-cookie"]',
             '*.accessToken',
             '*.pageAccessToken',
+            '*.userToken',
             '*.password',
             '*.newPassword',
             '*.token',
