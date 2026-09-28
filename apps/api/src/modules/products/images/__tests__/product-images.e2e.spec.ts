@@ -56,6 +56,9 @@ describeDb('product image routes over HTTP', () => {
 
     runtime = openRuntimeDb();
     const env: Record<string, string> = {
+      // Every supertest request comes from one address, so Better Auth's
+      // per-IP limit would refuse the fourth sign-up in ten seconds.
+      NODE_ENV: 'test',
       APP_URL: 'http://localhost:5173',
       BETTER_AUTH_SECRET: 'x'.repeat(32),
     };

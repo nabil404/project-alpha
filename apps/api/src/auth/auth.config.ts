@@ -32,6 +32,12 @@ export interface AuthSettings {
   secret: string;
   google: { clientId: string; clientSecret: string };
   facebook: { clientId: string; clientSecret: string };
+  /**
+   * Better Auth's brute-force limits (3 sign-ins per 10s, 3 reset emails a
+   * minute, per client IP). Off only under test, where every request shares
+   * one address.
+   */
+  rateLimit: boolean;
 }
 
 export function authSettingsFrom(config: AppConfig): AuthSettings {
@@ -46,6 +52,7 @@ export function authSettingsFrom(config: AppConfig): AuthSettings {
       clientId: config.get('FACEBOOK_CLIENT_ID') ?? '',
       clientSecret: config.get('FACEBOOK_CLIENT_SECRET') ?? '',
     },
+    rateLimit: config.get('NODE_ENV') !== 'test',
   };
 }
 
@@ -107,6 +114,10 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     // contract, not ours, and it does not move with a future /api/v2.
     basePath: '/api/v1/auth',
     secret: settings.secret,
+    // Set explicitly: left alone, Better Auth enables it only when its own read
+    // of process.env.NODE_ENV says production, so a deploy that forgot
+    // NODE_ENV would take sign-in and password reset unthrottled.
+    rateLimit: { enabled: settings.rateLimit },
     user: {
       additionalFields: {
         // Collected at email sign-up (signUpSchema makes it required there),

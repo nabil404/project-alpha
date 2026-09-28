@@ -5,7 +5,7 @@ import { z } from 'zod';
 const optional = <T extends z.ZodType>(schema: T) =>
   z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
 
-export const envSchema = z.object({
+const envObject = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   APP_URL: z.string().url(),
@@ -18,7 +18,7 @@ export const envSchema = z.object({
   REDIS_URL: z.string().url(),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
 
-  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_SECRET: z.string().min(32, 'at least 32 characters: openssl rand -base64 32'),
   GOOGLE_CLIENT_ID: optional(z.string()),
   GOOGLE_CLIENT_SECRET: optional(z.string()),
   FACEBOOK_CLIENT_ID: optional(z.string()),
@@ -55,6 +55,48 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   SENTRY_DSN: optional(z.string().url()),
 });
+
+/**
+ * The values .env.example ships, or once shipped, in place of a real secret.
+ * They pass every shape check - the example auth secret is long enough - so a
+ * copied file would otherwise boot production signing sessions with a key
+ * anyone can read in this repository. Development may keep them.
+ */
+const PLACEHOLDER_AUTH_SECRET = /replace-me/i;
+const PLACEHOLDER_DB_PASSWORD = 'APP_RUNTIME_PASSWORD';
+
+function refusePlaceholderSecrets(
+  env: { NODE_ENV: string; BETTER_AUTH_SECRET: string; DATABASE_URL: string },
+  ctx: z.RefinementCtx,
+): void {
+  if (env.NODE_ENV !== 'production') {
+    return;
+  }
+  if (PLACEHOLDER_AUTH_SECRET.test(env.BETTER_AUTH_SECRET)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['BETTER_AUTH_SECRET'],
+      message: 'is the .env.example placeholder: openssl rand -base64 32',
+    });
+  }
+  if (databasePassword(env.DATABASE_URL) === PLACEHOLDER_DB_PASSWORD) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DATABASE_URL'],
+      message: 'uses the .env.example placeholder password: set APP_RUNTIME_PASSWORD',
+    });
+  }
+}
+
+function databasePassword(url: string): string {
+  try {
+    return decodeURIComponent(new URL(url).password);
+  } catch {
+    return '';
+  }
+}
+
+export const envSchema = envObject.superRefine(refusePlaceholderSecrets);
 
 export type Env = z.infer<typeof envSchema>;
 

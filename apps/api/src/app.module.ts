@@ -14,7 +14,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { MessengerModule } from './modules/messenger/messenger.module';
 import { CryptoService } from './common/crypto.service';
-import { redactUrl } from './common/redact-url';
+import { serializeRequest } from './common/request-log';
 
 @Module({
   imports: [
@@ -41,13 +41,9 @@ import { redactUrl } from './common/redact-url';
             '*.token',
             '*.secretAccessKey',
           ],
-          // Email links and OAuth callbacks carry their credential in the URL.
-          serializers: {
-            req: (req: { url?: string }) => ({
-              ...req,
-              url: req.url === undefined ? undefined : redactUrl(req.url),
-            }),
-          },
+          // Email links and OAuth callbacks carry their credential in the URL,
+          // and in the parsed query, which is why fields are listed, not spread.
+          serializers: { req: serializeRequest },
         },
       }),
     }),

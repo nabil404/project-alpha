@@ -51,6 +51,41 @@ describe('validateEnv', () => {
     expect(() => validateEnv(withoutBucket)).toThrow(/STORAGE_BUCKET/);
   });
 
+  describe('in production', () => {
+    const production = { ...base, NODE_ENV: 'production' };
+
+    it('refuses the .env.example auth secret', () => {
+      expect(() =>
+        validateEnv({
+          ...production,
+          BETTER_AUTH_SECRET: 'replace-me-with-32-bytes-minimum-secret',
+        }),
+      ).toThrow(/BETTER_AUTH_SECRET: is the \.env\.example placeholder/);
+    });
+
+    it('refuses the .env.example database password', () => {
+      expect(() =>
+        validateEnv({
+          ...production,
+          DATABASE_URL: 'postgres://app_runtime:APP_RUNTIME_PASSWORD@postgres:5432/app',
+        }),
+      ).toThrow(/DATABASE_URL: uses the \.env\.example placeholder password/);
+    });
+
+    it('accepts real secrets', () => {
+      expect(validateEnv(production).NODE_ENV).toBe('production');
+    });
+  });
+
+  it('lets development keep the placeholders', () => {
+    const env = validateEnv({
+      ...base,
+      BETTER_AUTH_SECRET: 'replace-me-with-32-bytes-minimum-secret',
+      DATABASE_URL: 'postgres://app_runtime:APP_RUNTIME_PASSWORD@localhost:5432/app',
+    });
+    expect(env.NODE_ENV).toBe('development');
+  });
+
   it('rejects a public base URL that is not a URL', () => {
     expect(() => validateEnv({ ...base, STORAGE_PUBLIC_BASE_URL: 'media' })).toThrow(
       /STORAGE_PUBLIC_BASE_URL/,

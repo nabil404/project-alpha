@@ -12,6 +12,9 @@ name: app
 # in here localhost is the container itself. It also carries stack secrets the
 # app must never see. Both are corrected below - environment wins over env_file.
 x-app-env: &app-env
+  # The env file says development, for the host. The Dockerfile's ENV would
+  # lose to it, and development mounts Swagger and relaxes logging.
+  NODE_ENV: production
   DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD}@postgres:5432/${POSTGRES_DB:-app}
   REDIS_URL: redis://redis:6379
   APP_URL: https://${DOMAIN:?set DOMAIN}

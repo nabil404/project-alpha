@@ -121,6 +121,9 @@ describeDb('email/password auth over HTTP', () => {
     db = drizzle(pool, { schema });
 
     const env: Record<string, string> = {
+      // Every supertest request comes from one address, so Better Auth's
+      // per-IP limit would refuse the fourth sign-up in ten seconds.
+      NODE_ENV: 'test',
       APP_URL,
       BETTER_AUTH_SECRET: 'x'.repeat(32),
       // Enough for Better Auth to build Facebook's consent URL; nothing here calls Facebook.

@@ -18,6 +18,7 @@ export const auth = createAuth({
     secret: 'better-auth-cli-schema-generation-only',
     google: { clientId: '', clientSecret: '' },
     facebook: { clientId: '', clientSecret: '' },
+    rateLimit: false,
   },
   mailer: { dispatch: () => {} },
 });

@@ -1,4 +1,5 @@
-import { Controller, Get, type INestApplication, type LoggerService } from '@nestjs/common';
+import { Controller, Get, Req, type INestApplication, type LoggerService } from '@nestjs/common';
+import type { Request } from 'express';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test } from '@nestjs/testing';
 import { TerminusModule } from '@nestjs/terminus';
@@ -19,6 +20,11 @@ class DemoController {
   @Get()
   hello() {
     return { ok: true };
+  }
+
+  @Get('ip')
+  ip(@Req() req: Request) {
+    return { ip: req.ip };
   }
 }
 
@@ -56,6 +62,22 @@ describe('API versioning', () => {
 
   it('serves our routes under /api/v1', async () => {
     await request(server()).get('/api/v1/demo').expect(200, { ok: true });
+  });
+
+  // The throttler keys on req.ip; behind Caddy it must be the client, not Caddy.
+  it("takes the client address from the one proxy hop's X-Forwarded-For", async () => {
+    const response = await request(server())
+      .get('/api/v1/demo/ip')
+      .set('X-Forwarded-For', '198.51.100.7, 203.0.113.9')
+      .expect(200);
+
+    // Only the entry Caddy appended is trusted; a client-supplied one is not.
+    expect(response.body.ip).toBe('203.0.113.9');
+  });
+
+  it('does not advertise Express', async () => {
+    const response = await request(server()).get('/api/v1/demo').expect(200);
+    expect(response.headers['x-powered-by']).toBeUndefined();
   });
 
   it('answers an unversioned path with the coded 404', async () => {

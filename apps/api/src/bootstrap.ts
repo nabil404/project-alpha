@@ -4,6 +4,7 @@ import {
   type LoggerService,
   type NestApplicationOptions,
 } from '@nestjs/common';
+import type { Express as ExpressApp } from 'express';
 import { AllExceptionsFilter } from './common/errors/index';
 
 /**
@@ -34,6 +35,14 @@ export const NEST_APP_OPTIONS = {
  * createApplicationContext and has no HTTP server — it must not call this.
  */
 export function configureApp(app: INestApplication, logger: LoggerService): void {
+  const express = app.getHttpAdapter().getInstance() as ExpressApp;
+  // Caddy is the API's only client - compose publishes no api port - so
+  // without this req.ip is Caddy's address for every request and the throttler
+  // puts every seller, and Meta, in one bucket. One hop: Caddy replaces any
+  // X-Forwarded-For it did not add itself, so the last entry is the client.
+  express.set('trust proxy', 1);
+  express.disable('x-powered-by');
+
   app.setGlobalPrefix('api', { exclude: ['health'] });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.useGlobalFilters(new AllExceptionsFilter(logger));
