@@ -20,8 +20,9 @@ async function bootstrap(): Promise<void> {
 
   const config = app.get(AppConfig);
   // A map of the whole auth surface is a development aid, not something to
-  // hand to anyone who asks in production.
-  if (config.get('NODE_ENV') !== 'production') {
+  // hand to anyone who asks. Opt-in by name, so a deploy that forgot NODE_ENV,
+  // or runs as staging or test, does not publish it.
+  if (config.get('NODE_ENV') === 'development') {
     await setupOpenApi(app, app.get<AuthService<Auth>>(AuthService).instance);
   }
 

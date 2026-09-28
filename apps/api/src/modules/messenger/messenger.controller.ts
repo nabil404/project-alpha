@@ -8,6 +8,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Queue } from 'bullmq';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import {
@@ -65,6 +66,11 @@ export class MessengerController {
     return challenge;
   }
 
+  // Meta delivers every Page's events from a small pool of addresses, so a
+  // per-IP limit would throttle all sellers' conversations together. The HMAC
+  // is this route's gate, and it is checked before any work is done. The GET
+  // handshake above stays throttled: it compares a guessable-if-weak token.
+  @SkipThrottle()
   @Post()
   @HttpCode(200)
   @ApiOperation({

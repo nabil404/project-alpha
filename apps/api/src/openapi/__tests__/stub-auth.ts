@@ -15,6 +15,7 @@ export function stubAuth(): Auth {
       secret: 'openapi-spec-secret-at-least-32-characters',
       google: { clientId: 'google', clientSecret: 'google' },
       facebook: { clientId: 'facebook', clientSecret: 'facebook' },
+      rateLimit: false,
     },
     mailer: { dispatch: () => {} },
   });
