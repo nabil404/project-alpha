@@ -24,6 +24,8 @@ export const envSchema = z.object({
   FACEBOOK_CLIENT_ID: optional(z.string()),
   FACEBOOK_CLIENT_SECRET: optional(z.string()),
 
+  /** Optional: without it the API boots and connecting a Page answers MESSENGER_NOT_CONFIGURED. */
+  META_APP_ID: optional(z.string()),
   META_APP_SECRET: z.string().min(1),
   META_VERIFY_TOKEN: z.string().min(1),
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/, 'e.g. v21.0'),

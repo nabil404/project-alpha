@@ -32,9 +32,12 @@ SPA  DELETE /api/v1/messenger/page               → row deleted, then unsubscri
 - **Graph API** calls go through `MetaGraphClient` (`fetch`, pinned
   `META_GRAPH_VERSION`), tokens in the `Authorization` header with
   `appsecret_proof`, never inside a transaction. Errors carry no URL or token.
-- **Credentials:** the same Meta app as Facebook sign-in,
-  `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET`. Without them the API boots
-  and connecting answers `MESSENGER_NOT_CONFIGURED`. The Meta app must list
+- **Credentials:** the Messenger app, `META_APP_ID` / `META_APP_SECRET`, not
+  the Facebook sign-in app: Page tokens and webhook subscriptions belong to the
+  app that obtained them, and the webhook verifies signatures with
+  `META_APP_SECRET` ([meta setup](../../setup/meta-setup.md)). Without
+  `META_APP_ID` the API boots and connecting answers
+  `MESSENGER_NOT_CONFIGURED`. The Messenger app must list
   `${APP_URL}/api/v1/messenger/page/oauth/callback` as a valid OAuth redirect
   URI.
 
