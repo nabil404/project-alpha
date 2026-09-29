@@ -16,10 +16,12 @@
  * declares a pgPolicy against app_current_merchant() - see with-merchant.ts.
  * `pnpm --filter api db:verify-rls` fails the build if one is missing.
  *
- * Section files are added as their tables land: auth, pages and catalog exist
- * today.
+ * Section files are added as their tables land: auth, pages, catalog, customers and
+ * conversations exist today.
  */
 
 export * from './auth';
 export * from './pages';
 export * from './catalog';
+export * from './customers';
+export * from './conversations';

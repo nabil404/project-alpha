@@ -64,6 +64,27 @@
       "when": 1790570976394,
       "tag": "0008_facebook_page_force_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790641625790,
+      "tag": "0009_pg_trgm_page_resolver_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790641630827,
+      "tag": "0010_conversations",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790641638576,
+      "tag": "0011_conversations_force_rls_page_resolver",
+      "breakpoints": true
     }
   ]
 }

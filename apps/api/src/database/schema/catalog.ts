@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -6,16 +5,14 @@ import {
   foreignKey,
   index,
   integer,
-  pgPolicy,
   pgTable,
   primaryKey,
   text,
   timestamp,
   unique,
   uniqueIndex,
-  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { organization } from './auth';
+import { createdAt, id, merchantId, merchantIsolation, updatedAt } from './columns';
 
 /**
  * The catalog: products, their variants, a category tree, and product↔category
@@ -29,28 +26,6 @@ export const VARIANT_SKU_LIVE_UIDX = 'product_variant_merchant_sku_live_uidx';
 export const CATEGORY_NAME_LIVE_UIDX = 'category_merchant_name_live_uidx';
 /** Named for readability in `\d`/pg_indexes; fixed by migration 0003, not mapped by any service. */
 const VARIANT_DEFAULT_LIVE_UIDX = 'product_variant_default_live_uidx';
-
-const id = () =>
-  text('id')
-    .primaryKey()
-    .$defaultFn(() => randomUUID());
-const merchantId = () =>
-  text('merchant_id')
-    .notNull()
-    .references(() => organization.id);
-const createdAt = () => timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
-const updatedAt = () =>
-  timestamp('updated_at', { withTimezone: true })
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull();
-
-const merchantIsolation = (name: string, column: AnyPgColumn) =>
-  pgPolicy(name, {
-    for: 'all',
-    using: sql`${column} = app_current_merchant()`,
-    withCheck: sql`${column} = app_current_merchant()`,
-  });
 
 export const product = pgTable(
   'product',
