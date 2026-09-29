@@ -1,6 +1,21 @@
-import { createFileRoute, Link, Outlet, type LinkProps } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  useMatchRoute,
+  type LinkProps,
+} from '@tanstack/react-router';
 import type { ParseKeys } from 'i18next';
-import { Bell, Bot, CircleUser, MessageCircle, Store, Truck, type LucideIcon } from 'lucide-react';
+import {
+  Bell,
+  Bot,
+  ChevronRight,
+  CircleUser,
+  MessageCircle,
+  Store,
+  Truck,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/_app/settings')({
@@ -33,10 +48,29 @@ const itemClass =
  */
 function SettingsLayout() {
   const { t } = useTranslation('settings');
+  const matchRoute = useMatchRoute();
+  const current = SECTIONS.find(({ to }) => to && matchRoute({ to, fuzzy: true }));
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
       <header className="flex flex-col gap-1">
+        {current && (
+          <nav aria-label={t('breadcrumb.label')} className="mb-1">
+            <ol className="flex min-w-0 items-center gap-1 text-small text-ink-muted">
+              <li className="shrink-0">
+                <Link to="/settings" className="hover:text-ink">
+                  {t('header.title')}
+                </Link>
+              </li>
+              <li aria-hidden className="flex text-border-strong">
+                <ChevronRight className="size-3.5" strokeWidth={1.5} />
+              </li>
+              <li aria-current="page" className="truncate font-medium text-ink">
+                {t(current.label)}
+              </li>
+            </ol>
+          </nav>
+        )}
         <h1 className="text-display">{t('header.title')}</h1>
         <p className="text-body text-ink-muted">{t('header.description')}</p>
       </header>
