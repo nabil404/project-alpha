@@ -241,6 +241,11 @@ describeDb('conversation routes over HTTP', () => {
     ]);
   });
 
+  it('marks an already-read conversation read again without announcing it', async () => {
+    await request(server()).put(`/api/v1/conversations/${drafted}/read`).expect(204);
+    expect(events).toEqual([]);
+  });
+
   it('takes over and hands back, restoring a handed-off conversation', async () => {
     const paused = conversationDetailSchema.parse(
       (
