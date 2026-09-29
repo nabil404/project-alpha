@@ -230,8 +230,9 @@ internet over HTTPS, so locally you need a tunnel to your machine.
    - `messaging_postbacks`,
    - `message_echoes` (the seller's own replies, which pause the bot).
 
-   The API currently acts on text `messages` only; other fields are
-   acknowledged and ignored.
+   The API currently acts on text `messages` and text `message_echoes` (stored
+   as seller messages; echoes of replies sent by this app are skipped). Other
+   fields, and messages without text, are acknowledged and ignored.
 
 6. Connect your test Page, either way:
    - **In the app (preferred):** sign in, open **Settings → Messenger** and

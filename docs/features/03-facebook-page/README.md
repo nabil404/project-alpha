@@ -48,7 +48,10 @@ SPA  DELETE /api/v1/messenger/page               → row deleted, then unsubscri
 `merchant_id`, `page_id`, `name`, `access_token` (ciphertext), `bot_enabled`.
 `UNIQUE (page_id)` globally, the one deliberate exception to per-merchant
 uniqueness, and `UNIQUE (merchant_id)`: one Page per shop in the MVP. RLS is
-enabled and forced (migrations `0007`, `0008`).
+enabled and forced (migrations `0007`, `0008`). One more policy,
+`facebook_page_resolver_read`, lets the Page resolver's role read `page_id` and
+`merchant_id` only (a column grant from `0009`); see
+[Conversations](../04-conversations/README.md#data-model).
 
 ## Rules
 
