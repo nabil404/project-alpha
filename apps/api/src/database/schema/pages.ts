@@ -47,6 +47,14 @@ export const facebookPage = pgTable(
       using: sql`${t.merchantId} = app_current_merchant()`,
       withCheck: sql`${t.merchantId} = app_current_merchant()`,
     }),
+    // Read-only access for app_page_merchant() (migration 0011), which resolves a
+    // webhook's Page before any merchant context exists. app_page_resolver is
+    // NOLOGIN and only owns that function; see migration 0009.
+    pgPolicy('facebook_page_resolver_read', {
+      for: 'select',
+      to: 'app_page_resolver',
+      using: sql`true`,
+    }),
   ],
 );
 
