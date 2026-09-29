@@ -74,13 +74,10 @@ export class ConversationEventsHub implements OnModuleDestroy {
 
   /**
    * Completes every open stream first: an SSE response keeps its socket busy,
-   * so the HTTP server would never finish closing while one is open. Copies,
-   * because each completion's teardown splices its merchant's list.
+   * so the HTTP server would never finish closing while one is open.
    */
   async onModuleDestroy(): Promise<void> {
-    for (const list of [...this.streams.values()]) {
-      for (const subscriber of [...list]) subscriber.complete();
-    }
+    this.completeAll();
     const subscription = await this.subscription;
     await subscription?.close();
   }
@@ -90,9 +87,19 @@ export class ConversationEventsHub implements OnModuleDestroy {
       this.logger.error(
         `Conversation events subscriber failed: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
-      // The next stream tries again.
+      // The streams waiting on it would never get an update. Ending them makes
+      // each browser reconnect after its retry delay, which tries again here,
+      // and refetch on `ready`.
       this.subscription = null;
+      this.completeAll();
       return null;
     });
+  }
+
+  /** Copies, because each completion's teardown splices its merchant's list. */
+  private completeAll(): void {
+    for (const list of [...this.streams.values()]) {
+      for (const subscriber of [...list]) subscriber.complete();
+    }
   }
 }
