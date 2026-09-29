@@ -137,6 +137,26 @@ export class ConversationRepository {
     );
   }
 
+  /**
+   * Points the list columns at `latest`, the newest message left after one was
+   * deleted. Unlike applyMessage this may move them back in time.
+   */
+  async resetLastMessage(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+    latest: IncomingMessage,
+  ): Promise<void> {
+    await executor
+      .update(conversation)
+      .set({
+        lastMessageAt: latest.sentAt,
+        lastMessagePreview: messagePreview(latest.text),
+        lastMessageSender: latest.sender,
+      })
+      .where(and(eq(conversation.merchantId, merchantId), eq(conversation.id, id)));
+  }
+
   /** Newest activity first, keyset-paginated on (last_message_at, id). */
   async list(
     executor: Executor,

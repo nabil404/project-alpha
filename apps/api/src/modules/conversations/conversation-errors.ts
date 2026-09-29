@@ -8,6 +8,16 @@ import {
 export const conversationNotFound = () =>
   new CodedNotFoundException('CONVERSATION_NOT_FOUND', 'Conversation not found');
 
+export const messageNotFound = () =>
+  new CodedNotFoundException('MESSAGE_NOT_FOUND', 'Message not found');
+
+/** Only a seller reply Messenger refused never reached the customer, so only it may go. */
+export const messageNotDeletable = () =>
+  new CodedConflictException(
+    'MESSAGE_NOT_DELETABLE',
+    'Only a seller reply that was not delivered can be deleted',
+  );
+
 export const messengerWindowClosed = (closedAt: Date | null) =>
   new CodedConflictException(
     'MESSENGER_WINDOW_CLOSED',

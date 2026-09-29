@@ -86,6 +86,67 @@ export class MessageRepository {
     );
   }
 
+  /** One message of one conversation; null when either is not this merchant's. */
+  async findInConversation(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    conversationId: string,
+    id: string,
+  ): Promise<MessageRow | null> {
+    const [row] = await executor
+      .select()
+      .from(message)
+      .where(
+        and(
+          eq(message.merchantId, merchantId),
+          eq(message.conversationId, conversationId),
+          eq(message.id, id),
+        ),
+      );
+    return row ?? null;
+  }
+
+  /** The conversation's newest message, for the list columns after a delete. */
+  async latest(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    conversationId: string,
+  ): Promise<MessageRow | null> {
+    const [row] = await executor
+      .select()
+      .from(message)
+      .where(and(eq(message.merchantId, merchantId), eq(message.conversationId, conversationId)))
+      .orderBy(desc(message.sentAt), desc(message.id))
+      .limit(1);
+    return row ?? null;
+  }
+
+  /**
+   * Deletes a seller reply Messenger refused. The sender and status are part of
+   * the predicate, so nothing that reached the customer can ever be deleted
+   * here. False when no such failed reply exists.
+   */
+  async deleteFailed(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    conversationId: string,
+    id: string,
+  ): Promise<boolean> {
+    const rows = await executor
+      .delete(message)
+      .where(
+        and(
+          eq(message.merchantId, merchantId),
+          eq(message.conversationId, conversationId),
+          eq(message.id, id),
+          eq(message.sender, 'seller'),
+          eq(message.status, 'failed'),
+        ),
+      )
+      .returning({ id: message.id });
+    return rows.length > 0;
+  }
+
   async markFailed(
     executor: Executor,
     { merchantId }: TenantScope,
