@@ -71,14 +71,11 @@ export async function openCatalogTestDb(): Promise<CatalogTestDb> {
 /**
  * A second handle whose every connection is app_runtime, the role the api and
  * worker use, for code that opens its own transactions (so SET LOCAL ROLE
- * cannot reach it). RLS applies exactly as in production.
+ * cannot reach it). RLS applies exactly as in production. The role is a
+ * startup option, so it is in force before the connection runs anything.
  */
 export function openRuntimeDb(): { db: Database; close(): Promise<void> } {
-  const pool = new Pool({ connectionString: url, max: 4 });
-  pool.on('connect', (client) => {
-    // pg queues queries per client, so this runs before anything the test sends.
-    void client.query('set role app_runtime');
-  });
+  const pool = new Pool({ connectionString: url, max: 4, options: '-c role=app_runtime' });
   return { db: drizzle(pool, { schema }), close: () => pool.end() };
 }
 
