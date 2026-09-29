@@ -10,6 +10,14 @@ import {
 /** Open streams one merchant may hold; the oldest closes when another opens. Guards against leaked tabs. */
 export const MAX_STREAMS_PER_MERCHANT = 5;
 
+/** Ends a stream evicted over the cap, so it can say so instead of closing like a drop. */
+export class StreamEvicted extends Error {
+  constructor() {
+    super('Evicted: too many open conversation streams for this shop');
+    this.name = 'StreamEvicted';
+  }
+}
+
 /**
  * Fans the Redis channel out to each merchant's open SSE streams. It connects
  * on the first stream, not at boot: WorkerModule imports AppModule, so the hub
@@ -31,7 +39,7 @@ export class ConversationEventsHub implements OnModuleDestroy {
       this.streams.set(merchantId, list);
       list.push(subscriber);
       if (list.length > MAX_STREAMS_PER_MERCHANT) {
-        list[0]?.complete();
+        list[0]?.error(new StreamEvicted());
       }
       return () => {
         const index = list.indexOf(subscriber);

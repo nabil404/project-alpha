@@ -107,13 +107,13 @@ export class ConversationsController {
   }
 
   // A long-lived stream is one request, not a rate: exempt from the throttler.
-  // At most MAX_STREAMS_PER_MERCHANT stay open per shop (the hub closes the oldest).
+  // At most MAX_STREAMS_PER_MERCHANT stay open per shop (the hub evicts the oldest).
   @Sse('events')
   @SkipThrottle()
   @ApiOperation({
     summary: 'Live conversation updates',
     description:
-      'Server-Sent Events. `ready` (with a `retry` hint) on open, then `conversation.updated` with `{ conversationId }` whenever a conversation changes, and `ping` every 25 seconds. Refetch over REST on each event, and refetch everything on reconnect. The stream ends when the session expires.',
+      'Server-Sent Events. `ready` (with a `retry` hint) on open, then `conversation.updated` with `{ conversationId }` whenever a conversation changes, and `ping` every 25 seconds. Refetch over REST on each event, and refetch everything on reconnect. The stream ends when the session expires. At most 5 streams stay open per shop: opening another ends the oldest with an `evicted` event, after which the client must close its EventSource rather than reconnect.',
   })
   @ApiProduces('text/event-stream')
   @ApiOkResponse({

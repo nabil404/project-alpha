@@ -1,5 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { ConversationEventsHub, MAX_STREAMS_PER_MERCHANT } from '../conversation-events.hub';
+import {
+  ConversationEventsHub,
+  MAX_STREAMS_PER_MERCHANT,
+  StreamEvicted,
+} from '../conversation-events.hub';
 import type { ConversationEvent } from '../conversation-event';
 import type { SubscribeFn } from '../redis-connections';
 
@@ -79,27 +83,33 @@ describe('ConversationEventsHub', () => {
   });
 
   describe('the per-merchant stream cap', () => {
-    /** Opens `count` streams for merchant A, in order, recording completions and deliveries per index. */
+    /** Opens `count` streams for merchant A, in order, recording evictions and deliveries per index. */
     function openStreams(hub: ConversationEventsHub, count: number) {
+      const evicted: number[] = [];
       const completed: number[] = [];
       const delivered: number[] = [];
       const subscriptions = Array.from({ length: count }, (_, index) =>
         hub.events(A).subscribe({
           next: () => delivered.push(index),
+          error: (error: unknown) => {
+            if (error instanceof StreamEvicted) evicted.push(index);
+          },
           complete: () => completed.push(index),
         }),
       );
-      return { completed, delivered, subscriptions };
+      return { evicted, completed, delivered, subscriptions };
     }
 
-    it('completes the oldest stream and keeps delivering to the other five', () => {
+    it('ends the oldest stream as evicted and keeps delivering to the other five', () => {
       const hub = new ConversationEventsHub(fakeSubscribe().subscribe);
-      const { completed, delivered, subscriptions } = openStreams(
+      const { evicted, completed, delivered, subscriptions } = openStreams(
         hub,
         MAX_STREAMS_PER_MERCHANT + 1,
       );
 
-      expect(completed).toEqual([0]);
+      // Not a plain completion: the client must be able to tell eviction from a drop.
+      expect(evicted).toEqual([0]);
+      expect(completed).toEqual([]);
       hub.dispatch(raw(A));
       expect(delivered.sort()).toEqual([1, 2, 3, 4, 5]);
       subscriptions.forEach((subscription) => subscription.unsubscribe());
@@ -107,12 +117,9 @@ describe('ConversationEventsHub', () => {
 
     it('evicts the next-oldest stream on the following open, not the first one again', () => {
       const hub = new ConversationEventsHub(fakeSubscribe().subscribe);
-      const { completed, delivered, subscriptions } = openStreams(
-        hub,
-        MAX_STREAMS_PER_MERCHANT + 2,
-      );
+      const { evicted, delivered, subscriptions } = openStreams(hub, MAX_STREAMS_PER_MERCHANT + 2);
 
-      expect(completed).toEqual([0, 1]);
+      expect(evicted).toEqual([0, 1]);
       hub.dispatch(raw(A));
       expect(delivered.sort()).toEqual([2, 3, 4, 5, 6]);
       subscriptions.forEach((subscription) => subscription.unsubscribe());
