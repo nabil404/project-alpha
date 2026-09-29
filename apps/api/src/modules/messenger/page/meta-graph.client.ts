@@ -48,17 +48,6 @@ export class GraphError extends Error {
     super(message);
     this.name = 'GraphError';
   }
-
-  /** Facebook answered, but the object is missing or the token may not see it. */
-  get isNotFoundOrForbidden(): boolean {
-    // 100: unsupported get request / nonexisting field; 10 and 200-299: permission errors.
-    return (
-      this.status === 404 ||
-      this.graphCode === 100 ||
-      this.graphCode === 10 ||
-      (this.graphCode !== undefined && this.graphCode >= 200 && this.graphCode < 300)
-    );
-  }
 }
 
 type FetchFn = typeof fetch;
@@ -143,32 +132,26 @@ export class MetaGraphClient {
 
   /** The Pages the seller granted us, first 100 - more than any one seller in the MVP has. */
   async listPages(userToken: string): Promise<GraphPage[]> {
-    const body = await this.request<{ data?: unknown[] }>('GET', '/me/accounts', {
-      token: userToken,
-      query: { fields: 'id,name,tasks', limit: '100' },
-    });
-    return (body.data ?? []).flatMap((entry) => {
+    const entries = await this.grantedPages(userToken, 'id,name,tasks');
+    return entries.flatMap((entry) => {
       const page = toGraphPage(entry);
       return page ? [page] : [];
     });
   }
 
-  /** One of the seller's Pages with its Page access token, or null if they can't reach it. */
+  /**
+   * One of the seller's granted Pages with its Page access token, or null if
+   * it is not among them. Read from `/me/accounts`, not `/{page-id}`: `tasks`
+   * is the seller's role on the Page, a field of that edge only, and asking a
+   * Page node for it fails with Graph error 100.
+   */
   async getPage(userToken: string, pageId: string): Promise<GraphPageWithToken | null> {
-    try {
-      const body = await this.request<unknown>('GET', `/${encodeURIComponent(pageId)}`, {
-        token: userToken,
-        query: { fields: 'id,name,tasks,access_token' },
-      });
-      const page = toGraphPage(body);
-      const accessToken = (body as { access_token?: unknown }).access_token;
-      // No access_token means the seller can see the Page but has no role on it.
-      if (!page || typeof accessToken !== 'string' || !accessToken) return null;
-      return { ...page, accessToken };
-    } catch (error) {
-      if (error instanceof GraphError && error.isNotFoundOrForbidden) return null;
-      throw error;
-    }
+    const entries = await this.grantedPages(userToken, 'id,name,tasks,access_token');
+    const entry = entries.find((candidate) => toGraphPage(candidate)?.id === pageId);
+    const page = toGraphPage(entry);
+    const accessToken = (entry as { access_token?: unknown } | undefined)?.access_token;
+    if (!page || typeof accessToken !== 'string' || !accessToken) return null;
+    return { ...page, accessToken };
   }
 
   /** Points the Page's Messenger webhooks at our app. Idempotent on Facebook's side. */
@@ -183,6 +166,14 @@ export class MetaGraphClient {
     await this.request('DELETE', `/${encodeURIComponent(pageId)}/subscribed_apps`, {
       token: pageToken,
     });
+  }
+
+  private async grantedPages(userToken: string, fields: string): Promise<unknown[]> {
+    const body = await this.request<{ data?: unknown[] }>('GET', '/me/accounts', {
+      token: userToken,
+      query: { fields, limit: '100' },
+    });
+    return body.data ?? [];
   }
 
   private async request<T>(
