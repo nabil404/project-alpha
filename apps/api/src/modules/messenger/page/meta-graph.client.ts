@@ -168,6 +168,30 @@ export class MetaGraphClient {
     });
   }
 
+  /** A customer's display name from their Messenger profile, or null when Facebook shares none. */
+  async getUserName(pageToken: string, psid: string): Promise<string | null> {
+    const body = await this.request<{ name?: unknown }>('GET', `/${encodeURIComponent(psid)}`, {
+      token: pageToken,
+      query: { fields: 'name' },
+    });
+    return typeof body.name === 'string' && body.name ? body.name : null;
+  }
+
+  /**
+   * A text reply inside the 24h window (`messaging_type: RESPONSE`). The caller
+   * enforces the window; Facebook refusing anyway surfaces as a GraphError.
+   */
+  async sendText(pageToken: string, psid: string, text: string): Promise<{ messageId: string }> {
+    const body = await this.request<{ message_id?: unknown }>('POST', '/me/messages', {
+      token: pageToken,
+      json: { recipient: { id: psid }, messaging_type: 'RESPONSE', message: { text } },
+    });
+    if (typeof body.message_id !== 'string' || !body.message_id) {
+      throw new GraphError(502, undefined, 'Graph POST /me/messages returned no message id');
+    }
+    return { messageId: body.message_id };
+  }
+
   private async grantedPages(userToken: string, fields: string): Promise<unknown[]> {
     const body = await this.request<{ data?: unknown[] }>('GET', '/me/accounts', {
       token: userToken,
@@ -179,7 +203,11 @@ export class MetaGraphClient {
   private async request<T>(
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
-    { token, query = {} }: { token?: string; query?: Record<string, string> } = {},
+    {
+      token,
+      query = {},
+      json,
+    }: { token?: string; query?: Record<string, string>; json?: unknown } = {},
   ): Promise<T> {
     const url = new URL(`${this.graphBase}${path}`);
     const params = new URLSearchParams(query);
@@ -190,9 +218,13 @@ export class MetaGraphClient {
 
     let response: Response;
     try {
+      const headers: Record<string, string> = {};
+      if (token) headers.authorization = `Bearer ${token}`;
+      if (json !== undefined) headers['content-type'] = 'application/json';
       response = await this.fetchFn(url, {
         method,
-        headers: token ? { authorization: `Bearer ${token}` } : undefined,
+        headers,
+        body: json === undefined ? undefined : JSON.stringify(json),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch {

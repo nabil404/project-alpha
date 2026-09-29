@@ -9,6 +9,7 @@ interface Call {
   method: string;
   url: URL;
   authorization?: string;
+  body?: unknown;
 }
 
 /** A fetch that records each call and answers from a queue. */
@@ -20,6 +21,7 @@ function fakeFetch(...answers: { status?: number; body?: unknown }[]) {
       method: init?.method ?? 'GET',
       url: new URL(input),
       authorization: headers.authorization,
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
     });
     const answer = answers.shift();
     if (!answer) throw new Error('unexpected fetch');
@@ -153,5 +155,69 @@ describe('MetaGraphClient', () => {
 
     expect(error).toMatchObject({ status: 503 });
     expect((error as Error).message).not.toContain('secret');
+  });
+
+  describe('Messenger calls with the Page token', () => {
+    it("reads a customer's name from their profile", async () => {
+      const fetch = fakeFetch({ body: { name: 'Nusrat Jahan', id: 'psid-1' } });
+      const client = new MetaGraphClient(settings, fetch.fn);
+
+      await expect(client.getUserName('page-token', 'psid-1')).resolves.toBe('Nusrat Jahan');
+
+      const [call] = fetch.calls;
+      expect(call?.method).toBe('GET');
+      expect(call?.url.pathname).toBe('/v21.0/psid-1');
+      expect(call?.url.searchParams.get('fields')).toBe('name');
+      expect(call?.url.searchParams.get('appsecret_proof')).toBe(
+        appSecretProof('page-token', 'app-secret'),
+      );
+      expect(call?.authorization).toBe('Bearer page-token');
+    });
+
+    it('answers null when Facebook shares no name', async () => {
+      const client = new MetaGraphClient(settings, fakeFetch({ body: { id: 'psid-1' } }).fn);
+      await expect(client.getUserName('page-token', 'psid-1')).resolves.toBeNull();
+    });
+
+    it('sends a text reply as a RESPONSE and returns its message id', async () => {
+      const fetch = fakeFetch({ body: { recipient_id: 'psid-1', message_id: 'm_abc' } });
+      const client = new MetaGraphClient(settings, fetch.fn);
+
+      await expect(
+        client.sendText('page-token', 'psid-1', 'Your parcel ships today'),
+      ).resolves.toEqual({ messageId: 'm_abc' });
+
+      const [call] = fetch.calls;
+      expect(call?.method).toBe('POST');
+      expect(call?.url.pathname).toBe('/v21.0/me/messages');
+      expect(call?.authorization).toBe('Bearer page-token');
+      expect(call?.body).toEqual({
+        recipient: { id: 'psid-1' },
+        messaging_type: 'RESPONSE',
+        message: { text: 'Your parcel ships today' },
+      });
+    });
+
+    it('fails a send Facebook refused, without the token in the error', async () => {
+      const client = new MetaGraphClient(
+        settings,
+        fakeFetch({ status: 400, body: { error: { code: 10, message: 'outside window' } } }).fn,
+      );
+
+      const error = await client.sendText('page-token', 'psid-1', 'hi').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(GraphError);
+      expect((error as GraphError).graphCode).toBe(10);
+      expect((error as GraphError).message).not.toContain('page-token');
+    });
+
+    it('fails a send answered without a message id', async () => {
+      const client = new MetaGraphClient(
+        settings,
+        fakeFetch({ body: { recipient_id: 'psid-1' } }).fn,
+      );
+      await expect(client.sendText('page-token', 'psid-1', 'hi')).rejects.toBeInstanceOf(
+        GraphError,
+      );
+    });
   });
 });
