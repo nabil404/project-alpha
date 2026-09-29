@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
+import type { TenantScope } from '../database/base.repository';
 import { CodedForbiddenException } from './errors/coded-exceptions';
 
 export interface TenantRequest extends Request {
@@ -33,4 +34,12 @@ export class TenantGuard implements CanActivate {
     request.merchantId = merchantId;
     return true;
   }
+}
+
+/** The scope TenantGuard put on the request. Throws if a tenant route forgot the guard. */
+export function tenantScope(request: TenantRequest): TenantScope {
+  if (!request.merchantId) {
+    throw new Error('TenantGuard did not run before a tenant route');
+  }
+  return { merchantId: request.merchantId };
 }
