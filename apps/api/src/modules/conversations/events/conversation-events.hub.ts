@@ -64,7 +64,15 @@ export class ConversationEventsHub implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Completes every open stream first: an SSE response keeps its socket busy,
+   * so the HTTP server would never finish closing while one is open. Copies,
+   * because each completion's teardown splices its merchant's list.
+   */
   async onModuleDestroy(): Promise<void> {
+    for (const list of [...this.streams.values()]) {
+      for (const subscriber of [...list]) subscriber.complete();
+    }
     const subscription = await this.subscription;
     await subscription?.close();
   }

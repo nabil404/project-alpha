@@ -170,6 +170,25 @@ describe('ConversationEventsHub', () => {
     second.unsubscribe();
   });
 
+  it("completes every merchant's open streams on shutdown, so the HTTP server can close", async () => {
+    const { subscribe, state } = fakeSubscribe();
+    const hub = new ConversationEventsHub(subscribe);
+    const completed: string[] = [];
+    const streams = [A, A, B].map((merchantId, index) =>
+      hub
+        .events(merchantId)
+        .subscribe({ complete: () => completed.push(`${merchantId}#${index}`) }),
+    );
+
+    await hub.onModuleDestroy();
+
+    expect(completed.sort()).toEqual([`${A}#0`, `${A}#1`, `${B}#2`]);
+    expect(streams.every((stream) => stream.closed)).toBe(true);
+    expect(hub.streamCount(A)).toBe(0);
+    expect(hub.streamCount(B)).toBe(0);
+    expect(state.closed).toBe(1);
+  });
+
   it('closes the Redis subscription on shutdown', async () => {
     const { subscribe, state } = fakeSubscribe();
     const hub = new ConversationEventsHub(subscribe);
