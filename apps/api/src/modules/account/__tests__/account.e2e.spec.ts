@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Global, Module, type INestApplication, type LoggerService } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { deviceSessionSchema } from '@app/shared';
+import { AVATAR_MAX_BYTES, deviceSessionSchema } from '@app/shared';
 import { eq, inArray, like } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -258,6 +258,54 @@ describeDb('Settings > Account over HTTP', () => {
       const response = await agent.put('/api/v1/account/avatar').expect(400);
 
       expect(response.body.error.code).toBe('VALIDATION_FAILED');
+    });
+
+    const storedKeys = () => [...storage.objects.keys()].filter((key) => key.startsWith('u/'));
+
+    it('answers 413 AVATAR_TOO_LARGE past the size limit', async () => {
+      const agent = await verifiedSeller(email('huge'));
+
+      const response = await agent
+        .put('/api/v1/account/avatar')
+        .attach('file', Buffer.alloc(AVATAR_MAX_BYTES + 1), 'huge.jpg')
+        .expect(413);
+
+      expect(response.body.error).toMatchObject({
+        code: 'AVATAR_TOO_LARGE',
+        params: { maxBytes: AVATAR_MAX_BYTES },
+      });
+      expect(storedKeys()).toHaveLength(0);
+    });
+
+    it('answers 415 AVATAR_UNSUPPORTED_TYPE for a GIF', async () => {
+      const agent = await verifiedSeller(email('gif'));
+      const gif = await sharp({
+        create: { width: 300, height: 300, channels: 3, background: '#48c' },
+      })
+        .gif()
+        .toBuffer();
+
+      const response = await agent
+        .put('/api/v1/account/avatar')
+        .attach('file', gif, { filename: 'me.gif', contentType: 'image/gif' })
+        .expect(415);
+
+      expect(response.body.error.code).toBe('AVATAR_UNSUPPORTED_TYPE');
+      expect(storedKeys()).toHaveLength(0);
+    });
+
+    it('answers 400 AVATAR_INVALID for two files', async () => {
+      const agent = await verifiedSeller(email('two'));
+      const photo = await jpeg(300);
+
+      const response = await agent
+        .put('/api/v1/account/avatar')
+        .attach('file', photo, 'a.jpg')
+        .attach('file', photo, 'b.jpg')
+        .expect(400);
+
+      expect(response.body.error.code).toBe('AVATAR_INVALID');
+      expect(storedKeys()).toHaveLength(0);
     });
 
     it('turns away a request with no session', async () => {
