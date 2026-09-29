@@ -113,7 +113,8 @@ assistant stays paused; the seller retypes to retry.
   thread on every `ready`.
 - Ends at the session's `expiresAt` as read when the stream opened (a sliding
   refresh does not extend it); the browser reconnects after 5 s and is
-  authenticated again. Also ends on API shutdown.
+  authenticated again. Also ends on API shutdown, and when the API cannot
+  subscribe to Redis: the reconnect retries the subscription.
 - At most 5 open streams per shop **per API process**; a sixth ends the oldest
   with `evicted` (`CONVERSATION_STREAM_EVICTED_EVENT` in `@app/shared`). On
   `evicted` the client must close its `EventSource` rather than let it
@@ -211,8 +212,7 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 - An SSE stream is closed at session expiry, not on sign-out elsewhere or
   revocation; it exposes conversation ids only in the meantime.
 - Events are lost while the API's Redis subscriber is reconnecting, and when a
-  publish fails (logged and swallowed). If the first `SUBSCRIBE` fails, open
-  streams stay silent until another stream opens and retries it.
+  publish fails (logged and swallowed).
 - Check `bull:messenger-inbound:wait` in production before the first deploy of
   this branch: jobs queued before messages carried a `kind` are now read as
   customer messages, but confirm what is waiting.

@@ -145,7 +145,7 @@ describe('ConversationEventsHub', () => {
     });
   });
 
-  it('retries the Redis connection on the next stream after a failed connect', async () => {
+  it('ends every open stream when the connect fails, and retries on the next stream', async () => {
     let calls = 0;
     let closed = 0;
     const subscribe: SubscribeFn = async () => {
@@ -158,23 +158,27 @@ describe('ConversationEventsHub', () => {
       };
     };
     const hub = new ConversationEventsHub(subscribe);
-    const seen: ConversationEvent[] = [];
+    const completed: string[] = [];
 
-    // The failure is swallowed (an unhandled rejection would fail this test)
-    // and leaves the stream open.
-    const first = hub.events(A).subscribe((event) => seen.push(event));
+    // The failure is swallowed (an unhandled rejection would fail this test).
+    // Streams waiting on it would never get an update, so they end: each
+    // browser reconnects after its retry delay and refetches on `ready`.
+    const a = hub.events(A).subscribe({ complete: () => completed.push(A) });
+    const b = hub.events(B).subscribe({ complete: () => completed.push(B) });
     await new Promise((resolve) => setImmediate(resolve));
     expect(calls).toBe(1);
-    expect(first.closed).toBe(false);
+    expect(completed.sort()).toEqual([A, B]);
+    expect(a.closed && b.closed).toBe(true);
+    expect(hub.streamCount(A)).toBe(0);
 
-    // The next stream connects again.
-    const second = hub.events(B).subscribe();
+    // The reconnect connects again, and stays open.
+    const retried = hub.events(A).subscribe();
+    await new Promise((resolve) => setImmediate(resolve));
     expect(calls).toBe(2);
+    expect(retried.closed).toBe(false);
 
     await hub.onModuleDestroy();
     expect(closed).toBe(1);
-    first.unsubscribe();
-    second.unsubscribe();
   });
 
   it("completes every merchant's open streams on shutdown, so the HTTP server can close", async () => {
