@@ -1,7 +1,10 @@
 # Automatic HTTPS, SPA on the root, API on the same origin, and the static
 # pages Meta requires for App Review.
 {$DOMAIN} {
-	encode zstd gzip
+	# Compression buffers, which would hold Server-Sent Events back until a
+	# buffer fills. reverse_proxy already flushes text/event-stream immediately.
+	@compressible not path /api/v1/conversations/events
+	encode @compressible zstd gzip
 
 	handle /api/* {
 		reverse_proxy api:3000

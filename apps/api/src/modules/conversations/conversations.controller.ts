@@ -10,7 +10,9 @@ import {
   Put,
   Query,
   Req,
+  Sse,
   UseGuards,
+  type MessageEvent,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -18,10 +20,12 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiQuery,
   ApiTags,
   type SchemaObject,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   conversationCountsSchema,
   conversationDetailSchema,
@@ -43,11 +47,14 @@ import {
   type SendMessage,
   type UpdateConversation,
 } from '@app/shared';
+import type { Observable } from 'rxjs';
 import { z, type ZodType } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
 import { ConversationsService } from './conversations.service';
+import { ConversationEventsHub } from './events/conversation-events.hub';
+import { conversationEventStream } from './events/event-stream';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
 const openApi = (schema: ZodType, io: 'input' | 'output' = 'output') =>
@@ -58,7 +65,10 @@ const openApi = (schema: ZodType, io: 'input' | 'output' = 'output') =>
 @UseGuards(TenantGuard)
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly conversations: ConversationsService) {}
+  constructor(
+    private readonly conversations: ConversationsService,
+    private readonly hub: ConversationEventsHub,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -94,6 +104,27 @@ export class ConversationsController {
   })
   counts(@Req() request: TenantRequest): Promise<ConversationCounts> {
     return this.conversations.counts(tenantScope(request));
+  }
+
+  // A long-lived stream is one request, not a rate: exempt from the throttler.
+  // At most MAX_STREAMS_PER_MERCHANT stay open per shop (the hub closes the oldest).
+  @Sse('events')
+  @SkipThrottle()
+  @ApiOperation({
+    summary: 'Live conversation updates',
+    description:
+      'Server-Sent Events. `ready` (with a `retry` hint) on open, then `conversation.updated` with `{ conversationId }` whenever a conversation changes, and `ping` every 25 seconds. Refetch over REST on each event, and refetch everything on reconnect. The stream ends when the session expires.',
+  })
+  @ApiProduces('text/event-stream')
+  @ApiOkResponse({
+    description: 'An event stream.',
+    content: { 'text/event-stream': { schema: { type: 'string' } } },
+  })
+  events(@Req() request: TenantRequest): Observable<MessageEvent> {
+    const { merchantId } = tenantScope(request);
+    // Behind the global SessionGuard a session always exists; without one, fail closed.
+    const expiresAt = new Date(request.session?.session.expiresAt ?? Date.now());
+    return conversationEventStream(this.hub.events(merchantId), { expiresAt });
   }
 
   @Get(':id')
