@@ -13,11 +13,14 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppCatalogRouteImport } from './routes/_app/catalog'
+import { Route as AppConversationsRouteImport } from './routes/_app/conversations'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-password'
 import { Route as AuthResetPasswordRouteImport } from './routes/_auth/reset-password'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
+import { Route as AppConversationsIndexRouteImport } from './routes/_app/conversations/index'
+import { Route as AppConversationsConversationIdRouteImport } from './routes/_app/conversations/$conversationId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings/account'
 import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
@@ -38,6 +41,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppCatalogRoute = AppCatalogRouteImport.update({
   id: '/catalog',
   path: '/catalog',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConversationsRoute = AppConversationsRouteImport.update({
+  id: '/conversations',
+  path: '/conversations',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -65,6 +73,17 @@ const AuthSignUpRoute = AuthSignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => AuthRoute,
 } as any)
+const AppConversationsIndexRoute = AppConversationsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppConversationsRoute,
+} as any)
+const AppConversationsConversationIdRoute =
+  AppConversationsConversationIdRouteImport.update({
+    id: '/$conversationId',
+    path: '/$conversationId',
+    getParentRoute: () => AppConversationsRoute,
+  } as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -84,13 +103,16 @@ const AppSettingsMessengerRoute = AppSettingsMessengerRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/catalog': typeof AppCatalogRoute
+  '/conversations': typeof AppConversationsRouteWithChildren
   '/settings': typeof AppSettingsRouteWithChildren
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/reset-password': typeof AuthResetPasswordRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/conversations/': typeof AppConversationsIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -100,8 +122,10 @@ export interface FileRoutesByTo {
   '/reset-password': typeof AuthResetPasswordRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/conversations': typeof AppConversationsIndexRoute
   '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -109,14 +133,17 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
   '/_app/catalog': typeof AppCatalogRoute
+  '/_app/conversations': typeof AppConversationsRouteWithChildren
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_auth/forgot-password': typeof AuthForgotPasswordRoute
   '/_auth/reset-password': typeof AuthResetPasswordRoute
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/_app/settings/account': typeof AppSettingsAccountRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
+  '/_app/conversations/': typeof AppConversationsIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -124,13 +151,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/catalog'
+    | '/conversations'
     | '/settings'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/conversations/$conversationId'
     | '/settings/account'
     | '/settings/messenger'
+    | '/conversations/'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -140,22 +170,27 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/conversations/$conversationId'
     | '/settings/account'
     | '/settings/messenger'
+    | '/conversations'
     | '/settings'
   id:
     | '__root__'
     | '/_app'
     | '/_auth'
     | '/_app/catalog'
+    | '/_app/conversations'
     | '/_app/settings'
     | '/_auth/forgot-password'
     | '/_auth/reset-password'
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_app/'
+    | '/_app/conversations/$conversationId'
     | '/_app/settings/account'
     | '/_app/settings/messenger'
+    | '/_app/conversations/'
     | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -194,6 +229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCatalogRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/conversations': {
+      id: '/_app/conversations'
+      path: '/conversations'
+      fullPath: '/conversations'
+      preLoaderRoute: typeof AppConversationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -229,6 +271,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignUpRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_app/conversations/': {
+      id: '/_app/conversations/'
+      path: '/'
+      fullPath: '/conversations/'
+      preLoaderRoute: typeof AppConversationsIndexRouteImport
+      parentRoute: typeof AppConversationsRoute
+    }
+    '/_app/conversations/$conversationId': {
+      id: '/_app/conversations/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/conversations/$conversationId'
+      preLoaderRoute: typeof AppConversationsConversationIdRouteImport
+      parentRoute: typeof AppConversationsRoute
+    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/'
@@ -253,6 +309,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppConversationsRouteChildren {
+  AppConversationsConversationIdRoute: typeof AppConversationsConversationIdRoute
+  AppConversationsIndexRoute: typeof AppConversationsIndexRoute
+}
+
+const AppConversationsRouteChildren: AppConversationsRouteChildren = {
+  AppConversationsConversationIdRoute: AppConversationsConversationIdRoute,
+  AppConversationsIndexRoute: AppConversationsIndexRoute,
+}
+
+const AppConversationsRouteWithChildren =
+  AppConversationsRoute._addFileChildren(AppConversationsRouteChildren)
+
 interface AppSettingsRouteChildren {
   AppSettingsAccountRoute: typeof AppSettingsAccountRoute
   AppSettingsMessengerRoute: typeof AppSettingsMessengerRoute
@@ -271,12 +340,14 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppCatalogRoute: typeof AppCatalogRoute
+  AppConversationsRoute: typeof AppConversationsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppCatalogRoute: AppCatalogRoute,
+  AppConversationsRoute: AppConversationsRouteWithChildren,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
 }

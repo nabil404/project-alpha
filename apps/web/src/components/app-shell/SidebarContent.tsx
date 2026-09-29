@@ -36,7 +36,7 @@ export function SidebarContent({
       </div>
 
       <nav aria-label={t('nav.label')} className="flex flex-col gap-1">
-        {NAV_ITEMS.map(({ id, label, icon: Icon, to, exact }) =>
+        {NAV_ITEMS.map(({ id, label, icon: Icon, to, exact, badge: Badge }) =>
           to ? (
             <Link
               key={id}
@@ -51,6 +51,7 @@ export function SidebarContent({
             >
               <Icon aria-hidden strokeWidth={1.5} />
               {t(label)}
+              {Badge && <Badge />}
             </Link>
           ) : (
             <span key={id} aria-disabled className={`${itemClass} text-ink-disabled`}>
