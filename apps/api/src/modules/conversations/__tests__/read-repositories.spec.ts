@@ -208,10 +208,7 @@ describeDb('read repositories (app_runtime, two merchants)', () => {
       as(t.merchantA, (tx) => conversations.markRead(tx, scope, id));
     const unreadNow = async (id: string) => {
       const found = await as(t.merchantA, (tx) => conversations.findById(tx, scopeA(), id));
-      return isUnread(
-        found!.conversation.lastInboundAt,
-        found!.conversation.sellerLastReadAt,
-      );
+      return isUnread(found!.conversation.lastInboundAt, found!.conversation.sellerLastReadAt);
     };
 
     it("reads up to the customer's last message, once", async () => {
