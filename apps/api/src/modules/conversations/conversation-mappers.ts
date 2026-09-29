@@ -4,11 +4,11 @@ import { isUnread, replyWindowClosesAt } from './conversation-rules';
 
 export function toConversationListItem(
   row: ConversationRow,
-  customerName: string | null,
+  customer: Pick<CustomerRow, 'name' | 'pictureUrl'>,
 ): ConversationListItem {
   return {
     id: row.id,
-    customer: { id: row.customerId, name: customerName },
+    customer: { id: row.customerId, name: customer.name, pictureUrl: customer.pictureUrl },
     state: row.state,
     botPaused: row.botPaused,
     unread: isUnread(row.lastInboundAt, row.sellerLastReadAt),
@@ -27,7 +27,7 @@ export function toConversationDetail(
 ): ConversationDetail {
   return {
     id: row.id,
-    customer: { id: customer.id, name: customer.name },
+    customer: { id: customer.id, name: customer.name, pictureUrl: customer.pictureUrl },
     state: row.state,
     botPaused: row.botPaused,
     unread: isUnread(row.lastInboundAt, row.sellerLastReadAt),

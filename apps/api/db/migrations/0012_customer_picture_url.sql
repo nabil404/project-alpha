@@ -1,0 +1,1 @@
+ALTER TABLE "customer" ADD COLUMN "picture_url" text;

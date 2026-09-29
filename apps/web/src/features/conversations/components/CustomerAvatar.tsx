@@ -1,9 +1,23 @@
 import { UserRound } from 'lucide-react';
+import { useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
-/** The first letters of the first two words, or a person icon until Facebook shares a name. */
-export function CustomerAvatar({ name, className }: { name: string | null; className?: string }) {
+/**
+ * The customer's Facebook picture over their initials, or a person icon until
+ * Facebook shares a name. The picture link expires after a few days, so one
+ * that fails to load leaves the initials showing.
+ */
+export function CustomerAvatar({
+  name,
+  pictureUrl,
+  className,
+}: {
+  name: string | null;
+  pictureUrl: string | null;
+  className?: string;
+}) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const initials = name
     ?.trim()
     .split(/\s+/)
@@ -16,11 +30,22 @@ export function CustomerAvatar({ name, className }: { name: string | null; class
     <span
       aria-hidden
       className={cn(
-        'flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-label text-ink-muted',
+        'relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-sunken text-label text-ink-muted',
         className,
       )}
     >
       {initials || <UserRound className="size-5" strokeWidth={1.5} />}
+      {pictureUrl && pictureUrl !== failedUrl && (
+        <img
+          src={pictureUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(pictureUrl)}
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
     </span>
   );
 }

@@ -25,6 +25,8 @@ export async function seedFacebookPage(
   return row;
 }
 
+export const SEED_PICTURE_URL = 'https://platform-lookaside.fbsbx.com/pic?psid=seed';
+
 export async function seedCustomer(
   db: Database,
   merchantId: string,
@@ -32,7 +34,13 @@ export async function seedCustomer(
 ) {
   const [row] = await db
     .insert(schema.customer)
-    .values({ merchantId, psid: `psid-${randomUUID()}`, name: 'Nusrat Jahan', ...overrides })
+    .values({
+      merchantId,
+      psid: `psid-${randomUUID()}`,
+      name: 'Nusrat Jahan',
+      pictureUrl: SEED_PICTURE_URL,
+      ...overrides,
+    })
     .returning();
   if (!row) throw new Error('seedCustomer returned no row');
   return row;

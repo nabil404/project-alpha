@@ -1,5 +1,6 @@
 import {
   PREVIEW_LENGTH,
+  PROFILE_REFRESH_MS,
   PROFILE_RETRY_MS,
   isReplyWindowOpen,
   isUnread,
@@ -68,22 +69,74 @@ describe('isUnread', () => {
 
 describe('needsProfile', () => {
   const now = at('2026-09-29T10:00:00Z');
+  const PIC = 'https://platform-lookaside.fbsbx.com/pic';
+
+  it('retries a named customer without a picture after the retry period', () => {
+    expect(
+      needsProfile(
+        {
+          name: 'Nusrat',
+          pictureUrl: null,
+          profileFetchedAt: new Date(now.getTime() - PROFILE_RETRY_MS),
+        },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      needsProfile(
+        { name: 'Nusrat', pictureUrl: null, profileFetchedAt: new Date(now.getTime() - HOUR) },
+        now,
+      ),
+    ).toBe(false);
+  });
 
   it('asks Facebook for a new customer and for a nameless one after the retry period', () => {
     expect(needsProfile(null, now)).toBe(true);
-    expect(needsProfile({ name: null, profileFetchedAt: null }, now)).toBe(true);
+    expect(needsProfile({ name: null, pictureUrl: null, profileFetchedAt: null }, now)).toBe(true);
     expect(
       needsProfile(
-        { name: null, profileFetchedAt: new Date(now.getTime() - PROFILE_RETRY_MS) },
+        {
+          name: null,
+          pictureUrl: null,
+          profileFetchedAt: new Date(now.getTime() - PROFILE_RETRY_MS),
+        },
         now,
       ),
     ).toBe(true);
   });
 
-  it('does not ask again for a named customer or within the retry period', () => {
-    expect(needsProfile({ name: 'Nusrat', profileFetchedAt: null }, now)).toBe(false);
+  it('refreshes a named customer once their picture link may have expired', () => {
+    expect(needsProfile({ name: 'Nusrat', pictureUrl: PIC, profileFetchedAt: null }, now)).toBe(
+      true,
+    );
     expect(
-      needsProfile({ name: null, profileFetchedAt: new Date(now.getTime() - HOUR) }, now),
+      needsProfile(
+        {
+          name: 'Nusrat',
+          pictureUrl: PIC,
+          profileFetchedAt: new Date(now.getTime() - PROFILE_REFRESH_MS),
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it('does not ask again within the retry or refresh period', () => {
+    expect(
+      needsProfile(
+        { name: null, pictureUrl: null, profileFetchedAt: new Date(now.getTime() - HOUR) },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      needsProfile(
+        {
+          name: 'Nusrat',
+          pictureUrl: PIC,
+          profileFetchedAt: new Date(now.getTime() - PROFILE_RETRY_MS),
+        },
+        now,
+      ),
     ).toBe(false);
   });
 });

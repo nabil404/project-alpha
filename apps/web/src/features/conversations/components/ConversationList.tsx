@@ -201,7 +201,11 @@ function ConversationRow({
         selected ? 'bg-accent-soft' : 'bg-surface hover:bg-surface-hover',
       )}
     >
-      <CustomerAvatar name={conversation.customer.name} className="size-11 lg:size-10" />
+      <CustomerAvatar
+        name={conversation.customer.name}
+        pictureUrl={conversation.customer.pictureUrl}
+        className="size-11 lg:size-10"
+      />
       <span className="flex min-w-0 grow flex-col gap-0.5">
         <span className="flex items-center gap-2">
           <span

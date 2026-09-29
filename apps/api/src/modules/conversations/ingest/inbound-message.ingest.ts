@@ -1,19 +1,17 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { MessageSender } from '@app/shared';
-import { CryptoService } from '../../../common/crypto.service';
 import { AppConfig } from '../../config/app.config';
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
 import { withMerchant } from '../../database/with-merchant';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
-import { META_GRAPH } from '../../messenger/page/facebook-page.service';
-import type { MetaGraphClient } from '../../messenger/page/meta-graph.client';
 import type { InboundMessageJob } from '../../queue/queue.constants';
 import { ConversationRepository } from '../conversation.repository';
 import { needsProfile } from '../conversation-rules';
-import { CustomerRepository, type CustomerProfile } from '../customer.repository';
+import { CustomerRepository } from '../customer.repository';
 import { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { MessageRepository } from '../message.repository';
+import { CustomerProfileReader } from '../profiles/customer-profile.reader';
 import { resolvePageMerchant } from './page-merchant';
 
 export type IngestOutcome = 'stored' | 'duplicate' | 'own-echo' | 'unknown-page';
@@ -23,7 +21,7 @@ export type IngestOutcome = 'stored' | 'duplicate' | 'own-echo' | 'unknown-page'
  * reply from Facebook's inbox, which pauses the assistant.
  *
  * Order is load-bearing (backend invariant #1): read, call Graph for the
- * customer's name outside any transaction, then one short transaction that
+ * customer's profile outside any transaction, then one short transaction that
  * locks the conversation and writes, then publish after commit.
  *
  * This is where the AI spec will queue the assistant's turn, after a stored
@@ -37,8 +35,7 @@ export class InboundMessageIngest {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly config: AppConfig,
-    private readonly crypto: CryptoService,
-    @Inject(META_GRAPH) private readonly graph: MetaGraphClient | null,
+    private readonly profiles: CustomerProfileReader,
     private readonly pages: FacebookPageRepository,
     private readonly customers: CustomerRepository,
     private readonly conversations: ConversationRepository,
@@ -72,7 +69,7 @@ export class InboundMessageIngest {
     }));
     const profile =
       page && needsProfile(existing, new Date())
-        ? await this.fetchProfile(page.accessToken, psid)
+        ? (await this.profiles.read(page.accessToken, psid)).profile
         : undefined;
 
     const conversationId = await withMerchant(this.db, merchantId, async (tx) => {
@@ -102,22 +99,5 @@ export class InboundMessageIngest {
     if (!conversationId) return 'duplicate';
     await this.events.publish({ merchantId, conversationId, kind: 'message' });
     return 'stored';
-  }
-
-  /** Never fails the job: a customer without a name is still a customer. */
-  private async fetchProfile(encryptedToken: string, psid: string): Promise<CustomerProfile> {
-    const fetchedAt = new Date();
-    if (!this.graph) return { name: null, fetchedAt };
-    try {
-      return {
-        name: await this.graph.getUserName(this.crypto.decrypt(encryptedToken), psid),
-        fetchedAt,
-      };
-    } catch (error) {
-      this.logger.warn(
-        `Customer profile not read: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-      return { name: null, fetchedAt };
-    }
   }
 }

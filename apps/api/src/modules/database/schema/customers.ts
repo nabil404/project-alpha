@@ -17,6 +17,11 @@ export const customer = pgTable(
     psid: text('psid').notNull(),
     /** From the Graph profile; null until Facebook shares one. */
     name: text('name'),
+    /**
+     * From the Graph profile: a signed Facebook CDN link that expires after a
+     * few days, so it is refreshed with the profile and may already be dead.
+     */
+    pictureUrl: text('picture_url'),
     /** The last attempt to read the profile, successful or not. */
     profileFetchedAt: timestamp('profile_fetched_at', { withTimezone: true }),
     createdAt: createdAt(),

@@ -7,6 +7,7 @@ import {
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
 import {
+  SEED_PICTURE_URL,
   seedConversation,
   seedCustomer,
   seedMessage,
@@ -69,12 +70,12 @@ describeDb('read repositories (app_runtime, two merchants)', () => {
       conversations.list(tx, { merchantId: t.merchantA }, { filter: 'all', limit: 25, ...query }),
     ).then((rows) => rows.map((row) => row.conversation.id));
 
-  it('lists newest activity first, with the customer name, for this merchant only', async () => {
+  it('lists newest activity first, with the customer profile, for this merchant only', async () => {
     expect(await listA()).toEqual([ids.e, ids.d, ids.c, ids.b, ids.a]);
     const [first] = await as(t.merchantA, (tx) =>
       conversations.list(tx, { merchantId: t.merchantA }, { filter: 'all', limit: 25 }),
     );
-    expect(first?.customerName).toBe('Nusrat Jahan');
+    expect(first?.customer).toEqual({ name: 'Nusrat Jahan', pictureUrl: SEED_PICTURE_URL });
   });
 
   it('pages by cursor without gaps or repeats, even when a row moves to the top', async () => {

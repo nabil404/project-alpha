@@ -26,7 +26,7 @@ export interface IncomingMessage {
 
 export interface ConversationListRow {
   conversation: ConversationRow;
-  customerName: string | null;
+  customer: Pick<CustomerRow, 'name' | 'pictureUrl'>;
 }
 
 export interface ConversationListQuery {
@@ -194,7 +194,7 @@ export class ConversationRepository {
     }
 
     return executor
-      .select({ conversation, customerName: customer.name })
+      .select({ conversation, customer: { name: customer.name, pictureUrl: customer.pictureUrl } })
       .from(conversation)
       .innerJoin(customer, withCustomer)
       .where(and(...conditions))
