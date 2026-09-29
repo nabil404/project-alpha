@@ -38,14 +38,16 @@ delivery address.
 - **Category** — a seller's tree, at most 3 levels deep; names unique per seller.
   A product can sit in several categories. Deleting one is a soft delete, refused
   while it has subcategories, and removes it from its products.
-- **Customer** — Messenger PSID, name, phone, address.
+- **Customer** — Messenger PSID, name, phone, address (phone and address are
+  stored from the orders work on).
 - **Conversation** — customer, Page, state, collected slots, bot paused flag.
   `bot_paused` is the seller taking over (by hand, by replying from the
   dashboard, or by replying from Facebook's own inbox); `handed_off` is the
   assistant giving up. They are independent: handing back clears the first and
   resumes the second.
 - **Message** — sender (`customer`, `assistant`, `seller`), content, status
-  (`sending`, `sent`, `failed`), timestamps, Meta message ID.
+  (`sending`, `sent`, `failed`), timestamps, Meta message ID (none while a
+  reply is `sending`).
 - **Order / OrderItem** — items, totals, delivery charge, status, notes, linked
   conversation.
 
