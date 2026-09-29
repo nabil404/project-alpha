@@ -52,6 +52,12 @@ export const errorCodes = [
   // Object storage
   'STORAGE_UNAVAILABLE',
 
+  // Conversations
+  'CONVERSATION_NOT_FOUND',
+  'MESSENGER_WINDOW_CLOSED',
+  'MESSENGER_SEND_FAILED',
+  'MESSENGER_PAGE_NOT_CONNECTED',
+
   // Catalog
   'PRODUCT_NOT_FOUND',
   'VARIANT_NOT_FOUND',

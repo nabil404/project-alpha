@@ -41,9 +41,15 @@
       "other": "Other",
       "request_human": "Wants a human"
     },
-    "messageDirection": {
-      "inbound": "Customer",
-      "outbound": "Page"
+    "messageSender": {
+      "assistant": "Assistant",
+      "customer": "Customer",
+      "seller": "You"
+    },
+    "messageStatus": {
+      "failed": "Not delivered",
+      "sending": "Sending…",
+      "sent": "Sent"
     },
     "order": {
       "cancelled": "Cancelled",

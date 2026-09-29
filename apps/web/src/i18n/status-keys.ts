@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type {
   ConversationState,
   CustomerIntent,
-  MessageDirection,
+  MessageSender,
+  MessageStatus,
   OrderStatus,
   ProductStatus,
   StockStatus,
@@ -46,10 +47,17 @@ export const productStatusKeys = {
   archived: 'status.product.archived',
 } as const satisfies Record<ProductStatus, ParseKeys<'common'>>;
 
-export const messageDirectionKeys = {
-  inbound: 'status.messageDirection.inbound',
-  outbound: 'status.messageDirection.outbound',
-} as const satisfies Record<MessageDirection, ParseKeys<'common'>>;
+export const messageSenderKeys = {
+  customer: 'status.messageSender.customer',
+  assistant: 'status.messageSender.assistant',
+  seller: 'status.messageSender.seller',
+} as const satisfies Record<MessageSender, ParseKeys<'common'>>;
+
+export const messageStatusKeys = {
+  sending: 'status.messageStatus.sending',
+  sent: 'status.messageStatus.sent',
+  failed: 'status.messageStatus.failed',
+} as const satisfies Record<MessageStatus, ParseKeys<'common'>>;
 
 export const customerIntentKeys = {
   browse: 'status.intent.browse',
@@ -70,7 +78,8 @@ export function useStatusLabels() {
     conversationState: (state: ConversationState): string => t(conversationStateKeys[state]),
     stockStatus: (status: StockStatus): string => t(stockStatusKeys[status]),
     productStatus: (status: ProductStatus): string => t(productStatusKeys[status]),
-    messageDirection: (direction: MessageDirection): string => t(messageDirectionKeys[direction]),
+    messageSender: (sender: MessageSender): string => t(messageSenderKeys[sender]),
+    messageStatus: (status: MessageStatus): string => t(messageStatusKeys[status]),
     customerIntent: (intent: CustomerIntent): string => t(customerIntentKeys[intent]),
   };
 }
