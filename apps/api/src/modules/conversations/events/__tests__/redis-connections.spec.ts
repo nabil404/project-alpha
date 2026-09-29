@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { createServer, type AddressInfo } from 'node:net';
+import { Logger } from '@nestjs/common';
 import { CONVERSATION_EVENTS_CHANNEL } from '../conversation-event';
 import { publisherConnection, redisSubscribe } from '../redis-connections';
 
@@ -31,6 +33,31 @@ describeRedis('conversation events over a real Redis', () => {
     } finally {
       publisher.disconnect();
       await subscription.close();
+    }
+  });
+});
+
+describe('redisSubscribe against a server that drops every connection', () => {
+  beforeAll(() => Logger.overrideLogger(false));
+
+  it('rejects, and leaves no client behind reconnecting in the background', async () => {
+    let attempts = 0;
+    const server = createServer((socket) => {
+      attempts++;
+      socket.destroy();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      await expect(redisSubscribe(`redis://127.0.0.1:${port}`)(() => undefined)).rejects.toThrow();
+
+      // ioredis' first retry comes after 50ms: a client that was not
+      // disconnected would have dialled the server again by now.
+      const attemptsAtRejection = attempts;
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(attempts).toBe(attemptsAtRejection);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 });

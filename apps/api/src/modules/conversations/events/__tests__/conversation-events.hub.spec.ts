@@ -78,19 +78,96 @@ describe('ConversationEventsHub', () => {
     expect(seen).toEqual([]);
   });
 
-  it('closes the oldest stream when a merchant opens one too many', () => {
-    const hub = new ConversationEventsHub(fakeSubscribe().subscribe);
-    const completed: number[] = [];
-    const subscriptions = Array.from({ length: MAX_STREAMS_PER_MERCHANT + 1 }, (_, index) =>
-      hub.events(A).subscribe({ complete: () => completed.push(index) }),
-    );
+  describe('the per-merchant stream cap', () => {
+    /** Opens `count` streams for merchant A, in order, recording completions and deliveries per index. */
+    function openStreams(hub: ConversationEventsHub, count: number) {
+      const completed: number[] = [];
+      const delivered: number[] = [];
+      const subscriptions = Array.from({ length: count }, (_, index) =>
+        hub.events(A).subscribe({
+          next: () => delivered.push(index),
+          complete: () => completed.push(index),
+        }),
+      );
+      return { completed, delivered, subscriptions };
+    }
 
-    expect(completed).toEqual([0]);
-    const seen: number[] = [];
-    subscriptions.forEach((subscription) => subscription.unsubscribe());
-    hub.events(A).subscribe(() => seen.push(1));
-    hub.dispatch(raw(A));
-    expect(seen).toEqual([1]);
+    it('completes the oldest stream and keeps delivering to the other five', () => {
+      const hub = new ConversationEventsHub(fakeSubscribe().subscribe);
+      const { completed, delivered, subscriptions } = openStreams(
+        hub,
+        MAX_STREAMS_PER_MERCHANT + 1,
+      );
+
+      expect(completed).toEqual([0]);
+      hub.dispatch(raw(A));
+      expect(delivered.sort()).toEqual([1, 2, 3, 4, 5]);
+      subscriptions.forEach((subscription) => subscription.unsubscribe());
+    });
+
+    it('evicts the next-oldest stream on the following open, not the first one again', () => {
+      const hub = new ConversationEventsHub(fakeSubscribe().subscribe);
+      const { completed, delivered, subscriptions } = openStreams(
+        hub,
+        MAX_STREAMS_PER_MERCHANT + 2,
+      );
+
+      expect(completed).toEqual([0, 1]);
+      hub.dispatch(raw(A));
+      expect(delivered.sort()).toEqual([2, 3, 4, 5, 6]);
+      subscriptions.forEach((subscription) => subscription.unsubscribe());
+    });
+
+    it('frees the merchant entry once every stream has gone, and a fresh stream works', () => {
+      const hub = new ConversationEventsHub(fakeSubscribe().subscribe);
+      const { delivered, subscriptions } = openStreams(hub, MAX_STREAMS_PER_MERCHANT + 1);
+      expect(hub.streamCount(A)).toBe(MAX_STREAMS_PER_MERCHANT);
+
+      subscriptions.forEach((subscription) => subscription.unsubscribe());
+      expect(hub.streamCount(A)).toBe(0);
+      hub.dispatch(raw(A));
+      expect(delivered).toEqual([]);
+
+      const seen: number[] = [];
+      const fresh = hub.events(A).subscribe(() => seen.push(1));
+      expect(hub.streamCount(A)).toBe(1);
+      hub.dispatch(raw(A));
+      expect(seen).toEqual([1]);
+      fresh.unsubscribe();
+      expect(hub.streamCount(A)).toBe(0);
+    });
+  });
+
+  it('retries the Redis connection on the next stream after a failed connect', async () => {
+    let calls = 0;
+    let closed = 0;
+    const subscribe: SubscribeFn = async () => {
+      calls++;
+      if (calls === 1) throw new Error('connect ECONNREFUSED');
+      return {
+        close: async () => {
+          closed++;
+        },
+      };
+    };
+    const hub = new ConversationEventsHub(subscribe);
+    const seen: ConversationEvent[] = [];
+
+    // The failure is swallowed (an unhandled rejection would fail this test)
+    // and leaves the stream open.
+    const first = hub.events(A).subscribe((event) => seen.push(event));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(calls).toBe(1);
+    expect(first.closed).toBe(false);
+
+    // The next stream connects again.
+    const second = hub.events(B).subscribe();
+    expect(calls).toBe(2);
+
+    await hub.onModuleDestroy();
+    expect(closed).toBe(1);
+    first.unsubscribe();
+    second.unsubscribe();
   });
 
   it('closes the Redis subscription on shutdown', async () => {
