@@ -6,8 +6,9 @@ export interface MetaWebhookBody {
     id?: string;
     messaging?: {
       sender?: { id?: string };
+      recipient?: { id?: string };
       timestamp?: number;
-      message?: { mid?: string; text?: string; is_echo?: boolean };
+      message?: { mid?: string; text?: string; is_echo?: boolean; app_id?: number | string };
     }[];
   }[];
 }
@@ -19,19 +20,33 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
 
   const jobs: InboundMessageJob[] = [];
   for (const entry of body.entry ?? []) {
+    const pageId = entry.id;
+    if (!pageId) continue;
     for (const event of entry.messaging ?? []) {
-      const { mid, text, is_echo: isEcho } = event.message ?? {};
-      // Echoes are the seller's own replies; they pause the bot, they are not customer input.
-      if (!mid || !text || isEcho || !entry.id || !event.sender?.id) {
+      const { mid, text, is_echo: isEcho, app_id: appId } = event.message ?? {};
+      // Text only in the MVP: attachments, stickers, reactions and deliveries carry none.
+      if (!mid || !text) continue;
+      const sentAt = event.timestamp ?? Date.now();
+
+      if (isEcho) {
+        // Sent by the Page: the customer is the recipient.
+        const recipientPsid = event.recipient?.id;
+        if (!recipientPsid) continue;
+        jobs.push({
+          kind: 'page-echo',
+          messageId: mid,
+          pageId,
+          recipientPsid,
+          text,
+          sentAt,
+          ...(appId === undefined ? {} : { appId: String(appId) }),
+        });
         continue;
       }
-      jobs.push({
-        messageId: mid,
-        pageId: entry.id,
-        senderPsid: event.sender.id,
-        text,
-        sentAt: event.timestamp ?? Date.now(),
-      });
+
+      const senderPsid = event.sender?.id;
+      if (!senderPsid) continue;
+      jobs.push({ kind: 'customer-message', messageId: mid, pageId, senderPsid, text, sentAt });
     }
   }
   return jobs;

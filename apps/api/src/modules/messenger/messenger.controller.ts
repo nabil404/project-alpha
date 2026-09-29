@@ -17,7 +17,11 @@ import {
 } from '../../common/errors/coded-exceptions';
 import { AppConfig } from '../../config/app.config';
 import { ApiCodedError } from '../../openapi/api-coded-error';
-import { MESSENGER_QUEUE, type InboundMessageJob } from '../queue/queue.constants';
+import {
+  INBOUND_MESSAGE_JOB,
+  MESSENGER_QUEUE,
+  type InboundMessageJob,
+} from '../queue/queue.constants';
 import { verifyMetaSignature } from './signature';
 import { parseInboundJobs, parseWebhookBody } from './webhook-payload';
 import type { RawBodyRequest } from './raw-body';
@@ -117,7 +121,7 @@ export class MessengerController {
     }
 
     for (const job of parseInboundJobs(payload)) {
-      await this.queue.add('inbound-message', job, { jobId: job.messageId });
+      await this.queue.add(INBOUND_MESSAGE_JOB, job, { jobId: job.messageId });
     }
 
     return 'EVENT_RECEIVED';
