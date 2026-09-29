@@ -29,6 +29,12 @@ describe('redactUrl', () => {
     );
   });
 
+  it('masks a conversation search term', () => {
+    expect(redactUrl('/api/v1/conversations?filter=unread&q=Rahim%20Uddin&limit=20')).toBe(
+      '/api/v1/conversations?filter=unread&q=[REDACTED]&limit=20',
+    );
+  });
+
   it('matches a percent-encoded key', () => {
     expect(redactUrl('/x?%74oken=abc')).toBe('/x?%74oken=[REDACTED]');
   });

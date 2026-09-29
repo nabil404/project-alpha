@@ -6,7 +6,9 @@
  *   - /api/v1/auth/callback/<provider>?code=...        an OAuth authorization code
  *
  * Each is a secret or a bearer credential until used, so it is masked before
- * the URL reaches pino. Everything else in the URL stays readable.
+ * the URL reaches pino. So is the conversation search term:
+ *   - /api/v1/conversations?q=...                      a customer name or message text
+ * Everything else in the URL stays readable.
  *
  * Better Auth answers /api/v1/auth/* before Nest's middleware runs, so
  * pino-http does not log those requests today. They are covered anyway: the day request
@@ -17,6 +19,7 @@ const SENSITIVE_PARAMS: ReadonlySet<string> = new Set([
   'code',
   'state',
   'hub.verify_token',
+  'q',
 ]);
 const RESET_PATH = /(\/reset-password\/)[^/?#]+/;
 const MASK = '[REDACTED]';
