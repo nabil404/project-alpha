@@ -14,6 +14,7 @@ describe('toAuthErrorBody', () => {
     ['TOKEN_EXPIRED', 401, 'AUTH_INVALID_TOKEN'],
     ['FAILED_TO_UNLINK_LAST_ACCOUNT', 400, 'AUTH_LAST_SIGN_IN_METHOD'],
     ['SESSION_NOT_FRESH', 403, 'AUTH_SESSION_NOT_FRESH'],
+    ['INVALID_PASSWORD', 400, 'AUTH_WRONG_PASSWORD'],
   ])('maps %s to %s', (code, status, expected) => {
     expect(toAuthErrorBody(betterAuthError(status, code), '/sign-in/email')).toEqual({
       code: expected,

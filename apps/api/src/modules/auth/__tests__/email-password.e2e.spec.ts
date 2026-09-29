@@ -23,11 +23,11 @@ import { TenantGuard, type TenantRequest } from '../../../common/tenant.guard';
 import { AppConfig } from '../../config/app.config';
 import { DATABASE, type Database } from '../../database/database.module';
 import * as schema from '../../database/schema/index';
-import { MailService, type Mailer } from '../../mail/mail.service';
-import type { MailMessage } from '../../mail/templates';
+import { MailService } from '../../mail/mail.service';
 import type { RawBodyRequest } from '../../messenger/raw-body';
 import { AuthModule } from '../auth.module';
 import { SessionGuard } from '../session.guard';
+import { CapturingMailer } from './capturing-mailer';
 
 // Needs a real Postgres: Better Auth, the organization bootstrap and the token
 // tables are all server behaviour. CI sets DATABASE_ADMIN_URL; locally, export
@@ -40,34 +40,6 @@ const EMAIL_DOMAIN = `${randomUUID()}.example.test`;
 const PASSWORD = 'correct horse battery';
 
 const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
-
-/** Captures mail instead of sending it, so the spec can follow the links. */
-class CapturingMailer implements Mailer {
-  readonly sent: MailMessage[] = [];
-
-  dispatch(message: MailMessage): void {
-    this.sent.push(message);
-  }
-
-  /** The most recent message to `to`, failing loudly if there is none. */
-  lastTo(to: string): MailMessage {
-    const message = this.sent.filter((mail) => mail.to === to).at(-1);
-    if (!message) {
-      throw new Error(`No mail sent to ${to}`);
-    }
-    return message;
-  }
-
-  /** The link in the most recent message to `to`, as a path on this server. */
-  linkTo(to: string): string {
-    const link = /https?:\/\/\S+/.exec(this.lastTo(to).text)?.[0];
-    if (!link) {
-      throw new Error(`No link in the last mail to ${to}`);
-    }
-    const parsed = new URL(link);
-    return `${parsed.pathname}${parsed.search}`;
-  }
-}
 
 @Controller('demo')
 class DemoController {
