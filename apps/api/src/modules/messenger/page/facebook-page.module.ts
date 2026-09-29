@@ -43,6 +43,8 @@ import { MetaGraphClient } from './meta-graph.client';
         new URL(PAGE_CONNECT_CALLBACK_PATH, config.get('APP_URL')).toString(),
     },
   ],
-  exports: [FacebookPageRepository],
+  // META_GRAPH is shared so ingestion and seller replies use the same pinned
+  // client (or null, and MESSENGER_NOT_CONFIGURED).
+  exports: [FacebookPageRepository, META_GRAPH],
 })
 export class FacebookPageModule {}
