@@ -30,6 +30,8 @@ const direct: Readonly<Record<string, ErrorCode>> = {
   // /unlink-account: the seller's only sign-in method, or a session older than freshAge.
   FAILED_TO_UNLINK_LAST_ACCOUNT: 'AUTH_LAST_SIGN_IN_METHOD',
   SESSION_NOT_FRESH: 'AUTH_SESSION_NOT_FRESH',
+  // /change-password: the current password the seller typed is wrong.
+  INVALID_PASSWORD: 'AUTH_WRONG_PASSWORD',
 };
 
 /** Endpoints whose password field is `newPassword` rather than `password`. */

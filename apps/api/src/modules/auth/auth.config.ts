@@ -8,6 +8,7 @@ import {
   PASSWORD_MIN_LENGTH,
   RESET_PASSWORD_TOKEN_TTL,
   signUpSchema,
+  updateProfileSchema,
 } from '@app/shared';
 import { zodIssuesToFields } from '../../common/errors/validation-fields';
 import type { AppConfig } from '../config/app.config';
@@ -199,23 +200,20 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     ],
     disabledPaths: ['/open-api/generate-schema'],
     hooks: {
-      // Email sign-up is validated against the same signUpSchema as the SPA's
-      // form, before Better Auth reads the body: Better Auth checks only the
-      // fields it knows, and would store a blank phone or drop a shop name.
+      // Email sign-up and profile updates are validated against the same
+      // shared schemas as the SPA's forms, before Better Auth reads the body:
+      // Better Auth checks only the fields it knows, and would store a blank
+      // phone, drop a shop name, or take a blank name.
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === UPDATE_USER_PATH) {
+          return { context: { body: validatedProfileUpdate(ctx.body) } };
+        }
         if (ctx.path !== SIGN_UP_EMAIL_PATH) {
           return;
         }
         const parsed = signUpSchema.safeParse(ctx.body);
         if (!parsed.success) {
-          throw new APIError('BAD_REQUEST', {
-            error: {
-              code: 'VALIDATION_FAILED',
-              message: 'Validation failed',
-              params: {},
-              fields: zodIssuesToFields(parsed.error.issues),
-            },
-          });
+          throw validationFailed(zodIssuesToFields(parsed.error.issues));
         }
         // Merged over the body, so callbackURL and rememberMe pass through
         // and the trimmed values are what gets stored.
@@ -284,6 +282,38 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
 }
 
 const SIGN_UP_EMAIL_PATH = '/sign-up/email';
+const UPDATE_USER_PATH = '/update-user';
+
+function validationFailed(fields: ReturnType<typeof zodIssuesToFields>): APIError {
+  return new APIError('BAD_REQUEST', {
+    error: { code: 'VALIDATION_FAILED', message: 'Validation failed', params: {}, fields },
+  });
+}
+
+/**
+ * /update-user takes the name only. `image` is refused: the photo is set
+ * through /account/avatar, which strips its metadata and stores it in our
+ * bucket, so a client can never point it at a URL of its choosing.
+ */
+function validatedProfileUpdate(body: unknown): Record<string, unknown> {
+  const input = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
+  if ('image' in input) {
+    throw validationFailed({
+      image: [
+        {
+          code: 'UNRECOGNIZED_KEYS',
+          message: 'Set the photo through /account/avatar',
+          params: {},
+        },
+      ],
+    });
+  }
+  const parsed = updateProfileSchema.safeParse(input);
+  if (!parsed.success) {
+    throw validationFailed(zodIssuesToFields(parsed.error.issues));
+  }
+  return { ...input, ...parsed.data };
+}
 
 /** Where Google and Facebook send the browser back to: `/callback/:id`. */
 const OAUTH_CALLBACK_PATH = '/callback/';
