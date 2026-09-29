@@ -222,13 +222,14 @@ await withMerchant(db, merchantId, (tx) => ordersRepo.listForMerchant(tx, { merc
 
 **Still open, to decide with the first tables:**
 
-- **The webhook bootstrap path.** A job carries a Page id and must resolve it to
-  a merchant — a read that happens _before_ any merchant context exists, so a
-  policy on `page` would block the very query that establishes the context.
-  Prefer a narrow `SECURITY DEFINER` resolver owned by the schema owner, with
-  `EXECUTE` granted to `app_runtime`, returning only the merchant id. Do **not**
-  write a policy that permits reads when no context is set: that reopens the hole
-  for every table it touches.
+- **The webhook bootstrap path — settled.** `app_page_merchant(text)`
+  (migration `0011`) resolves a Page id to its merchant before any context
+  exists. It is `SECURITY DEFINER`, owned by the `NOLOGIN` role
+  `app_page_resolver`, whose only access is a `SELECT` policy and a column grant
+  on `facebook_page (page_id, merchant_id)`, so it does not rely on the migrating
+  role being a superuser. Call it through `resolvePageMerchant()`
+  (`src/modules/conversations/ingest/page-merchant.ts`). Do **not** write a
+  policy that permits reads when no context is set.
 - **Policies themselves**, one per business table, declared in its schema file, plus the `FORCE` that `db:custom` must carry alongside.
 
 ### Authoring the policies

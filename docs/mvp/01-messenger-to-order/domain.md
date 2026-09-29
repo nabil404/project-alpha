@@ -40,7 +40,12 @@ delivery address.
   while it has subcategories, and removes it from its products.
 - **Customer** — Messenger PSID, name, phone, address.
 - **Conversation** — customer, Page, state, collected slots, bot paused flag.
-- **Message** — direction, content, timestamps, Meta message ID.
+  `bot_paused` is the seller taking over (by hand, by replying from the
+  dashboard, or by replying from Facebook's own inbox); `handed_off` is the
+  assistant giving up. They are independent: handing back clears the first and
+  resumes the second.
+- **Message** — sender (`customer`, `assistant`, `seller`), content, status
+  (`sending`, `sent`, `failed`), timestamps, Meta message ID.
 - **Order / OrderItem** — items, totals, delivery charge, status, notes, linked
   conversation.
 

@@ -7,10 +7,11 @@ separate step after sign-in that requests Page permissions"). This page
 describes what is built.
 
 **Status (Sep 2026):** connect, reconnect and disconnect work end to end, in
-the API and in Settings › Messenger. Not built yet: resolving a webhook's Page
-to its shop (a `SECURITY DEFINER` resolver, since `facebook_page` is under
-forced RLS), the bot on/off toggle (the column exists), and the Replies
-settings in the design.
+the API and in Settings › Messenger. Not built yet: the bot on/off toggle (the
+column exists), and the Replies settings in the design.
+
+A webhook's Page is resolved to its shop by `app_page_merchant()`; see
+[04 · Conversations](../04-conversations/README.md).
 
 ## Flow
 
