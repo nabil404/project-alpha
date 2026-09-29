@@ -20,6 +20,7 @@ Worker InboundMessageIngest                   → app_page_merchant(pageId) → 
        one withMerchant transaction          → upsert customer, lock/create conversation,
                                                 insert message (ON CONFLICT DO NOTHING),
                                                 move last_* forward; seller echo → bot_paused
+                                                (the echo of a reply our app sent is skipped)
        after commit                          → PUBLISH conversation-events {merchantId, conversationId, kind}
 API    ConversationEventsHub (lazy SUBSCRIBE) → that merchant's SSE streams: conversation.updated {conversationId}
 SPA    refetches over REST
@@ -73,3 +74,19 @@ SPA    refetches over REST
   default of 1 is used).
 - The Caddyfile change (`@compressible not path …`) has not been run through
   `caddy validate`; validate before deploying.
+- A reply can stay `sending` if the process dies mid-send or the final write
+  fails; the web client should treat a `sending` message older than about 30 s
+  as failed, and a sweep can mark them later.
+- A send that times out may still have been delivered; it is recorded as
+  failed, so retyping it can send it twice.
+- The web client should mark a thread read only while it is `unread`: marking
+  read always publishes an event.
+- An SSE stream is closed at session expiry, not on sign-out elsewhere or
+  revocation; it exposes conversation ids only in the meantime.
+- Events published while the API's Redis subscriber is reconnecting are lost
+  until the browser next refetches.
+- Unread compares Meta's send time with the read marker, so a message delayed
+  in the queue can arrive already read.
+- Check `bull:messenger-inbound:wait` in production before the first deploy of
+  this branch: jobs queued before messages carried a `kind` are now read as
+  customer messages, but confirm what is waiting.
