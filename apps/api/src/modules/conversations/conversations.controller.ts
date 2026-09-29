@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Patch,
+  Post,
   Put,
   Query,
   Req,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBody,
+  ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -28,13 +30,17 @@ import {
   listConversationsQuerySchema,
   listMessagesQuerySchema,
   messagePageSchema,
+  messageSchema,
+  sendMessageSchema,
   updateConversationSchema,
   type ConversationCounts,
   type ConversationDetail,
   type ConversationListResponse,
   type ListConversationsQuery,
   type ListMessagesQuery,
+  type Message,
   type MessagePage,
+  type SendMessage,
   type UpdateConversation,
 } from '@app/shared';
 import { z, type ZodType } from 'zod';
@@ -154,5 +160,26 @@ export class ConversationsController {
     @Body(new ZodValidationPipe(updateConversationSchema)) body: UpdateConversation,
   ): Promise<ConversationDetail> {
     return this.conversations.update(tenantScope(request), id, body);
+  }
+
+  @Post(':id/messages')
+  @ApiOperation({
+    summary: 'Reply to the customer',
+    description:
+      'Sends a text reply through Messenger and pauses the assistant in this chat. Allowed only within 24 hours of the customer’s last message.',
+  })
+  @ApiBody({ schema: openApi(sendMessageSchema, 'input') })
+  @ApiCreatedResponse({ description: 'The delivered message.', schema: openApi(messageSchema) })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  @ApiCodedError(404, ['CONVERSATION_NOT_FOUND'])
+  @ApiCodedError(409, ['MESSENGER_WINDOW_CLOSED', 'MESSENGER_PAGE_NOT_CONNECTED'])
+  @ApiCodedError(502, ['MESSENGER_SEND_FAILED'])
+  @ApiCodedError(503, ['MESSENGER_NOT_CONFIGURED'])
+  send(
+    @Req() request: TenantRequest,
+    @Param('id', uuidParam) id: string,
+    @Body(new ZodValidationPipe(sendMessageSchema)) body: SendMessage,
+  ): Promise<Message> {
+    return this.conversations.send(tenantScope(request), id, body);
   }
 }

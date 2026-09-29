@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   collectedSlotsSchema,
   type ConversationCounts,
@@ -6,17 +6,29 @@ import {
   type ConversationListResponse,
   type ListConversationsQuery,
   type ListMessagesQuery,
+  type Message,
   type MessagePage,
+  type SendMessage,
   type UpdateConversation,
 } from '@app/shared';
+import { CryptoService } from '../../common/crypto.service';
 import { CodedValidationException } from '../../common/errors/index';
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
 import { withMerchant } from '../../database/with-merchant';
-import { conversationNotFound } from './conversation-errors';
+import { messengerNotConfigured } from '../messenger/page/facebook-page-errors';
+import { FacebookPageRepository } from '../messenger/page/facebook-page.repository';
+import { META_GRAPH } from '../messenger/page/facebook-page.service';
+import type { MetaGraphClient } from '../messenger/page/meta-graph.client';
+import {
+  conversationNotFound,
+  messengerPageNotConnected,
+  messengerSendFailed,
+  messengerWindowClosed,
+} from './conversation-errors';
 import { toConversationDetail, toConversationListItem, toMessage } from './conversation-mappers';
 import { ConversationRepository } from './conversation.repository';
-import { stateAfterHandBack } from './conversation-rules';
+import { isReplyWindowOpen, replyWindowClosesAt, stateAfterHandBack } from './conversation-rules';
 import { decodeCursor, encodeCursor, type CursorKey } from './cursor';
 import { ConversationEventsPublisher } from './events/conversation-events.publisher';
 import { MessageRepository } from './message.repository';
@@ -28,11 +40,16 @@ import { MessageRepository } from './message.repository';
  */
 @Injectable()
 export class ConversationsService {
+  private readonly logger = new Logger(ConversationsService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly conversations: ConversationRepository,
     // Not `messages`: that would shadow the messages() method below.
     private readonly messageRows: MessageRepository,
+    private readonly pages: FacebookPageRepository,
+    private readonly crypto: CryptoService,
+    @Inject(META_GRAPH) private readonly graph: MetaGraphClient | null,
     private readonly events: ConversationEventsPublisher,
   ) {}
 
@@ -134,6 +151,69 @@ export class ConversationsService {
       kind: 'conversation',
     });
     return detail;
+  }
+
+  /**
+   * A seller reply, in three steps so no transaction is open across the Graph
+   * call (invariant #1): check and store it as `sending` (pausing the
+   * assistant), send, then record the outcome. A refused send stays in the
+   * thread as `failed` and the seller retypes to retry. The echo Meta sends
+   * back carries our app id and is skipped by the ingest.
+   */
+  async send(scope: TenantScope, id: string, { text }: SendMessage): Promise<Message> {
+    const graph = this.graph;
+    if (!graph) throw messengerNotConfigured();
+    const now = new Date();
+
+    const pending = await withMerchant(this.db, scope.merchantId, async (tx) => {
+      const found = await this.conversations.findById(tx, scope, id, { lock: true });
+      if (!found) throw conversationNotFound();
+      const { conversation, customer } = found;
+      if (!isReplyWindowOpen(conversation.lastInboundAt, now)) {
+        throw messengerWindowClosed(replyWindowClosesAt(conversation.lastInboundAt));
+      }
+      const page = await this.pages.findForMerchant(tx, scope);
+      if (!page || page.pageId !== conversation.facebookPageId) throw messengerPageNotConnected();
+
+      const row = await this.messageRows.insertSending(tx, scope, {
+        conversationId: id,
+        text,
+        sentAt: now,
+      });
+      await this.conversations.applyMessage(tx, scope, conversation, {
+        sender: 'seller',
+        text,
+        sentAt: now,
+        pauseBot: true,
+      });
+      return { row, psid: customer.psid, encryptedToken: page.accessToken };
+    });
+
+    let delivered: { messageId: string } | null = null;
+    try {
+      delivered = await graph.sendText(
+        this.crypto.decrypt(pending.encryptedToken),
+        pending.psid,
+        text,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Seller reply not delivered: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
+
+    const final = await withMerchant(this.db, scope.merchantId, (tx) =>
+      delivered
+        ? this.messageRows.markSent(tx, scope, pending.row.id, delivered.messageId)
+        : this.messageRows.markFailed(tx, scope, pending.row.id),
+    );
+    await this.events.publish({
+      merchantId: scope.merchantId,
+      conversationId: id,
+      kind: 'message',
+    });
+    if (!delivered) throw messengerSendFailed();
+    return toMessage(final);
   }
 }
 

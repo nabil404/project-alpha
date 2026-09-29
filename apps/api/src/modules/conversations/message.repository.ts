@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { MessageSender } from '@app/shared';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../../database/base.repository';
+import { one } from '../../database/rows';
 import { message, type MessageRow } from '../../database/schema/index';
 import type { CursorKey } from './cursor';
 
@@ -52,5 +53,51 @@ export class MessageRepository {
       )
       .orderBy(desc(message.sentAt), desc(message.id))
       .limit(limit);
+  }
+
+  /** A seller reply, stored before it is sent so the thread shows it while Messenger answers. */
+  async insertSending(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    values: { conversationId: string; text: string; sentAt: Date },
+  ): Promise<MessageRow> {
+    return one(
+      await executor
+        .insert(message)
+        .values({ ...values, merchantId, sender: 'seller', status: 'sending' })
+        .returning(),
+      'message insert',
+    );
+  }
+
+  async markSent(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+    metaMessageId: string,
+  ): Promise<MessageRow> {
+    return one(
+      await executor
+        .update(message)
+        .set({ status: 'sent', metaMessageId })
+        .where(and(eq(message.merchantId, merchantId), eq(message.id, id)))
+        .returning(),
+      'message sent',
+    );
+  }
+
+  async markFailed(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+  ): Promise<MessageRow> {
+    return one(
+      await executor
+        .update(message)
+        .set({ status: 'failed' })
+        .where(and(eq(message.merchantId, merchantId), eq(message.id, id)))
+        .returning(),
+      'message failed',
+    );
   }
 }

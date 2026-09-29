@@ -11,10 +11,12 @@ import {
   conversationDetailSchema,
   conversationListResponseSchema,
   messagePageSchema,
+  messageSchema,
 } from '@app/shared';
 import request from 'supertest';
 import { AuthModule } from '../../../auth/auth.module';
 import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
+import { CryptoService } from '../../../common/crypto.service';
 import { TenantGuard } from '../../../common/tenant.guard';
 import { AppConfig } from '../../../config/app.config';
 import { DATABASE } from '../../../database/database.module';
@@ -27,6 +29,7 @@ import {
 import {
   seedConversation,
   seedCustomer,
+  seedFacebookPage,
   seedMessage,
 } from '../../../database/__tests__/conversation-seeds';
 import { MailService } from '../../mail/mail.service';
@@ -49,6 +52,7 @@ describeDb('conversation routes over HTTP', () => {
   let runtime: ReturnType<typeof openRuntimeDb>;
   let merchantId: string;
   const events: ConversationEvent[] = [];
+  const sent: string[] = [];
   const server = () => app.getHttpServer();
   let handedOff: string;
   let drafted: string;
@@ -57,11 +61,19 @@ describeDb('conversation routes over HTTP', () => {
     t = await openCatalogTestDb();
     runtime = openRuntimeDb();
 
+    const pageCrypto = new CryptoService({
+      get: () => Buffer.alloc(32, 7).toString('base64'),
+    } as unknown as AppConfig);
+    const page = await seedFacebookPage(t.db, t.merchantA, {
+      accessToken: pageCrypto.encrypt('token-A'),
+    });
+
     const nusrat = await seedCustomer(t.db, t.merchantA, { name: 'Nusrat Jahan' });
     const now = Date.now();
     handedOff = (
       await seedConversation(t.db, t.merchantA, {
         customerId: nusrat.id,
+        facebookPageId: page.pageId,
         state: 'handed_off',
         lastMessageAt: new Date(now - 60_000),
         lastInboundAt: new Date(now - 60_000),
@@ -112,7 +124,12 @@ describeDb('conversation routes over HTTP', () => {
       .overrideProvider(CONVERSATION_EVENTS_SUBSCRIBE)
       .useValue(async () => ({ close: async () => {} }))
       .overrideProvider(META_GRAPH)
-      .useValue(null)
+      .useValue({
+        sendText: async (_token: string, _psid: string, text: string) => {
+          sent.push(text);
+          return { messageId: `m_${sent.length}` };
+        },
+      })
       .overrideGuard(TenantGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
@@ -260,17 +277,45 @@ describeDb('conversation routes over HTTP', () => {
     expect(list.data).toEqual([]);
 
     // Lazy: supertest starts listening when a request is built and stops when it
-    // ends, so building all four up front would leave three on a closed port.
+    // ends, so building them all up front would leave all but one on a closed port.
     const calls = [
       () => request(server()).get(`/api/v1/conversations/${handedOff}`),
       () => request(server()).get(`/api/v1/conversations/${handedOff}/messages`),
       () => request(server()).put(`/api/v1/conversations/${handedOff}/read`),
       () => request(server()).patch(`/api/v1/conversations/${handedOff}`).send({ botPaused: true }),
+      () =>
+        request(server()).post(`/api/v1/conversations/${handedOff}/messages`).send({ text: 'hi' }),
     ];
     for (const call of calls) {
       const response = await call().expect(404);
       expect(response.body.error.code).toBe('CONVERSATION_NOT_FOUND');
     }
     expect(events).toEqual([]);
+  });
+
+  it('sends a seller reply', async () => {
+    const response = await request(server())
+      .post(`/api/v1/conversations/${handedOff}/messages`)
+      .send({ text: '  Your parcel ships today  ' })
+      .expect(201);
+    expect(messageSchema.parse(response.body)).toMatchObject({
+      sender: 'seller',
+      text: 'Your parcel ships today',
+      status: 'sent',
+    });
+    expect(sent.at(-1)).toBe('Your parcel ships today');
+  });
+
+  it('refuses an empty or over-long reply before touching Messenger', async () => {
+    const before = sent.length;
+    await request(server())
+      .post(`/api/v1/conversations/${handedOff}/messages`)
+      .send({ text: '   ' })
+      .expect(400);
+    await request(server())
+      .post(`/api/v1/conversations/${handedOff}/messages`)
+      .send({ text: 'x'.repeat(2001) })
+      .expect(400);
+    expect(sent.length).toBe(before);
   });
 });
