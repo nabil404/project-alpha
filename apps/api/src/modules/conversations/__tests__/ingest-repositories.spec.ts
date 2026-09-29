@@ -13,8 +13,13 @@ import { ConversationRepository } from '../conversation.repository';
 import { CustomerRepository } from '../customer.repository';
 import { MessageRepository } from '../message.repository';
 
-// Runs as app_runtime so row-level security applies exactly as in production;
-// every call also passes a scope, so each test proves the filter, not the policy.
+// Runs as app_runtime so row-level security applies exactly as in production.
+// Most cases run in the merchant's own context with its own scope, which proves
+// behavior and isolation of the data as a whole. The "filter, not policy" cases
+// run in merchant A's context but pass merchant B's scope against A's rows: row
+// visibility is then A's, so only the repository's own merchantId filter can
+// hide them. The mismatched-write cases show RLS and composite keys stop a
+// cross-merchant write.
 describeDb('ingest repositories (app_runtime, two merchants)', () => {
   const customers = new CustomerRepository();
   const conversations = new ConversationRepository();
@@ -85,6 +90,13 @@ describeDb('ingest repositories (app_runtime, two merchants)', () => {
       await expect(
         as(t.merchantA, (tx) => customers.findByPsid(tx, scope(t.merchantA), 'psid-private')),
       ).resolves.toMatchObject({ psid: 'psid-private' });
+    });
+
+    it('filter, not policy: findByPsid hides a row RLS would show when the scope is another merchant', async () => {
+      await seedCustomer(t.db, t.merchantA, { psid: 'psid-filter' });
+      await expect(
+        as(t.merchantA, (tx) => customers.findByPsid(tx, scope(t.merchantB), 'psid-filter')),
+      ).resolves.toBeNull();
     });
 
     it('is stopped by row-level security when the scope and the context disagree', async () => {
@@ -161,6 +173,36 @@ describeDb('ingest repositories (app_runtime, two merchants)', () => {
       });
     });
 
+    it('filter, not policy: applyMessage cannot update a row under another merchant scope', async () => {
+      const row = await seedConversation(t.db, t.merchantA, {
+        lastMessageAt: at('2026-09-29T10:05:00Z'),
+        lastInboundAt: at('2026-09-29T10:05:00Z'),
+        lastMessagePreview: 'untouched',
+      });
+
+      await expect(
+        as(t.merchantA, (tx) =>
+          conversations.applyMessage(tx, scope(t.merchantB), row, {
+            sender: 'seller',
+            text: 'should not land',
+            sentAt: at('2026-09-29T10:09:00Z'),
+            pauseBot: true,
+          }),
+        ),
+      ).rejects.toThrow('conversation update');
+
+      const [after] = await t.db
+        .select()
+        .from(schema.conversation)
+        .where(eq(schema.conversation.id, row.id));
+      expect(after).toMatchObject({
+        lastMessagePreview: 'untouched',
+        lastMessageSender: row.lastMessageSender,
+        botPaused: false,
+        lastMessageAt: row.lastMessageAt,
+      });
+    });
+
     it("cannot lock another merchant's thread into existence", async () => {
       const customerOfA = await seedCustomer(t.db, t.merchantA);
       await expect(
@@ -200,6 +242,45 @@ describeDb('ingest repositories (app_runtime, two merchants)', () => {
       expect(
         await t.db.select().from(schema.message).where(eq(schema.message.conversationId, convo.id)),
       ).toHaveLength(1);
+    });
+
+    it('treats the same Meta message id under two merchants as two messages, not a redelivery', async () => {
+      const convoA = await seedConversation(t.db, t.merchantA);
+      const convoB = await seedConversation(t.db, t.merchantB);
+      const base = {
+        sender: 'customer' as const,
+        text: 'same mid',
+        metaMessageId: 'mid-shared-across-merchants',
+        sentAt: at('2026-09-29T10:04:00Z'),
+      };
+
+      const inA = await as(t.merchantA, (tx) =>
+        messages.insertDelivered(tx, scope(t.merchantA), { ...base, conversationId: convoA.id }),
+      );
+      const inB = await as(t.merchantB, (tx) =>
+        messages.insertDelivered(tx, scope(t.merchantB), { ...base, conversationId: convoB.id }),
+      );
+
+      expect(inA).not.toBeNull();
+      expect(inB).toMatchObject({ merchantId: t.merchantB, conversationId: convoB.id });
+      expect(inB?.id).not.toBe(inA?.id);
+    });
+
+    it("cannot store a message into another merchant's conversation", async () => {
+      const convoOfA = await seedConversation(t.db, t.merchantA);
+      await expect(
+        pgErrorOf(
+          as(t.merchantB, (tx) =>
+            messages.insertDelivered(tx, scope(t.merchantB), {
+              conversationId: convoOfA.id,
+              sender: 'customer',
+              text: 'x',
+              metaMessageId: 'mid-into-a',
+              sentAt: new Date(),
+            }),
+          ),
+        ),
+      ).resolves.toMatchObject({ code: '23503' });
     });
   });
 });
