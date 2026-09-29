@@ -68,7 +68,7 @@ export class ConversationsService {
     const page = rows.slice(0, query.limit);
     const last = page.at(-1)?.conversation;
     return {
-      data: page.map((row) => toConversationListItem(row.conversation, row.customerName)),
+      data: page.map((row) => toConversationListItem(row.conversation, row.customer)),
       pagination: {
         nextCursor:
           rows.length > query.limit && last

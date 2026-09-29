@@ -158,25 +158,48 @@ describe('MetaGraphClient', () => {
   });
 
   describe('Messenger calls with the Page token', () => {
-    it("reads a customer's name from their profile", async () => {
-      const fetch = fakeFetch({ body: { name: 'Nusrat Jahan', id: 'psid-1' } });
+    it("reads a customer's name and picture from their profile", async () => {
+      const fetch = fakeFetch({
+        body: {
+          name: 'Nusrat Jahan',
+          profile_pic: 'https://platform-lookaside.fbsbx.com/pic?psid=1',
+          id: 'psid-1',
+        },
+      });
       const client = new MetaGraphClient(settings, fetch.fn);
 
-      await expect(client.getUserName('page-token', 'psid-1')).resolves.toBe('Nusrat Jahan');
+      await expect(client.getUserProfile('page-token', 'psid-1')).resolves.toEqual({
+        name: 'Nusrat Jahan',
+        pictureUrl: 'https://platform-lookaside.fbsbx.com/pic?psid=1',
+      });
 
       const [call] = fetch.calls;
       expect(call?.method).toBe('GET');
       expect(call?.url.pathname).toBe('/v21.0/psid-1');
-      expect(call?.url.searchParams.get('fields')).toBe('name');
+      expect(call?.url.searchParams.get('fields')).toBe('name,profile_pic');
       expect(call?.url.searchParams.get('appsecret_proof')).toBe(
         appSecretProof('page-token', 'app-secret'),
       );
       expect(call?.authorization).toBe('Bearer page-token');
     });
 
-    it('answers null when Facebook shares no name', async () => {
+    it('answers nulls when Facebook shares no name or picture', async () => {
       const client = new MetaGraphClient(settings, fakeFetch({ body: { id: 'psid-1' } }).fn);
-      await expect(client.getUserName('page-token', 'psid-1')).resolves.toBeNull();
+      await expect(client.getUserProfile('page-token', 'psid-1')).resolves.toEqual({
+        name: null,
+        pictureUrl: null,
+      });
+    });
+
+    it('drops a picture link that is not https', async () => {
+      const client = new MetaGraphClient(
+        settings,
+        fakeFetch({ body: { name: 'Nusrat', profile_pic: 'javascript:alert(1)' } }).fn,
+      );
+      await expect(client.getUserProfile('page-token', 'psid-1')).resolves.toEqual({
+        name: 'Nusrat',
+        pictureUrl: null,
+      });
     });
 
     it('sends a text reply as a RESPONSE and returns its message id', async () => {

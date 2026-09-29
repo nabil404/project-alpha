@@ -113,7 +113,11 @@ function ThreadHeader({
     <>
       <header className="flex items-center gap-1 border-b border-border bg-surface px-2 py-2 sm:gap-3 lg:px-6 lg:py-4">
         <BackLink className="lg:hidden" />
-        <CustomerAvatar name={conversation.customer.name} className="max-sm:hidden" />
+        <CustomerAvatar
+          name={conversation.customer.name}
+          pictureUrl={conversation.customer.pictureUrl}
+          className="max-sm:hidden"
+        />
         <h2 className="min-w-0 grow truncate text-heading">
           {customerName(conversation.customer.name)}
         </h2>
@@ -170,7 +174,10 @@ function CustomerPanel({ conversation }: { conversation: ConversationDetail }) {
     >
       <h2 className="text-heading">{t('customer.title')}</h2>
       <div className="flex items-center gap-3">
-        <CustomerAvatar name={conversation.customer.name} />
+        <CustomerAvatar
+          name={conversation.customer.name}
+          pictureUrl={conversation.customer.pictureUrl}
+        />
         <span className="min-w-0 truncate text-body font-medium">
           {customerName(conversation.customer.name)}
         </span>

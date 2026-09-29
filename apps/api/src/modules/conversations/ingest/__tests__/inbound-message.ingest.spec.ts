@@ -15,10 +15,12 @@ import type { CustomerMessageJob, PageEchoJob } from '../../../queue/queue.const
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-graph.client';
 import { ConversationRepository } from '../../conversation.repository';
+import { PROFILE_REFRESH_MS } from '../../conversation-rules';
 import { CustomerRepository } from '../../customer.repository';
 import type { ConversationEvent } from '../../events/conversation-event';
 import type { ConversationEventsPublisher } from '../../events/conversation-events.publisher';
 import { MessageRepository } from '../../message.repository';
+import { CustomerProfileReader } from '../../profiles/customer-profile.reader';
 import { InboundMessageIngest } from '../inbound-message.ingest';
 
 const OUR_APP = 'our-app-id';
@@ -27,15 +29,17 @@ const crypto = new CryptoService({
 } as unknown as AppConfig);
 
 class FakeGraph {
-  names = new Map<string, string>();
+  profiles = new Map<string, { name: string | null; pictureUrl: string | null }>();
   profileCalls: { token: string; psid: string }[] = [];
   fail = false;
-  async getUserName(token: string, psid: string) {
+  async getUserProfile(token: string, psid: string) {
     this.profileCalls.push({ token, psid });
     if (this.fail) throw new GraphError(400, 100, 'no profile');
-    return this.names.get(psid) ?? null;
+    return this.profiles.get(psid) ?? { name: null, pictureUrl: null };
   }
 }
+
+const PICTURE = 'https://platform-lookaside.fbsbx.com/pic?psid=1&oe=1';
 
 class FakePublisher {
   events: ConversationEvent[] = [];
@@ -105,8 +109,7 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
       {
         get: (key: string) => (key === 'META_APP_ID' ? OUR_APP : undefined),
       } as unknown as AppConfig,
-      crypto,
-      graph as unknown as MetaGraphClient,
+      new CustomerProfileReader(crypto, graph as unknown as MetaGraphClient),
       new FacebookPageRepository(),
       new CustomerRepository(),
       new ConversationRepository(),
@@ -122,12 +125,16 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
 
   it("stores a customer's first message as a new thread, named from their profile", async () => {
     const job = customerMessage();
-    graph.names.set(job.senderPsid, 'Nusrat Jahan');
+    graph.profiles.set(job.senderPsid, { name: 'Nusrat Jahan', pictureUrl: PICTURE });
 
     await expect(ingest.handle(job)).resolves.toBe('stored');
 
     const thread = await threadOf(job.senderPsid);
-    expect(thread?.customer).toMatchObject({ merchantId: t.merchantA, name: 'Nusrat Jahan' });
+    expect(thread?.customer).toMatchObject({
+      merchantId: t.merchantA,
+      name: 'Nusrat Jahan',
+      pictureUrl: PICTURE,
+    });
     expect(thread?.conversation).toMatchObject({
       facebookPageId: pageA,
       state: 'browsing',
@@ -205,6 +212,44 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
 
     await ingest.handle(customerMessage({ senderPsid: first.senderPsid }));
     expect(graph.profileCalls).toHaveLength(1);
+  });
+
+  it("refreshes a named customer's picture once the refresh period has passed", async () => {
+    const first = customerMessage();
+    graph.profiles.set(first.senderPsid, { name: 'Nusrat Jahan', pictureUrl: PICTURE });
+    await ingest.handle(first);
+
+    await ingest.handle(customerMessage({ senderPsid: first.senderPsid }));
+    expect(graph.profileCalls).toHaveLength(1);
+
+    await t.db
+      .update(schema.customer)
+      .set({ profileFetchedAt: new Date(Date.now() - PROFILE_REFRESH_MS) })
+      .where(eq(schema.customer.psid, first.senderPsid));
+    const renewed = `${PICTURE}&oe=2`;
+    graph.profiles.set(first.senderPsid, { name: 'Nusrat Jahan', pictureUrl: renewed });
+    await ingest.handle(customerMessage({ senderPsid: first.senderPsid }));
+
+    expect(graph.profileCalls).toHaveLength(2);
+    expect((await threadOf(first.senderPsid))?.customer.pictureUrl).toBe(renewed);
+  });
+
+  it('keeps the known name and picture when a refresh fails', async () => {
+    const first = customerMessage();
+    graph.profiles.set(first.senderPsid, { name: 'Nusrat Jahan', pictureUrl: PICTURE });
+    await ingest.handle(first);
+    await t.db
+      .update(schema.customer)
+      .set({ profileFetchedAt: new Date(Date.now() - PROFILE_REFRESH_MS) })
+      .where(eq(schema.customer.psid, first.senderPsid));
+
+    graph.fail = true;
+    await ingest.handle(customerMessage({ senderPsid: first.senderPsid }));
+
+    expect((await threadOf(first.senderPsid))?.customer).toMatchObject({
+      name: 'Nusrat Jahan',
+      pictureUrl: PICTURE,
+    });
   });
 
   it('keeps the newest message in the list when an older one arrives late', async () => {

@@ -51,25 +51,42 @@ describeDb('ingest repositories (app_runtime, two merchants)', () => {
         customers.upsert(tx, scope(t.merchantA), { psid: 'psid-once' }),
       );
       expect(again.id).toBe(first.id);
-      expect(first).toMatchObject({ name: null, profileFetchedAt: null });
+      expect(first).toMatchObject({ name: null, pictureUrl: null, profileFetchedAt: null });
     });
 
-    it('records a profile read, and keeps a known name when a later read finds none', async () => {
+    it('records a profile read, and keeps a known name and picture when a later read finds none', async () => {
       const fetchedAt = at('2026-09-29T10:00:00Z');
+      const pictureUrl = 'https://platform-lookaside.fbsbx.com/pic?oe=1';
       await as(t.merchantA, (tx) =>
         customers.upsert(tx, scope(t.merchantA), {
           psid: 'psid-named',
-          profile: { name: 'Nusrat Jahan', fetchedAt },
+          profile: { name: 'Nusrat Jahan', pictureUrl, fetchedAt },
         }),
       );
       const later = at('2026-09-30T10:00:00Z');
       const row = await as(t.merchantA, (tx) =>
         customers.upsert(tx, scope(t.merchantA), {
           psid: 'psid-named',
-          profile: { name: null, fetchedAt: later },
+          profile: { name: null, pictureUrl: null, fetchedAt: later },
         }),
       );
-      expect(row).toMatchObject({ name: 'Nusrat Jahan', profileFetchedAt: later });
+      expect(row).toMatchObject({ name: 'Nusrat Jahan', pictureUrl, profileFetchedAt: later });
+    });
+
+    it('replaces the picture link with the one a later read returns', async () => {
+      const read = (pictureUrl: string, fetchedAt: Date) =>
+        as(t.merchantA, (tx) =>
+          customers.upsert(tx, scope(t.merchantA), {
+            psid: 'psid-renewed',
+            profile: { name: 'Nusrat Jahan', pictureUrl, fetchedAt },
+          }),
+        );
+      await read('https://platform-lookaside.fbsbx.com/pic?oe=1', at('2026-09-29T10:00:00Z'));
+      const row = await read(
+        'https://platform-lookaside.fbsbx.com/pic?oe=2',
+        at('2026-10-02T10:00:00Z'),
+      );
+      expect(row.pictureUrl).toBe('https://platform-lookaside.fbsbx.com/pic?oe=2');
     });
 
     it('keeps the same person messaging two shops as two customers', async () => {
@@ -105,6 +122,125 @@ describeDb('ingest repositories (app_runtime, two merchants)', () => {
           as(t.merchantB, (tx) => customers.upsert(tx, scope(t.merchantA), { psid: 'psid-rls' })),
         ),
       ).resolves.toMatchObject({ code: '42501' });
+    });
+  });
+
+  describe('CustomerRepository profile refresh', () => {
+    const now = at('2026-09-30T04:00:00Z');
+    const daysAgo = (days: number) => new Date(now.getTime() - days * 24 * 3_600_000);
+    const stale = (merchantId: string, limit = 200) =>
+      as(merchantId, (tx) =>
+        customers.listStaleProfiles(tx, scope(merchantId), {
+          now,
+          activeSince: daysAgo(30),
+          limit,
+        }),
+      );
+    /** A customer with one conversation whose last message was `activeDaysAgo` ago. */
+    const customerWith = async (
+      merchantId: string,
+      profile: { name?: string | null; pictureUrl?: string | null; profileFetchedAt?: Date | null },
+      activeDaysAgo = 1,
+    ) => {
+      const row = await seedCustomer(t.db, merchantId, { name: null, ...profile });
+      await seedConversation(t.db, merchantId, {
+        customerId: row.id,
+        lastMessageAt: daysAgo(activeDaysAgo),
+      });
+      return row.id;
+    };
+
+    it('lists recently active customers whose profile is due, never-read first', async () => {
+      const namedFresh = await customerWith(t.merchantA, {
+        name: 'Fresh',
+        profileFetchedAt: daysAgo(1),
+      });
+      const namedStale = await customerWith(t.merchantA, {
+        name: 'Stale',
+        profileFetchedAt: daysAgo(4),
+      });
+      const namelessRetry = await customerWith(t.merchantA, { profileFetchedAt: daysAgo(2) });
+      const picturelessRetry = await customerWith(t.merchantA, {
+        name: 'No picture',
+        pictureUrl: null,
+        profileFetchedAt: daysAgo(2),
+      });
+      const neverRead = await customerWith(t.merchantA, { profileFetchedAt: null });
+      const inactive = await customerWith(t.merchantA, { profileFetchedAt: null }, 40);
+      const noConversation = (await seedCustomer(t.db, t.merchantA, { profileFetchedAt: null })).id;
+      const mine = new Set([
+        namedFresh,
+        namedStale,
+        namelessRetry,
+        picturelessRetry,
+        neverRead,
+        inactive,
+        noConversation,
+      ]);
+
+      const listed = (await stale(t.merchantA)).map((row) => row.id).filter((id) => mine.has(id));
+
+      expect(listed[0]).toBe(neverRead);
+      expect(listed.sort()).toEqual(
+        [namedStale, namelessRetry, picturelessRetry, neverRead].sort(),
+      );
+    });
+
+    it('caps the batch', async () => {
+      await customerWith(t.merchantA, { profileFetchedAt: null });
+      await customerWith(t.merchantA, { profileFetchedAt: null });
+      await expect(stale(t.merchantA, 1)).resolves.toHaveLength(1);
+    });
+
+    it("never lists another merchant's customers", async () => {
+      const inB = await customerWith(t.merchantB, { profileFetchedAt: null });
+      expect((await stale(t.merchantA)).map((row) => row.id)).not.toContain(inB);
+      expect((await stale(t.merchantB)).map((row) => row.id)).toContain(inB);
+    });
+
+    it('filter, not policy: listStaleProfiles hides rows RLS would show when the scope is another merchant', async () => {
+      const inA = await customerWith(t.merchantA, { profileFetchedAt: null });
+      const listed = await as(t.merchantA, (tx) =>
+        customers.listStaleProfiles(tx, scope(t.merchantB), {
+          now,
+          activeSince: daysAgo(30),
+          limit: 200,
+        }),
+      );
+      expect(listed.map((row) => row.id)).not.toContain(inA);
+    });
+
+    it('records a read, keeping what the read did not return', async () => {
+      const { id } = await seedCustomer(t.db, t.merchantA, { name: 'Nusrat Jahan' });
+      const pictureUrl = 'https://platform-lookaside.fbsbx.com/pic?oe=9';
+
+      await expect(
+        as(t.merchantA, (tx) =>
+          customers.recordProfile(tx, scope(t.merchantA), id, {
+            name: null,
+            pictureUrl,
+            fetchedAt: now,
+          }),
+        ),
+      ).resolves.toBe(true);
+
+      const [row] = await t.db.select().from(schema.customer).where(eq(schema.customer.id, id));
+      expect(row).toMatchObject({ name: 'Nusrat Jahan', pictureUrl, profileFetchedAt: now });
+    });
+
+    it("filter, not policy: recordProfile leaves another merchant's customer alone", async () => {
+      const { id } = await seedCustomer(t.db, t.merchantA, { profileFetchedAt: null });
+      await expect(
+        as(t.merchantA, (tx) =>
+          customers.recordProfile(tx, scope(t.merchantB), id, {
+            name: 'Intruder',
+            pictureUrl: null,
+            fetchedAt: now,
+          }),
+        ),
+      ).resolves.toBe(false);
+      const [row] = await t.db.select().from(schema.customer).where(eq(schema.customer.id, id));
+      expect(row?.profileFetchedAt).toBeNull();
     });
   });
 

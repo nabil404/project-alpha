@@ -5,7 +5,7 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import type { Queue } from 'bullmq';
 import type { Express as ExpressApp } from 'express';
-import { MESSENGER_QUEUE, STORAGE_QUEUE } from './queue.constants';
+import { MESSENGER_QUEUE, PROFILE_QUEUE, STORAGE_QUEUE } from './queue.constants';
 
 export const QUEUE_BOARD_PATH = '/api/queues';
 
@@ -24,7 +24,7 @@ export function setupQueueBoard(app: INestApplication): void {
   const serverAdapter = new ExpressAdapter().setBasePath(QUEUE_BOARD_PATH);
 
   createBullBoard({
-    queues: [MESSENGER_QUEUE, STORAGE_QUEUE].map(
+    queues: [MESSENGER_QUEUE, STORAGE_QUEUE, PROFILE_QUEUE].map(
       (name) => new BullMQAdapter(app.get<Queue>(getQueueToken(name))),
     ),
     serverAdapter,

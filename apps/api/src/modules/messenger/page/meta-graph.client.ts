@@ -35,6 +35,12 @@ export interface GraphPageWithToken extends GraphPage {
   accessToken: string;
 }
 
+export interface GraphUserProfile {
+  name: string | null;
+  /** A signed CDN link that expires after a few days. */
+  pictureUrl: string | null;
+}
+
 /**
  * A failed Graph call. Carries Facebook's status and error code but never the
  * request URL or a token, so it is safe to log.
@@ -168,13 +174,19 @@ export class MetaGraphClient {
     });
   }
 
-  /** A customer's display name from their Messenger profile, or null when Facebook shares none. */
-  async getUserName(pageToken: string, psid: string): Promise<string | null> {
-    const body = await this.request<{ name?: unknown }>('GET', `/${encodeURIComponent(psid)}`, {
-      token: pageToken,
-      query: { fields: 'name' },
-    });
-    return typeof body.name === 'string' && body.name ? body.name : null;
+  /** A customer's Messenger profile; each field is null when Facebook shares none. */
+  async getUserProfile(pageToken: string, psid: string): Promise<GraphUserProfile> {
+    const body = await this.request<{ name?: unknown; profile_pic?: unknown }>(
+      'GET',
+      `/${encodeURIComponent(psid)}`,
+      { token: pageToken, query: { fields: 'name,profile_pic' } },
+    );
+    const picture = body.profile_pic;
+    return {
+      name: typeof body.name === 'string' && body.name ? body.name : null,
+      // The dashboard renders it in an <img>, so only an https link gets through.
+      pictureUrl: typeof picture === 'string' && picture.startsWith('https://') ? picture : null,
+    };
   }
 
   /**

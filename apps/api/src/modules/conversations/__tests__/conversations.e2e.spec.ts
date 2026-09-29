@@ -27,6 +27,7 @@ import {
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
 import {
+  SEED_PICTURE_URL,
   seedConversation,
   seedCustomer,
   seedFacebookPage,
@@ -164,7 +165,7 @@ describeDb('conversation routes over HTTP', () => {
     const body = conversationListResponseSchema.parse(all.body);
     expect(body.data.map((item) => item.id)).toEqual([handedOff, drafted]);
     expect(body.data[0]).toMatchObject({
-      customer: { name: 'Nusrat Jahan' },
+      customer: { name: 'Nusrat Jahan', pictureUrl: SEED_PICTURE_URL },
       state: 'handed_off',
       unread: true,
     });
@@ -209,7 +210,7 @@ describeDb('conversation routes over HTTP', () => {
     );
     expect(detail).toMatchObject({
       id: handedOff,
-      customer: { name: 'Nusrat Jahan' },
+      customer: { name: 'Nusrat Jahan', pictureUrl: SEED_PICTURE_URL },
       botPaused: false,
     });
     expect(detail.replyWindowClosesAt).not.toBeNull();

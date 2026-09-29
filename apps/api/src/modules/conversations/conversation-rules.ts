@@ -3,8 +3,11 @@ import { REPLY_WINDOW_MS, type CollectedSlots, type ConversationState } from '@a
 /** How much of the last message the conversation list shows. */
 export const PREVIEW_LENGTH = 140;
 
-/** A customer whose profile could not be read is asked for again after this long. */
+/** A customer whose profile could not be read, or lacks a name or picture, is asked for again after this long. */
 export const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000;
+
+/** A named customer's profile is read again after this long, before their picture link expires. */
+export const PROFILE_REFRESH_MS = 3 * PROFILE_RETRY_MS;
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
@@ -42,17 +45,23 @@ export function isUnread(lastInboundAt: Date | null, sellerLastReadAt: Date | nu
   return lastInboundAt !== null && (sellerLastReadAt === null || lastInboundAt > sellerLastReadAt);
 }
 
-/** Whether to ask Facebook for this customer's name before storing their message. */
+/**
+ * Whether to ask Facebook for this customer's name and picture. A profile
+ * missing either is retried daily: Facebook may share it later, and customers
+ * read before pictures were asked for have none yet.
+ */
 export function needsProfile(
-  customer: { name: string | null; profileFetchedAt: Date | null } | null,
+  customer: {
+    name: string | null;
+    pictureUrl: string | null;
+    profileFetchedAt: Date | null;
+  } | null,
   now: Date,
 ): boolean {
-  if (customer === null) return true;
-  if (customer.name !== null) return false;
-  return (
-    customer.profileFetchedAt === null ||
-    now.getTime() - customer.profileFetchedAt.getTime() >= PROFILE_RETRY_MS
-  );
+  if (customer === null || customer.profileFetchedAt === null) return true;
+  const complete = customer.name !== null && customer.pictureUrl !== null;
+  const wait = complete ? PROFILE_REFRESH_MS : PROFILE_RETRY_MS;
+  return now.getTime() - customer.profileFetchedAt.getTime() >= wait;
 }
 
 /** An ILIKE pattern matching `term` literally anywhere: `%`, `_` and `\` lose their meaning. */

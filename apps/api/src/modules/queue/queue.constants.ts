@@ -33,3 +33,7 @@ export type InboundMessageJob = CustomerMessageJob | PageEchoJob;
 /** Housekeeping for object storage. Jobs are scheduled by the worker, never by the API. */
 export const STORAGE_QUEUE = 'storage-maintenance';
 export const SWEEP_JOB = 'sweep-orphaned-images';
+
+/** Customer profile upkeep. Jobs are scheduled by the worker, never by the API. */
+export const PROFILE_QUEUE = 'customer-profiles';
+export const REFRESH_PROFILES_JOB = 'refresh-stale-profiles';

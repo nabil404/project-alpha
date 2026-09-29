@@ -85,6 +85,8 @@ export const conversationCustomerSchema = z.object({
   id: z.string().uuid(),
   /** Null until Facebook shares the customer's profile. */
   name: z.string().nullable(),
+  /** Facebook's signed CDN link. It expires, so the image may fail to load. */
+  pictureUrl: z.string().url().nullable(),
 });
 
 export const conversationListItemSchema = z.object({
