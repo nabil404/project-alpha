@@ -136,6 +136,58 @@ describeDb('read repositories (app_runtime, two merchants)', () => {
     ).resolves.toEqual([]);
   });
 
+  // The cases above run as merchant B, so RLS alone would hide merchant A's rows. These run
+  // in A's context, where RLS shows A's rows, and pass B's scope: only the repositories'
+  // own merchantId filter can hide them.
+  describe('filter, not policy', () => {
+    const other = () => ({ merchantId: t.merchantB });
+
+    it('list returns nothing under another merchant scope', async () => {
+      await expect(
+        as(t.merchantA, (tx) => conversations.list(tx, other(), { filter: 'all', limit: 25 })),
+      ).resolves.toEqual([]);
+      await expect(
+        as(t.merchantA, (tx) =>
+          conversations.list(tx, other(), { filter: 'all', q: 'Tanvir', limit: 25 }),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it('counts are all zero: A’s rows hidden by the filter, B’s own hidden by RLS', async () => {
+      await expect(as(t.merchantA, (tx) => conversations.counts(tx, other()))).resolves.toEqual({
+        all: 0,
+        needsYou: 0,
+        drafted: 0,
+        unread: 0,
+      });
+    });
+
+    it('findById does not find the conversation, locked or not', async () => {
+      await expect(
+        as(t.merchantA, (tx) => conversations.findById(tx, other(), ids.a)),
+      ).resolves.toBeNull();
+      await expect(
+        as(t.merchantA, (tx) => conversations.findById(tx, other(), ids.a, { lock: true })),
+      ).resolves.toBeNull();
+    });
+
+    it('update changes nothing', async () => {
+      await expect(
+        as(t.merchantA, (tx) => conversations.update(tx, other(), ids.a, { botPaused: true })),
+      ).resolves.toBeNull();
+      const [row] = (
+        await t.db.execute(sql`select bot_paused from conversation where id = ${ids.a}`)
+      ).rows;
+      expect(row?.bot_paused).toBe(false);
+    });
+
+    it('listPage returns no messages', async () => {
+      await expect(
+        as(t.merchantA, (tx) => messages.listPage(tx, other(), ids.c, { limit: 10 })),
+      ).resolves.toEqual([]);
+    });
+  });
+
   it('finds a conversation with its customer, and updates it', async () => {
     const found = await as(t.merchantA, (tx) =>
       conversations.findById(tx, { merchantId: t.merchantA }, ids.a, { lock: true }),
