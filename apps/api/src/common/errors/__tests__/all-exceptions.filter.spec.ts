@@ -5,6 +5,7 @@ import {
   type ArgumentsHost,
   type LoggerService,
 } from '@nestjs/common';
+import { DrizzleQueryError } from 'drizzle-orm';
 import type { ErrorResponseBody } from '@app/shared';
 import { AllExceptionsFilter } from '../all-exceptions.filter';
 import { CodedUnauthorizedException, CodedValidationException } from '../coded-exceptions';
@@ -99,6 +100,70 @@ describe('AllExceptionsFilter', () => {
     expect(JSON.stringify(sent.body)).not.toContain('hunter2');
     // The detail is not lost — it goes to the server log instead.
     expect(logged.at(-1)?.[0]).toBe(bug.message);
+  });
+
+  describe('a database error', () => {
+    const query = 'update "message" set "text" = $1, "status" = $2 where "message"."id" = $3';
+    const params = ['secret reply', 'sent', 'mid-1'];
+    const lockTimeout = () =>
+      Object.assign(new Error('canceling statement due to lock timeout'), {
+        code: '55P03',
+      });
+    const uniqueViolation = () =>
+      Object.assign(new Error('duplicate key value violates unique constraint'), {
+        code: '23505',
+        constraint: 'message_meta_message_id_uq',
+      });
+
+    /** Everything one filter.catch passed to the logger, as a single string. */
+    function logFor(exception: unknown): string {
+      const { sent, host } = capture();
+      const before = logged.length;
+      filter.catch(exception, host);
+      expect(sent.body?.error.code).toBe('INTERNAL_SERVER_ERROR');
+      return JSON.stringify(logged.slice(before));
+    }
+
+    it('logs its name and SQLSTATE, never the parameters or the query', () => {
+      const line = logFor(new DrizzleQueryError(query, params, lockTimeout()));
+
+      expect(line).toContain('DrizzleQueryError');
+      expect(line).toContain('55P03');
+      expect(line).not.toContain('secret reply');
+      expect(line).not.toContain('update "message"');
+      // The call site survives: only the stack's message line is dropped.
+      expect(logged.at(-1)?.[1]).toMatch(/^\s+at /);
+    });
+
+    it('names the constraint a violation hit', () => {
+      const line = logFor(new DrizzleQueryError(query, params, uniqueViolation()));
+
+      expect(line).toContain('23505');
+      expect(line).toContain('message_meta_message_id_uq');
+      expect(line).not.toContain('secret reply');
+    });
+
+    it('is recognised when another error wraps it', () => {
+      const wrapped = new Error(`Transaction failed: ${query} params: ${params.join(',')}`, {
+        cause: new DrizzleQueryError(query, params, lockTimeout()),
+      });
+      const line = logFor(wrapped);
+
+      expect(line).toContain('55P03');
+      expect(line).not.toContain('secret reply');
+    });
+
+    it('is recognised by its query and params, whatever its class', () => {
+      const lookalike = Object.assign(new Error(`Failed query: ${query}\nparams: ${params}`), {
+        query,
+        params,
+        cause: lockTimeout(),
+      });
+      const line = logFor(lookalike);
+
+      expect(line).toContain('55P03');
+      expect(line).not.toContain('secret reply');
+    });
   });
 
   it('handles a thrown non-Error without crashing the filter', () => {
