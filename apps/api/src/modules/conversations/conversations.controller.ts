@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -191,6 +192,25 @@ export class ConversationsController {
     @Body(new ZodValidationPipe(updateConversationSchema)) body: UpdateConversation,
   ): Promise<ConversationDetail> {
     return this.conversations.update(tenantScope(request), id, body);
+  }
+
+  @Delete(':id/messages/:messageId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Delete a reply that was not delivered',
+    description:
+      'Only a seller reply Messenger refused (`status: failed`): it never reached the customer. Any other message answers 409. The list preview falls back to the newest message left.',
+  })
+  @ApiNoContentResponse({ description: 'Deleted.' })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  @ApiCodedError(404, ['CONVERSATION_NOT_FOUND', 'MESSAGE_NOT_FOUND'])
+  @ApiCodedError(409, ['MESSAGE_NOT_DELETABLE'])
+  deleteMessage(
+    @Req() request: TenantRequest,
+    @Param('id', uuidParam) id: string,
+    @Param('messageId', uuidParam) messageId: string,
+  ): Promise<void> {
+    return this.conversations.deleteMessage(tenantScope(request), id, messageId);
   }
 
   @Post(':id/messages')

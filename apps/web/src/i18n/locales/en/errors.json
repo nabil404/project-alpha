@@ -27,6 +27,8 @@
     "FACEBOOK_PERMISSIONS_DECLINED": "Allow every permission Facebook asks for, so the assistant can read and answer chats.",
     "FACEBOOK_UNAVAILABLE": "We couldn't reach Facebook. Try again in a moment.",
     "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again.",
+    "MESSAGE_NOT_DELETABLE": "Only a reply that wasn't delivered can be removed.",
+    "MESSAGE_NOT_FOUND": "That message no longer exists. Refresh the page.",
     "MESSENGER_NOT_CONFIGURED": "Facebook isn't set up for this app yet. Contact support.",
     "MESSENGER_PAGE_NOT_CONNECTED": "This chat's Facebook Page isn't connected any more. Reconnect it in Settings > Messenger.",
     "MESSENGER_SEND_FAILED": "Messenger didn't accept that message. Try sending it again.",

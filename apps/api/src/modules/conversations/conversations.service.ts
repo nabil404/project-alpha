@@ -22,6 +22,8 @@ import { META_GRAPH } from '../messenger/page/facebook-page.service';
 import type { MetaGraphClient } from '../messenger/page/meta-graph.client';
 import {
   conversationNotFound,
+  messageNotDeletable,
+  messageNotFound,
   messengerPageNotConnected,
   messengerSendFailed,
   messengerWindowClosed,
@@ -105,6 +107,33 @@ export class ConversationsService {
             : null,
       },
     };
+  }
+
+  /**
+   * Deletes a seller reply Messenger refused. Nothing else can go: every other
+   * message reached the customer, or may still. The conversation row is locked
+   * so a concurrent send cannot interleave with moving the list preview back to
+   * the newest message left. Leaves the assistant paused: the seller took over
+   * by replying, and deleting the reply doesn't hand the chat back.
+   */
+  async deleteMessage(scope: TenantScope, id: string, messageId: string): Promise<void> {
+    await withMerchant(this.db, scope.merchantId, async (tx) => {
+      if (!(await this.conversations.findById(tx, scope, id, { lock: true }))) {
+        throw conversationNotFound();
+      }
+      const target = await this.messageRows.findInConversation(tx, scope, id, messageId);
+      if (!target) throw messageNotFound();
+      if (!(await this.messageRows.deleteFailed(tx, scope, id, messageId))) {
+        throw messageNotDeletable();
+      }
+      const latest = await this.messageRows.latest(tx, scope, id);
+      if (latest) await this.conversations.resetLastMessage(tx, scope, id, latest);
+    });
+    await this.events.publish({
+      merchantId: scope.merchantId,
+      conversationId: id,
+      kind: 'message',
+    });
   }
 
   /** Idempotent: announces a change only when something was unread. */

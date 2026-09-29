@@ -290,6 +290,10 @@ describeDb('conversation routes over HTTP', () => {
       () => request(server()).patch(`/api/v1/conversations/${handedOff}`).send({ botPaused: true }),
       () =>
         request(server()).post(`/api/v1/conversations/${handedOff}/messages`).send({ text: 'hi' }),
+      () =>
+        request(server()).delete(
+          `/api/v1/conversations/${handedOff}/messages/00000000-0000-4000-8000-000000000000`,
+        ),
     ];
     for (const call of calls) {
       const response = await call().expect(404);
@@ -322,5 +326,37 @@ describeDb('conversation routes over HTTP', () => {
       .send({ text: 'x'.repeat(2001) })
       .expect(400);
     expect(sent.length).toBe(before);
+  });
+
+  it('deletes a reply that was not delivered, and refuses one that was', async () => {
+    const failed = await seedMessage(t.db, t.merchantA, handedOff, {
+      sender: 'seller',
+      text: 'not delivered',
+      status: 'failed',
+      metaMessageId: null,
+    });
+    const delivered = await seedMessage(t.db, t.merchantA, handedOff, {
+      sender: 'seller',
+      text: 'delivered',
+    });
+
+    await request(server())
+      .delete(`/api/v1/conversations/${handedOff}/messages/${failed.id}`)
+      .expect(204);
+    const refused = await request(server())
+      .delete(`/api/v1/conversations/${handedOff}/messages/${delivered.id}`)
+      .expect(409);
+    expect(refused.body.error.code).toBe('MESSAGE_NOT_DELETABLE');
+    const gone = await request(server())
+      .delete(`/api/v1/conversations/${handedOff}/messages/${failed.id}`)
+      .expect(404);
+    expect(gone.body.error.code).toBe('MESSAGE_NOT_FOUND');
+    await request(server())
+      .delete(`/api/v1/conversations/${handedOff}/messages/not-a-uuid`)
+      .expect(400);
+
+    expect(events).toEqual([
+      { merchantId: t.merchantA, conversationId: handedOff, kind: 'message' },
+    ]);
   });
 });
