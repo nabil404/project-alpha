@@ -222,7 +222,7 @@ export class ConversationRepository {
     executor: Executor,
     { merchantId }: TenantScope,
     id: string,
-    values: { botPaused?: boolean; state?: ConversationState; sellerLastReadAt?: Date },
+    values: { botPaused?: boolean; state?: ConversationState },
   ): Promise<ConversationRow | null> {
     const [row] = await executor
       .update(conversation)
@@ -230,5 +230,20 @@ export class ConversationRepository {
       .where(and(eq(conversation.merchantId, merchantId), eq(conversation.id, id)))
       .returning();
     return row ?? null;
+  }
+
+  /**
+   * Read up to the customer's last message the server has stored, not up to
+   * the clock: a message still in the queue, or stamped ahead of this clock by
+   * Meta, then arrives unread. False when there was nothing unread to mark,
+   * including when the merchant has no such conversation.
+   */
+  async markRead(executor: Executor, { merchantId }: TenantScope, id: string): Promise<boolean> {
+    const rows = await executor
+      .update(conversation)
+      .set({ sellerLastReadAt: sql`${conversation.lastInboundAt}` })
+      .where(and(eq(conversation.merchantId, merchantId), eq(conversation.id, id), unread))
+      .returning({ id: conversation.id });
+    return rows.length > 0;
   }
 }

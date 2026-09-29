@@ -58,7 +58,7 @@ is `404 CONVERSATION_NOT_FOUND` (never 403).
 | `GET /events`        | —                                                                                                          | SSE, below                                                                                                                                                              |
 | `GET /:id`           | —                                                                                                          | `ConversationDetail`                                                                                                                                                    |
 | `GET /:id/messages`  | `before`, `limit` 1–100 (default 50)                                                                       | `{ data: Message[], pagination: { prevCursor } }`: the newest page, oldest first; pass `prevCursor` as `before` for the page before it, null at the start of the thread |
-| `PUT /:id/read`      | —                                                                                                          | 204. Sets `seller_last_read_at` to now; idempotent, but always publishes an event                                                                                       |
+| `PUT /:id/read`      | —                                                                                                          | 204. Reads up to the customer's last message; idempotent, and publishes only when something was unread                                                                  |
 | `PATCH /:id`         | `{ botPaused }`, strict (any other key is 400)                                                             | 200 `ConversationDetail`. `true` takes over and never changes `state`; `false` hands back, below                                                                        |
 | `POST /:id/messages` | `{ text }`, trimmed, 1–2000                                                                                | 201 `Message` (`sender: seller`, `status: sent`); errors below                                                                                                          |
 
@@ -77,7 +77,10 @@ Shapes are the Zod schemas in
 **Filters.** `needs_you` is `state = handed_off`; `drafted` is
 `state = awaiting_confirmation`; `unread` is `last_inbound_at > seller_last_read_at`
 (or never read). Only a customer message makes a thread unread. `botPaused` is
-part of no filter.
+part of no filter. Marking read copies `last_inbound_at` into
+`seller_last_read_at` rather than stamping the clock, so a message still in the
+queue when the seller looked, or stamped ahead of the API's clock by Meta,
+still arrives unread.
 
 **Seller reply errors,** in the order they are checked. Everything after the
 503 runs in one transaction with the conversation row locked.
@@ -205,16 +208,11 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 - If an echo of our own reply arrives without our `app_id` before the reply is
   marked `sent`, the ingest stores it first and `markSent` hits
   `UNIQUE (merchant_id, meta_message_id)`: a 500 and a doubled message.
-- The web client should mark a thread read only while it is `unread`: marking
-  read always publishes an event.
 - An SSE stream is closed at session expiry, not on sign-out elsewhere or
   revocation; it exposes conversation ids only in the meantime.
 - Events are lost while the API's Redis subscriber is reconnecting, and when a
   publish fails (logged and swallowed). If the first `SUBSCRIBE` fails, open
   streams stay silent until another stream opens and retries it.
-- Unread compares Meta's send time with the API's clock at mark-read, so a
-  message delayed in the queue, or stamped ahead of the API clock, can arrive
-  already read.
 - Check `bull:messenger-inbound:wait` in production before the first deploy of
   this branch: jobs queued before messages carried a `kind` are now read as
   customer messages, but confirm what is waiting.

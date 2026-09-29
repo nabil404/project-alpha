@@ -11,6 +11,7 @@ import {
   seedCustomer,
   seedMessage,
 } from '../../../database/__tests__/conversation-seeds';
+import { isUnread } from '../conversation-rules';
 import { ConversationRepository } from '../conversation.repository';
 import { MessageRepository } from '../message.repository';
 
@@ -194,11 +195,69 @@ describeDb('read repositories (app_runtime, two merchants)', () => {
     );
     expect(found?.customer.name).toBe('Nusrat Jahan');
 
-    const readAt = minute(30);
+    const convo = await seedConversation(t.db, t.merchantA);
     const updated = await as(t.merchantA, (tx) =>
-      conversations.update(tx, { merchantId: t.merchantA }, ids.a, { sellerLastReadAt: readAt }),
+      conversations.update(tx, { merchantId: t.merchantA }, convo.id, { state: 'handed_off' }),
     );
-    expect(updated?.sellerLastReadAt).toEqual(readAt);
+    expect(updated?.state).toBe('handed_off');
+  });
+
+  describe('markRead', () => {
+    const scopeA = () => ({ merchantId: t.merchantA });
+    const markRead = (id: string, scope = scopeA()) =>
+      as(t.merchantA, (tx) => conversations.markRead(tx, scope, id));
+    const unreadNow = async (id: string) => {
+      const found = await as(t.merchantA, (tx) => conversations.findById(tx, scopeA(), id));
+      return isUnread(
+        found!.conversation.lastInboundAt,
+        found!.conversation.sellerLastReadAt,
+      );
+    };
+
+    it("reads up to the customer's last message, once", async () => {
+      const convo = await seedConversation(t.db, t.merchantA, { lastMessageAt: minute(20) });
+
+      await expect(markRead(convo.id)).resolves.toBe(true);
+      const found = await as(t.merchantA, (tx) => conversations.findById(tx, scopeA(), convo.id));
+      expect(found?.conversation.sellerLastReadAt).toEqual(minute(20));
+      await expect(markRead(convo.id)).resolves.toBe(false);
+    });
+
+    it('leaves a message that was still queued when the seller looked unread', async () => {
+      const convo = await seedConversation(t.db, t.merchantA, { lastMessageAt: minute(20) });
+      await markRead(convo.id);
+
+      // Sent at 10:21, long before this test's clock, but stored only now.
+      await as(t.merchantA, async (tx) => {
+        const found = await conversations.findById(tx, scopeA(), convo.id, { lock: true });
+        await conversations.applyMessage(tx, scopeA(), found!.conversation, {
+          sender: 'customer',
+          text: 'still there?',
+          sentAt: minute(21),
+        });
+      });
+
+      expect(await unreadNow(convo.id)).toBe(true);
+    });
+
+    it("marks read a message Meta stamped ahead of this server's clock", async () => {
+      const ahead = new Date(Date.now() + 60_000);
+      const convo = await seedConversation(t.db, t.merchantA, { lastMessageAt: ahead });
+
+      await markRead(convo.id);
+      expect(await unreadNow(convo.id)).toBe(false);
+    });
+
+    it('does nothing for a conversation the customer never wrote in', async () => {
+      const convo = await seedConversation(t.db, t.merchantA, { lastInboundAt: null });
+      await expect(markRead(convo.id)).resolves.toBe(false);
+    });
+
+    it("never marks another merchant's conversation, even where RLS shows it", async () => {
+      const convo = await seedConversation(t.db, t.merchantA);
+      await expect(markRead(convo.id, { merchantId: t.merchantB })).resolves.toBe(false);
+      expect(await unreadNow(convo.id)).toBe(true);
+    });
   });
 
   it('pages a thread newest first, by cursor', async () => {

@@ -107,11 +107,13 @@ export class ConversationsService {
     };
   }
 
+  /** Idempotent: announces a change only when something was unread. */
   async markRead(scope: TenantScope, id: string): Promise<void> {
-    const row = await withMerchant(this.db, scope.merchantId, (tx) =>
-      this.conversations.update(tx, scope, id, { sellerLastReadAt: new Date() }),
-    );
-    if (!row) throw conversationNotFound();
+    const changed = await withMerchant(this.db, scope.merchantId, async (tx) => {
+      if (!(await this.conversations.findById(tx, scope, id))) throw conversationNotFound();
+      return this.conversations.markRead(tx, scope, id);
+    });
+    if (!changed) return;
     await this.events.publish({
       merchantId: scope.merchantId,
       conversationId: id,

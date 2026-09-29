@@ -57,6 +57,7 @@ export const conversation = pgTable(
     lastMessageSender: text('last_message_sender', { enum: MESSAGE_SENDERS }).notNull(),
     /** The customer's last message: the 24h reply window, "Active N min ago", and unread. */
     lastInboundAt: instant('last_inbound_at'),
+    /** Read up to: the `last_inbound_at` the seller last saw, not when they looked. */
     sellerLastReadAt: timestamp('seller_last_read_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
