@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Outlet, useMatchRoute } from '@tanstack/react-router';
+import { Outlet, useMatches, useMatchRoute } from '@tanstack/react-router';
 import { Menu, X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 import { NAV_ITEMS } from './nav-items';
 import { SidebarContent } from './SidebarContent';
@@ -14,13 +15,17 @@ import { SidebarContent } from './SidebarContent';
  * whose menu button opens the same sidebar as a drawer.
  */
 export function AppShell() {
+  const fullBleed = useMatches({
+    select: (matches) => matches.some((match) => match.staticData.fullBleed),
+  });
+
   return (
     <div className="min-h-dvh bg-bg text-ink lg:flex">
       <aside className="sticky top-0 hidden h-dvh w-62 shrink-0 overflow-y-auto border-r border-border bg-surface px-4 py-6 lg:block">
         <SidebarContent />
       </aside>
       <MobileTopBar />
-      <main className="min-w-0 grow px-4 py-6 sm:px-8 sm:py-8">
+      <main className={cn('min-w-0 grow', !fullBleed && 'px-4 py-6 sm:px-8 sm:py-8')}>
         <Outlet />
       </main>
     </div>

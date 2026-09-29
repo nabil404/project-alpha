@@ -10,6 +10,7 @@ import i18n from '@/i18n';
  */
 const DATE_PRESETS = {
   date: { dateStyle: 'medium' },
+  dayMonth: { month: 'short', day: 'numeric' },
   dateTime: { dateStyle: 'medium', timeStyle: 'short' },
   time: { timeStyle: 'short' },
 } as const satisfies Record<string, Intl.DateTimeFormatOptions>;

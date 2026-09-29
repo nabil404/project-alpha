@@ -1,0 +1,53 @@
+{
+  "composer": {
+    "hintAssistant": "The assistant is handling this chat. Sending a message takes it over.",
+    "hintSeller": "The assistant is paused in this chat until you hand it back.",
+    "label": "Message",
+    "placeholder": "Write a message to {{name}}",
+    "send": "Send",
+    "windowClosed": "Messenger only allows replies within 24 hours of the customer's last message. You can reply again after they write to you."
+  },
+  "customer": {
+    "replyUntil": "You can reply until {{time}}",
+    "replyWindowClosed": "Reply window closed",
+    "title": "Customer",
+    "unknownName": "Facebook user"
+  },
+  "empty": {
+    "description": "Pick a chat to read it and reply.",
+    "title": "Choose a conversation"
+  },
+  "filters": {
+    "all": "All",
+    "drafted": "Drafted",
+    "label": "Filter conversations",
+    "needs_you": "Needs you",
+    "unread": "Unread"
+  },
+  "list": {
+    "empty": "No conversations yet. When customers message your Page, they show up here.",
+    "emptyFiltered": "No conversations match.",
+    "label": "Conversation list",
+    "loadMore": "Load more",
+    "preview": "{{sender}}: {{text}}",
+    "searchLabel": "Search conversations",
+    "searchPlaceholder": "Search by name or message",
+    "title": "Conversations",
+    "unread": "Unread"
+  },
+  "thread": {
+    "back": "Back to conversations",
+    "empty": "No messages yet.",
+    "handBack": "Hand back to assistant",
+    "loadOlder": "Load earlier messages",
+    "mode": {
+      "assistant": "Assistant is replying",
+      "seller": "You are replying"
+    },
+    "remove": "Remove",
+    "retry": "Retry",
+    "sender": "{{sender}} · {{time}}",
+    "takeOver": "Take over chat",
+    "today": "Today"
+  }
+}

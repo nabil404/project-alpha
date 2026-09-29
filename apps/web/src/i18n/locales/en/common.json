@@ -26,11 +26,11 @@
   "status": {
     "conversation": {
       "abandoned": "Abandoned",
-      "awaiting_confirmation": "Awaiting confirmation",
+      "awaiting_confirmation": "Order drafted",
       "browsing": "Browsing",
       "collecting_details": "Collecting details",
       "confirmed": "Confirmed",
-      "handed_off": "Handed off"
+      "handed_off": "Needs you"
     },
     "intent": {
       "ask_question": "Question",

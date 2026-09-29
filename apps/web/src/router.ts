@@ -19,4 +19,9 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
   }
+
+  interface StaticDataRouteOption {
+    /** The page fills the shell edge to edge, with no page gutters, and scrolls its own panes. */
+    fullBleed?: boolean;
+  }
 }

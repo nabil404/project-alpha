@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import type { LinkProps } from '@tanstack/react-router';
 import type { ParseKeys } from 'i18next';
 import {
@@ -9,6 +10,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { NeedsYouBadge } from '@/features/conversations';
+
 export interface NavItem {
   id: string;
   label: ParseKeys<'common'>;
@@ -17,12 +20,20 @@ export interface NavItem {
   to?: LinkProps['to'];
   /** Only for `/`, which every other path would otherwise match. */
   exact?: boolean;
+  /** A count at the end of the item, fetched by the badge itself. */
+  badge?: ComponentType;
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'overview', label: 'nav.overview', icon: LayoutDashboard },
   { id: 'orders', label: 'nav.orders', icon: ShoppingBag, to: '/', exact: true },
-  { id: 'conversations', label: 'nav.conversations', icon: MessageCircle },
+  {
+    id: 'conversations',
+    label: 'nav.conversations',
+    icon: MessageCircle,
+    to: '/conversations',
+    badge: NeedsYouBadge,
+  },
   { id: 'catalog', label: 'nav.catalog', icon: Package, to: '/catalog' },
   { id: 'settings', label: 'nav.settings', icon: SlidersHorizontal, to: '/settings' },
 ];
