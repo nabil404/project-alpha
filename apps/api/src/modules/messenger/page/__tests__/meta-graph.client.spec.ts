@@ -92,14 +92,16 @@ describe('MetaGraphClient', () => {
     expect([...granted]).toEqual(['pages_show_list']);
   });
 
-  it('reads a Page with its token, and null for a Page the seller cannot reach', async () => {
-    const { fn } = fakeFetch(
-      {
-        body: { id: '42', name: 'Rahim Kitchen', tasks: ['MESSAGING'], access_token: 'page-token' },
+  it('reads a Page with its token from the granted Pages, and null for any other', async () => {
+    const accounts = {
+      body: {
+        data: [
+          { id: '42', name: 'Rahim Kitchen', tasks: ['MESSAGING'], access_token: 'page-token' },
+          { id: '43', name: 'Granted, no token', tasks: ['MESSAGING'] },
+        ],
       },
-      { status: 400, body: { error: { code: 100, message: 'Unsupported get request' } } },
-      { body: { id: '43', name: 'Visible, no role' } },
-    );
+    };
+    const { fn, calls } = fakeFetch(accounts, accounts, accounts);
     const client = new MetaGraphClient(settings, fn);
 
     await expect(client.getPage('t', '42')).resolves.toEqual({
@@ -110,6 +112,11 @@ describe('MetaGraphClient', () => {
     });
     await expect(client.getPage('t', '999')).resolves.toBeNull();
     await expect(client.getPage('t', '43')).resolves.toBeNull();
+
+    // `tasks` exists only on the /me/accounts edge; asking a Page node for it
+    // is Graph error 100, so the Page must be read from the edge.
+    expect(calls[0]?.url.pathname).toBe('/v21.0/me/accounts');
+    expect(calls[0]?.url.searchParams.get('fields')).toBe('id,name,tasks,access_token');
   });
 
   it('subscribes the app to the Page webhooks with the Page token', async () => {
