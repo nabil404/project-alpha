@@ -33,13 +33,22 @@ export function publisherConnection(url: string): Redis {
  */
 export function redisSubscribe(url: string): SubscribeFn {
   return async (onMessage) => {
-    const redis = new Redis(url, { lazyConnect: true });
+    // disconnectTimeout 0: disconnect() on a socket that already dropped would
+    // otherwise leave ioredis' 2s "destroy it if still open" timer holding the process.
+    const redis = new Redis(url, { lazyConnect: true, disconnectTimeout: 0 });
     redis.on('error', (error: Error) => logger.warn(`Subscriber connection: ${error.message}`));
     redis.on('message', (channel: string, message: string) => {
       if (channel === CONVERSATION_EVENTS_CHANNEL) onMessage(message);
     });
-    await redis.connect();
-    await redis.subscribe(CONVERSATION_EVENTS_CHANNEL);
+    try {
+      // connect() rejects on the first failed attempt, but the client would keep
+      // reconnecting in the background: drop it so a retry starts from scratch.
+      await redis.connect();
+      await redis.subscribe(CONVERSATION_EVENTS_CHANNEL);
+    } catch (error) {
+      redis.disconnect();
+      throw error;
+    }
     return {
       close: async () => {
         redis.disconnect();

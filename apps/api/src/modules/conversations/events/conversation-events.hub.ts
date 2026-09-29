@@ -43,6 +43,11 @@ export class ConversationEventsHub implements OnModuleDestroy {
     });
   }
 
+  /** Open streams for one merchant. Lets tests prove a closed stream leaves nothing behind. */
+  streamCount(merchantId: string): number {
+    return this.streams.get(merchantId)?.length ?? 0;
+  }
+
   /** One raw channel message. Anything that is not a valid event is dropped. */
   dispatch(raw: string): void {
     let event: ConversationEvent;
