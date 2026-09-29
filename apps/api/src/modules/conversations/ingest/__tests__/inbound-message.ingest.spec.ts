@@ -159,8 +159,10 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
   it("stores a seller's reply from Facebook's inbox and pauses the assistant", async () => {
     const first = customerMessage();
     await ingest.handle(first);
+    const reply = echo({ recipientPsid: first.senderPsid });
+    publisher.events.length = 0;
 
-    await expect(ingest.handle(echo({ recipientPsid: first.senderPsid }))).resolves.toBe('stored');
+    await expect(ingest.handle(reply)).resolves.toBe('stored');
 
     const thread = await threadOf(first.senderPsid);
     expect(thread?.conversation).toMatchObject({
@@ -168,6 +170,15 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
       lastMessageSender: 'seller',
       lastInboundAt: new Date(first.sentAt),
     });
+    const stored = await messagesOf(thread!.conversation.id);
+    expect(stored.find((row) => row.metaMessageId === reply.messageId)).toMatchObject({
+      sender: 'seller',
+      text: reply.text,
+      status: 'sent',
+    });
+    expect(publisher.events).toEqual([
+      { merchantId: t.merchantA, conversationId: thread!.conversation.id, kind: 'message' },
+    ]);
   });
 
   it('skips the echo of a message our own app sent', async () => {
