@@ -1,6 +1,6 @@
 export { ConversationList } from './components/ConversationList';
 export { ConversationThread } from './components/ConversationThread';
-export { NeedsYouBadge } from './components/NeedsYouBadge';
+export { UnreadBadge } from './components/UnreadBadge';
 export { NoConversationSelected } from './components/NoConversationSelected';
 export {
   conversationKeys,

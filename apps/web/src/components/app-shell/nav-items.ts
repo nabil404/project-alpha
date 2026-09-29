@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { NeedsYouBadge } from '@/features/conversations';
+import { UnreadBadge } from '@/features/conversations';
 
 export interface NavItem {
   id: string;
@@ -32,7 +32,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: 'nav.conversations',
     icon: MessageCircle,
     to: '/conversations',
-    badge: NeedsYouBadge,
+    badge: UnreadBadge,
   },
   { id: 'catalog', label: 'nav.catalog', icon: Package, to: '/catalog' },
   { id: 'settings', label: 'nav.settings', icon: SlidersHorizontal, to: '/settings' },

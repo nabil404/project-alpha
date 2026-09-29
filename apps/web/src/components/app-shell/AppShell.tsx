@@ -5,6 +5,7 @@ import { Dialog } from 'radix-ui';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { useConversationEvents } from '@/features/conversations';
 import { cn } from '@/lib/utils';
 
 import { NAV_ITEMS } from './nav-items';
@@ -12,9 +13,12 @@ import { SidebarContent } from './SidebarContent';
 
 /**
  * The signed-in dashboard: a fixed sidebar from `lg` up; below it, a top bar
- * whose menu button opens the same sidebar as a drawer.
+ * whose menu button opens the same sidebar as a drawer. The conversation
+ * event stream lives here, not on the conversations page, so the sidebar's
+ * unread count stays live on every page.
  */
 export function AppShell() {
+  useConversationEvents();
   const fullBleed = useMatches({
     select: (matches) => matches.some((match) => match.staticData.fullBleed),
   });
