@@ -18,6 +18,9 @@
       "title": "Unlink {{name}}?"
     }
   },
+  "breadcrumb": {
+    "label": "Breadcrumb"
+  },
   "header": {
     "description": "Your shop, your Messenger Page and how the order assistant works.",
     "title": "Settings"
