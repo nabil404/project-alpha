@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { Global, Module, type INestApplication, type LoggerService } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import { deviceSessionSchema } from '@app/shared';
 import { eq, inArray, like } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import sharp from 'sharp';
 import request from 'supertest';
 import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
 import { CapturingMailer } from '../../auth/__tests__/capturing-mailer';
@@ -14,6 +16,12 @@ import { AppConfig } from '../../config/app.config';
 import { DATABASE, type Database } from '../../database/database.module';
 import * as schema from '../../database/schema/index';
 import { MailService } from '../../mail/mail.service';
+import { ObjectStorage } from '../../storage/object-storage';
+import {
+  InMemoryObjectStorage,
+  TEST_PUBLIC_BASE_URL,
+} from '../../storage/__tests__/in-memory-object-storage';
+import { AccountModule } from '../account.module';
 
 // Needs a real Postgres: sessions, password hashing and the hooks are Better
 // Auth server behaviour. CI sets DATABASE_ADMIN_URL; locally, export it.
@@ -23,6 +31,8 @@ const describeDb = url ? describe : describe.skip;
 const APP_URL = 'http://localhost:5173';
 const EMAIL_DOMAIN = `${randomUUID()}.example.test`;
 const PASSWORD = 'correct horse battery';
+const IPHONE_SAFARI =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 
 const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
 
@@ -31,6 +41,11 @@ describeDb('Settings > Account over HTTP', () => {
   let pool: Pool;
   let db: Database;
   const mailer = new CapturingMailer();
+  const storage = new InMemoryObjectStorage();
+  const jpeg = (side: number) =>
+    sharp({ create: { width: side, height: side, channels: 3, background: '#48c' } })
+      .jpeg()
+      .toBuffer();
 
   const email = (label: string) => `${label}-${randomUUID()}@${EMAIL_DOMAIN}`;
   const server = () => app.getHttpServer();
@@ -92,11 +107,13 @@ describeDb('Settings > Account over HTTP', () => {
     class TestInfrastructureModule {}
 
     const moduleRef = await Test.createTestingModule({
-      imports: [TestInfrastructureModule, AuthModule],
+      imports: [TestInfrastructureModule, AuthModule, AccountModule],
       providers: [{ provide: APP_GUARD, useClass: SessionGuard }],
     })
       .overrideProvider(MailService)
       .useValue(mailer)
+      .overrideProvider(ObjectStorage)
+      .useValue(storage)
       .compile();
 
     app = moduleRef.createNestApplication({
@@ -193,6 +210,119 @@ describeDb('Settings > Account over HTTP', () => {
       expect(elsewhereSession.body).toBeNull();
       const hereSession = await here.get('/api/v1/auth/get-session').expect(200);
       expect(hereSession.body?.user.email).toBe(address);
+    });
+  });
+
+  describe('/account/avatar', () => {
+    it('uploads, replaces and removes the photo', async () => {
+      const agent = await verifiedSeller(email('avatar'));
+
+      const first = await agent
+        .put('/api/v1/account/avatar')
+        .attach('file', await jpeg(300), { filename: 'me.jpg', contentType: 'image/jpeg' })
+        .expect(200);
+      expect(first.body.image).toMatch(new RegExp(`^${TEST_PUBLIC_BASE_URL}/u/[^/]+/avatar/`));
+      const session = await agent.get('/api/v1/auth/get-session').expect(200);
+      expect(session.body.user.image).toBe(first.body.image);
+
+      const second = await agent
+        .put('/api/v1/account/avatar')
+        .attach('file', await jpeg(300), 'me2.jpg')
+        .expect(200);
+      expect(second.body.image).not.toBe(first.body.image);
+      const keys = () => [...storage.objects.keys()].filter((key) => key.startsWith('u/'));
+      expect(keys()).toHaveLength(1);
+
+      const removed = await agent.delete('/api/v1/account/avatar').expect(200);
+      expect(removed.body).toEqual({ image: null });
+      expect(keys()).toHaveLength(0);
+    });
+
+    it('refuses a photo below the minimum size', async () => {
+      const agent = await verifiedSeller(email('tiny'));
+
+      const response = await agent
+        .put('/api/v1/account/avatar')
+        .attach('file', await jpeg(100), 'tiny.jpg')
+        .expect(400);
+
+      expect(response.body.error).toMatchObject({
+        code: 'AVATAR_TOO_SMALL',
+        params: { minSide: 256 },
+      });
+    });
+
+    it('asks for a file when none is attached', async () => {
+      const agent = await verifiedSeller(email('nofile'));
+
+      const response = await agent.put('/api/v1/account/avatar').expect(400);
+
+      expect(response.body.error.code).toBe('VALIDATION_FAILED');
+    });
+
+    it('turns away a request with no session', async () => {
+      await request(server()).delete('/api/v1/account/avatar').expect(401);
+    });
+  });
+
+  describe('/account/sessions', () => {
+    it('lists devices, current first, without tokens or addresses', async () => {
+      const address = email('devices');
+      const here = await verifiedSeller(address);
+      await signIn(address, IPHONE_SAFARI);
+
+      const response = await here.get('/api/v1/account/sessions').expect(200);
+
+      expect(response.body).toHaveLength(2);
+      const [current, phone] = response.body.map((s: unknown) => deviceSessionSchema.parse(s));
+      expect(current?.current).toBe(true);
+      expect(phone).toMatchObject({ current: false, browser: 'Safari', os: 'iOS' });
+      for (const entry of response.body) {
+        expect(entry).not.toHaveProperty('token');
+        expect(entry).not.toHaveProperty('ipAddress');
+      }
+    });
+
+    it('signs another device out', async () => {
+      const address = email('revoke');
+      const here = await verifiedSeller(address);
+      const phone = await signIn(address, IPHONE_SAFARI);
+      const list = await here.get('/api/v1/account/sessions').expect(200);
+      const phoneId = list.body.find((s: { current: boolean }) => !s.current).id;
+
+      await here.delete(`/api/v1/account/sessions/${phoneId}`).set('Origin', APP_URL).expect(204);
+
+      await phone.get('/api/v1/account/sessions').expect(401);
+      // Review Focus 4: a second click on the same row.
+      const again = await here
+        .delete(`/api/v1/account/sessions/${phoneId}`)
+        .set('Origin', APP_URL)
+        .expect(404);
+      expect(again.body.error.code).toBe('SESSION_NOT_FOUND');
+    });
+
+    it('refuses to end the session making the request', async () => {
+      const here = await verifiedSeller(email('self'));
+      const list = await here.get('/api/v1/account/sessions').expect(200);
+
+      const response = await here
+        .delete(`/api/v1/account/sessions/${list.body[0].id}`)
+        .set('Origin', APP_URL)
+        .expect(409);
+
+      expect(response.body.error.code).toBe('SESSION_IS_CURRENT');
+    });
+
+    it("answers 404 for another seller's session", async () => {
+      const mine = await verifiedSeller(email('mine'));
+      const theirs = await verifiedSeller(email('theirs'));
+      const theirList = await theirs.get('/api/v1/account/sessions').expect(200);
+
+      await mine
+        .delete(`/api/v1/account/sessions/${theirList.body[0].id}`)
+        .set('Origin', APP_URL)
+        .expect(404);
+      await theirs.get('/api/v1/account/sessions').expect(200);
     });
   });
 });
