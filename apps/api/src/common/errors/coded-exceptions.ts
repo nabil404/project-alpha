@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -102,5 +103,12 @@ export class CodedValidationException extends BadRequestException {
       params: {},
       fields,
     } satisfies CodedErrorBody);
+  }
+}
+
+/** An upstream service (Facebook) refused or failed a call we made on the seller's behalf. */
+export class CodedBadGatewayException extends BadGatewayException {
+  constructor(code: ErrorCode, message: string, params: ErrorParams = {}) {
+    super({ code, message, params } satisfies CodedErrorBody);
   }
 }

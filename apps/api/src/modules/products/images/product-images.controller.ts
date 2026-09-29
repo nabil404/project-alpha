@@ -31,9 +31,8 @@ import {
 } from '@app/shared';
 import { z } from 'zod';
 import { CodedValidationException } from '../../../common/errors/coded-exceptions';
-import { TenantGuard, type TenantRequest } from '../../../common/tenant.guard';
+import { TenantGuard, tenantScope, type TenantRequest } from '../../../common/tenant.guard';
 import { ZodValidationPipe } from '../../../common/zod-validation.pipe';
-import type { TenantScope } from '../../../database/base.repository';
 import { ApiCodedError } from '../../../openapi/api-coded-error';
 import { ProductImageUploadInterceptor } from './product-image-upload.interceptor';
 import { ProductImagesService } from './product-images.service';
@@ -43,13 +42,6 @@ const imageSchema = z.toJSONSchema(productImageSchema, {
   target: 'openapi-3.0',
   io: 'output',
 }) as SchemaObject;
-
-function scopeOf(request: TenantRequest): TenantScope {
-  if (!request.merchantId) {
-    throw new Error('TenantGuard did not run before a tenant route');
-  }
-  return { merchantId: request.merchantId };
-}
 
 /** The merchant always comes from the session via TenantGuard, never the request. */
 @ApiTags('Product images')
@@ -91,7 +83,7 @@ export class ProductImagesController {
         file: [{ code: 'REQUIRED', message: 'Attach an image in the `file` field', params: {} }],
       });
     }
-    return this.images.upload(scopeOf(request), productId, file.buffer);
+    return this.images.upload(tenantScope(request), productId, file.buffer);
   }
 
   @Delete(':imageId')
@@ -108,7 +100,7 @@ export class ProductImagesController {
     @Param('productId', uuidParam) productId: string,
     @Param('imageId', uuidParam) imageId: string,
   ): Promise<void> {
-    return this.images.delete(scopeOf(request), productId, imageId);
+    return this.images.delete(tenantScope(request), productId, imageId);
   }
 
   @Put('order')
@@ -134,6 +126,6 @@ export class ProductImagesController {
     @Param('productId', uuidParam) productId: string,
     @Body(new ZodValidationPipe(reorderProductImagesSchema)) body: ReorderProductImages,
   ): Promise<ProductImage[]> {
-    return this.images.reorder(scopeOf(request), productId, body.imageIds);
+    return this.images.reorder(tenantScope(request), productId, body.imageIds);
   }
 }

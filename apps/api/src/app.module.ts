@@ -13,6 +13,7 @@ import { StorageModule } from './modules/storage/storage.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { MessengerModule } from './modules/messenger/messenger.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
 import { CryptoService } from './common/crypto.service';
 import { serializeRequest } from './common/request-log';
 
@@ -63,6 +64,7 @@ import { serializeRequest } from './common/request-log';
     ProductsModule,
     HealthModule,
     MessengerModule,
+    ConversationsModule,
   ],
   providers: [
     CryptoService,
