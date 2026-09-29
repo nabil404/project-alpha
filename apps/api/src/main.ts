@@ -24,6 +24,9 @@ async function bootstrap(): Promise<void> {
   // or runs as staging or test, does not publish it.
   if (config.get('NODE_ENV') === 'development') {
     await setupOpenApi(app, app.get<AuthService<Auth>>(AuthService).instance);
+    // Dynamic, so production never loads @bull-board - a devDependency.
+    const { setupQueueBoard } = await import('./modules/queue/queue-board');
+    setupQueueBoard(app);
   }
 
   await app.listen(config.get('PORT'), '0.0.0.0');
