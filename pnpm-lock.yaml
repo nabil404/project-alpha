@@ -74,6 +74,9 @@ importers:
       better-auth:
         specifier: ^1.7.5
         version: 1.7.5(@prisma/client@5.22.0)(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@prisma/client@5.22.0)(@types/pg@8.23.1)(better-sqlite3@12.11.1)(kysely@0.29.6)(pg@8.23.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      bowser:
+        specifier: ^2.14.1
+        version: 2.14.1
       bullmq:
         specifier: ^6.3.8
         version: 6.3.8(ioredis@6.0.0)(pg@8.23.0)
