@@ -156,8 +156,8 @@ assistant stays paused; the seller retypes to retry.
 ## Data model
 
 Migrations `0009`–`0011`; schema in
-[`customers.ts`](../../../apps/api/src/database/schema/customers.ts) and
-[`conversations.ts`](../../../apps/api/src/database/schema/conversations.ts).
+[`customers.ts`](../../../apps/api/src/modules/database/schema/customers.ts) and
+[`conversations.ts`](../../../apps/api/src/modules/database/schema/conversations.ts).
 All three tables have RLS enabled and forced with a `*_merchant_isolation`
 policy, and composite `(merchant_id, id)` foreign keys, so a row cannot point
 into another shop.

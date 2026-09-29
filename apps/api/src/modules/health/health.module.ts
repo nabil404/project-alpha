@@ -4,7 +4,7 @@ import { HealthCheck, HealthCheckService, TerminusModule } from '@nestjs/terminu
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module';
-import { ApiCodedError } from '../openapi/api-coded-error';
+import { ApiCodedError } from '../../openapi/api-coded-error';
 
 const indicators: SchemaObject = {
   type: 'object',

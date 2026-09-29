@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AppConfig } from '../../../config/app.config';
+import { AppConfig } from '../../config/app.config';
 import { ConversationEventsHub } from './conversation-events.hub';
 import { ConversationEventsPublisher } from './conversation-events.publisher';
 import {

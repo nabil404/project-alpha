@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import * as schema from '../../../../database/schema/index';
+import * as schema from '../../../database/schema/index';
 import {
   describeDb,
   openCatalogTestDb,
   seedImages,
   seedProduct,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db';
+} from '../../../database/__tests__/catalog-test-db';
 import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
 import { ProductsRepository } from '../../products.repository';
 import { productImageKeys } from '../product-image-keys';

@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { MessageSender } from '@app/shared';
 import { CryptoService } from '../../../common/crypto.service';
-import { AppConfig } from '../../../config/app.config';
-import type { TenantScope } from '../../../database/base.repository';
-import { DATABASE, type Database } from '../../../database/database.module';
-import { withMerchant } from '../../../database/with-merchant';
+import { AppConfig } from '../../config/app.config';
+import type { TenantScope } from '../../database/base.repository';
+import { DATABASE, type Database } from '../../database/database.module';
+import { withMerchant } from '../../database/with-merchant';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
 import { META_GRAPH } from '../../messenger/page/facebook-page.service';
 import type { MetaGraphClient } from '../../messenger/page/meta-graph.client';

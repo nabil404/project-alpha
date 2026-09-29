@@ -1,5 +1,5 @@
 import { eq, isNull, type SQL } from 'drizzle-orm';
-import { product, productVariant } from '../../database/schema/index';
+import { product, productVariant } from '../database/schema/index';
 
 /**
  * Every read of `product_variant` adds liveVariant(): Drizzle has no automatic

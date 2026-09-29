@@ -7,7 +7,7 @@ commands and coding conventions in [AGENTS.md](./AGENTS.md).
 ## Layout
 
 ```
-apps/api         NestJS API + worker (one codebase), Drizzle schema in src/database/schema/
+apps/api         NestJS API + worker (one codebase), Drizzle schema in src/modules/database/schema/
 apps/web         React SPA (Vite, TanStack Router/Query, Tailwind, shadcn/ui)
 packages/shared  Zod schemas shared by API input, forms, and LLM output
 docker/          Compose stacks and the Caddyfile
@@ -54,7 +54,7 @@ drizzle-kit is the only tool that changes the schema. `drizzle-kit push` is neve
 used: every change ships as a reviewed migration.
 
 ```bash
-# 1. edit apps/api/src/database/schema/
+# 1. edit apps/api/src/modules/database/schema/
 pnpm --filter api db:generate --name add_orders   # generate a migration
 #    review the generated SQL by hand
 pnpm --filter api db:migrate                      # apply
@@ -75,7 +75,7 @@ and the policy but not `FORCE`, so a table can look protected and not be.
 
 Better Auth owns the `user`, `session`, `account`, `verification` and
 organization tables. Regenerate them with `pnpm --filter api db:auth-schema`,
-which overwrites `src/database/schema/auth.ts` — never edit it by hand. They then
+which overwrites `src/modules/database/schema/auth.ts` — never edit it by hand. They then
 migrate through the same pipeline as everything else.
 
 The api and worker connect as `app_runtime`, a non-superuser role, so row-level

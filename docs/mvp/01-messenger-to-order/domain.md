@@ -17,7 +17,7 @@ delivery address.
 - **Seller / User** — account and auth identities (password, Google, Facebook).
   The `user`, `session`, `account`, and `verification` tables are owned by
   Better Auth. Their Drizzle schema is generated with the Better Auth CLI into
-  `apps/api/src/database/schema/auth.ts` and migrated through drizzle-kit like
+  `apps/api/src/modules/database/schema/auth.ts` and migrated through drizzle-kit like
   any other table, so auth changes stay versioned and reviewed.
 - **Organization** (seller account / tenant) — via the Better Auth Organization
   plugin, created automatically at signup with the seller as its owner. The

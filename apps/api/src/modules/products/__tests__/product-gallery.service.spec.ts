@@ -12,7 +12,7 @@ import {
   seedImages,
   seedProduct,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db';
+} from '../../database/__tests__/catalog-test-db';
 
 // How the catalog's own operations treat a product's images.
 describeDb('ProductsService — images', () => {

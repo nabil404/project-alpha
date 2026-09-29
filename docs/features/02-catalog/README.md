@@ -35,7 +35,7 @@ catalog UI, CSV import, and stock movement on orders (see
 ## Data model
 
 Defined in
-[`database/schema/catalog.ts`](../../../apps/api/src/database/schema/catalog.ts).
+[`database/schema/catalog.ts`](../../../apps/api/src/modules/database/schema/catalog.ts).
 Every table has a `text` UUID `id` (the junction table has none), a
 `merchant_id` referencing `organization(id)`, `created_at`, and a
 `<table>_merchant_isolation` policy on `merchant_id = app_current_merchant()`.
@@ -313,7 +313,7 @@ After changing it, run `pnpm --filter @app/shared build`: `apps/api` resolves
 
 ## Configuration
 
-From [`config/env.schema.ts`](../../../apps/api/src/config/env.schema.ts), all
+From [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts), all
 required, set in `apps/api/.env`:
 
 | Variable                    | Notes                                                                       |
@@ -348,8 +348,8 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 
 | Spec                                                                                                                                       | Covers                                                                                                 |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| [`database/__tests__/catalog-schema.spec.ts`](../../../apps/api/src/database/__tests__/catalog-schema.spec.ts)                             | Constraints: composite keys, checks, partial unique indexes                                            |
-| [`database/__tests__/catalog-rls.spec.ts`](../../../apps/api/src/database/__tests__/catalog-rls.spec.ts)                                   | Two-merchant isolation under RLS                                                                       |
+| [`database/__tests__/catalog-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-schema.spec.ts)                     | Constraints: composite keys, checks, partial unique indexes                                            |
+| [`database/__tests__/catalog-rls.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-rls.spec.ts)                           | Two-merchant isolation under RLS                                                                       |
 | [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)         | Tree rules, concurrent opposite moves, delete, name clashes                                            |
 | [`products/__tests__/products.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/products.service.spec.ts)                 | Product create, update, delete, category links                                                         |
 | [`products/__tests__/product-variants.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-variants.service.spec.ts) | Last-variant guard, default-variant rule, SKUs, variant images                                         |
@@ -387,7 +387,7 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
 
 ## Key files
 
-- [`apps/api/src/database/schema/catalog.ts`](../../../apps/api/src/database/schema/catalog.ts): all five tables
+- [`apps/api/src/modules/database/schema/catalog.ts`](../../../apps/api/src/modules/database/schema/catalog.ts): all five tables
 - [`apps/api/src/modules/categories/categories.service.ts`](../../../apps/api/src/modules/categories/categories.service.ts): tree rules
 - [`apps/api/src/modules/categories/categories.repository.ts`](../../../apps/api/src/modules/categories/categories.repository.ts): tree lock, recursive walks, soft delete
 - [`apps/api/src/modules/products/products.service.ts`](../../../apps/api/src/modules/products/products.service.ts): product and variant rules, `findSellableCatalog`

@@ -1,16 +1,16 @@
 import { sql } from 'drizzle-orm';
-import type { Transaction } from '../../../database/base.repository';
-import { withMerchant } from '../../../database/with-merchant';
+import type { Transaction } from '../../database/base.repository';
+import { withMerchant } from '../../database/with-merchant';
 import {
   describeDb,
   openCatalogTestDb,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db';
+} from '../../database/__tests__/catalog-test-db';
 import {
   seedConversation,
   seedCustomer,
   seedMessage,
-} from '../../../database/__tests__/conversation-seeds';
+} from '../../database/__tests__/conversation-seeds';
 import { isUnread } from '../conversation-rules';
 import { ConversationRepository } from '../conversation.repository';
 import { MessageRepository } from '../message.repository';

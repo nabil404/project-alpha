@@ -26,7 +26,7 @@ Page connection flow (see [Not yet built](#not-yet-built)).
 
 ## Sign-in methods
 
-Configured in [`auth.config.ts`](../../../apps/api/src/auth/auth.config.ts).
+Configured in [`auth.config.ts`](../../../apps/api/src/modules/auth/auth.config.ts).
 
 - **Email and password.** Email verification is required before the first
   sign-in. Password length is 8–128, defined once in
@@ -126,7 +126,7 @@ make sure that can't happen:
 | `session.create.before` | `ensureOrganizationForUserId(db, userId)`       | Puts `activeOrganizationId` on every new session. The plugin marks that field `input: false`, so a client can't set it. It has to be resolved here, or it stays null.                                                                                                                |
 
 Both functions live in
-[`database/ensure-organization.ts`](../../../apps/api/src/database/ensure-organization.ts)
+[`database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts)
 and are **idempotent on purpose**. The `user.create.after` hook runs after the
 user row is committed, so if it fails, the user is left with no organization.
 The session hook calls the same logic again at the next sign-in and repairs that
@@ -158,7 +158,7 @@ TenantGuard      (per controller) ── no activeOrganizationId ──▶ 403 T
 handler → repository(merchantId, …) → withMerchant(db, merchantId, tx => …)
 ```
 
-- [`SessionGuard`](../../../apps/api/src/auth/session.guard.ts) extends the
+- [`SessionGuard`](../../../apps/api/src/modules/auth/session.guard.ts) extends the
   library's `AuthGuard` only to add a code to the rejection. The SPA relies on
   `AUTH_UNAUTHENTICATED` to know when to send the seller to sign-in. It is
   registered in [`app.module.ts`](../../../apps/api/src/app.module.ts) in place
@@ -167,14 +167,14 @@ handler → repository(merchantId, …) → withMerchant(db, merchantId, tx => �
   `request.session.session.activeOrganizationId`. It is the first layer of
   tenant isolation, not the only one. Repositories still take `merchantId` and
   filter by it, and
-  [`withMerchant`](../../../apps/api/src/database/with-merchant.ts) sets the
+  [`withMerchant`](../../../apps/api/src/modules/database/with-merchant.ts) sets the
   transaction-local `app.current_merchant` that row-level security policies
   check, as a backstop.
 
 ## HTTP surface
 
 Better Auth is mounted at **`/api/v1/auth/*`** by
-[`auth.module.ts`](../../../apps/api/src/auth/auth.module.ts). The `basePath` is
+[`auth.module.ts`](../../../apps/api/src/modules/auth/auth.module.ts). The `basePath` is
 a literal (`'/api/v1/auth'`), not derived from the API version. It is Better
 Auth's contract, so it doesn't change if the API moves to a future `/api/v2`.
 `baseURL` is `APP_URL`: Caddy serves the SPA and proxies `/api` on the same
@@ -210,7 +210,7 @@ keeps `req.rawBody` available for the Messenger webhook's signature check.
 
 Better Auth writes its errors straight to the response, bypassing
 `AllExceptionsFilter`. An after-hook in `auth.config.ts` passes each one through
-[`toAuthErrorBody`](../../../apps/api/src/auth/auth-errors.ts), so the SPA
+[`toAuthErrorBody`](../../../apps/api/src/modules/auth/auth-errors.ts), so the SPA
 parses `/api/v1/auth/*` errors exactly like errors from any other endpoint.
 Redirects (302) pass through untouched.
 
@@ -234,7 +234,7 @@ Adding a new auth `ErrorCode` touches three files:
 Better Auth owns seven tables: `user`, `session`, `account`, `verification`
 (core), and `organization`, `member`, `invitation` (Organization plugin). Their
 Drizzle schema is generated into
-[`database/schema/auth.ts`](../../../apps/api/src/database/schema/auth.ts) by:
+[`database/schema/auth.ts`](../../../apps/api/src/modules/database/schema/auth.ts) by:
 
 ```bash
 pnpm --filter api db:auth-schema
@@ -242,7 +242,7 @@ pnpm --filter api db:auth-schema
 
 and then migrated through drizzle-kit like any other table (`db:generate` →
 review → `db:migrate`), so auth schema changes are versioned and reviewed.
-The CLI entry point, [`auth.cli.ts`](../../../apps/api/src/auth/auth.cli.ts),
+The CLI entry point, [`auth.cli.ts`](../../../apps/api/src/modules/auth/auth.cli.ts),
 builds the same config against `drizzle.mock()`, so generating the schema needs
 no database or credentials.
 
@@ -254,7 +254,7 @@ lock out sign-in itself.
 
 ## Configuration
 
-From [`config/env.schema.ts`](../../../apps/api/src/config/env.schema.ts),
+From [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts),
 set in `apps/api/.env`:
 
 | Variable                                       | Required | Notes                                                                  |
@@ -285,11 +285,11 @@ http://localhost:8025.
 
 ## Tests
 
-| Spec                                                                                                                     | Covers                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| [`auth/__tests__/email-password.e2e.spec.ts`](../../../apps/api/src/auth/__tests__/email-password.e2e.spec.ts)           | Every email/password flow above over real HTTP, organization resolution, mount point, raw-body preservation |
-| [`auth/__tests__/auth-errors.spec.ts`](../../../apps/api/src/auth/__tests__/auth-errors.spec.ts)                         | The error mapping table                                                                                     |
-| [`database/__tests__/ensure-organization.spec.ts`](../../../apps/api/src/database/__tests__/ensure-organization.spec.ts) | Organization bootstrap and its idempotency                                                                  |
+| Spec                                                                                                                             | Covers                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [`auth/__tests__/email-password.e2e.spec.ts`](../../../apps/api/src/modules/auth/__tests__/email-password.e2e.spec.ts)           | Every email/password flow above over real HTTP, organization resolution, mount point, raw-body preservation |
+| [`auth/__tests__/auth-errors.spec.ts`](../../../apps/api/src/modules/auth/__tests__/auth-errors.spec.ts)                         | The error mapping table                                                                                     |
+| [`database/__tests__/ensure-organization.spec.ts`](../../../apps/api/src/modules/database/__tests__/ensure-organization.spec.ts) | Organization bootstrap and its idempotency                                                                  |
 
 The e2e spec needs a real Postgres and is **skipped** unless
 `DATABASE_ADMIN_URL` is set. CI sets it. Locally:
@@ -320,13 +320,13 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- auth
 
 ## Key files
 
-- [`apps/api/src/auth/auth.config.ts`](../../../apps/api/src/auth/auth.config.ts): the whole Better Auth configuration
-- [`apps/api/src/auth/auth.module.ts`](../../../apps/api/src/auth/auth.module.ts): mounting, body parser
-- [`apps/api/src/auth/session.guard.ts`](../../../apps/api/src/auth/session.guard.ts): global session requirement
-- [`apps/api/src/auth/auth-errors.ts`](../../../apps/api/src/auth/auth-errors.ts): error envelope mapping
-- [`apps/api/src/auth/auth.cli.ts`](../../../apps/api/src/auth/auth.cli.ts): schema-generation entry point
+- [`apps/api/src/modules/auth/auth.config.ts`](../../../apps/api/src/modules/auth/auth.config.ts): the whole Better Auth configuration
+- [`apps/api/src/modules/auth/auth.module.ts`](../../../apps/api/src/modules/auth/auth.module.ts): mounting, body parser
+- [`apps/api/src/modules/auth/session.guard.ts`](../../../apps/api/src/modules/auth/session.guard.ts): global session requirement
+- [`apps/api/src/modules/auth/auth-errors.ts`](../../../apps/api/src/modules/auth/auth-errors.ts): error envelope mapping
+- [`apps/api/src/modules/auth/auth.cli.ts`](../../../apps/api/src/modules/auth/auth.cli.ts): schema-generation entry point
 - [`apps/api/src/common/tenant.guard.ts`](../../../apps/api/src/common/tenant.guard.ts): merchant resolution
-- [`apps/api/src/database/ensure-organization.ts`](../../../apps/api/src/database/ensure-organization.ts): organization bootstrap
-- [`apps/api/src/database/schema/auth.ts`](../../../apps/api/src/database/schema/auth.ts): generated auth tables
+- [`apps/api/src/modules/database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts): organization bootstrap
+- [`apps/api/src/modules/database/schema/auth.ts`](../../../apps/api/src/modules/database/schema/auth.ts): generated auth tables
 - [`apps/api/src/modules/mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts): auth emails
 - [`packages/shared/src/schemas/auth.ts`](../../../packages/shared/src/schemas/auth.ts): password rules

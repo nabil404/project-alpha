@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CryptoService } from '../../../common/crypto.service';
-import { AppConfig } from '../../../config/app.config';
+import { AppConfig } from '../../config/app.config';
 import { FacebookPageController, PAGE_CONNECT_CALLBACK_PATH } from './facebook-page.controller';
 import { FacebookPageRepository } from './facebook-page.repository';
 import {

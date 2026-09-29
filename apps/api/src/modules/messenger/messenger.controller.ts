@@ -15,7 +15,7 @@ import {
   CodedBadRequestException,
   CodedUnauthorizedException,
 } from '../../common/errors/coded-exceptions';
-import { AppConfig } from '../../config/app.config';
+import { AppConfig } from '../config/app.config';
 import { ApiCodedError } from '../../openapi/api-coded-error';
 import {
   INBOUND_MESSAGE_JOB,

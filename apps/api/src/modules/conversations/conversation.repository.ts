@@ -6,15 +6,15 @@ import type {
   MessageSender,
 } from '@app/shared';
 import { and, desc, eq, exists, ilike, or, sql, type SQL } from 'drizzle-orm';
-import type { Executor, TenantScope } from '../../database/base.repository';
-import { one } from '../../database/rows';
+import type { Executor, TenantScope } from '../database/base.repository';
+import { one } from '../database/rows';
 import {
   conversation,
   customer,
   message,
   type ConversationRow,
   type CustomerRow,
-} from '../../database/schema/index';
+} from '../database/schema/index';
 import { likePattern, messagePreview } from './conversation-rules';
 import type { CursorKey } from './cursor';
 

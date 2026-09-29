@@ -1,6 +1,6 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { Module } from '@nestjs/common';
-import { AppConfig } from '../../config/app.config';
+import { AppConfig } from '../config/app.config';
 import { ObjectStorage } from './object-storage';
 import { S3ObjectStorage } from './s3-object-storage';
 

@@ -1,14 +1,14 @@
 import { eq, sql } from 'drizzle-orm';
-import type { Transaction } from '../../../database/base.repository';
-import * as schema from '../../../database/schema/index';
-import { withMerchant } from '../../../database/with-merchant';
+import type { Transaction } from '../../database/base.repository';
+import * as schema from '../../database/schema/index';
+import { withMerchant } from '../../database/with-merchant';
 import {
   describeDb,
   openCatalogTestDb,
   pgErrorOf,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db';
-import { seedConversation, seedCustomer } from '../../../database/__tests__/conversation-seeds';
+} from '../../database/__tests__/catalog-test-db';
+import { seedConversation, seedCustomer } from '../../database/__tests__/conversation-seeds';
 import { ConversationRepository } from '../conversation.repository';
 import { CustomerRepository } from '../customer.repository';
 import { MessageRepository } from '../message.repository';

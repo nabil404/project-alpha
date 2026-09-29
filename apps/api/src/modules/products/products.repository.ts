@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { ProductStatus } from '@app/shared';
-import type { Executor, TenantScope } from '../../database/base.repository';
-import { one } from '../../database/rows';
-import { category, product, productCategory, productVariant } from '../../database/schema/index';
+import type { Executor, TenantScope } from '../database/base.repository';
+import { one } from '../database/rows';
+import { category, product, productCategory, productVariant } from '../database/schema/index';
 import { generateSku } from './sku';
 import { liveCategory } from '../categories/category-visibility';
 import { liveVariant, sellableProduct } from './product-visibility';

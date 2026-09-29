@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
-import type { Executor, TenantScope } from '../../database/base.repository';
-import { one } from '../../database/rows';
-import { customer, type CustomerRow } from '../../database/schema/index';
+import type { Executor, TenantScope } from '../database/base.repository';
+import { one } from '../database/rows';
+import { customer, type CustomerRow } from '../database/schema/index';
 
 /** The outcome of asking Facebook for a customer's profile; `name` is null when it shared none. */
 export interface CustomerProfile {

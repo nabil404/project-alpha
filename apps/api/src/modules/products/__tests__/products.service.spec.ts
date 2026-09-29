@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { createProductSchema, type CreateProduct } from '@app/shared';
-import * as schema from '../../../database/schema/index';
+import * as schema from '../../database/schema/index';
 import { CategoriesRepository } from '../../categories/categories.repository';
 import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
 import { ProductImageRepository } from '../images/product-image.repository';
@@ -12,7 +12,7 @@ import {
   openCatalogTestDb,
   seedCategory,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db';
+} from '../../database/__tests__/catalog-test-db';
 
 describeDb('ProductsService — products and category links', () => {
   let t: CatalogTestDb;

@@ -1,5 +1,5 @@
 import type { Logger } from '@nestjs/common';
-import type { ProductImageRow } from '../../../database/schema/index';
+import type { ProductImageRow } from '../../database/schema/index';
 import type { ObjectStorage } from '../../storage/object-storage';
 import { productImageKeys } from './product-image-keys';
 

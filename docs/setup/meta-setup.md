@@ -19,7 +19,7 @@ META_GRAPH_VERSION=v21.0
 Facebook sign-in button fails, and without `META_APP_ID` connecting a Page
 answers `MESSENGER_NOT_CONFIGURED`. `META_APP_SECRET`, `META_VERIFY_TOKEN` and
 `META_GRAPH_VERSION` are **required**; the API refuses to boot without them
-([`env.schema.ts`](../../apps/api/src/config/env.schema.ts)).
+([`env.schema.ts`](../../apps/api/src/modules/config/env.schema.ts)).
 
 Meta renames App Dashboard menus often. If a label below has moved, look for
 the product name ("Facebook Login", "Facebook Login for Business",
@@ -43,7 +43,7 @@ sign-in app would deliver its messages to the wrong app.
 
 | Variable                 | Value                           | Read by                                                                                                                |
 | ------------------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `FACEBOOK_CLIENT_ID`     | **Sign-in app** App ID          | Better Auth ([`auth.config.ts`](../../apps/api/src/auth/auth.config.ts))                                               |
+| `FACEBOOK_CLIENT_ID`     | **Sign-in app** App ID          | Better Auth ([`auth.config.ts`](../../apps/api/src/modules/auth/auth.config.ts))                                       |
 | `FACEBOOK_CLIENT_SECRET` | **Sign-in app** App Secret      | Better Auth                                                                                                            |
 | `META_APP_ID`            | **Messenger app** App ID        | Page connection ([`facebook-page.module.ts`](../../apps/api/src/modules/messenger/page/facebook-page.module.ts))       |
 | `META_APP_SECRET`        | **Messenger app** App Secret    | Page connection, and the webhook signature check ([`signature.ts`](../../apps/api/src/modules/messenger/signature.ts)) |

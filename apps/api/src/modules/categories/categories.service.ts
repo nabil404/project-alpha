@@ -6,9 +6,9 @@ import {
   type UpdateCategory,
 } from '@app/shared';
 import { CodedConflictException } from '../../common/errors/index';
-import type { TenantScope, Transaction } from '../../database/base.repository';
-import { DATABASE, type Database } from '../../database/database.module';
-import { withMerchant } from '../../database/with-merchant';
+import type { TenantScope, Transaction } from '../database/base.repository';
+import { DATABASE, type Database } from '../database/database.module';
+import { withMerchant } from '../database/with-merchant';
 import { categoryNotFound, guardCategoryName } from './category-errors';
 import { toCategory } from './category-mappers';
 import { CategoriesRepository } from './categories.repository';

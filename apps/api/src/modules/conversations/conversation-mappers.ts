@@ -1,5 +1,5 @@
 import type { ConversationDetail, ConversationListItem, Message } from '@app/shared';
-import type { ConversationRow, CustomerRow, MessageRow } from '../../database/schema/index';
+import type { ConversationRow, CustomerRow, MessageRow } from '../database/schema/index';
 import { isUnread, replyWindowClosesAt } from './conversation-rules';
 
 export function toConversationListItem(

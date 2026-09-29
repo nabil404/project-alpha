@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
-import { AppConfig } from '../../config/app.config';
+import { AppConfig } from '../config/app.config';
 import type { MailMessage } from './templates';
 
 /** What Better Auth's email callbacks depend on, so a spec can capture mail instead. */

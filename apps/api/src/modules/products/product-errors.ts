@@ -5,8 +5,8 @@ import {
   CodedNotFoundException,
   CodedUnsupportedMediaTypeException,
 } from '../../common/errors/index';
-import { uniqueViolationConstraint } from '../../database/pg-errors';
-import { VARIANT_SKU_LIVE_UIDX } from '../../database/schema/index';
+import { uniqueViolationConstraint } from '../database/pg-errors';
+import { VARIANT_SKU_LIVE_UIDX } from '../database/schema/index';
 
 export const productNotFound = (id: string) =>
   new CodedNotFoundException('PRODUCT_NOT_FOUND', 'Product not found', { id });

@@ -13,9 +13,9 @@ import {
 } from '@app/shared';
 import { CryptoService } from '../../common/crypto.service';
 import { CodedValidationException } from '../../common/errors/index';
-import type { TenantScope } from '../../database/base.repository';
-import { DATABASE, type Database } from '../../database/database.module';
-import { withMerchant } from '../../database/with-merchant';
+import type { TenantScope } from '../database/base.repository';
+import { DATABASE, type Database } from '../database/database.module';
+import { withMerchant } from '../database/with-merchant';
 import { messengerNotConfigured } from '../messenger/page/facebook-page-errors';
 import { FacebookPageRepository } from '../messenger/page/facebook-page.repository';
 import { META_GRAPH } from '../messenger/page/facebook-page.service';
