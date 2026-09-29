@@ -1,6 +1,7 @@
 import type { MessageEvent } from '@nestjs/common';
-import { CONVERSATION_UPDATED_EVENT } from '@app/shared';
+import { CONVERSATION_STREAM_EVICTED_EVENT, CONVERSATION_UPDATED_EVENT } from '@app/shared';
 import {
+  catchError,
   concatWith,
   interval,
   map,
@@ -8,10 +9,12 @@ import {
   of,
   takeUntil,
   takeWhile,
+  throwError,
   timer,
   type Observable,
 } from 'rxjs';
 import type { ConversationEvent } from './conversation-event';
+import { StreamEvicted } from './conversation-events.hub';
 
 /** Under the idle timeouts of common proxies, so an open stream is never cut for silence. */
 export const HEARTBEAT_MS = 25_000;
@@ -26,9 +29,10 @@ const EVENTS_ENDED = Symbol('events ended');
  * id-only `conversation.updated` per change, and a `ping` to keep proxies
  * from closing it. It ends when the session expires, so the browser's
  * reconnect then fails authentication rather than an old stream living on, and
- * when `events` completes (the hub evicting the oldest stream over the
- * per-merchant cap), so an evicted stream closes instead of pinging on stale.
- * `events` is subscribed once; an error from it still propagates.
+ * when `events` completes (shutdown). A stream the hub evicts over the
+ * per-merchant cap sends a last `evicted` event first, so the browser closes it
+ * instead of reconnecting and evicting another tab. `events` is subscribed
+ * once; any other error from it still propagates.
  */
 export function conversationEventStream(
   events: Observable<ConversationEvent>,
@@ -48,6 +52,11 @@ export function conversationEventStream(
       type: CONVERSATION_UPDATED_EVENT,
       data: { conversationId: event.conversationId },
     })),
+    catchError((error: unknown) =>
+      error instanceof StreamEvicted
+        ? of<MessageEvent>({ type: CONVERSATION_STREAM_EVICTED_EVENT, data: {} })
+        : throwError(() => error),
+    ),
     concatWith(of(EVENTS_ENDED)),
   );
   const pings = interval(heartbeatMs).pipe(map((): MessageEvent => ({ type: 'ping', data: {} })));

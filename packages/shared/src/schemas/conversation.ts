@@ -166,3 +166,9 @@ export type SendMessage = z.infer<typeof sendMessageSchema>;
 export const CONVERSATION_UPDATED_EVENT = 'conversation.updated';
 export const conversationUpdatedEventSchema = z.object({ conversationId: z.string().uuid() });
 export type ConversationUpdatedEvent = z.infer<typeof conversationUpdatedEventSchema>;
+
+/**
+ * The last event of a stream the server closed because the shop has too many
+ * open: close the EventSource rather than reconnect, or tabs evict each other.
+ */
+export const CONVERSATION_STREAM_EVICTED_EVENT = 'evicted';

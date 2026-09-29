@@ -17,7 +17,7 @@ import { describeDb, openRuntimeDb } from '../../../database/__tests__/catalog-t
 import { MailService } from '../../mail/mail.service';
 import { META_GRAPH } from '../../messenger/page/facebook-page.service';
 import { ConversationsModule } from '../conversations.module';
-import { ConversationEventsHub } from '../events/conversation-events.hub';
+import { ConversationEventsHub, MAX_STREAMS_PER_MERCHANT } from '../events/conversation-events.hub';
 import { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { CONVERSATION_EVENTS_SUBSCRIBE } from '../events/redis-connections';
 
@@ -132,5 +132,31 @@ describeDb('GET /conversations/events', () => {
 
     controller.abort();
     await reader.cancel().catch(() => undefined);
+  });
+
+  it('tells the oldest stream it was evicted before closing it, when a sixth opens', async () => {
+    const controllers: AbortController[] = [];
+    const readers: ReadableStreamDefaultReader<Uint8Array>[] = [];
+    // One at a time, each open before the next, so the first is the oldest.
+    for (let n = 0; n <= MAX_STREAMS_PER_MERCHANT; n++) {
+      const controller = new AbortController();
+      const response = await fetch(`${base}/api/v1/conversations/events`, {
+        signal: controller.signal,
+      });
+      const reader = response.body!.getReader();
+      await readUntil(reader, (text) => text.includes('event: ready'));
+      controllers.push(controller);
+      readers.push(reader);
+    }
+
+    // Written before the response ends, so the browser sees it; then the socket closes.
+    const [oldest, ...open] = readers;
+    expect(await readUntil(oldest!, (text) => text.includes('event: evicted'))).toContain(
+      'event: evicted',
+    );
+    await expect(oldest!.read()).resolves.toMatchObject({ done: true });
+
+    controllers.forEach((controller) => controller.abort());
+    await Promise.all(open.map((reader) => reader.cancel().catch(() => undefined)));
   });
 });

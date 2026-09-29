@@ -107,14 +107,18 @@ assistant stays paused; the seller retypes to retry.
 | `ready`                | `{}`                 | first, with `retry: 5000`                                  |
 | `conversation.updated` | `{ conversationId }` | one per change; no message text, no kind                   |
 | `ping`                 | `{}`                 | every 25 s, so proxies never cut the stream for being idle |
+| `evicted`              | `{}`                 | the last event of a stream closed over the cap, below      |
 
 - No event ids and no `Last-Event-ID` replay: refetch the list, counts and open
   thread on every `ready`.
 - Ends at the session's `expiresAt` as read when the stream opened (a sliding
   refresh does not extend it); the browser reconnects after 5 s and is
   authenticated again. Also ends on API shutdown.
-- At most 5 open streams per shop **per API process**; a sixth completes the
-  oldest, which looks like any other close.
+- At most 5 open streams per shop **per API process**; a sixth ends the oldest
+  with `evicted` (`CONVERSATION_STREAM_EVICTED_EVENT` in `@app/shared`). On
+  `evicted` the client must close its `EventSource` rather than let it
+  reconnect, or tabs evict each other in a loop. Any other close is safe to
+  reconnect from.
 - `@SkipThrottle()`, so the global rate limit does not count reconnects. An
   unauthenticated request gets the usual 401 envelope, which `EventSource`
   treats as fatal.
@@ -188,10 +192,6 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 - Per-shop auto-resume after a takeover (Never / 1 h / 24 h) in Settings ›
   Assistant, once the settings API exists.
 - The Conversations web route, using the SSE contract above.
-- An evicted stream closes exactly like a dropped one, so the web client cannot
-  tell it to stop reconnecting, and more than 5 tabs will evict each other in a
-  loop. Either send a terminal `evicted` event before completing it, or have
-  the client share one stream per browser (`BroadcastChannel`).
 - `HUMAN_AGENT` tag after App Review, if pilots ask for it.
 - `WORKER_CONCURRENCY` is not yet applied to the inbound processor (BullMQ's
   default of 1 is used).
