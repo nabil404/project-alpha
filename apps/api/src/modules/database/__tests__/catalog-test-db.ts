@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import type { ErrorCode } from '@app/shared';
 import type { Database } from '../database.module';
-import { productImageKeys } from '../../modules/products/images/product-image-keys';
+import { productImageKeys } from '../../products/images/product-image-keys';
 import * as schema from '../schema/index';
 
 // Needs a real Postgres: constraints, locks and policies are server behaviour.

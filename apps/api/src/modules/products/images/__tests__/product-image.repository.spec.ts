@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
-import type { Transaction } from '../../../../database/base.repository';
-import * as schema from '../../../../database/schema/index';
-import { withMerchant } from '../../../../database/with-merchant';
+import type { Transaction } from '../../../database/base.repository';
+import * as schema from '../../../database/schema/index';
+import { withMerchant } from '../../../database/with-merchant';
 import {
   describeDb,
   openCatalogTestDb,
@@ -10,7 +10,7 @@ import {
   seedImages,
   seedProduct,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db';
+} from '../../../database/__tests__/catalog-test-db';
 import { productImageKeys } from '../product-image-keys';
 import { ProductImageRepository } from '../product-image.repository';
 

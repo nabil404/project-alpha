@@ -9,7 +9,7 @@ import {
   RESET_PASSWORD_TOKEN_TTL,
   signUpSchema,
 } from '@app/shared';
-import { zodIssuesToFields } from '../common/errors/validation-fields';
+import { zodIssuesToFields } from '../../common/errors/validation-fields';
 import type { AppConfig } from '../config/app.config';
 import type { Database } from '../database/database.module';
 import {
@@ -17,12 +17,8 @@ import {
   ensureOrganizationForUserId,
 } from '../database/ensure-organization';
 import * as schema from '../database/schema/index';
-import type { Mailer } from '../modules/mail/mail.service';
-import {
-  existingAccountEmail,
-  resetPasswordEmail,
-  verificationEmail,
-} from '../modules/mail/templates';
+import type { Mailer } from '../mail/mail.service';
+import { existingAccountEmail, resetPasswordEmail, verificationEmail } from '../mail/templates';
 import { toAuthErrorBody, toOAuthErrorLocation } from './auth-errors';
 
 /** The settings createAuth reads, so nothing here touches process.env. */
@@ -78,7 +74,7 @@ export const VERIFICATION_TOKEN_TTL = 24 * 60 * 60;
  * lookup runs before any merchant context exists, so a policy there would lock
  * out login itself.
  *
- * Their schema is generated into src/database/schema/auth.ts by
+ * Their schema is generated into src/modules/database/schema/auth.ts by
  * `pnpm --filter api db:auth-schema` and flows through drizzle-kit like any
  * other table, so auth changes are versioned and reviewed rather than applied
  * out of band.

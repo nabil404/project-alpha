@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import type { TenantRequest } from '../../../../common/tenant.guard';
-import type { AppConfig } from '../../../../config/app.config';
+import type { AppConfig } from '../../../config/app.config';
 import { FacebookPageController } from '../facebook-page.controller';
 import { facebookAuthCancelled } from '../facebook-page-errors';
 import type { FacebookPageService } from '../facebook-page.service';

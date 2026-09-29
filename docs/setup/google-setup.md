@@ -10,7 +10,7 @@ GOOGLE_CLIENT_SECRET=
 
 Both are optional. Without them the API still boots and email/password sign-in
 keeps working; only the Google button fails. See
-[`env.schema.ts`](../../apps/api/src/config/env.schema.ts).
+[`env.schema.ts`](../../apps/api/src/modules/config/env.schema.ts).
 
 Google renames Cloud Console menus often. If a label below has moved, search
 the console for the page name (for example "OAuth consent screen" or
@@ -19,7 +19,7 @@ the console for the page name (for example "OAuth consent screen" or
 ## What the app expects
 
 Better Auth is mounted on the SPA's origin (`APP_URL`) under `/api/v1/auth`
-([`auth.config.ts`](../../apps/api/src/auth/auth.config.ts)), so Google must
+([`auth.config.ts`](../../apps/api/src/modules/auth/auth.config.ts)), so Google must
 redirect to:
 
 | Environment | Authorized JavaScript origin | Authorized redirect URI                             |

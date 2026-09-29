@@ -1,15 +1,15 @@
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../../common/crypto.service';
-import type { AppConfig } from '../../../../config/app.config';
-import type { Database } from '../../../../database/database.module';
-import * as schema from '../../../../database/schema/index';
+import type { AppConfig } from '../../../config/app.config';
+import type { Database } from '../../../database/database.module';
+import * as schema from '../../../database/schema/index';
 import {
   describeDb,
   expectCoded,
   openCatalogTestDb,
   openRuntimeDb,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db';
+} from '../../../database/__tests__/catalog-test-db';
 import { FacebookPageRepository } from '../facebook-page.repository';
 import { FacebookPageService, type PageConnectOwner } from '../facebook-page.service';
 import {

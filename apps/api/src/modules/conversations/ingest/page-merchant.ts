@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import type { Database } from '../../../database/database.module';
+import type { Database } from '../../database/database.module';
 
 /**
  * The merchant that connected this Facebook Page, or null. Runs before any

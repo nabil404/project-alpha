@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PRODUCT_IMAGE_MAX_COUNT, type ProductImage } from '@app/shared';
-import type { TenantScope, Transaction } from '../../../database/base.repository';
-import { DATABASE, type Database } from '../../../database/database.module';
-import { withMerchant } from '../../../database/with-merchant';
+import type { TenantScope, Transaction } from '../../database/base.repository';
+import { DATABASE, type Database } from '../../database/database.module';
+import { withMerchant } from '../../database/with-merchant';
 import { ObjectStorage } from '../../storage/object-storage';
 import {
   productImageInvalid,

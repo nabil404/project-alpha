@@ -9,7 +9,7 @@ import {
   describeDb,
   openCatalogTestDb,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db';
+} from '../../database/__tests__/catalog-test-db';
 
 describeDb('ProductsService.findSellableCatalog', () => {
   let t: CatalogTestDb;

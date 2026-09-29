@@ -2,7 +2,7 @@
 
 Postgres objects that sit outside the plain table definitions: roles, grants,
 row-level security, policies, functions, extensions and triggers. The tables
-themselves are declared in `apps/api/src/database/schema/`; everything below is
+themselves are declared in `apps/api/src/modules/database/schema/`; everything below is
 as created by the migrations in `apps/api/db/migrations/`. When a migration changes
 any of it, update this page in the same change.
 
@@ -47,9 +47,9 @@ a setting.
 
 ## Session settings
 
-| Setting                | Set by                                                                                    | Scope             | What it does                                                                                                                                                                                                                            |
-| ---------------------- | ----------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app.current_merchant` | `withMerchant()` in `apps/api/src/database/with-merchant.ts`, via `set_config(..., true)` | Transaction-local | The merchant the current transaction acts for; read by `app_current_merchant()`. Transaction-local so one merchant's context never bleeds into the next request on a pooled connection. `withMerchant()` refuses an empty `merchantId`. |
+| Setting                | Set by                                                                                            | Scope             | What it does                                                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app.current_merchant` | `withMerchant()` in `apps/api/src/modules/database/with-merchant.ts`, via `set_config(..., true)` | Transaction-local | The merchant the current transaction acts for; read by `app_current_merchant()`. Transaction-local so one merchant's context never bleeds into the next request on a pooled connection. `withMerchant()` refuses an empty `merchantId`. |
 
 ## Row-level security by table
 

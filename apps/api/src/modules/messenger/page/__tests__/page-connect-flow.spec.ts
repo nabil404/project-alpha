@@ -1,5 +1,5 @@
 import { CryptoService } from '../../../../common/crypto.service';
-import type { AppConfig } from '../../../../config/app.config';
+import type { AppConfig } from '../../../config/app.config';
 import {
   newOAuthState,
   openFlow,

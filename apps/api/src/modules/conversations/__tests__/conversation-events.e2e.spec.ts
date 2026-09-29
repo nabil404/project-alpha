@@ -8,12 +8,12 @@ import {
   type LoggerService,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AuthModule } from '../../../auth/auth.module';
+import { AuthModule } from '../../auth/auth.module';
 import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
 import { TenantGuard } from '../../../common/tenant.guard';
-import { AppConfig } from '../../../config/app.config';
-import { DATABASE } from '../../../database/database.module';
-import { describeDb, openRuntimeDb } from '../../../database/__tests__/catalog-test-db';
+import { AppConfig } from '../../config/app.config';
+import { DATABASE } from '../../database/database.module';
+import { describeDb, openRuntimeDb } from '../../database/__tests__/catalog-test-db';
 import { MailService } from '../../mail/mail.service';
 import { META_GRAPH } from '../../messenger/page/facebook-page.service';
 import { ConversationsModule } from '../conversations.module';

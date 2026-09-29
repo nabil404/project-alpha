@@ -10,7 +10,7 @@ try {
 
 export default defineConfig({
   dialect: 'postgresql',
-  schema: './src/database/schema/index.ts',
+  schema: './src/modules/database/schema/index.ts',
   out: './db/migrations',
   dbCredentials: { url: process.env.DATABASE_ADMIN_URL ?? '' },
   // The runtime role is created by db/migrations (and docker/postgres-init on a

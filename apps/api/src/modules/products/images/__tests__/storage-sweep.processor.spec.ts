@@ -8,7 +8,7 @@ import {
   seedImages,
   seedProduct,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db';
+} from '../../../database/__tests__/catalog-test-db';
 import { SWEEP_JOB } from '../../../queue/queue.constants';
 import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
 import { productImageKeys } from '../product-image-keys';

@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@thallesp/nestjs-better-auth';
-import { CodedUnauthorizedException } from '../common/errors/coded-exceptions';
+import { CodedUnauthorizedException } from '../../common/errors/coded-exceptions';
 
 /**
  * The library's AuthGuard, registered globally in AppModule: every route needs

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
-import type { TenantScope } from '../database/base.repository';
+import type { TenantScope } from '../modules/database/base.repository';
 import { CodedForbiddenException } from './errors/coded-exceptions';
 
 export interface TenantRequest extends Request {

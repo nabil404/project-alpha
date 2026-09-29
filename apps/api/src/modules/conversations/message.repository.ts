@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { MessageSender } from '@app/shared';
 import { and, desc, eq, sql } from 'drizzle-orm';
-import type { Executor, TenantScope } from '../../database/base.repository';
-import { one } from '../../database/rows';
-import { message, type MessageRow } from '../../database/schema/index';
+import type { Executor, TenantScope } from '../database/base.repository';
+import { one } from '../database/rows';
+import { message, type MessageRow } from '../database/schema/index';
 import type { CursorKey } from './cursor';
 
 @Injectable()

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import * as schema from '../../../database/schema/index';
-import { withMerchant } from '../../../database/with-merchant';
+import * as schema from '../../database/schema/index';
+import { withMerchant } from '../../database/with-merchant';
 import { CategoriesRepository } from '../categories.repository';
 import { CategoriesService } from '../categories.service';
 import {
@@ -9,7 +9,7 @@ import {
   openCatalogTestDb,
   seedProduct,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db';
+} from '../../database/__tests__/catalog-test-db';
 
 describeDb('CategoriesService', () => {
   let t: CatalogTestDb;

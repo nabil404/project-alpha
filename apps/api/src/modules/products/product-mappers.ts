@@ -1,5 +1,5 @@
 import type { Product, ProductImage, Variant } from '@app/shared';
-import type { ProductImageRow } from '../../database/schema/index';
+import type { ProductImageRow } from '../database/schema/index';
 import type { ObjectStorage } from '../storage/object-storage';
 import { productImageKeys } from './images/product-image-keys';
 import type { ProductRow, VariantRow } from './products.repository';

@@ -7,9 +7,9 @@ import type {
   UpdateProduct,
   UpdateVariant,
 } from '@app/shared';
-import type { TenantScope, Transaction } from '../../database/base.repository';
-import { DATABASE, type Database } from '../../database/database.module';
-import { withMerchant } from '../../database/with-merchant';
+import type { TenantScope, Transaction } from '../database/base.repository';
+import { DATABASE, type Database } from '../database/database.module';
+import { withMerchant } from '../database/with-merchant';
 import { toCategory } from '../categories/category-mappers';
 import { CategoriesRepository } from '../categories/categories.repository';
 import { categoryNotFound } from '../categories/category-errors';

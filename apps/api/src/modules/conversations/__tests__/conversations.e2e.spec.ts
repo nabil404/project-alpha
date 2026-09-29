@@ -14,24 +14,24 @@ import {
   messageSchema,
 } from '@app/shared';
 import request from 'supertest';
-import { AuthModule } from '../../../auth/auth.module';
+import { AuthModule } from '../../auth/auth.module';
 import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
 import { CryptoService } from '../../../common/crypto.service';
 import { TenantGuard } from '../../../common/tenant.guard';
-import { AppConfig } from '../../../config/app.config';
-import { DATABASE } from '../../../database/database.module';
+import { AppConfig } from '../../config/app.config';
+import { DATABASE } from '../../database/database.module';
 import {
   describeDb,
   openCatalogTestDb,
   openRuntimeDb,
   type CatalogTestDb,
-} from '../../../database/__tests__/catalog-test-db';
+} from '../../database/__tests__/catalog-test-db';
 import {
   seedConversation,
   seedCustomer,
   seedFacebookPage,
   seedMessage,
-} from '../../../database/__tests__/conversation-seeds';
+} from '../../database/__tests__/conversation-seeds';
 import { MailService } from '../../mail/mail.service';
 import { META_GRAPH } from '../../messenger/page/facebook-page.service';
 import type { ConversationEvent } from '../events/conversation-event';

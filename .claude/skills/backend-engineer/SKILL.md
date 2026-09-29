@@ -30,6 +30,13 @@ and are marked ⚠️ below.
   `baseUrl` — without the `baseUrl` SWC silently skips the rewrite and `dist`
   fails at runtime with `ERR_MODULE_NOT_FOUND`. Decorator metadata comes from
   `.swcrc` `decoratorMetadata`, which Nest DI depends on.
+- **Every Nest module lives under `src/modules/<name>/`** — feature modules
+  (products, conversations) and infrastructure ones (auth, config, database,
+  health, queue, storage, mail) alike, each with its `<name>.module.ts` and a
+  colocated `__tests__/`. A new module goes there, never directly under `src/`.
+  Only what isn't a module stays at `src/`: the entry points (`main.ts`,
+  `worker.ts`, `bootstrap.ts`, `app.module.ts`, `worker.module.ts`), `common/`
+  (guards, pipes, coded errors) and `openapi/`.
 - **Drizzle infers types from the schema**, so there is no codegen step and no
   live database needed to typecheck. A schema edit without its migration is what
   CI catches, not stale types.
@@ -38,10 +45,10 @@ and are marked ⚠️ below.
   excluded from the prefix and marked `VERSION_NEUTRAL`. Versioning policy:
   `rest-api-design`.
 - **Every route needs a session by default.** `SessionGuard`
-  (`src/auth/session.guard.ts`) is a global `APP_GUARD`; a route that must stay
+  (`src/modules/auth/session.guard.ts`) is a global `APP_GUARD`; a route that must stay
   public is marked `@AllowAnonymous()` from `@thallesp/nestjs-better-auth`, as
   health and the Messenger webhook are. Better Auth itself is mounted at
-  `/api/v1/auth/*` by `src/auth/auth.module.ts`, which also turns Nest's body
+  `/api/v1/auth/*` by `src/modules/auth/auth.module.ts`, which also turns Nest's body
   parser off: JSON parsing and `req.rawBody` now come from that module's
   `bodyParser` option, so `rawBody: true` on `NestFactory` does nothing.
 - **The first business controller is `ProductImagesController`**
@@ -54,7 +61,7 @@ and are marked ⚠️ below.
 
 ### This codebase is still greenfield — expect empty files
 
-`src/database/schema/` contains `auth.ts` — Better Auth's tables, generated,
+`src/modules/database/schema/` contains `auth.ts` — Better Auth's tables, generated,
 not hand-written — and `catalog.ts`: `product`, `product_variant`, `category`
 and `product_category`, the first business tables. Every other business table
 you reference has to come with the schema file and migration that create it.
@@ -95,8 +102,8 @@ violates one, stop and fix the design rather than working around it.
   makes the whole boundary bypassable.
 
 - **The organization is created at signup**, by `ensureOrganizationForUser`
-  (`src/database/ensure-organization.ts`), called from the `user.create.after`
-  and `session.create.before` hooks in `src/auth/auth.config.ts`. It is
+  (`src/modules/database/ensure-organization.ts`), called from the `user.create.after`
+  and `session.create.before` hooks in `src/modules/auth/auth.config.ts`. It is
   idempotent on purpose: `user.create.after` runs after the user row is
   committed, so a failure there would otherwise strand a seller with no merchant
   and the guard would answer every one of their requests with
@@ -111,13 +118,13 @@ violates one, stop and fix the design rather than working around it.
 > **Current state.** Better Auth is mounted at `/api/v1/auth/*` and the global
 > `SessionGuard` puts Better Auth's `{ session, user }` on `request.session`,
 > so the organization bootstrap now runs on every real signup and login
-> (exercised by `src/auth/__tests__/email-password.e2e.spec.ts`). `TenantGuard`
+> (exercised by `src/modules/auth/__tests__/email-password.e2e.spec.ts`). `TenantGuard`
 > is **per-route**, not global: put `@UseGuards(TenantGuard)` on each business
 > controller, where it reads `request.session.session.activeOrganizationId`.
 
 - **The guard is a convenience, not the boundary.** Repositories still take
   `merchantId` explicitly and filter on it. The contract already exists in
-  `src/database/base.repository.ts`:
+  `src/modules/database/base.repository.ts`:
 
 ```ts
 export type Executor = Database | Transaction;
@@ -189,7 +196,7 @@ ALTER TABLE "order" FORCE ROW LEVEL SECURITY;
   `merchant_id`, and the session lookup runs before any merchant context exists.
 - **Two connection strings.** `DATABASE_URL` is the application's restricted
   connection. `DATABASE_ADMIN_URL` is the owner, used only by schema tooling:
-  `db:generate`, `db:migrate`, `db:auth-schema` (via `src/auth/auth.cli.ts`), and the
+  `db:generate`, `db:migrate`, `db:auth-schema` (via `src/modules/auth/auth.cli.ts`), and the
   CI deploy step. **Never give the admin URL to the api or worker** — it is
   deliberately absent from `env.schema.ts` so it cannot be read through
   `AppConfig`.
@@ -202,8 +209,8 @@ ALTER TABLE "order" FORCE ROW LEVEL SECURITY;
   the empty string, so on a pooled connection every query after the first
   `withMerchant()` sees `''`. Unguarded that is a real value a policy would
   compare against; wrapped, it is NULL, the predicate is NULL, and the policy
-  exposes no rows. Pinned by `src/database/__tests__/with-merchant.spec.ts`.
-- **`withMerchant(db, merchantId, fn)`** in `src/database/with-merchant.ts` — the
+  exposes no rows. Pinned by `src/modules/database/__tests__/with-merchant.spec.ts`.
+- **`withMerchant(db, merchantId, fn)`** in `src/modules/database/with-merchant.ts` — the
   context gate. It opens a transaction, runs
   `set_config('app.current_merchant', $1, true)`, and hands the callback the
   transaction.
@@ -280,7 +287,7 @@ the two-merchant repository tests are for.
 - **drizzle-kit is the only tool that changes the schema.** Never hand-edit a
   _generated_ migration, never apply DDL directly, and **never run
   `drizzle-kit push`** — it syncs without a reviewable migration. The loop is:
-  edit `src/database/schema/` → `pnpm --filter api db:generate` → **review the
+  edit `src/modules/database/schema/` → `pnpm --filter api db:generate` → **review the
   generated SQL by hand** → `pnpm --filter api db:migrate` →
   `pnpm --filter api db:verify-rls`.
   The one sanctioned exception is DDL drizzle-kit does not model, authored with
@@ -294,7 +301,7 @@ the two-merchant repository tests are for.
   snapshot with the migration; CI fails if a schema change has none.
 - **Better Auth owns `user`, `session`, `account`, `verification` and the
   organization tables.** Regenerate with `pnpm --filter api db:auth-schema`,
-  which overwrites `src/database/schema/auth.ts` — never hand-edit it. Its tables
+  which overwrites `src/modules/database/schema/auth.ts` — never hand-edit it. Its tables
   then flow through `db:generate` like any other, so auth changes are versioned
   and reviewed rather than applied out of band.
 - **Money is integer minor units** (paisa/cents), never a float or `numeric`.
@@ -304,7 +311,7 @@ the two-merchant repository tests are for.
 - **Counts and `bigint` values come back as strings** from Postgres — convert
   them explicitly rather than letting a string reach arithmetic.
 - Pool-level `lock_timeout` and `idle_in_transaction_session_timeout` are
-  already set in `src/database/database.module.ts`; don't re-set them per query.
+  already set in `src/modules/database/database.module.ts`; don't re-set them per query.
 
 ## Queue and worker
 

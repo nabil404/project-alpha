@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import type { Executor, TenantScope } from '../../../database/base.repository';
-import { one } from '../../../database/rows';
-import { facebookPage, type FacebookPageRow } from '../../../database/schema/index';
+import type { Executor, TenantScope } from '../../database/base.repository';
+import { one } from '../../database/rows';
+import { facebookPage, type FacebookPageRow } from '../../database/schema/index';
 
 export interface PageValues {
   pageId: string;

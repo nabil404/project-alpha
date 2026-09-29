@@ -35,13 +35,13 @@ _None yet._
 | `pnpm dev:up` / `pnpm dev:down`                                    | Local Postgres, Redis and Mailpit, via compose pointed at `apps/api/.env`.                                                                                                                                                                                        |
 | `pnpm test` / `pnpm typecheck` / `pnpm lint` / `pnpm format:check` | From the root, recursive.                                                                                                                                                                                                                                         |
 | `pnpm --filter @app/shared build`                                  | Run after changing a shared schema while the api is already running, or before `apps/api` tests and typecheck — they resolve `@app/shared` through its built `dist`, and CI builds it before lint, typecheck and test.                                            |
-| `pnpm --filter api db:generate`                                    | Generate a migration from edits to `apps/api/src/database/schema/`. **Review the generated SQL by hand.**                                                                                                                                                         |
+| `pnpm --filter api db:generate`                                    | Generate a migration from edits to `apps/api/src/modules/database/schema/`. **Review the generated SQL by hand.**                                                                                                                                                 |
 | `pnpm --filter api db:migrate`                                     | Apply migrations.                                                                                                                                                                                                                                                 |
 | `pnpm --filter api db:verify-rls`                                  | Fails if a table carrying `merchant_id` lacks `ENABLE`/`FORCE` row-level security or a policy. Run after `db:migrate`; CI runs it too, because drizzle-kit generates `ENABLE` and the policy but not `FORCE`, so nothing else would catch a half-protected table. |
 | `pnpm --filter api db:custom`                                      | An empty migration for DDL drizzle-kit does not model: `FORCE ROW LEVEL SECURITY`, roles, grants, default privileges, functions, triggers.                                                                                                                        |
-| `pnpm --filter api db:auth-schema`                                 | Regenerate Better Auth SQL, then paste `src/database/schema/auth.ts`, then `db:generate` to migrate it.                                                                                                                                                           |
+| `pnpm --filter api db:auth-schema`                                 | Regenerate Better Auth SQL, then paste `src/modules/database/schema/auth.ts`, then `db:generate` to migrate it.                                                                                                                                                   |
 
-**Schema loop:** edit `apps/api/src/database/schema/` → `db:generate` → review
+**Schema loop:** edit `apps/api/src/modules/database/schema/` → `db:generate` → review
 the SQL by hand → `db:migrate` → `db:verify-rls`.
 
 | Local URL (dev only)           | What                                                                                                                                                                                                                                                                                                                                                                  |
@@ -85,7 +85,7 @@ the SQL by hand → `db:migrate` → `db:verify-rls`.
 - Every API route needs a signed-in session: `SessionGuard` is global. A route
   that must stay public (health, Meta webhooks) says so with `@AllowAnonymous()`
   from `@thallesp/nestjs-better-auth`; Better Auth itself is mounted at
-  `/api/v1/auth/*` by `apps/api/src/auth/auth.module.ts`.
+  `/api/v1/auth/*` by `apps/api/src/modules/auth/auth.module.ts`.
 - Errors leave the API as the coded envelope `{ error: { code, message, params } }`.
   Throw a `Coded*Exception` from `apps/api/src/common/errors/`, never a bare NestJS
   exception; the contract is in

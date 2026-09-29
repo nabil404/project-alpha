@@ -1,8 +1,8 @@
 import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
 import { AppConfig } from '../config/app.config';
 import { DATABASE, type Database } from '../database/database.module';
-import { MailModule } from '../modules/mail/mail.module';
-import { MailService } from '../modules/mail/mail.service';
+import { MailModule } from '../mail/mail.module';
+import { MailService } from '../mail/mail.service';
 import { authSettingsFrom, createAuth } from './auth.config';
 
 export type Auth = ReturnType<typeof createAuth>;

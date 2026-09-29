@@ -16,7 +16,7 @@
     "db:custom": "drizzle-kit generate --custom",
     "db:migrate": "node scripts/migrate.mjs",
     "db:verify-rls": "node scripts/verify-rls.mjs",
-    "db:auth-schema": "better-auth generate --config src/auth/auth.cli.ts --output src/database/schema/auth.ts"
+    "db:auth-schema": "better-auth generate --config src/modules/auth/auth.cli.ts --output src/modules/database/schema/auth.ts"
   },
   "dependencies": {
     "@app/shared": "workspace:*",

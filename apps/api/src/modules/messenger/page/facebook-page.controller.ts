@@ -46,7 +46,7 @@ import { z } from 'zod';
 import { isCodedErrorBody } from '../../../common/errors/index';
 import { TenantGuard, type TenantRequest } from '../../../common/tenant.guard';
 import { ZodValidationPipe } from '../../../common/zod-validation.pipe';
-import { AppConfig } from '../../../config/app.config';
+import { AppConfig } from '../../config/app.config';
 import { ApiCodedError } from '../../../openapi/api-coded-error';
 import { FacebookPageService, type PageConnectOwner } from './facebook-page.service';
 import { PAGE_CONNECT_COOKIE, PAGE_CONNECT_TTL_MS, readCookie } from './page-connect-flow';

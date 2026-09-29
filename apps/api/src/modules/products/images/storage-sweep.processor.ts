@@ -1,8 +1,8 @@
 import { Inject, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job, Queue } from 'bullmq';
-import { DATABASE, type Database } from '../../../database/database.module';
-import { withMerchant } from '../../../database/with-merchant';
+import { DATABASE, type Database } from '../../database/database.module';
+import { withMerchant } from '../../database/with-merchant';
 import { STORAGE_QUEUE, SWEEP_JOB } from '../../queue/queue.constants';
 import { ObjectStorage } from '../../storage/object-storage';
 import { ProductImageRepository } from './product-image.repository';

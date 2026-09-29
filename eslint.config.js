@@ -8,7 +8,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
-      'apps/api/src/database/database.types.ts',
+      'apps/api/src/modules/database/database.types.ts',
       'apps/web/src/routeTree.gen.ts',
     ],
   },

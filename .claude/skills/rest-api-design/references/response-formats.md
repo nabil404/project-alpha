@@ -116,9 +116,9 @@ error wiring.
 
 Better Auth writes its responses straight to the socket and **bypasses
 `AllExceptionsFilter` entirely**. A global `hooks.after` in
-`apps/api/src/auth/auth.config.ts` rewrites every error it returns (status
+`apps/api/src/modules/auth/auth.config.ts` rewrites every error it returns (status
 ≥ 400; its 302 redirects pass through) into this same envelope, using the pure
-mapping in `apps/api/src/auth/auth-errors.ts`:
+mapping in `apps/api/src/modules/auth/auth-errors.ts`:
 
 | Better Auth                         | Envelope                                                    |
 | ----------------------------------- | ----------------------------------------------------------- |

@@ -1,15 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { FacebookPage, FacebookPageCandidate } from '@app/shared';
 import { CryptoService } from '../../../common/crypto.service';
-import type { TenantScope } from '../../../database/base.repository';
-import { DATABASE, type Database } from '../../../database/database.module';
-import { uniqueViolationConstraint } from '../../../database/pg-errors';
+import type { TenantScope } from '../../database/base.repository';
+import { DATABASE, type Database } from '../../database/database.module';
+import { uniqueViolationConstraint } from '../../database/pg-errors';
 import {
   FACEBOOK_PAGE_MERCHANT_UQ,
   FACEBOOK_PAGE_PAGE_ID_UQ,
   type FacebookPageRow,
-} from '../../../database/schema/index';
-import { withMerchant } from '../../../database/with-merchant';
+} from '../../database/schema/index';
+import { withMerchant } from '../../database/with-merchant';
 import {
   facebookAuthCancelled,
   facebookAuthExpired,

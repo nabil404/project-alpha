@@ -2,15 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../../common/crypto.service';
-import type { AppConfig } from '../../../../config/app.config';
-import * as schema from '../../../../database/schema/index';
+import type { AppConfig } from '../../../config/app.config';
+import * as schema from '../../../database/schema/index';
 import {
   describeDb,
   openCatalogTestDb,
   openRuntimeDb,
   type CatalogTestDb,
-} from '../../../../database/__tests__/catalog-test-db';
-import { randomPageId, seedFacebookPage } from '../../../../database/__tests__/conversation-seeds';
+} from '../../../database/__tests__/catalog-test-db';
+import { randomPageId, seedFacebookPage } from '../../../database/__tests__/conversation-seeds';
 import type { CustomerMessageJob, PageEchoJob } from '../../../queue/queue.constants';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-graph.client';

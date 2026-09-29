@@ -44,7 +44,7 @@ SPA  DELETE /api/v1/messenger/page               → row deleted, then unsubscri
 
 ## Data model
 
-`facebook_page` ([`schema/pages.ts`](../../../apps/api/src/database/schema/pages.ts)):
+`facebook_page` ([`schema/pages.ts`](../../../apps/api/src/modules/database/schema/pages.ts)):
 `merchant_id`, `page_id`, `name`, `access_token` (ciphertext), `bot_enabled`.
 `UNIQUE (page_id)` globally, the one deliberate exception to per-merchant
 uniqueness, and `UNIQUE (merchant_id)`: one Page per shop in the MVP. RLS is

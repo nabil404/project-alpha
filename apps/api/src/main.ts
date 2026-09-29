@@ -4,8 +4,8 @@ import { AuthService } from '@thallesp/nestjs-better-auth';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { configureApp, NEST_APP_OPTIONS } from './bootstrap';
-import type { Auth } from './auth/auth.module';
-import { AppConfig } from './config/config.module';
+import type { Auth } from './modules/auth/auth.module';
+import { AppConfig } from './modules/config/config.module';
 import { setupOpenApi } from './openapi/openapi';
 
 async function bootstrap(): Promise<void> {
