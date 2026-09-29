@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { createFileRoute, Outlet, useNavigate, useParams } from '@tanstack/react-router';
 import { listConversationsQuerySchema, type ConversationFilter } from '@app/shared';
 
-import { ConversationList, useConversationEvents } from '@/features/conversations';
+import { ConversationList } from '@/features/conversations';
 import { cn } from '@/lib/utils';
 
 interface ConversationsSearch {
@@ -30,7 +30,6 @@ export const Route = createFileRoute('/_app/conversations')({
 });
 
 function ConversationsLayout() {
-  useConversationEvents();
   const { filter = 'all', q } = Route.useSearch();
   const { conversationId } = useParams({ strict: false });
   const navigate = useNavigate();
