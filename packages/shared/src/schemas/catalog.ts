@@ -13,6 +13,8 @@ export const CATEGORY_MAX_DEPTH = 3;
 /** Upload limits. The API enforces them; the dashboard pre-checks against the same values. */
 export const PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const PRODUCT_IMAGE_MAX_COUNT = 8;
+/** What the file picker offers; the API decides by the file's content, not this type. */
+export const PRODUCT_IMAGE_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 /** A product varies on at most this many options; each has at most this many values. */
 export const PRODUCT_OPTION_MAX_COUNT = 3;
