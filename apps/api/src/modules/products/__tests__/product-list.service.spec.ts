@@ -21,8 +21,8 @@ describeDb('ProductsService — list and counts', () => {
   let t: CatalogTestDb;
   let service: ProductsService;
   const made: Record<string, Product> = {};
-  let parentCategory: string;
-  let childCategory: string;
+  let categoryA: string;
+  let categoryB: string;
 
   const create = async (
     key: string,
@@ -41,10 +41,8 @@ describeDb('ProductsService — list and counts', () => {
   beforeAll(async () => {
     t = await openCatalogTestDb();
     service = productsService(t.db);
-    const parent = await seedCategory(t.db, t.merchantA);
-    const child = await seedCategory(t.db, t.merchantA, { parentId: parent.id });
-    parentCategory = parent.id;
-    childCategory = child.id;
+    categoryA = (await seedCategory(t.db, t.merchantA)).id;
+    categoryB = (await seedCategory(t.db, t.merchantA)).id;
 
     // Created oldest to newest; the list shows them the other way round.
     await create('Archived shawl', {
@@ -71,7 +69,7 @@ describeDb('ProductsService — list and counts', () => {
       ],
     });
     await create('Georgette saree', {
-      categoryIds: [parentCategory],
+      categoryIds: [categoryA],
       options: [
         { name: 'Colour', values: [{ value: 'Maroon' }, { value: 'Teal' }, { value: 'Black' }] },
       ],
@@ -82,7 +80,7 @@ describeDb('ProductsService — list and counts', () => {
       ],
     });
     await create('Blue kurti', {
-      categoryIds: [childCategory],
+      categoryIds: [categoryB],
       options: [
         { name: 'Size', values: [{ value: 'S' }, { value: 'M' }] },
         { name: 'Sleeve', values: [{ value: 'Short' }] },
@@ -115,7 +113,7 @@ describeDb('ProductsService — list and counts', () => {
     expect(saree).toMatchObject({
       id: made['Georgette saree']!.id,
       status: 'active',
-      categoryIds: [parentCategory],
+      categoryIds: [categoryA],
       optionNames: ['Colour'],
       variantCount: 3,
       priceMin: 330000,
@@ -179,9 +177,9 @@ describeDb('ProductsService — list and counts', () => {
     expect(await names({ q: '%' })).toEqual([]);
   });
 
-  it('filters by a category and its subcategories', async () => {
-    expect(await names({ categoryId: parentCategory })).toEqual(['Blue kurti', 'Georgette saree']);
-    expect(await names({ categoryId: childCategory })).toEqual(['Blue kurti']);
+  it('filters by a category', async () => {
+    expect(await names({ categoryId: categoryA })).toEqual(['Georgette saree']);
+    expect(await names({ categoryId: categoryB })).toEqual(['Blue kurti']);
     expect(await names({ categoryId: randomUUID() })).toEqual([]);
   });
 
@@ -224,12 +222,8 @@ describeDb('ProductsService — list and counts', () => {
       archived: 0,
     });
     expect(
-      (
-        await service.list(
-          t.merchantB,
-          listProductsQuerySchema.parse({ categoryId: parentCategory }),
-        )
-      ).data,
+      (await service.list(t.merchantB, listProductsQuerySchema.parse({ categoryId: categoryA })))
+        .data,
     ).toEqual([]);
   });
 });

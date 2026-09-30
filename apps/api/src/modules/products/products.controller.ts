@@ -83,7 +83,7 @@ export class ProductsController {
   @ApiOperation({
     summary: 'List products',
     description:
-      "Newest first, a page at a time, with each product's live variants summed up. A product with one variant carries it as `variant`; the rest load through GET /products/:id. `all` and the stock filters leave archived products out. `q` matches the name, a tag or a SKU; `categoryId` includes its subcategories.",
+      "Newest first, a page at a time, with each product's live variants summed up. A product with one variant carries it as `variant`; the rest load through GET /products/:id. `all` and the stock filters leave archived products out. `q` matches the name, a tag or a SKU; `categoryId` keeps products in that category.",
   })
   @ApiQuery({ name: 'filter', required: false, enum: [...productListFilters] })
   @ApiQuery({ name: 'q', required: false, schema: { type: 'string', maxLength: 100 } })

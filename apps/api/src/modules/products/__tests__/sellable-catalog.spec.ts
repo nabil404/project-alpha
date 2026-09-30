@@ -26,10 +26,9 @@ describeDb('ProductsService.findSellableCatalog', () => {
   });
 
   it('returns only active products, live variants and live categories, for this merchant only', async () => {
-    const kept = await categories.create(t.merchantA, { name: 'Sellable Kept', parentId: null });
+    const kept = await categories.create(t.merchantA, { name: 'Sellable Kept' });
     const removed = await categories.create(t.merchantA, {
       name: 'Sellable Removed',
-      parentId: null,
     });
 
     const make = (name: string, status: 'draft' | 'active' | 'archived') =>

@@ -7,9 +7,6 @@ export type StockStatus = z.infer<typeof stockStatusSchema>;
 export const productStatusSchema = z.enum(['draft', 'active', 'archived']);
 export type ProductStatus = z.infer<typeof productStatusSchema>;
 
-/** Categories nest at most this many levels, roots included. */
-export const CATEGORY_MAX_DEPTH = 3;
-
 /** Upload limits. The API enforces them; the dashboard pre-checks against the same values. */
 export const PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const PRODUCT_IMAGE_MAX_COUNT = 8;
@@ -44,20 +41,16 @@ const categoryNameSchema = z.string().trim().min(1).max(80);
 export const categorySchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
-  parentId: z.string().uuid().nullable(),
 });
 export type Category = z.infer<typeof categorySchema>;
 
 export const createCategorySchema = z.object({
   name: categoryNameSchema,
-  parentId: z.string().uuid().nullable().default(null),
 });
 export type CreateCategory = z.infer<typeof createCategorySchema>;
 
-/** `parentId: null` moves the category to the root; omitting it leaves it where it is. */
 export const updateCategorySchema = z.object({
-  name: categoryNameSchema.optional(),
-  parentId: z.string().uuid().nullable().optional(),
+  name: categoryNameSchema,
 });
 export type UpdateCategory = z.infer<typeof updateCategorySchema>;
 
@@ -384,7 +377,7 @@ const productSearchTerm = z.preprocess(
 
 /**
  * GET /products, newest first. `q` matches the name, a tag or a live
- * variant's SKU; `categoryId` includes its subcategories.
+ * variant's SKU; `categoryId` keeps products in that category.
  */
 export const listProductsQuerySchema = z.object({
   filter: productListFilterSchema.default('all'),
