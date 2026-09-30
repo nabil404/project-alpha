@@ -1,5 +1,16 @@
 {
   "account": {
+    "profile": {
+      "email": "Email",
+      "emailHint": "Your sign-in email can't be changed.",
+      "name": "Name",
+      "photo": "Profile photo",
+      "photoHint": "PNG, JPG or WebP, at least {{minSide}} × {{minSide}} px.",
+      "removePhoto": "Remove",
+      "saved": "Saved.",
+      "title": "Your profile",
+      "uploadPhoto": "Upload photo"
+    },
     "signInMethods": {
       "description": "Ways you can sign in to this account. Link Google or Facebook to sign in with them too, or unlink one you no longer use.",
       "link": "Link",
