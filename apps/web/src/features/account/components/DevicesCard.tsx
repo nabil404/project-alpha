@@ -46,6 +46,9 @@ export function DevicesCard() {
             key={session.id}
             session={session}
             pending={revoke.isPending && revoke.variables === session.id}
+            // One mutation serves every row, so a second click would move its
+            // variables off the row still being signed out.
+            disabled={revoke.isPending}
             onSignOut={() => revoke.mutate(session.id)}
           />
         ))}
@@ -57,10 +60,12 @@ export function DevicesCard() {
 function DeviceRow({
   session,
   pending,
+  disabled,
   onSignOut,
 }: {
   session: DeviceSession;
   pending: boolean;
+  disabled: boolean;
   onSignOut: () => void;
 }) {
   const { t } = useTranslation('settings');
@@ -87,7 +92,13 @@ function DeviceRow({
           {t('account.devices.thisDevice')}
         </span>
       ) : (
-        <Button size="sm" disabled={pending} aria-busy={pending} onClick={onSignOut}>
+        <Button
+          size="sm"
+          disabled={disabled}
+          aria-busy={pending}
+          aria-label={t('account.devices.signOutLabel', { device: name })}
+          onClick={onSignOut}
+        >
           {t('account.devices.signOut')}
         </Button>
       )}

@@ -6,6 +6,7 @@
       "description": "Sign out anywhere you don't recognise.",
       "device": "{{browser}} on {{os}}",
       "signOut": "Sign out",
+      "signOutLabel": "Sign out {{device}}",
       "thisDevice": "This device",
       "title": "Signed-in devices",
       "unknown": "Unknown device"

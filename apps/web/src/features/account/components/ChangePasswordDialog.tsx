@@ -56,6 +56,9 @@ export function ChangePasswordDialog({ onChanged }: { onChanged: () => void }) {
   });
 
   const onOpenChange = (next: boolean) => {
+    // Closing resets the mutation, which would drop the per-call onSuccess
+    // and lose the "Password changed." confirmation.
+    if (!next && change.isPending) return;
     setOpen(next);
     if (!next) {
       form.reset(defaultValues);
