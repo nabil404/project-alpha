@@ -62,7 +62,10 @@ function ProfileForm({ user }: { user: SessionUser }) {
     update.mutate(values, {
       // The saved (trimmed) name becomes the new baseline, so Save and Cancel go quiet.
       onSuccess: () => form.reset(values),
-      onError: (error) => applyServerFieldErrors(error, form.setError, serverFields, forField),
+      onError: (error) => {
+        // A field error is shown under the field; only unplaced errors keep the banner.
+        if (applyServerFieldErrors(error, form.setError, serverFields, forField)) update.reset();
+      },
     });
 
   const onPickFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -102,9 +105,7 @@ function ProfileForm({ user }: { user: SessionUser }) {
             <h2 className="text-heading">{t('account.profile.title')}</h2>
 
             {photoError && <ErrorBanner>{photoError}</ErrorBanner>}
-            {update.isError && !form.formState.errors.name && (
-              <ErrorBanner>{forError(update.error)}</ErrorBanner>
-            )}
+            {update.isError && <ErrorBanner>{forError(update.error)}</ErrorBanner>}
 
             <div className="flex flex-wrap items-center gap-4">
               <Avatar
