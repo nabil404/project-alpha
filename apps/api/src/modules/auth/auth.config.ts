@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware, getOAuthState, isAPIError } from 'better-auth/api';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { openAPI, organization } from 'better-auth/plugins';
+import { eq } from 'drizzle-orm';
 import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -131,6 +132,19 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
       // A reset is how a seller takes back an account someone else got into,
       // so it signs every existing session out.
       revokeSessionsOnPasswordReset: true,
+      // The emailed link proves the seller controls the mailbox. A seller who
+      // came in through Facebook has an unverified email (see the facebook
+      // mapProfileToUser below), and a reset is how they add a password: it
+      // creates the credential account but never verifies the email, so with
+      // requireEmailVerification their first password sign-in would be a 403.
+      onPasswordReset: async ({ user }) => {
+        if (!user.emailVerified) {
+          await db
+            .update(schema.user)
+            .set({ emailVerified: true })
+            .where(eq(schema.user.id, user.id));
+        }
+      },
       // Mail is dispatched, not awaited: see Mailer.dispatch.
       sendResetPassword: async ({ user, url }) => {
         mailer.dispatch({ to: user.email, ...resetPasswordEmail(url) });
@@ -193,7 +207,8 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     // Organization deletion is off: every catalog table references
     // organization(id) with ON DELETE NO ACTION, so the delete would fail on
     // the first seller with products. It comes back with account deletion,
-    // which must also delete every product image object under m/{merchantId}/.
+    // which must also delete every product image object under m/{merchantId}/
+    // and every avatar under u/{userId}/avatar/ (outside the product sweep's prefix).
     plugins: [
       organization({ disableOrganizationDeletion: true }),
       openAPI({ disableDefaultReference: true }),
@@ -211,6 +226,7 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
         if (ctx.path !== SIGN_UP_EMAIL_PATH) {
           return;
         }
+        refuseImage(ctx.body);
         const parsed = signUpSchema.safeParse(ctx.body);
         if (!parsed.success) {
           throw validationFailed(zodIssuesToFields(parsed.error.issues));
@@ -291,13 +307,39 @@ function validationFailed(fields: ReturnType<typeof zodIssuesToFields>): APIErro
 }
 
 /**
- * /update-user takes the name only. `image` is refused: the photo is set
- * through /account/avatar, which strips its metadata and stores it in our
- * bucket, so a client can never point it at a URL of its choosing.
+ * /update-user takes the name only. Better Auth merges whatever this hook
+ * returns over the original body, so an extra field cannot be dropped here,
+ * only refused: phone is an additional field with `input: true`, and would
+ * otherwise be stored unchecked.
  */
 function validatedProfileUpdate(body: unknown): Record<string, unknown> {
+  refuseImage(body);
   const input = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
-  if ('image' in input) {
+  const extra = Object.keys(input).filter((key) => key !== 'name');
+  if (extra.length > 0) {
+    throw validationFailed(
+      Object.fromEntries(
+        extra.map((key) => [
+          key,
+          [{ code: 'UNRECOGNIZED_KEYS', message: 'Not accepted here', params: {} }],
+        ]),
+      ),
+    );
+  }
+  const parsed = updateProfileSchema.safeParse(input);
+  if (!parsed.success) {
+    throw validationFailed(zodIssuesToFields(parsed.error.issues));
+  }
+  return parsed.data;
+}
+
+/**
+ * The photo is set through /account/avatar, which strips its metadata and
+ * stores it in our bucket. Neither sign-up nor /update-user may take an
+ * `image`, so a client can never point it at a URL of its choosing.
+ */
+function refuseImage(body: unknown): void {
+  if (typeof body === 'object' && body !== null && 'image' in body) {
     throw validationFailed({
       image: [
         {
@@ -308,11 +350,6 @@ function validatedProfileUpdate(body: unknown): Record<string, unknown> {
       ],
     });
   }
-  const parsed = updateProfileSchema.safeParse(input);
-  if (!parsed.success) {
-    throw validationFailed(zodIssuesToFields(parsed.error.issues));
-  }
-  return { ...input, ...parsed.data };
 }
 
 /** Where Google and Facebook send the browser back to: `/callback/:id`. */
