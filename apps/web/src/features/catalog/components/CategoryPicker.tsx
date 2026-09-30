@@ -1,43 +1,13 @@
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { Category } from '@app/shared';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+import { toCategoryEntries, type CategoryEntry } from '../category-entries';
 import { useCategories } from '../queries';
-
-interface CategoryEntry {
-  id: string;
-  name: string;
-  /** Its ancestors, "Women › Kurtis"; empty for a root. */
-  path: string;
-}
-
-function toEntries(categories: Category[]): CategoryEntry[] {
-  const byId = new Map(categories.map((c) => [c.id, c]));
-  const ancestors = (category: Category): string[] => {
-    const names: string[] = [];
-    const seen = new Set<string>();
-    let parent = category.parentId ? byId.get(category.parentId) : undefined;
-    while (parent && !seen.has(parent.id)) {
-      seen.add(parent.id);
-      names.unshift(parent.name);
-      parent = parent.parentId ? byId.get(parent.parentId) : undefined;
-    }
-    return names;
-  };
-
-  return categories
-    .map((c) => ({ id: c.id, name: c.name, path: ancestors(c).join(' › ') }))
-    .sort((a, b) =>
-      `${a.path} ${a.name}`.localeCompare(`${b.path} ${b.name}`, undefined, {
-        sensitivity: 'base',
-      }),
-    );
-}
 
 interface CategoryPickerProps {
   value: string[];
@@ -54,7 +24,7 @@ export function CategoryPicker({ value, onChange, labelId }: CategoryPickerProps
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
 
-  const entries = useMemo(() => toEntries(categories.data ?? []), [categories.data]);
+  const entries = useMemo(() => toCategoryEntries(categories.data ?? []), [categories.data]);
   const byId = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
   const selected = value.map((id) => byId.get(id)).filter((e) => e !== undefined);
 

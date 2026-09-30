@@ -6,7 +6,7 @@ import {
   type LoggerService,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { productSchema } from '@app/shared';
+import { productCountsSchema, productListResponseSchema, productSchema } from '@app/shared';
 import request from 'supertest';
 import { AuthModule } from '../../auth/auth.module';
 import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
@@ -101,6 +101,29 @@ describeDb('product routes over HTTP', () => {
     await app?.close();
     await runtime?.close();
     await t.close();
+  });
+
+  it('lists products a page at a time, and counts them without reading counts as an id', async () => {
+    const created = await request(server()).post('/api/v1/products').send(newProduct).expect(201);
+
+    const listed = await request(server())
+      .get('/api/v1/products')
+      .query({ q: 'kurti', limit: 25 })
+      .expect(200);
+    const page = productListResponseSchema.parse(listed.body);
+    expect(page.data.map((item) => item.id)).toContain(created.body.id);
+    expect(page.pagination).toMatchObject({ page: 1, limit: 25 });
+
+    const counts = await request(server()).get('/api/v1/products/counts').expect(200);
+    expect(productCountsSchema.parse(counts.body).all).toBeGreaterThan(0);
+
+    await request(server()).delete(`/api/v1/products/${created.body.id}`).expect(204);
+  });
+
+  it('refuses a page size the list does not offer, and an unknown filter', async () => {
+    const tooBig = await request(server()).get('/api/v1/products').query({ limit: 7 }).expect(400);
+    expect(tooBig.body.error.code).toBe('VALIDATION_FAILED');
+    await request(server()).get('/api/v1/products').query({ filter: 'cheap' }).expect(400);
   });
 
   it('creates, reads, saves with a new option, and deletes', async () => {

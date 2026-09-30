@@ -1,4 +1,11 @@
-import type { Product, ProductImage, Variant } from '@app/shared';
+import {
+  stockLevelOf,
+  type Product,
+  type ProductImage,
+  type ProductListItem,
+  type StockLevel,
+  type Variant,
+} from '@app/shared';
 import type { ProductImageRow } from '../database/schema/index';
 import type { ObjectStorage } from '../storage/object-storage';
 import { productImageKeys } from './images/product-image-keys';
@@ -7,7 +14,7 @@ import type {
   OptionValueRow,
   VariantOptionValueRow,
 } from './options/product-options.repository';
-import type { ProductRow, VariantRow } from './products.repository';
+import type { ProductListRow, ProductRow, ProductTotals, VariantRow } from './products.repository';
 
 /** URLs are built from keys on every read, never stored. */
 export function toProductImage(
@@ -87,5 +94,51 @@ export function toProduct(row: ProductRow, parts: ProductParts): Product {
       .sort((a, b) => byValuePositions(a.valueIds, b.valueIds))
       .map(({ variant, valueIds }) => toVariant(variant, valueIds)),
     version: String(row.revision),
+  };
+}
+
+/** The same rules as the list's stock filters, so a row always sits under the chip it counts in. */
+export function productStockLevel(totals: ProductTotals): StockLevel {
+  if (totals.stock === 0) return 'out_of_stock';
+  return totals.lowCount + totals.outCount > 0 ? 'low_stock' : 'in_stock';
+}
+
+/** A list row. `onlyVariant` is the live variant of a product that has exactly one. */
+export function toProductListItem(
+  { product: row, totals }: ProductListRow,
+  parts: { categoryIds: string[]; optionNames: string[]; onlyVariant: VariantRow | undefined },
+  storage: Pick<ObjectStorage, 'publicUrl'>,
+): ProductListItem {
+  const thumbnail = (imageId: string | null) =>
+    imageId === null
+      ? null
+      : storage.publicUrl(productImageKeys(row.merchantId, imageId).thumbnail);
+  const only = totals.variantCount === 1 ? parts.onlyVariant : undefined;
+
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    categoryIds: parts.categoryIds,
+    coverThumbnailUrl: thumbnail(row.coverImageId),
+    optionNames: parts.optionNames,
+    variantCount: totals.variantCount,
+    priceMin: totals.priceMin,
+    priceMax: totals.priceMax,
+    stock: totals.stock,
+    lowVariantCount: totals.lowCount,
+    outVariantCount: totals.outCount,
+    stockLevel: productStockLevel(totals),
+    variant: only
+      ? {
+          id: only.id,
+          name: only.name,
+          sku: only.sku,
+          price: only.price,
+          stock: only.stock,
+          stockLevel: stockLevelOf(only.stock),
+          thumbnailUrl: thumbnail(only.imageId ?? row.coverImageId),
+        }
+      : null,
   };
 }

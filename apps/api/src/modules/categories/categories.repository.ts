@@ -96,6 +96,28 @@ export class CategoriesRepository {
     return result.rows[0]?.height ?? 0;
   }
 
+  /** `id` and every live category under it; empty when `id` itself is not live. */
+  async liveSubtreeIds(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+  ): Promise<string[]> {
+    const result = await executor.execute<{ id: string }>(sql`
+      with recursive subtree (id, level) as (
+        select id, 1
+        from category
+        where merchant_id = ${merchantId} and id = ${id} and deleted_at is null
+        union all
+        select c.id, subtree.level + 1
+        from category c
+        join subtree on c.parent_id = subtree.id
+        where c.merchant_id = ${merchantId} and c.deleted_at is null and subtree.level < ${MAX_WALK}
+      )
+      select id from subtree
+    `);
+    return result.rows.map((row) => row.id);
+  }
+
   async hasLiveChildren(
     executor: Executor,
     { merchantId }: TenantScope,

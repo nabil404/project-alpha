@@ -321,3 +321,127 @@ export const productCsvRowSchema = z.object({
   stock: z.string().optional(),
   delivery_charge: z.string().optional(),
 });
+
+/**
+ * A variant at or below this many is running low. Fixed for every seller until
+ * the threshold becomes a setting; the Products page and its counts read it.
+ */
+export const LOW_STOCK_THRESHOLD = 5;
+
+/** The Products page's stock reading, finer than a variant's `stockStatus`. */
+export const stockLevels = ['in_stock', 'low_stock', 'out_of_stock'] as const;
+export const stockLevelSchema = z.enum(stockLevels);
+export type StockLevel = z.infer<typeof stockLevelSchema>;
+
+export function stockLevelOf(stock: number): StockLevel {
+  if (stock <= 0) return 'out_of_stock';
+  return stock <= LOW_STOCK_THRESHOLD ? 'low_stock' : 'in_stock';
+}
+
+/**
+ * The Products page's filter chips. `all` and the stock filters leave archived
+ * products out; `archived` is the only way to list them. A product is out of
+ * stock when none of its variants is left, and low when any is low or out.
+ */
+export const productListFilters = [
+  'all',
+  'in_stock',
+  'low_stock',
+  'out_of_stock',
+  'draft',
+  'archived',
+] as const;
+export const productListFilterSchema = z.enum(productListFilters);
+export type ProductListFilter = z.infer<typeof productListFilterSchema>;
+
+export const PRODUCT_LIST_PAGE_SIZES = [10, 25, 50, 100] as const;
+
+/** An empty `q=` in the URL means no search, not a failed one. */
+const productSearchTerm = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().max(100).optional(),
+);
+
+/**
+ * GET /products, newest first. `q` matches the name, a tag or a live
+ * variant's SKU; `categoryId` includes its subcategories.
+ */
+export const listProductsQuerySchema = z.object({
+  filter: productListFilterSchema.default('all'),
+  q: productSearchTerm,
+  categoryId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce
+    .number()
+    .int()
+    .refine((n) => (PRODUCT_LIST_PAGE_SIZES as readonly number[]).includes(n), {
+      message: `One of ${PRODUCT_LIST_PAGE_SIZES.join(', ')}`,
+    })
+    .default(10),
+});
+export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>;
+
+/** A product's only variant, in its list row, so the row needs no second read. */
+export const productListVariantSchema = z.object({
+  id: z.string().uuid(),
+  /** Null for the default variant of a product without options. */
+  name: z.string().min(1).nullable(),
+  sku: z.string().min(1),
+  /** Minor units. */
+  price: z.number().int().nonnegative(),
+  stock: z.number().int().nonnegative(),
+  stockLevel: stockLevelSchema,
+  /** Its own image, else the product's cover; null when the product has no photos. */
+  thumbnailUrl: z.string().url().nullable(),
+});
+export type ProductListVariant = z.infer<typeof productListVariantSchema>;
+
+/**
+ * One row of the Products page: the product and its live variants summed up.
+ * The variants themselves load on demand through GET /products/:id, except a
+ * lone one, which comes inline as `variant`.
+ */
+export const productListItemSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  status: productStatusSchema,
+  /** Live categories, by name. */
+  categoryIds: z.array(z.string().uuid()),
+  coverThumbnailUrl: z.string().url().nullable(),
+  /** Option names in order ("Size", "Colour"); empty for a product without options. */
+  optionNames: z.array(z.string().min(1)),
+  variantCount: z.number().int().positive(),
+  /** Minor units, over live variants. */
+  priceMin: z.number().int().nonnegative(),
+  priceMax: z.number().int().nonnegative(),
+  /** Units left across live variants. */
+  stock: z.number().int().nonnegative(),
+  lowVariantCount: z.number().int().nonnegative(),
+  outVariantCount: z.number().int().nonnegative(),
+  stockLevel: stockLevelSchema,
+  /** Present exactly when `variantCount` is 1. */
+  variant: productListVariantSchema.nullable(),
+});
+export type ProductListItem = z.infer<typeof productListItemSchema>;
+
+export const productListResponseSchema = z.object({
+  data: z.array(productListItemSchema),
+  pagination: z.object({
+    page: z.number().int().positive(),
+    limit: z.number().int().positive(),
+    total: z.number().int().nonnegative(),
+    totalPages: z.number().int().nonnegative(),
+  }),
+});
+export type ProductListResponse = z.infer<typeof productListResponseSchema>;
+
+/** GET /products/counts: the filter chips and the stock banner. Ignores search and category. */
+export const productCountsSchema = z.object({
+  all: z.number().int().nonnegative(),
+  inStock: z.number().int().nonnegative(),
+  lowStock: z.number().int().nonnegative(),
+  outOfStock: z.number().int().nonnegative(),
+  draft: z.number().int().nonnegative(),
+  archived: z.number().int().nonnegative(),
+});
+export type ProductCounts = z.infer<typeof productCountsSchema>;

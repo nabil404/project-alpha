@@ -14,7 +14,7 @@ composite tenant keys and forced row-level security, `CategoriesService` and
 `ProductsService` with every rule below (including the AI's
 `findSellableCatalog` read), product image upload/delete/reorder over HTTP,
 object storage on Cloudflare R2, a daily orphan sweep in the worker, and the
-dashboard's product add/edit page. Not built yet: the products list, category
+dashboard's products list and add/edit page. Not built yet: category
 writes, CSV import, and stock movement on orders (see
 [Not yet built](#not-yet-built)).
 
@@ -144,6 +144,28 @@ so two concurrent archives can't both pass the last-variant check.
   exist, their `RESTRICT` key to `product_variant` will make the database refuse
   this, and the seller archives instead.
 
+### Products list
+
+The dashboard's Products page reads `GET /products` and `GET /products/counts`
+(`ProductsService.list` / `counts`).
+
+- **One row per product, its live variants summed up**: count, price range,
+  total stock, and how many variants are low or out. The variants themselves
+  are not in the list; expanding a row reads `GET /products/:id`, the edit
+  page's read, so the page opens from cache afterwards. A product with a single
+  live variant carries it inline as `variant`, so its row needs no second read.
+- **Stock levels**: a variant is low at `LOW_STOCK_THRESHOLD` (5) or fewer and
+  out at 0. A product is out when nothing is left, low when any variant is low
+  or out, in stock otherwise. The threshold is a shared constant until sellers
+  can set it.
+- **Filters**: `all` and the three stock filters leave archived products out;
+  `draft` and `archived` list those statuses. Every non-archived product counts
+  under exactly one stock chip. `q` matches the name, a tag or a live SKU;
+  `categoryId` includes its subcategories. Counts ignore search and category.
+- **Paging** is by page number (`page`, `limit` of 10, 25, 50 or 100), newest
+  first, with a total for "Showing 1–10 of 64". A seller's catalog is small
+  enough that offset paging stays cheap, and the page wants numbered pages.
+
 ### Visibility
 
 Drizzle has no automatic soft-delete filter, so every read uses a named
@@ -256,8 +278,11 @@ global limit. The image resource is
 in that shape, ordered by position, so there is no list endpoint. A variant's
 image is set through the variant update (`imageId`), not these routes.
 
-The product, variant and category services have no controller yet. Their
-inputs are already the shared schemas below, ready for one.
+The products list is `GET /api/v1/products` (query `filter`, `q`,
+`categoryId`, `page`, `limit`; 400 `VALIDATION_FAILED` on anything else) and
+`GET /api/v1/products/counts`, in
+[`products.controller.ts`](../../../apps/api/src/modules/products/products.controller.ts)
+beside the product routes. See [Products list](#products-list).
 
 ## Errors
 
@@ -372,18 +397,17 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
 
 ## Not yet built
 
-- **Catalog HTTP routes** for listing products (`GET /products`) and writing
-  categories. The product edit page's routes are built.
+- **Category write routes.** The product routes, including the list, are built.
 - **Dashboard UI, beyond the edit page.** `/catalog/products/new` and
   `/catalog/products/$productId` are built: basic details, the option editor
   and variant table, the variant image picker, status, categories and
   aliases, and the photo dialogs (Add photos with per-file progress, All
   photos with delete and the default choice, and a full-screen viewer). The
   default photo is saved with the page; uploads and deletes happen at once.
-  Still to come: the products list (it waits on `GET /products`), reordering
+  The products list at `/catalog` is built too. Still to come: reordering
   photos, the Categories page, and fields the design shows that the API
   doesn't hold yet: a per-product delivery charge choice, the assistant
-  notes, the low-stock threshold and sales figures.
+  notes, a per-seller low-stock threshold and sales figures.
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
 - **Stock movement.** Decrement on order confirmation (row lock, reject if

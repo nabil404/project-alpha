@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -18,17 +19,26 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   type SchemaObject,
 } from '@nestjs/swagger';
 import {
   createProductSchema,
+  listProductsQuerySchema,
+  PRODUCT_LIST_PAGE_SIZES,
+  productCountsSchema,
+  productListFilters,
+  productListResponseSchema,
   productSchema,
   saveProductSchema,
   updateProductSchema,
   updateVariantSchema,
   type CreateProduct,
+  type ListProductsQuery,
   type Product,
+  type ProductCounts,
+  type ProductListResponse,
   type SaveProduct,
   type UpdateProduct,
   type UpdateVariant,
@@ -67,6 +77,43 @@ export class ProductsController {
     @Body(new ZodValidationPipe(createProductSchema)) body: CreateProduct,
   ): Promise<Product> {
     return this.products.create(tenantScope(request).merchantId, body);
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'List products',
+    description:
+      "Newest first, a page at a time, with each product's live variants summed up. A product with one variant carries it as `variant`; the rest load through GET /products/:id. `all` and the stock filters leave archived products out. `q` matches the name, a tag or a SKU; `categoryId` includes its subcategories.",
+  })
+  @ApiQuery({ name: 'filter', required: false, enum: [...productListFilters] })
+  @ApiQuery({ name: 'q', required: false, schema: { type: 'string', maxLength: 100 } })
+  @ApiQuery({ name: 'categoryId', required: false, schema: { type: 'string', format: 'uuid' } })
+  @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1, default: 1 } })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', enum: [...PRODUCT_LIST_PAGE_SIZES], default: 10 },
+  })
+  @ApiOkResponse({
+    description: 'A page of products.',
+    schema: json(productListResponseSchema, 'output'),
+  })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  list(
+    @Req() request: TenantRequest,
+    @Query(new ZodValidationPipe(listProductsQuerySchema)) query: ListProductsQuery,
+  ): Promise<ProductListResponse> {
+    return this.products.list(tenantScope(request).merchantId, query);
+  }
+
+  @Get('counts')
+  @ApiOperation({
+    summary: 'Count products per filter',
+    description: 'For the filter chips and the stock banner. Ignores search and category.',
+  })
+  @ApiOkResponse({ description: 'Counts per filter.', schema: json(productCountsSchema, 'output') })
+  counts(@Req() request: TenantRequest): Promise<ProductCounts> {
+    return this.products.counts(tenantScope(request).merchantId);
   }
 
   @Get(':id')

@@ -7,6 +7,7 @@ import type {
   MessageStatus,
   OrderStatus,
   ProductStatus,
+  StockLevel,
   StockStatus,
 } from '@app/shared';
 
@@ -40,6 +41,13 @@ export const stockStatusKeys = {
   in_stock: 'status.stock.in_stock',
   out_of_stock: 'status.stock.out_of_stock',
 } as const satisfies Record<StockStatus, ParseKeys<'common'>>;
+
+/** The Products page's finer reading; in and out share the variant status's labels. */
+export const stockLevelKeys = {
+  in_stock: 'status.stock.in_stock',
+  low_stock: 'status.stock.low_stock',
+  out_of_stock: 'status.stock.out_of_stock',
+} as const satisfies Record<StockLevel, ParseKeys<'common'>>;
 
 export const productStatusKeys = {
   draft: 'status.product.draft',
@@ -77,6 +85,7 @@ export function useStatusLabels() {
     orderStatus: (status: OrderStatus): string => t(orderStatusKeys[status]),
     conversationState: (state: ConversationState): string => t(conversationStateKeys[state]),
     stockStatus: (status: StockStatus): string => t(stockStatusKeys[status]),
+    stockLevel: (level: StockLevel): string => t(stockLevelKeys[level]),
     productStatus: (status: ProductStatus): string => t(productStatusKeys[status]),
     messageSender: (sender: MessageSender): string => t(messageSenderKeys[sender]),
     messageStatus: (status: MessageStatus): string => t(messageStatusKeys[status]),

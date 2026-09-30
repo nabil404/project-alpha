@@ -4,7 +4,10 @@ import {
   saveProductSchema,
   type Category,
   type CreateProduct,
+  type ListProductsQuery,
   type Product,
+  type ProductCounts,
+  type ProductListResponse,
   type SaveProduct,
   type UpdateProduct,
   type UpdateVariant,
@@ -32,7 +35,7 @@ import {
   productStale,
   variantNotFound,
 } from './product-errors';
-import { toProduct, toProductImage } from './product-mappers';
+import { toProduct, toProductImage, toProductListItem } from './product-mappers';
 import { ProductsRepository, type ProductRow } from './products.repository';
 import { normalizeSku } from './sku';
 
@@ -76,6 +79,68 @@ export class ProductsService {
 
   get(merchantId: string, id: string): Promise<Product> {
     return withMerchant(this.db, merchantId, (tx) => this.load(tx, { merchantId }, id));
+  }
+
+  /** The Products page: a page of products with their variants summed up. */
+  list(merchantId: string, query: ListProductsQuery): Promise<ProductListResponse> {
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const scope = { merchantId };
+      const { page, limit } = query;
+      const filters = {
+        filter: query.filter,
+        q: query.q,
+        categoryIds:
+          query.categoryId === undefined
+            ? undefined
+            : await this.categories.liveSubtreeIds(tx, scope, query.categoryId),
+      };
+      const total = await this.products.countList(tx, scope, filters);
+      const rows = await this.products.listPage(tx, scope, {
+        ...filters,
+        offset: (page - 1) * limit,
+        limit,
+      });
+
+      const ids = rows.map((row) => row.product.id);
+      const singles = rows
+        .filter((row) => row.totals.variantCount === 1)
+        .map((row) => row.product.id);
+      const { options } = await this.options.listForProducts(tx, scope, ids);
+      const categoryIds = await this.products.categoryIdsByProduct(tx, scope, ids);
+      const onlyVariants = await this.products.liveVariants(tx, scope, singles);
+
+      return {
+        data: rows.map((row) =>
+          toProductListItem(
+            row,
+            {
+              categoryIds: categoryIds.get(row.product.id) ?? [],
+              optionNames: options
+                .filter((option) => option.productId === row.product.id)
+                .map((option) => option.name),
+              onlyVariant: onlyVariants.find((variant) => variant.productId === row.product.id),
+            },
+            this.storage,
+          ),
+        ),
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    });
+  }
+
+  /** The filter chips and the stock banner. */
+  counts(merchantId: string): Promise<ProductCounts> {
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const counts = await this.products.counts(tx, { merchantId });
+      return {
+        all: counts.all,
+        inStock: counts.in_stock,
+        lowStock: counts.low_stock,
+        outOfStock: counts.out_of_stock,
+        draft: counts.draft,
+        archived: counts.archived,
+      };
+    });
   }
 
   /**
