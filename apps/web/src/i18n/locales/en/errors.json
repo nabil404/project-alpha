@@ -44,8 +44,11 @@
     "PRODUCT_IMAGE_ORDER_MISMATCH": "The photos changed while you were reordering them. Refresh and try again.",
     "PRODUCT_IMAGE_TOO_LARGE": "That photo is over 10 MB. Choose a smaller one.",
     "PRODUCT_IMAGE_UNSUPPORTED_TYPE": "Upload a JPEG, PNG or WebP photo.",
+    "PRODUCT_IN_USE": "This product is on existing orders, so it can't be deleted. Archive it instead.",
     "PRODUCT_NEEDS_VARIANT": "A product needs at least one variant.",
     "PRODUCT_NOT_FOUND": "That product no longer exists.",
+    "PRODUCT_OPTION_NOT_FOUND": "That option was removed in the meantime. Refresh the page and try again.",
+    "PRODUCT_STALE": "This product changed since you opened it. Refresh to see the latest version, then make your changes again.",
     "SESSION_IS_CURRENT": "That's the device you're using. Sign out instead.",
     "SESSION_NOT_FOUND": "That device is already signed out.",
     "SKU_TAKEN": "Another variant already uses the SKU {{sku}}.",
@@ -60,6 +63,7 @@
     "WEBHOOK_VERIFICATION_FAILED": "The webhook verification request was rejected."
   },
   "field": {
+    "DUPLICATE": "This is already used here. Each one must be different.",
     "INVALID_FORMAT": "Enter a valid {{format}}.",
     "INVALID_INPUT": "This value isn't valid.",
     "INVALID_PHONE": "Enter a phone number, like 01712-345678.",
@@ -72,8 +76,11 @@
     "MIN_LENGTH": "Use at least {{min}} characters.",
     "MIN_VALUE": "Must be at least {{min}}.",
     "NOT_MULTIPLE_OF": "Must be a multiple of {{divisor}}.",
+    "OPTION_VALUES_MISMATCH": "Pick one value for every option.",
     "REQUIRED": "This field is required.",
-    "UNRECOGNIZED_KEYS": "Unexpected fields: {{keys}}."
+    "UNKNOWN_OPTION_VALUE": "Pick one of this option's values.",
+    "UNRECOGNIZED_KEYS": "Unexpected fields: {{keys}}.",
+    "VARIANTS_NEED_OPTION": "Add an option, like Size, to sell more than one variant."
   },
   "generic": "Something went wrong. Please try again."
 }
