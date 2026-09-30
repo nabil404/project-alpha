@@ -32,6 +32,25 @@ function dateTimeFormatter(locale: string, preset: DatePreset): Intl.DateTimeFor
   return formatter;
 }
 
+const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+
+function relativeTimeFormatter(locale: string): Intl.RelativeTimeFormat {
+  const cached = relativeTimeFormatters.get(locale);
+  if (cached) {
+    return cached;
+  }
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  relativeTimeFormatters.set(locale, formatter);
+  return formatter;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Local midnight, so "yesterday" means the calendar day, not 24 hours ago. */
+function startOfDay(value: Date): number {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+}
+
 /**
  * The seam between i18next's active language and the framework-agnostic Intl
  * helpers in @app/shared — which must never import i18next themselves, so the
@@ -55,7 +74,20 @@ export function useFormatters() {
     [locale],
   );
 
-  return useMemo(() => ({ locale, formatMoney, formatDate }), [locale, formatMoney, formatDate]);
+  /** "today", "yesterday", "3 days ago" — for values only accurate to the day. */
+  const formatRelativeDay = useCallback(
+    (value: Date | string | number, now: Date = new Date()): string => {
+      // Rounded: a DST change makes one calendar day 23 or 25 hours long.
+      const days = Math.round((startOfDay(new Date(value)) - startOfDay(now)) / DAY_MS);
+      return relativeTimeFormatter(locale).format(days, 'day');
+    },
+    [locale],
+  );
+
+  return useMemo(
+    () => ({ locale, formatMoney, formatDate, formatRelativeDay }),
+    [locale, formatMoney, formatDate, formatRelativeDay],
+  );
 }
 
 /**

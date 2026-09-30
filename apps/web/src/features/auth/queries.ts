@@ -142,6 +142,8 @@ export interface LinkedAccount {
   id: string;
   providerId: SocialProvider | 'credential';
   createdAt: string;
+  /** When it last changed; for `credential`, when the password was last set. */
+  updatedAt: string;
 }
 
 export const linkedAccountsQueryOptions = () =>
