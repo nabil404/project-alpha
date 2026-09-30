@@ -1,15 +1,13 @@
 import { createProductSchema } from '@app/shared';
 import { CategoriesRepository } from '../../categories/categories.repository';
-import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
-import { ProductImageRepository } from '../images/product-image.repository';
 import { CategoriesService } from '../../categories/categories.service';
-import { ProductsRepository } from '../products.repository';
-import { ProductsService } from '../products.service';
+import type { ProductsService } from '../products.service';
 import {
   describeDb,
   openCatalogTestDb,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
+import { documentOf, productsService } from './products-service.fixture';
 
 describeDb('ProductsService.findSellableCatalog', () => {
   let t: CatalogTestDb;
@@ -19,13 +17,7 @@ describeDb('ProductsService.findSellableCatalog', () => {
   beforeAll(async () => {
     t = await openCatalogTestDb();
     const categoriesRepository = new CategoriesRepository();
-    products = new ProductsService(
-      t.db,
-      new ProductsRepository(),
-      categoriesRepository,
-      new ProductImageRepository(),
-      new InMemoryObjectStorage(),
-    );
+    products = productsService(t.db);
     categories = new CategoriesService(t.db, categoriesRepository);
   });
 
@@ -48,9 +40,10 @@ describeDb('ProductsService.findSellableCatalog', () => {
           status,
           deliveryCharge: 0,
           categoryIds: [kept.id, removed.id],
+          options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
           variants: [
-            { name: 'M', price: 1000, stock: 1 },
-            { name: 'L', price: 1000, stock: 0 },
+            { optionValues: ['M'], price: 1000, stock: 1 },
+            { optionValues: ['L'], price: 1000, stock: 0 },
           ],
         }),
       );
@@ -68,8 +61,10 @@ describeDb('ProductsService.findSellableCatalog', () => {
       }),
     );
 
-    const archivedVariant = active.variants.find((v) => v.name === 'L');
-    await products.archiveVariant(t.merchantA, active.id, archivedVariant!.id);
+    const archivedVariant = active.variants.find((v) => v.name === 'L')!;
+    const doc = documentOf(active);
+    doc.variants = doc.variants.filter((v) => v.id !== archivedVariant.id);
+    await products.save(t.merchantA, active.id, doc);
     await categories.remove(t.merchantA, removed.id);
 
     const catalog = await products.findSellableCatalog(t.merchantA);
