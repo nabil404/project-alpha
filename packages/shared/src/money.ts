@@ -8,6 +8,11 @@ export function toMinorUnits(major: number, unitsPerMajor = 100): MinorUnits {
   return Math.round(major * unitsPerMajor);
 }
 
+/** For an editable amount field only; display goes through formatMinorUnits. */
+export function fromMinorUnits(amount: MinorUnits, unitsPerMajor = 100): number {
+  return amount / unitsPerMajor;
+}
+
 export function formatMinorUnits(
   amount: MinorUnits,
   currency: string,
