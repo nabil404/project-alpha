@@ -92,6 +92,20 @@
       "when": 1790721149324,
       "tag": "0012_customer_picture_url",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790763108825,
+      "tag": "0013_catalog_options",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790763126146,
+      "tag": "0014_catalog_options_fk_force_rls_backfill",
+      "breakpoints": true
     }
   ]
 }

@@ -114,6 +114,40 @@ export async function seedVariant(
   return row;
 }
 
+export async function seedOption(
+  db: Database,
+  merchantId: string,
+  productId: string,
+  overrides: Partial<typeof schema.productOption.$inferInsert> = {},
+) {
+  const [row] = await db
+    .insert(schema.productOption)
+    .values({
+      merchantId,
+      productId,
+      name: `Opt ${randomUUID().slice(0, 8)}`,
+      position: 0,
+      ...overrides,
+    })
+    .returning();
+  if (!row) throw new Error('seedOption returned no row');
+  return row;
+}
+
+export async function seedOptionValue(
+  db: Database,
+  merchantId: string,
+  optionId: string,
+  overrides: Partial<typeof schema.productOptionValue.$inferInsert> = {},
+) {
+  const [row] = await db
+    .insert(schema.productOptionValue)
+    .values({ merchantId, optionId, value: 'M', position: 0, ...overrides })
+    .returning();
+  if (!row) throw new Error('seedOptionValue returned no row');
+  return row;
+}
+
 /** A row only - nothing in object storage. */
 export async function seedImage(
   db: Database,
