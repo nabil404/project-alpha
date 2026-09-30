@@ -1,11 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { createProductSchema, type CreateProduct } from '@app/shared';
 import * as schema from '../../database/schema/index';
-import { CategoriesRepository } from '../../categories/categories.repository';
-import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
-import { ProductImageRepository } from '../images/product-image.repository';
-import { ProductsRepository } from '../products.repository';
-import { ProductsService } from '../products.service';
+import type { ProductsService } from '../products.service';
 import {
   describeDb,
   expectCoded,
@@ -13,6 +9,7 @@ import {
   seedCategory,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
+import { productsService } from './products-service.fixture';
 
 describeDb('ProductsService — products and category links', () => {
   let t: CatalogTestDb;
@@ -29,13 +26,7 @@ describeDb('ProductsService — products and category links', () => {
 
   beforeAll(async () => {
     t = await openCatalogTestDb();
-    service = new ProductsService(
-      t.db,
-      new ProductsRepository(),
-      new CategoriesRepository(),
-      new ProductImageRepository(),
-      new InMemoryObjectStorage(),
-    );
+    service = productsService(t.db);
   });
 
   afterAll(async () => {
@@ -72,9 +63,10 @@ describeDb('ProductsService — products and category links', () => {
       const product = await service.create(
         t.merchantA,
         input({
+          options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
           variants: [
-            { name: 'M', sku: `  ${given.toLowerCase()} `, price: 150000, stock: 2 },
-            { name: 'L', price: 155000, stock: 0 },
+            { optionValues: ['M'], sku: `  ${given.toLowerCase()} `, price: 150000, stock: 2 },
+            { optionValues: ['L'], price: 155000, stock: 0 },
           ],
         }),
       );
@@ -83,15 +75,15 @@ describeDb('ProductsService — products and category links', () => {
       expect(product.variants.every((v) => !v.isDefault)).toBe(true);
     });
 
-    it('requires names when there is more than one variant, even past the schema', async () => {
-      const unchecked: CreateProduct = {
+    it('refuses several variants without options, even past the schema', async () => {
+      const unchecked = {
         ...input(),
         variants: [
-          { name: null, sku: undefined, price: 1, stock: 1 },
-          { name: 'L', sku: undefined, price: 1, stock: 1 },
+          { optionValues: [], price: 1, stock: 1, imageId: null },
+          { optionValues: [], price: 1, stock: 1, imageId: null },
         ],
-      };
-      await expectCoded(service.create(t.merchantA, unchecked), 'VARIANT_NAME_REQUIRED');
+      } as CreateProduct;
+      await expectCoded(service.create(t.merchantA, unchecked), 'VALIDATION_FAILED');
     });
 
     it("rejects a SKU another live variant of the merchant uses, but not another merchant's", async () => {
@@ -109,19 +101,15 @@ describeDb('ProductsService — products and category links', () => {
     it('rejects two variants in one create sharing a SKU by case, leaving nothing behind', async () => {
       const name = `Dup case ${++n}`;
       const shared = sku('case');
-      await expectCoded(
-        service.create(
-          t.merchantA,
-          input({
-            name,
-            variants: [
-              { name: 'M', sku: shared.toLowerCase(), price: 1, stock: 1 },
-              { name: 'L', sku: shared.toUpperCase(), price: 1, stock: 1 },
-            ],
-          }),
-        ),
-        'SKU_TAKEN',
-      );
+      const unchecked = {
+        ...input({ name }),
+        options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
+        variants: [
+          { optionValues: ['M'], sku: shared.toLowerCase(), price: 1, stock: 1, imageId: null },
+          { optionValues: ['L'], sku: shared.toUpperCase(), price: 1, stock: 1, imageId: null },
+        ],
+      } as CreateProduct;
+      await expectCoded(service.create(t.merchantA, unchecked), 'VALIDATION_FAILED');
       await expect(
         t.db.select().from(schema.product).where(eq(schema.product.name, name)),
       ).resolves.toHaveLength(0);
@@ -149,7 +137,7 @@ describeDb('ProductsService — products and category links', () => {
     it('refuses a product with no variants, before any insert, even past the schema', async () => {
       const name = `No Variants ${++n}`;
       const unchecked: CreateProduct = { ...input({ name }), variants: [] };
-      await expectCoded(service.create(t.merchantA, unchecked), 'PRODUCT_NEEDS_VARIANT');
+      await expectCoded(service.create(t.merchantA, unchecked), 'VALIDATION_FAILED');
       await expect(
         t.db.select().from(schema.product).where(eq(schema.product.name, name)),
       ).resolves.toHaveLength(0);

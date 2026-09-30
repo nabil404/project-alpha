@@ -14,19 +14,9 @@ export const productNotFound = (id: string) =>
 export const variantNotFound = (id: string) =>
   new CodedNotFoundException('VARIANT_NOT_FOUND', 'Variant not found', { id });
 
-export const variantNameRequired = () =>
-  new CodedBadRequestException(
-    'VARIANT_NAME_REQUIRED',
-    'Every variant needs a name when a product has more than one',
-  );
-
-/** Spec rule: "A product with no live variant cannot exist." */
-export const productNeedsVariant = (id?: string) =>
-  new CodedConflictException(
-    'PRODUCT_NEEDS_VARIANT',
-    'A product needs at least one variant',
-    id ? { id } : {},
-  );
+/** The product changed after the page read it; saving would overwrite that change. */
+export const productStale = (id: string) =>
+  new CodedConflictException('PRODUCT_STALE', 'The product changed since it was read', { id });
 
 export const productImageNotFound = (id: string) =>
   new CodedNotFoundException('PRODUCT_IMAGE_NOT_FOUND', 'Image not found', { id });

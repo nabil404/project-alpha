@@ -4,6 +4,8 @@ import { StorageModule } from '../storage/storage.module';
 import { ProductImageRepository } from './images/product-image.repository';
 import { ProductImagesController } from './images/product-images.controller';
 import { ProductImagesService } from './images/product-images.service';
+import { ProductOptionsRepository } from './options/product-options.repository';
+import { ProductWriter } from './options/product-writer';
 import { ProductsRepository } from './products.repository';
 import { ProductsService } from './products.service';
 
@@ -14,7 +16,14 @@ import { ProductsService } from './products.service';
 @Module({
   imports: [CategoriesModule, StorageModule],
   controllers: [ProductImagesController],
-  providers: [ProductsRepository, ProductsService, ProductImageRepository, ProductImagesService],
+  providers: [
+    ProductsRepository,
+    ProductsService,
+    ProductImageRepository,
+    ProductImagesService,
+    ProductOptionsRepository,
+    ProductWriter,
+  ],
   exports: [ProductsService, ProductImagesService, ProductImageRepository],
 })
 export class ProductsModule {}

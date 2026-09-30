@@ -59,9 +59,23 @@ export const updateCategorySchema = z.object({
 });
 export type UpdateCategory = z.infer<typeof updateCategorySchema>;
 
+export const productOptionValueSchema = z.object({
+  id: z.string().uuid(),
+  value: z.string().min(1),
+});
+export type ProductOptionValue = z.infer<typeof productOptionValueSchema>;
+
+/** A dimension the product varies on ("Size"), its values in the order customers see them. */
+export const productOptionSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  values: z.array(productOptionValueSchema),
+});
+export type ProductOption = z.infer<typeof productOptionSchema>;
+
 export const variantSchema = z.object({
   id: z.string().uuid(),
-  /** Null only for the default variant - the one a product without options is sold as. */
+  /** Null only for the default variant; otherwise its option values joined ("M / Short"). Never written. */
   name: z.string().min(1).nullable(),
   sku: z.string().min(1),
   /** Minor units. */
@@ -72,6 +86,8 @@ export const variantSchema = z.object({
   isDefault: z.boolean(),
   /** One of the product's own images, or null for the product's cover. */
   imageId: z.string().uuid().nullable().default(null),
+  /** One value id per product option, in the options' order; empty for the default variant. */
+  optionValueIds: z.array(z.string().uuid()).default([]),
 });
 export type Variant = z.infer<typeof variantSchema>;
 
@@ -83,43 +99,23 @@ export const productSchema = z.object({
   aliases: z.array(z.string().min(1)).default([]),
   categoryIds: z.array(z.string().uuid()).default([]),
   images: z.array(productImageSchema).default([]),
+  /** The default photo; null exactly when there are no images. */
+  coverImageId: z.string().uuid().nullable().default(null),
+  options: z.array(productOptionSchema).default([]),
   /** Minor units. */
   deliveryCharge: z.number().int().nonnegative(),
   variants: z.array(variantSchema),
+  /** Opaque. Send it back with a save; a save from an older read is refused with PRODUCT_STALE. */
+  version: z.string().min(1),
 });
 export type Product = z.infer<typeof productSchema>;
 
 const productNameSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().trim().max(5000).nullable();
-const variantNameSchema = z.string().trim().min(1).max(80);
 /** Blank or omitted: the API generates one. */
 const skuInputSchema = z.string().trim().max(64).optional();
 const moneySchema = z.number().int().nonnegative();
 const stockSchema = z.number().int().nonnegative();
-
-const newVariantSchema = z.object({
-  name: variantNameSchema.nullable().default(null),
-  sku: skuInputSchema,
-  price: moneySchema,
-  stock: stockSchema.default(0),
-});
-
-/** Images attach through their own endpoint afterwards, so creation carries none. */
-export const createProductSchema = z
-  .object({
-    name: productNameSchema,
-    description: descriptionSchema.default(null),
-    status: productStatusSchema.default('draft'),
-    aliases: z.array(z.string().trim().min(1)).default([]),
-    deliveryCharge: moneySchema,
-    categoryIds: z.array(z.string().uuid()).default([]),
-    variants: z.array(newVariantSchema).min(1),
-  })
-  .refine((p) => p.variants.length === 1 || p.variants.every((v) => v.name !== null), {
-    path: ['variants'],
-    message: 'Every variant needs a name when there is more than one',
-  });
-export type CreateProduct = z.infer<typeof createProductSchema>;
 
 /** `categoryIds`, when present, replaces the product's links. */
 export const updateProductSchema = z.object({
@@ -131,27 +127,6 @@ export const updateProductSchema = z.object({
   categoryIds: z.array(z.string().uuid()).optional(),
 });
 export type UpdateProduct = z.infer<typeof updateProductSchema>;
-
-/** `defaultVariantName` names the product's default variant; required when it has one. */
-export const addVariantSchema = z.object({
-  name: variantNameSchema,
-  sku: skuInputSchema,
-  price: moneySchema,
-  stock: stockSchema.default(0),
-  defaultVariantName: variantNameSchema.optional(),
-});
-export type AddVariant = z.infer<typeof addVariantSchema>;
-
-/** `name: null` is allowed only on a product's single live variant, which makes it the default. */
-export const updateVariantSchema = z.object({
-  name: variantNameSchema.nullable().optional(),
-  sku: z.string().trim().min(1).max(64).optional(),
-  price: moneySchema.optional(),
-  stock: stockSchema.optional(),
-  /** One of the product's own images; null shows the product's cover. */
-  imageId: z.string().uuid().nullable().optional(),
-});
-export type UpdateVariant = z.infer<typeof updateVariantSchema>;
 
 const optionNameSchema = z.string().trim().min(1).max(40);
 const optionValueTextSchema = z.string().trim().min(1).max(40);
@@ -313,6 +288,12 @@ export const saveProductSchema = z
   })
   .superRefine(refineProductDocument);
 export type SaveProduct = z.infer<typeof saveProductSchema>;
+
+/** Images attach through their own endpoint afterwards, so creation carries none. */
+export const createProductSchema = z
+  .object(productDocumentShape)
+  .superRefine(refineProductDocument);
+export type CreateProduct = z.infer<typeof createProductSchema>;
 
 /** CSV import carries no images or categories; sellers add those in the dashboard afterwards. */
 export const productCsvRowSchema = z.object({
