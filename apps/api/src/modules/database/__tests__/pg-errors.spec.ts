@@ -1,5 +1,5 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors';
-import { uniqueViolationConstraint } from '../pg-errors';
+import { isForeignKeyViolation, uniqueViolationConstraint } from '../pg-errors';
 import { one } from '../rows';
 
 const pgError = (code: string, constraint?: string) =>
@@ -32,5 +32,19 @@ describe('one', () => {
 
   it('throws, naming the query, when there is no row', () => {
     expect(() => one([], 'thing insert')).toThrow(/thing insert/);
+  });
+});
+
+describe('isForeignKeyViolation', () => {
+  it('recognizes a foreign key violation, through the Drizzle wrapper too', () => {
+    expect(isForeignKeyViolation(pgError('23503', 'x_fk'))).toBe(true);
+    expect(isForeignKeyViolation(new DrizzleQueryError('delete ...', [], pgError('23503')))).toBe(
+      true,
+    );
+  });
+
+  it('ignores other errors', () => {
+    expect(isForeignKeyViolation(pgError('23505', 'x_uidx'))).toBe(false);
+    expect(isForeignKeyViolation(new Error('boom'))).toBe(false);
   });
 });

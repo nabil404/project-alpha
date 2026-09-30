@@ -11,6 +11,7 @@ import {
 import { parseOrThrow } from '../../common/parse-or-throw';
 import type { TenantScope, Transaction } from '../database/base.repository';
 import { DATABASE, type Database } from '../database/database.module';
+import { isForeignKeyViolation } from '../database/pg-errors';
 import { withMerchant } from '../database/with-merchant';
 import { toCategory } from '../categories/category-mappers';
 import { CategoriesRepository } from '../categories/categories.repository';
@@ -21,7 +22,7 @@ import { ProductImageRepository } from './images/product-image.repository';
 import { EMPTY_PRODUCT_STATE, planProductDocument } from './options/product-document-plan';
 import { ProductOptionsRepository } from './options/product-options.repository';
 import { ProductWriter } from './options/product-writer';
-import { productNotFound, productStale } from './product-errors';
+import { productInUse, productNotFound, productStale } from './product-errors';
 import { toProduct, toProductImage } from './product-mappers';
 import { ProductsRepository, type ProductRow } from './products.repository';
 
@@ -122,15 +123,22 @@ export class ProductsService {
 
   /**
    * The database refuses this once an order references a variant; the seller
-   * archives instead. Image rows cascade; their objects go after commit.
+   * archives instead. Image rows cascade; their objects go after commit, so a
+   * refused delete keeps them.
    */
   async remove(merchantId: string, id: string): Promise<void> {
-    const keys = await withMerchant(this.db, merchantId, async (tx) => {
-      const scope = { merchantId };
-      const images = await this.images.listForProducts(tx, scope, [id]);
-      if (!(await this.products.deleteProduct(tx, scope, id))) throw productNotFound(id);
-      return objectKeysFor(images);
-    });
+    let keys: string[];
+    try {
+      keys = await withMerchant(this.db, merchantId, async (tx) => {
+        const scope = { merchantId };
+        const images = await this.images.listForProducts(tx, scope, [id]);
+        if (!(await this.products.deleteProduct(tx, scope, id))) throw productNotFound(id);
+        return objectKeysFor(images);
+      });
+    } catch (error) {
+      if (isForeignKeyViolation(error)) throw productInUse(id);
+      throw error;
+    }
     await deleteObjectsQuietly(this.storage, this.logger, keys);
   }
 
