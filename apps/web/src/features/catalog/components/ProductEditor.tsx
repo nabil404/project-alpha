@@ -49,6 +49,8 @@ import { ProductStatusBadge } from './ProductStatusBadge';
 import { VariantsCard } from './VariantsCard';
 
 const card = 'flex flex-col gap-4 rounded-lg border border-border bg-surface p-6 shadow-card';
+/** Main column and side column; 22rem is just wide enough for Delete, Discard and Save in one row. */
+const columns = 'lg:grid-cols-[minmax(0,1fr)_22rem]';
 const topLevelFields = [
   'name',
   'description',
@@ -206,7 +208,8 @@ export function ProductEditor({ product }: { product?: Product }) {
                 </li>
               </ol>
             </nav>
-            <div className="mt-1 flex flex-wrap items-center gap-4">
+            {/* The columns below, so the actions start where the side column does. */}
+            <div className={cn('mt-1 flex flex-wrap items-center gap-4 lg:grid lg:gap-6', columns)}>
               <div className="flex min-w-0 grow items-center gap-3">
                 <h1 className="truncate text-display">{title}</h1>
                 {product && <ProductStatusBadge status={product.status} />}
@@ -251,7 +254,7 @@ export function ProductEditor({ product }: { product?: Product }) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className={cn('grid grid-cols-1 items-start gap-6', columns)}>
             <div className="flex min-w-0 flex-col gap-6">
               <BasicDetailsCard />
               <PhotosCard product={product} />

@@ -86,6 +86,41 @@ describe('saveProductSchema', () => {
     });
   });
 
+  it('accepts a name for a variant, trimmed', () => {
+    const parsed = saveProductSchema.parse(
+      doc({
+        variants: [
+          { name: ' Small, short ', optionValues: ['S', 'Short'], price: 1 },
+          { optionValues: ['M', 'Long'], price: 1 },
+        ],
+      }),
+    );
+    expect(parsed.variants.map((v) => v.name)).toEqual(['Small, short', undefined]);
+  });
+
+  it("refuses a name another variant has, or that is another's values", () => {
+    expect(
+      fieldCodes(
+        doc({
+          variants: [
+            { name: 'Everyday', optionValues: ['S', 'Short'], price: 1 },
+            { name: 'everyday ', optionValues: ['M', 'Long'], price: 1 },
+          ],
+        }),
+      ),
+    ).toEqual({ 'variants.1.name': ['DUPLICATE'] });
+    expect(
+      fieldCodes(
+        doc({
+          variants: [
+            { optionValues: ['S', 'Short'], price: 1 },
+            { name: 's / short', optionValues: ['M', 'Long'], price: 1 },
+          ],
+        }),
+      ),
+    ).toEqual({ 'variants.1.name': ['DUPLICATE'] });
+  });
+
   it('refuses two variants with the same values, ignoring case', () => {
     expect(
       fieldCodes(

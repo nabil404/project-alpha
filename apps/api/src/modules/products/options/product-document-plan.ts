@@ -68,9 +68,13 @@ export interface ProductDocumentPlan {
 
 const sameText = (text: string) => text.trim().toLowerCase();
 
-/** The variant's display name, which order lines and the assistant read. */
-export function variantLabel(values: string[]): string | null {
-  return values.length === 0 ? null : values.join(' / ');
+/**
+ * The variant's display name, which order lines and the assistant read: the
+ * seller's own, else its values joined. The default variant has none.
+ */
+export function variantLabel(values: string[], given?: string): string | null {
+  if (values.length === 0) return null;
+  return given || values.join(' / ');
 }
 
 export function planProductDocument(
@@ -122,7 +126,10 @@ export function planProductDocument(
     });
     return {
       id: variant.id ?? null,
-      name: variantLabel(valueRefs.map((ref) => options[ref.option]!.values[ref.value]!.value)),
+      name: variantLabel(
+        valueRefs.map((ref) => options[ref.option]!.values[ref.value]!.value),
+        variant.name,
+      ),
       sku: normalizeSku(variant.sku),
       price: variant.price,
       stock: variant.stock,

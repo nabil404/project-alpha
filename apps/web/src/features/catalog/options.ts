@@ -7,7 +7,9 @@ import type { OptionDraft, VariantDraft } from './product-form';
  *
  * A kept variant keeps its id, SKU and stock (orders and the assistant already
  * know it); a new one copies its price and image from the variant it grew
- * from, starts at zero stock and gets its SKU from the API.
+ * from, starts at zero stock and gets its SKU from the API. A name the seller
+ * gave survives a value's rename but not a change of options, which changes
+ * what the variant is.
  */
 export interface OptionState {
   options: OptionDraft[];
@@ -19,10 +21,20 @@ export const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.t
 
 const comboKey = (values: string[]) => values.map((v) => v.trim().toLowerCase()).join('\u0000');
 
-export const variantLabel = (variant: VariantDraft) => variant.optionValues.join(' / ');
+/** What the variant is called if the seller doesn't name it. */
+export const valuesLabel = (variant: VariantDraft) => variant.optionValues.join(' / ');
+
+export const variantLabel = (variant: VariantDraft) => variant.name.trim() || valuesLabel(variant);
 
 function grownFrom(template: VariantDraft, optionValues: string[]): VariantDraft {
-  return { optionValues, sku: '', price: template.price, stock: 0, imageId: template.imageId };
+  return {
+    name: '',
+    optionValues,
+    sku: '',
+    price: template.price,
+    stock: 0,
+    imageId: template.imageId,
+  };
 }
 
 /** Each current variant times each of the new option's values. */
@@ -32,7 +44,7 @@ export function addOption({ options, variants }: OptionState, option: OptionDraf
     variants: variants.flatMap((variant) =>
       option.values.map(({ value }, index) =>
         index === 0
-          ? { ...variant, optionValues: [...variant.optionValues, value] }
+          ? { ...variant, name: '', optionValues: [...variant.optionValues, value] }
           : grownFrom(variant, [...variant.optionValues, value]),
       ),
     ),
@@ -56,7 +68,7 @@ export function removeOption({ options, variants }: OptionState, index: number):
     const key = comboKey(optionValues);
     if (seen.has(key)) continue;
     seen.add(key);
-    kept.push({ ...variant, optionValues });
+    kept.push({ ...variant, name: '', optionValues });
   }
   return { options: options.filter((_, i) => i !== index), variants: kept };
 }
