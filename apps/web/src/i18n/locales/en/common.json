@@ -1,6 +1,7 @@
 {
   "actions": {
     "cancel": "Cancel",
+    "close": "Close",
     "retry": "Retry",
     "save": "Save",
     "signOut": "Sign out"
@@ -60,7 +61,7 @@
       "shipped": "Shipped"
     },
     "product": {
-      "active": "Active",
+      "active": "Published",
       "archived": "Archived",
       "draft": "Draft"
     },

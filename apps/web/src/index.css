@@ -42,6 +42,10 @@
   --overlay: rgb(20 21 23 / 0.4);
   --elevation-sm: 0 1px 2px rgb(20 21 23 / 0.05);
   --elevation-md: 0 8px 24px rgb(20 21 23 / 0.08);
+  /* The full-screen photo viewer: dark in every theme, so photos read true. */
+  --viewer: #141517;
+  --on-viewer: #ffffff;
+  --on-viewer-muted: #a4a59f;
 }
 
 [data-theme='dark'] {
@@ -70,6 +74,10 @@
   --overlay: rgb(0 0 0 / 0.6);
   --elevation-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --elevation-md: 0 8px 24px rgb(0 0 0 / 0.5);
+  /* The full-screen photo viewer: dark in every theme, so photos read true. */
+  --viewer: #141517;
+  --on-viewer: #ffffff;
+  --on-viewer-muted: #a4a59f;
 }
 
 /* Colours and shadows follow the active theme, so they are mapped `inline`. */
@@ -96,6 +104,9 @@
   --color-focus-ring: var(--focus-ring);
   --color-link: var(--link);
   --color-overlay: var(--overlay);
+  --color-viewer: var(--viewer);
+  --color-on-viewer: var(--on-viewer);
+  --color-on-viewer-muted: var(--on-viewer-muted);
 
   /* shadow-card under resting cards and tables; shadow-popover for menus, popovers, dialogs. */
   --shadow-card: var(--elevation-sm);

@@ -12,18 +12,20 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppCatalogRouteImport } from './routes/_app/catalog'
 import { Route as AppConversationsRouteImport } from './routes/_app/conversations'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-password'
 import { Route as AuthResetPasswordRouteImport } from './routes/_auth/reset-password'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
+import { Route as AppCatalogIndexRouteImport } from './routes/_app/catalog/index'
 import { Route as AppConversationsIndexRouteImport } from './routes/_app/conversations/index'
 import { Route as AppConversationsConversationIdRouteImport } from './routes/_app/conversations/$conversationId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings/account'
 import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
+import { Route as AppCatalogProductsProductIdRouteImport } from './routes/_app/catalog/products/$productId'
+import { Route as AppCatalogProductsNewRouteImport } from './routes/_app/catalog/products/new'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -36,11 +38,6 @@ const AuthRoute = AuthRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppCatalogRoute = AppCatalogRouteImport.update({
-  id: '/catalog',
-  path: '/catalog',
   getParentRoute: () => AppRoute,
 } as any)
 const AppConversationsRoute = AppConversationsRouteImport.update({
@@ -73,6 +70,11 @@ const AuthSignUpRoute = AuthSignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => AuthRoute,
 } as any)
+const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
+  id: '/catalog/',
+  path: '/catalog/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConversationsIndexRoute = AppConversationsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -99,10 +101,20 @@ const AppSettingsMessengerRoute = AppSettingsMessengerRouteImport.update({
   path: '/messenger',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppCatalogProductsProductIdRoute =
+  AppCatalogProductsProductIdRouteImport.update({
+    id: '/catalog/products/$productId',
+    path: '/catalog/products/$productId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppCatalogProductsNewRoute = AppCatalogProductsNewRouteImport.update({
+  id: '/catalog/products/new',
+  path: '/catalog/products/new',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/catalog': typeof AppCatalogRoute
   '/conversations': typeof AppConversationsRouteWithChildren
   '/settings': typeof AppSettingsRouteWithChildren
   '/forgot-password': typeof AuthForgotPasswordRoute
@@ -112,12 +124,14 @@ export interface FileRoutesByFullPath {
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/catalog/': typeof AppCatalogIndexRoute
   '/conversations/': typeof AppConversationsIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
+  '/catalog/products/new': typeof AppCatalogProductsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
-  '/catalog': typeof AppCatalogRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/reset-password': typeof AuthResetPasswordRoute
   '/sign-in': typeof AuthSignInRoute
@@ -125,14 +139,16 @@ export interface FileRoutesByTo {
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/catalog': typeof AppCatalogIndexRoute
   '/conversations': typeof AppConversationsIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
+  '/catalog/products/new': typeof AppCatalogProductsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
-  '/_app/catalog': typeof AppCatalogRoute
   '/_app/conversations': typeof AppConversationsRouteWithChildren
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_auth/forgot-password': typeof AuthForgotPasswordRoute
@@ -143,14 +159,16 @@ export interface FileRoutesById {
   '/_app/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/_app/settings/account': typeof AppSettingsAccountRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
+  '/_app/catalog/': typeof AppCatalogIndexRoute
   '/_app/conversations/': typeof AppConversationsIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
+  '/_app/catalog/products/new': typeof AppCatalogProductsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/catalog'
     | '/conversations'
     | '/settings'
     | '/forgot-password'
@@ -160,12 +178,14 @@ export interface FileRouteTypes {
     | '/conversations/$conversationId'
     | '/settings/account'
     | '/settings/messenger'
+    | '/catalog/'
     | '/conversations/'
     | '/settings/'
+    | '/catalog/products/$productId'
+    | '/catalog/products/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/catalog'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -173,13 +193,15 @@ export interface FileRouteTypes {
     | '/conversations/$conversationId'
     | '/settings/account'
     | '/settings/messenger'
+    | '/catalog'
     | '/conversations'
     | '/settings'
+    | '/catalog/products/$productId'
+    | '/catalog/products/new'
   id:
     | '__root__'
     | '/_app'
     | '/_auth'
-    | '/_app/catalog'
     | '/_app/conversations'
     | '/_app/settings'
     | '/_auth/forgot-password'
@@ -190,8 +212,11 @@ export interface FileRouteTypes {
     | '/_app/conversations/$conversationId'
     | '/_app/settings/account'
     | '/_app/settings/messenger'
+    | '/_app/catalog/'
     | '/_app/conversations/'
     | '/_app/settings/'
+    | '/_app/catalog/products/$productId'
+    | '/_app/catalog/products/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -220,13 +245,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/catalog': {
-      id: '/_app/catalog'
-      path: '/catalog'
-      fullPath: '/catalog'
-      preLoaderRoute: typeof AppCatalogRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/conversations': {
@@ -271,6 +289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignUpRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_app/catalog/': {
+      id: '/_app/catalog/'
+      path: '/catalog'
+      fullPath: '/catalog/'
+      preLoaderRoute: typeof AppCatalogIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/conversations/': {
       id: '/_app/conversations/'
       path: '/'
@@ -306,6 +331,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsMessengerRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/catalog/products/$productId': {
+      id: '/_app/catalog/products/$productId'
+      path: '/catalog/products/$productId'
+      fullPath: '/catalog/products/$productId'
+      preLoaderRoute: typeof AppCatalogProductsProductIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/catalog/products/new': {
+      id: '/_app/catalog/products/new'
+      path: '/catalog/products/new'
+      fullPath: '/catalog/products/new'
+      preLoaderRoute: typeof AppCatalogProductsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -339,17 +378,21 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
-  AppCatalogRoute: typeof AppCatalogRoute
   AppConversationsRoute: typeof AppConversationsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
+  AppCatalogIndexRoute: typeof AppCatalogIndexRoute
+  AppCatalogProductsProductIdRoute: typeof AppCatalogProductsProductIdRoute
+  AppCatalogProductsNewRoute: typeof AppCatalogProductsNewRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppCatalogRoute: AppCatalogRoute,
   AppConversationsRoute: AppConversationsRouteWithChildren,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
+  AppCatalogIndexRoute: AppCatalogIndexRoute,
+  AppCatalogProductsProductIdRoute: AppCatalogProductsProductIdRoute,
+  AppCatalogProductsNewRoute: AppCatalogProductsNewRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
