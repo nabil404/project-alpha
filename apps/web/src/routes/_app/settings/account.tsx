@@ -1,17 +1,27 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { accountSettingsSearchSchema, type AccountSettingsSearch } from '@app/shared';
 
-import { PasswordCard, ProfileCard } from '@/features/account';
+import {
+  DevicesCard,
+  deviceSessionsQueryOptions,
+  PasswordCard,
+  ProfileCard,
+} from '@/features/account';
 import { linkedAccountsQueryOptions, SignInMethodsCard } from '@/features/auth';
 
 /** Also where linking Google or Facebook lands: `?error=<code>` after a refused link. */
 export const Route = createFileRoute('/_app/settings/account')({
   validateSearch: (search: Record<string, unknown>): AccountSettingsSearch =>
     accountSettingsSearchSchema.parse(search),
-  loader: ({ context }) => context.queryClient.prefetchQuery(linkedAccountsQueryOptions()),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.prefetchQuery(linkedAccountsQueryOptions()),
+      context.queryClient.prefetchQuery(deviceSessionsQueryOptions()),
+    ]),
   component: AccountSettingsPage,
 });
 
+/** Each card loads and fails on its own, so one bad query doesn't blank the page. */
 function AccountSettingsPage() {
   const { error } = Route.useSearch();
 
@@ -20,6 +30,7 @@ function AccountSettingsPage() {
       <ProfileCard />
       <SignInMethodsCard error={error} />
       <PasswordCard />
+      <DevicesCard />
     </div>
   );
 }

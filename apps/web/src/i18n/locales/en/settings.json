@@ -1,5 +1,15 @@
 {
   "account": {
+    "devices": {
+      "activeNow": "Active now",
+      "activity": "Signed in {{signedIn}} · Active {{active}}",
+      "description": "Sign out anywhere you don't recognise.",
+      "device": "{{browser}} on {{os}}",
+      "signOut": "Sign out",
+      "thisDevice": "This device",
+      "title": "Signed-in devices",
+      "unknown": "Unknown device"
+    },
     "password": {
       "change": "Change password",
       "changed": "Password changed.",
