@@ -52,7 +52,9 @@ describe('AvatarService', () => {
   it('stores the photo under the user and points user.image at it', async () => {
     const { image } = await service.upload(USER, await jpeg());
 
-    expect(image).toMatch(new RegExp(`^${TEST_PUBLIC_BASE_URL}/u/${USER}/avatar/[0-9a-f-]{36}\\.jpg$`));
+    expect(image).toMatch(
+      new RegExp(`^${TEST_PUBLIC_BASE_URL}/u/${USER}/avatar/[0-9a-f-]{36}\\.jpg$`),
+    );
     expect(users.image).toBe(image);
     expect([...storage.objects.keys()]).toHaveLength(1);
     const [stored] = storage.objects.values();

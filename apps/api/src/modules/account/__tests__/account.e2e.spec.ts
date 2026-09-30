@@ -182,6 +182,83 @@ describeDb('Settings > Account over HTTP', () => {
     });
   });
 
+  describe('POST /auth/update-user, unvalidated fields', () => {
+    it('refuses fields other than the name and leaves the phone alone', async () => {
+      const address = email('phone');
+      const agent = await verifiedSeller(address);
+
+      const response = await post(agent, '/api/v1/auth/update-user', {
+        name: 'Nadia Rahman',
+        phone: '',
+      }).expect(400);
+      expect(response.body.error.fields.phone[0].code).toBe('UNRECOGNIZED_KEYS');
+
+      const [row] = await db
+        .select({ phone: schema.user.phone })
+        .from(schema.user)
+        .where(eq(schema.user.email, address));
+      expect(row?.phone).toBe('01712-345678');
+    });
+  });
+
+  describe('POST /auth/sign-up/email', () => {
+    it('refuses a photo, which only /account/avatar may set', async () => {
+      const response = await post(request(server()), '/api/v1/auth/sign-up/email', {
+        email: email('signup-image'),
+        password: PASSWORD,
+        name: 'Nadia Rahman',
+        shopName: "Nadia's Kitchen",
+        phone: '01712-345678',
+        callbackURL: '/',
+        image: 'https://tracker.example.test/pixel.gif',
+      }).expect(400);
+
+      expect(response.body.error.code).toBe('VALIDATION_FAILED');
+      expect(response.body.error.fields.image[0].code).toBe('UNRECOGNIZED_KEYS');
+    });
+  });
+
+  describe('adding a password by reset', () => {
+    it('lets a Facebook-only seller sign in with the password they just set', async () => {
+      // Better Auth stores Facebook emails unverified, so unless the reset
+      // marks the email verified this seller is turned away at sign-in.
+      const address = email('facebook-only');
+      const userId = randomUUID();
+      await db.insert(schema.user).values({
+        id: userId,
+        name: 'Nadia Rahman',
+        email: address,
+        emailVerified: false,
+      });
+      await db.insert(schema.account).values({
+        id: randomUUID(),
+        accountId: `fb-${userId}`,
+        providerId: 'facebook',
+        userId,
+      });
+
+      await post(request(server()), '/api/v1/auth/request-password-reset', {
+        email: address,
+        redirectTo: '/reset-password',
+      }).expect(200);
+      const landing = await request(server()).get(mailer.linkTo(address)).expect(302);
+      const token = new URL(landing.headers.location as string, APP_URL).searchParams.get('token');
+      if (!token) {
+        throw new Error(`No token in ${landing.headers.location}`);
+      }
+
+      const newPassword = 'a brand new passphrase';
+      await post(request(server()), '/api/v1/auth/reset-password', { token, newPassword }).expect(
+        200,
+      );
+
+      await post(request(server()), '/api/v1/auth/sign-in/email', {
+        email: address,
+        password: newPassword,
+      }).expect(200);
+    });
+  });
+
   describe('POST /auth/change-password', () => {
     it('answers a wrong current password with AUTH_WRONG_PASSWORD', async () => {
       const agent = await verifiedSeller(email('wrong'));
@@ -341,7 +418,7 @@ describeDb('Settings > Account over HTTP', () => {
       await here.delete(`/api/v1/account/sessions/${phoneId}`).set('Origin', APP_URL).expect(204);
 
       await phone.get('/api/v1/account/sessions').expect(401);
-      // Review Focus 4: a second click on the same row.
+      // A second click on the same row.
       const again = await here
         .delete(`/api/v1/account/sessions/${phoneId}`)
         .set('Origin', APP_URL)
