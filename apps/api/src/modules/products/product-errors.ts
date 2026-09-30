@@ -18,6 +18,14 @@ export const variantNotFound = (id: string) =>
 export const productStale = (id: string) =>
   new CodedConflictException('PRODUCT_STALE', 'The product changed since it was read', { id });
 
+/** Order lines (or anything else) still reference its variants; the seller archives instead. */
+export const productInUse = (id: string) =>
+  new CodedConflictException(
+    'PRODUCT_IN_USE',
+    'The product is referenced by orders; archive it instead',
+    { id },
+  );
+
 export const productImageNotFound = (id: string) =>
   new CodedNotFoundException('PRODUCT_IMAGE_NOT_FOUND', 'Image not found', { id });
 
