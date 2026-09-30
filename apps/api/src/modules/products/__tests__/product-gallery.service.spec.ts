@@ -7,7 +7,6 @@ import {
   expectCoded,
   openCatalogTestDb,
   seedImages,
-  seedProduct,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
 import { productsService } from './products-service.fixture';

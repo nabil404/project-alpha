@@ -27,13 +27,24 @@ delivery address.
   references `organization(id)` and never `user(id)`, and all queries are scoped
   by it.
 - **Page** — connected Facebook Page, encrypted token, bot on/off.
-- **Product / Variant** — product: name, aliases, description, images,
-  delivery charge, status (`draft`, `active`, `archived`). Variant: name, SKU
-  (unique per seller among live variants), price, stock count. A product always
-  has at least one live variant; one sold without options has a single unnamed
-  default variant. Variants are archived, never deleted individually, so orders
-  keep pointing at them (a product hard delete cascades to its variants). The
-  AI sees only active products and their live variants. Stock is
+- **Product / Option / Variant** — product: name, aliases (shown to sellers
+  as Tags), description, images, a cover image, delivery charge, status
+  (`draft`, `active`, `archived`; shown as Draft, Published, Archived). A
+  product varies on up to 3 options (Size, Sleeve), each with ordered values;
+  each variant is one combination of values, one per option, with its own
+  SKU (unique per seller among live variants), price, stock count and
+  optional image. A product always has at least one live variant; one with
+  no options has a single unnamed default variant. A variant's name is its
+  values joined ("M / Short"), kept on archived variants for their orders.
+  Variants are archived, never deleted individually, so orders keep pointing
+  at them; removing a value archives its variants. A product hard delete
+  cascades to its variants and is refused once orders reference one. The
+  cover is the photo the assistant sends when no variant is picked, and for
+  variants without their own; gallery order does not change it. The dashboard
+  saves a product's options and variants as one document, and every write to
+  them bumps the product's revision, so a save from an outdated page is
+  refused. Order confirmation and cancellation, which change stock, must bump
+  it too. The AI sees only active products and their live variants. Stock is
   decremented when an order is confirmed and restored if it is cancelled.
 - **Category** — a seller's tree, at most 3 levels deep; names unique per seller.
   A product can sit in several categories. Deleting one is a soft delete, refused
