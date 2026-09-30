@@ -1,5 +1,23 @@
 {
   "account": {
+    "password": {
+      "change": "Change password",
+      "changed": "Password changed.",
+      "dialog": {
+        "current": "Current password",
+        "description": "Enter your current password, then choose a new one.",
+        "new": "New password",
+        "newHint": "At least {{min}} characters.",
+        "revokeOthers": "Sign out of other devices",
+        "submit": "Change password",
+        "title": "Change password"
+      },
+      "lastChanged": "Last changed {{date}}.",
+      "linkSent": "Check {{email}} for a link. Setting your password signs you out everywhere, so you'll sign in again with it.",
+      "noPassword": "You sign in with {{providers}}. Add a password to also sign in with {{email}}.",
+      "sendLink": "Email me a link",
+      "title": "Password"
+    },
     "profile": {
       "email": "Email",
       "emailHint": "Your sign-in email can't be changed.",
