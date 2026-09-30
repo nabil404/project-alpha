@@ -1,6 +1,235 @@
 {
+  "basics": {
+    "description": "Description",
+    "descriptionHint": "What you'd tell a customer about it. The assistant reads this too.",
+    "name": "Product name",
+    "title": "Basic details"
+  },
+  "delete": {
+    "confirm": "Delete product",
+    "description": "Its variants and photos go with it. This can't be undone. If you only want to stop selling it, set its status to Archived instead.",
+    "title": "Delete {{name}}?"
+  },
+  "editor": {
+    "actions": {
+      "delete": "Delete",
+      "discard": "Discard",
+      "reload": "Load the latest version",
+      "save": "Save product",
+      "saving": "Saving…"
+    },
+    "backToCatalog": "Back to catalog",
+    "breadcrumb": "Breadcrumb",
+    "leave": {
+      "confirm": "Leave without saving",
+      "description": "Your changes to this product haven't been saved.",
+      "stay": "Keep editing",
+      "title": "Leave this page?"
+    },
+    "newTitle": "New product",
+    "saved": "Product saved."
+  },
+  "gallery": {
+    "caption": "Photo {{number}} · {{w}} × {{h}}",
+    "default": "Default",
+    "defaultGroup": "Default image",
+    "defaultImage": "Default image",
+    "delete": "Delete photo {{number}}",
+    "deleteConfirm": "Delete photo",
+    "deleteDefault": "This is the default photo. The next photo becomes the default. This can't be undone.",
+    "deleteDescription": "Variants using it go back to the default photo. This can't be undone.",
+    "deleteShort": "Delete",
+    "deleteTitle": "Delete photo {{number}}?",
+    "description": "{{name}} · {{count}} photos",
+    "done": "Done",
+    "empty": "No photos yet.",
+    "fullScreen": "Full screen",
+    "hint": "Only one photo can be the default. The assistant sends it when a customer hasn't picked a variant. A new default is saved with the product.",
+    "makeDefault": "Make photo {{number}} the default image",
+    "title": "All photos",
+    "used": "{{count}} of {{max}} photos",
+    "view": "View photo {{number}} full screen"
+  },
+  "imagePicker": {
+    "add": "Add image for {{variant}}",
+    "addShort": "Add",
+    "change": "Change image for {{variant}}",
+    "description": "Pick one of this product's photos or upload a new one.",
+    "saveFirst": "Save the product first to add photos.",
+    "title": "Image for {{variant}}",
+    "upload": "Upload a new image",
+    "use": "Use photo",
+    "useDefault": "Use default photo",
+    "useDefaultNumbered": "Use photo {{number}} (default)",
+    "useNumbered": "Use photo {{number}}"
+  },
   "list": {
-    "empty": "No products yet.",
+    "addProduct": "Add product",
+    "empty": "Products you add appear here.",
     "title": "Catalog"
+  },
+  "options": {
+    "add": "Add option",
+    "addOption": "Add option",
+    "addValue": "Add {{option}}",
+    "added": "Added",
+    "apply": "Apply changes",
+    "create": "Create your own option",
+    "createNamed": "Create “{{name}}”",
+    "discard": "Discard this option",
+    "edit": "Edit {{name}}",
+    "editHint": "Removing a value removes the variants that use it when you save.",
+    "editShort": "Edit",
+    "editTitle": "Edit {{name}}",
+    "limit": "A product can have up to {{max}} options.",
+    "makesVariants_one": "This makes {{count}} variant.",
+    "makesVariants_other": "This makes {{count}} variants.",
+    "menuHint": "Up to {{max}} options per product. Each combination becomes a variant.",
+    "moreVariants": "+{{count}} more",
+    "name": "Option name",
+    "nameHint": "The assistant uses this name when it asks customers to choose.",
+    "nameTaken": "This product already has an option with this name.",
+    "newTitle": "New option",
+    "newVariantsHint": "New variants copy the price and image of the variant they come from, and start with no stock.",
+    "remove": "Remove {{name}}",
+    "removeShort": "Remove",
+    "removeValue": "Remove {{value}}",
+    "search": "Search or type a new option",
+    "suggested": "Suggested",
+    "suggestions": {
+      "colour": {
+        "examples": "Red, Blue, Black",
+        "name": "Colour"
+      },
+      "fabric": {
+        "examples": "Cotton, Georgette, Silk",
+        "name": "Fabric"
+      },
+      "length": {
+        "examples": "Regular, Long",
+        "name": "Length"
+      },
+      "packSize": {
+        "examples": "Single, Pack of 3",
+        "name": "Pack size"
+      },
+      "size": {
+        "examples": "S, M, L, XL",
+        "name": "Size"
+      }
+    },
+    "title": "Options",
+    "tooManyValues": "An option can have up to {{max}} values.",
+    "tooManyVariants": "That's more than {{max}} variants. Use fewer values.",
+    "used": "{{count}} of {{max}} options used",
+    "valuePlaceholder": "Type a value and press Enter",
+    "valueTaken": "{{value}} is already a value of this option.",
+    "values": "Values",
+    "valuesHint": "Customers see them in this order.",
+    "valuesRequired": "Add at least one value.",
+    "variantCount_one": "{{count}} variant",
+    "variantCount_other": "{{count}} variants"
+  },
+  "organisation": {
+    "addCategory": "Add a category",
+    "aliases": "Aliases",
+    "aliasesHint": "Other names customers use for it, separated with commas. Helps the assistant find it.",
+    "categories": "Categories",
+    "categoriesHint": "A product can be in more than one category. Customers and the assistant find it in each one.",
+    "loadFailed": "Categories couldn't be loaded. Refresh to try again.",
+    "noCategories": "You have no categories yet.",
+    "noMatch": "No category matches.",
+    "remove": "Remove {{name}}",
+    "selected": "Selected categories",
+    "title": "Organisation"
+  },
+  "photos": {
+    "add": "Add photos",
+    "alt": "Photo {{number}}",
+    "count": " · {{count}}",
+    "default": "Default",
+    "full": "A product can have up to {{max}} photos.",
+    "hint": "The default photo is what the assistant sends when a customer hasn't picked a variant, and for any variant without its own image. Change it in All photos.",
+    "more": "+{{count}}",
+    "moreLabel": "Show all {{count}} photos",
+    "saveFirst": "Save the product first, then add its photos.",
+    "showAll": "Show all {{count}}",
+    "title": "Photos",
+    "uploading": "Uploading…"
+  },
+  "status": {
+    "hint": "Published: the assistant offers it to customers. Draft: only you can see it while you finish it. Archived: no longer sold, kept for past orders.",
+    "title": "Status"
+  },
+  "stock": {
+    "outOfStock": "Out of stock",
+    "title": "Stock summary",
+    "total": "Total in stock",
+    "variantsOf": "{{count}} of {{total}}"
+  },
+  "upload": {
+    "addMore": "Add more",
+    "cancelUpload": "Cancel upload",
+    "connection": "Couldn't upload. Check your connection.",
+    "count": "{{count}} photos",
+    "description": "{{name}} has {{count}} photos, so you can add up to {{room}} more · JPEG, PNG or WebP, up to 10 MB each",
+    "done": "Done",
+    "drop": "Drag and drop photos here",
+    "failedCount": " · {{count}} failed",
+    "finished": "Uploaded {{done}} of {{total}}",
+    "hint": "New photos go after the existing ones. Your default photo stays the same.",
+    "listHint": "Choose a photo in the list to preview it. New photos go after the existing ones; your default photo stays the same. Change it in All photos.",
+    "meta": "· {{w}} × {{h}} · {{size}}",
+    "none": "No photos selected",
+    "or": "or",
+    "overall": "Upload progress",
+    "percent": "{{value}}%",
+    "previewOf": "Preview of {{name}}",
+    "progress": "Uploading {{current}} of {{total}}",
+    "refused": "{{files}}: {{reason}}",
+    "remove": "Remove {{name}}",
+    "retry": "Retry",
+    "retryFailed": "Retry {{count}} failed",
+    "select": "Select from files",
+    "selected": "Selected photos",
+    "show": "Preview {{name}}",
+    "submit_one": "Upload {{count}} photo",
+    "submit_other": "Upload {{count}} photos",
+    "summary": "{{count}} photos · {{size}}",
+    "title": "Add photos",
+    "uploaded": "Uploaded · {{size}}",
+    "uploadingSize": "Uploading · {{size}}",
+    "waiting": "Waiting · {{size}}"
+  },
+  "variants": {
+    "addMissing_one": "Add the missing one",
+    "addMissing_other": "Add all {{count}} missing",
+    "addVariant": "Add variant",
+    "descriptionMany": "Only the combinations you sell. Each one has its own image, price and stock; a variant without its own image uses the default photo.",
+    "descriptionNone": "One price, stock and image for the whole product. Add an option, like Size, to sell it in more than one variant.",
+    "descriptionOne": "Each {{option}} has its own image, price and stock. One without its own image uses the default photo.",
+    "image": "Image",
+    "missing": "Pick a value for each option to add that combination. Missing now: {{list}}.",
+    "noneMissing": "Every combination is in the table.",
+    "only": "Default",
+    "price": "Price",
+    "priceFor": "Price for {{variant}}",
+    "priceInvalid": "Enter an amount, like 1600 or 1,600.50.",
+    "remove": "Remove",
+    "removeVariant": "Remove {{variant}}",
+    "sku": "SKU",
+    "skuFor": "SKU for {{variant}}",
+    "skuPlaceholder": "Made for you",
+    "stock": "Stock",
+    "stockFor": "Stock for {{variant}}",
+    "stockInvalid": "Enter a whole number, like 0 or 12.",
+    "title": "Variants",
+    "variant": "Variant"
+  },
+  "viewer": {
+    "close": "Exit full screen",
+    "next": "Next photo",
+    "position": "{{current}} of {{total}}",
+    "previous": "Previous photo"
   }
 }

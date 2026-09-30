@@ -1,4 +1,4 @@
-import type { ConversationState } from '@app/shared';
+import type { ConversationState, ProductStatus, StockStatus } from '@app/shared';
 
 /**
  * Status → badge tone, in one place (docs/DESIGN.md, "Status badge tones").
@@ -15,6 +15,17 @@ export const conversationStateTones = {
   handed_off: 'warning',
   abandoned: 'neutral',
 } as const satisfies Record<ConversationState, StatusTone | null>;
+
+export const productStatusTones = {
+  draft: 'neutral',
+  active: 'success',
+  archived: 'neutral',
+} as const satisfies Record<ProductStatus, StatusTone>;
+
+export const stockStatusTones = {
+  in_stock: 'success',
+  out_of_stock: 'danger',
+} as const satisfies Record<StockStatus, StatusTone>;
 
 export const statusToneClasses = {
   accent: 'bg-accent-soft text-accent',

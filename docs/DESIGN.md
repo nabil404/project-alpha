@@ -87,6 +87,8 @@ Tailwind utilities are `bg-<token>`, `text-<token>`, `border-<token>`
 | `focus-ring`               | = `accent`            | = `accent`            | 2px focus outline (applied globally)                        |
 | `link`                     | = `accent`            | = `accent`            | Inline links                                                |
 | `overlay`                  | black-ish 40%         | black 60%             | Scrim behind dialogs and the mobile drawer                  |
+| `viewer` / `on-viewer`     | `#141517` / `#ffffff` | same as Light         | Full-screen photo viewer, dark in every theme               |
+| `on-viewer-muted`          | `#a4a59f`             | same as Light         | Secondary text in the photo viewer                          |
 
 ## Type
 
@@ -172,6 +174,8 @@ new enum member fails the build instead of rendering unstyled.
 | Order `cancelled`, stock `out_of_stock`            | danger                       |
 | Conversation `awaiting_confirmation`, `handed_off` | warning                      |
 | Conversation `abandoned`                           | neutral                      |
+| Product `active` (Published)                       | success                      |
+| Product `draft`, `archived`                        | neutral                      |
 
 Keep `accent` for the one status that needs the seller: the teal accent sits
 near `success` in hue, so an accent badge must never be the only thing that

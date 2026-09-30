@@ -13,9 +13,9 @@ specs. This page describes what is actually built.
 composite tenant keys and forced row-level security, `CategoriesService` and
 `ProductsService` with every rule below (including the AI's
 `findSellableCatalog` read), product image upload/delete/reorder over HTTP,
-object storage on Cloudflare R2, and a daily orphan sweep in the worker. Not
-built yet: HTTP routes for products, variants and categories, the dashboard
-catalog UI, CSV import, and stock movement on orders (see
+object storage on Cloudflare R2, a daily orphan sweep in the worker, and the
+dashboard's product add/edit page. Not built yet: the products list, category
+writes, CSV import, and stock movement on orders (see
 [Not yet built](#not-yet-built)).
 
 ## At a glance
@@ -372,10 +372,18 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
 
 ## Not yet built
 
-- **Catalog HTTP routes** for products, variants and categories, with OpenAPI.
-  The services and input schemas are ready.
-- **Dashboard UI.** `/catalog` renders only its title. The product list and
-  edit page, the image gallery, and the variant image picker all wait on it.
+- **Catalog HTTP routes** for listing products (`GET /products`) and writing
+  categories. The product edit page's routes are built.
+- **Dashboard UI, beyond the edit page.** `/catalog/products/new` and
+  `/catalog/products/$productId` are built: basic details, the option editor
+  and variant table, the variant image picker, status, categories and
+  aliases, and the photo dialogs (Add photos with per-file progress, All
+  photos with delete and the default choice, and a full-screen viewer). The
+  default photo is saved with the page; uploads and deletes happen at once.
+  Still to come: the products list (it waits on `GET /products`), reordering
+  photos, the Categories page, and fields the design shows that the API
+  doesn't hold yet: a per-product delivery charge choice, the assistant
+  notes, the low-stock threshold and sales figures.
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
 - **Stock movement.** Decrement on order confirmation (row lock, reject if

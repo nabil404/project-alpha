@@ -84,9 +84,36 @@ export function useFormatters() {
     [locale],
   );
 
+  /** "৳" for BDT: the prefix inside an amount field. */
+  const currencySymbol = useCallback(
+    (currency: string): string =>
+      new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency,
+        currencyDisplay: 'narrowSymbol',
+      })
+        .formatToParts(0)
+        .find((part) => part.type === 'currency')?.value ?? currency,
+    [locale],
+  );
+
+  /** "1.6 MB", or "240 kB" under a megabyte: a file's size for the seller, not a byte count. */
+  const formatFileSize = useCallback(
+    (bytes: number): string => {
+      const megabytes = bytes / 1_000_000;
+      const [value, unit] = megabytes >= 1 ? [megabytes, 'megabyte'] : [bytes / 1000, 'kilobyte'];
+      return new Intl.NumberFormat(locale, {
+        style: 'unit',
+        unit,
+        maximumFractionDigits: 1,
+      }).format(value);
+    },
+    [locale],
+  );
+
   return useMemo(
-    () => ({ locale, formatMoney, formatDate, formatRelativeDay }),
-    [locale, formatMoney, formatDate, formatRelativeDay],
+    () => ({ locale, formatMoney, formatDate, formatRelativeDay, currencySymbol, formatFileSize }),
+    [locale, formatMoney, formatDate, formatRelativeDay, currencySymbol, formatFileSize],
   );
 }
 
