@@ -20,7 +20,7 @@ export const PRODUCT_OPTION_VALUE_MAX_COUNT = 30;
 /** Live variants per product. Options multiply; this caps what one save can create. */
 export const PRODUCT_VARIANT_MAX_COUNT = 100;
 
-/** A stored product image as the API returns it. URLs are public; `position` 0 is the cover. */
+/** A stored product image as the API returns it. URLs are public; `position` is gallery order only. */
 export const productImageSchema = z.object({
   id: z.string().uuid(),
   url: z.string().url(),
@@ -31,7 +31,7 @@ export const productImageSchema = z.object({
 });
 export type ProductImage = z.infer<typeof productImageSchema>;
 
-/** The product's current image ids, every one exactly once, in the new order. */
+/** The product's current image ids, every one exactly once, in the new gallery order. */
 export const reorderProductImagesSchema = z.object({
   imageIds: z.array(z.string().uuid()).min(1).max(PRODUCT_IMAGE_MAX_COUNT),
 });

@@ -15,7 +15,7 @@ export type NewProductImage = Pick<
  */
 @Injectable()
 export class ProductImageRepository {
-  /** Ordered by product, then cover first. */
+  /** Ordered by product, then gallery position. */
   async listForProducts(
     executor: Executor,
     { merchantId }: TenantScope,

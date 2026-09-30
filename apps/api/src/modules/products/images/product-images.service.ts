@@ -14,7 +14,7 @@ import {
   productNotFound,
 } from '../product-errors';
 import { toProductImage } from '../product-mappers';
-import { ProductsRepository } from '../products.repository';
+import { ProductsRepository, type ProductRow } from '../products.repository';
 import { normalizeProductImage, type NormalizedImage } from './normalize-product-image';
 import { deleteObjectsQuietly, objectKeysFor } from './product-image-objects';
 import { PRODUCT_IMAGE_OBJECT_OPTIONS, productImageKeys } from './product-image-keys';
@@ -54,8 +54,10 @@ export class ProductImagesService {
 
     try {
       const row = await withMerchant(this.db, scope.merchantId, async (tx) => {
-        const position = await this.countWithRoom(tx, scope, productId, { lock: true });
-        return this.images.insert(tx, scope, {
+        const { position, product } = await this.countWithRoom(tx, scope, productId, {
+          lock: true,
+        });
+        const inserted = await this.images.insert(tx, scope, {
           id,
           productId,
           storageKey: keys.full,
@@ -64,6 +66,11 @@ export class ProductImagesService {
           height: image.height,
           byteSize: image.byteSize,
         });
+        // A product with photos always has a cover; the first photo becomes it.
+        if (product.coverImageId === null) {
+          await this.products.setCoverImage(tx, scope, productId, id);
+        }
+        return inserted;
       });
       return toProductImage(row, this.storage);
     } catch (error) {
@@ -75,7 +82,8 @@ export class ProductImagesService {
   async delete(scope: TenantScope, productId: string, imageId: string): Promise<void> {
     const deleted = await withMerchant(this.db, scope.merchantId, async (tx) => {
       // Another merchant's product answers exactly as a missing image does.
-      if (!(await this.products.findProduct(tx, scope, productId, { lock: true }))) return null;
+      const product = await this.products.findProduct(tx, scope, productId, { lock: true });
+      if (!product) return null;
       const row = await this.images.delete(tx, scope, productId, imageId);
       if (row) {
         const remaining = await this.images.listForProducts(tx, scope, [productId]);
@@ -85,6 +93,10 @@ export class ProductImagesService {
           productId,
           remaining.map((image) => image.id),
         );
+        // The foreign key already nulled the cover if this was it; the first remaining photo takes over.
+        if (product.coverImageId === row.id) {
+          await this.products.setCoverImage(tx, scope, productId, remaining[0]?.id ?? null);
+        }
       }
       return row;
     });
@@ -118,22 +130,21 @@ export class ProductImagesService {
   }
 
   /**
-   * The product's image count, which is also the next position, after proving
-   * the product is this merchant's and has room. `lock` holds the product row,
-   * serializing gallery changes, until the transaction ends.
+   * The product, and its image count, which is also the next position, after
+   * proving the product is this merchant's and has room. `lock` holds the
+   * product row, serializing gallery changes, until the transaction ends.
    */
   private async countWithRoom(
     tx: Transaction,
     scope: TenantScope,
     productId: string,
     { lock }: { lock: boolean },
-  ): Promise<number> {
-    if (!(await this.products.findProduct(tx, scope, productId, { lock }))) {
-      throw productNotFound(productId);
-    }
+  ): Promise<{ position: number; product: ProductRow }> {
+    const product = await this.products.findProduct(tx, scope, productId, { lock });
+    if (!product) throw productNotFound(productId);
     const count = await this.images.count(tx, scope, productId);
     if (count >= PRODUCT_IMAGE_MAX_COUNT) throw productImageLimitReached();
-    return count;
+    return { position: count, product };
   }
 
   private async storeBoth(

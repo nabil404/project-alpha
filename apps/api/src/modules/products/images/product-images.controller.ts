@@ -107,7 +107,7 @@ export class ProductImagesController {
   @ApiOperation({
     summary: 'Reorder product images',
     description:
-      "`imageIds` must list each of the product's images exactly once; the first becomes the cover.",
+      "`imageIds` must list each of the product's images exactly once. The order is the gallery's only; the cover is set separately.",
   })
   @ApiBody({
     schema: z.toJSONSchema(reorderProductImagesSchema, {
