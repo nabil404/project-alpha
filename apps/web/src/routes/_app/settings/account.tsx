@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { accountSettingsSearchSchema, type AccountSettingsSearch } from '@app/shared';
 
-import { ProfileCard } from '@/features/account';
+import { PasswordCard, ProfileCard } from '@/features/account';
 import { linkedAccountsQueryOptions, SignInMethodsCard } from '@/features/auth';
 
 /** Also where linking Google or Facebook lands: `?error=<code>` after a refused link. */
@@ -19,6 +19,7 @@ function AccountSettingsPage() {
     <div className="flex flex-col gap-6">
       <ProfileCard />
       <SignInMethodsCard error={error} />
+      <PasswordCard />
     </div>
   );
 }
