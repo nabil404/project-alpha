@@ -31,6 +31,12 @@ export const productNeedsVariant = (id?: string) =>
 export const productImageNotFound = (id: string) =>
   new CodedNotFoundException('PRODUCT_IMAGE_NOT_FOUND', 'Image not found', { id });
 
+/** An option or option value id a save names that is not on this product. */
+export const productOptionNotFound = (id: string) =>
+  new CodedNotFoundException('PRODUCT_OPTION_NOT_FOUND', 'Option or option value not found', {
+    id,
+  });
+
 export const productImageLimitReached = () =>
   new CodedConflictException(
     'PRODUCT_IMAGE_LIMIT_REACHED',
