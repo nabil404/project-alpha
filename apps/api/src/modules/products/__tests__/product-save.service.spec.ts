@@ -215,7 +215,7 @@ describeDb('ProductsService — save', () => {
     );
   });
 
-  it('sets the cover to one of its own photos, or the first when null', async () => {
+  it('sets the cover to one of its own photos, or the first when null or not its own', async () => {
     const product = await sized();
     const [first, second] = await seedImages(t.db, t.merchantA, product.id, 2);
     const other = await seedProduct(t.db, t.merchantA);
@@ -231,12 +231,11 @@ describeDb('ProductsService — save', () => {
     });
     expect(defaulted.coverImageId).toBe(first!.id);
 
-    await expectCoded(
-      save(defaulted, (doc) => {
-        doc.coverImageId = foreign!.id;
-      }),
-      'PRODUCT_IMAGE_NOT_FOUND',
-    );
+    // Another product's photo is not this product's, so the first photo stays the cover.
+    const refused = await save(defaulted, (doc) => {
+      doc.coverImageId = foreign!.id;
+    });
+    expect(refused.coverImageId).toBe(first!.id);
   });
 
   it('sets and clears a variant image', async () => {
@@ -261,6 +260,37 @@ describeDb('ProductsService — save', () => {
       }),
       'SKU_TAKEN',
     );
+  });
+
+  it('swaps SKUs between two variants in one save', async () => {
+    const product = await sized();
+    const [m, l] = product.variants;
+    const saved = await save(product, (doc) => {
+      doc.variants[0]!.sku = l!.sku;
+      doc.variants[1]!.sku = m!.sku;
+    });
+    expect(saved.variants.map((v) => [v.id, v.sku])).toEqual([
+      [m!.id, l!.sku],
+      [l!.id, m!.sku],
+    ]);
+  });
+
+  it('gives a new variant the SKU a surviving variant gives up', async () => {
+    const product = await sized();
+    const [m, l] = product.variants;
+    const saved = await save(product, (doc) => {
+      doc.options[0]!.values.push({ value: 'XL' });
+      doc.variants.unshift({
+        optionValues: ['XL'],
+        sku: l!.sku,
+        price: 1,
+        stock: 0,
+        imageId: null,
+      });
+      doc.variants[2]!.sku = sku('l2');
+    });
+    expect(saved.variants.find((v) => v.name === 'XL')?.sku).toBe(l!.sku);
+    expect(saved.variants.find((v) => v.id === m!.id)?.sku).toBe(m!.sku);
   });
 
   it("cannot save another merchant's product", async () => {

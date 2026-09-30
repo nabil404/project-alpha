@@ -164,26 +164,15 @@ describe('planProductDocument', () => {
     ).toMatchObject({ code: 'VARIANT_NOT_FOUND' });
   });
 
-  it("refuses an image that isn't this product's, for a variant or the cover", () => {
-    const foreign = randomUUID();
-    const base = { options: [sizeOption([{ id: ids.s, value: 'S' }])] };
-    expect(
-      codeOf(() =>
-        planProductDocument(stored, {
-          ...base,
-          variants: [variant({ optionValues: ['S'], imageId: foreign })],
-        }),
-      ),
-    ).toMatchObject({ code: 'PRODUCT_IMAGE_NOT_FOUND' });
-    expect(
-      codeOf(() =>
-        planProductDocument(stored, {
-          ...base,
-          variants: [variant({ optionValues: ['S'] })],
-          coverImageId: foreign,
-        }),
-      ),
-    ).toMatchObject({ code: 'PRODUCT_IMAGE_NOT_FOUND' });
+  it("treats an image the product doesn't have as none, for a variant or the cover", () => {
+    const gone = randomUUID();
+    const plan = planProductDocument(stored, {
+      options: [sizeOption([{ id: ids.s, value: 'S' }])],
+      variants: [variant({ optionValues: ['S'], imageId: gone })],
+      coverImageId: gone,
+    });
+    expect(plan.variants[0]?.imageId).toBeNull();
+    expect(plan.coverImageId).toBe(images[0]);
   });
 
   it('keeps a given cover, picks the first photo for null, and leaves undefined alone', () => {

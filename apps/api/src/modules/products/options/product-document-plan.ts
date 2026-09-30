@@ -1,5 +1,5 @@
 import type { ProductOptionInput, ProductVariantInput } from '@app/shared';
-import { productImageNotFound, productOptionNotFound, variantNotFound } from '../product-errors';
+import { productOptionNotFound, variantNotFound } from '../product-errors';
 import { normalizeSku } from '../sku';
 
 /**
@@ -105,12 +105,12 @@ export function planProductDocument(
 
   const liveVariants = new Set(current.variantIds);
   const images = new Set(current.imageIds);
+  // The gallery changes outside the document, so the page may still name a
+  // photo deleted since it read; that reads as none, and the cover takes over.
+  const ownImage = (id: string | null) => (id !== null && images.has(id) ? id : null);
   const variants: PlannedVariant[] = doc.variants.map((variant) => {
     if (variant.id !== undefined && !liveVariants.has(variant.id)) {
       throw variantNotFound(variant.id);
-    }
-    if (variant.imageId !== null && !images.has(variant.imageId)) {
-      throw productImageNotFound(variant.imageId);
     }
     const valueRefs = variant.optionValues.map((text, option) => {
       const value =
@@ -126,7 +126,7 @@ export function planProductDocument(
       sku: normalizeSku(variant.sku),
       price: variant.price,
       stock: variant.stock,
-      imageId: variant.imageId,
+      imageId: ownImage(variant.imageId),
       valueRefs,
     };
   });
@@ -136,10 +136,7 @@ export function planProductDocument(
 
   let coverImageId: string | null | undefined;
   if (doc.coverImageId !== undefined) {
-    if (doc.coverImageId !== null && !images.has(doc.coverImageId)) {
-      throw productImageNotFound(doc.coverImageId);
-    }
-    coverImageId = doc.coverImageId ?? current.imageIds[0] ?? null;
+    coverImageId = ownImage(doc.coverImageId) ?? current.imageIds[0] ?? null;
   }
 
   return { archiveVariantIds, deleteOptionIds, deleteValueIds, options, variants, coverImageId };

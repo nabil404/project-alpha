@@ -92,7 +92,6 @@ export class ProductsController {
     'PRODUCT_NOT_FOUND',
     'PRODUCT_OPTION_NOT_FOUND',
     'VARIANT_NOT_FOUND',
-    'PRODUCT_IMAGE_NOT_FOUND',
     'CATEGORY_NOT_FOUND',
   ])
   @ApiCodedError(409, ['PRODUCT_STALE', 'SKU_TAKEN'])

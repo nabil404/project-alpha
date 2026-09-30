@@ -67,6 +67,16 @@ export class ProductWriter {
       valueIds.push(ids);
     }
 
+    // The live-SKU index is checked row by row, so a swap between surviving
+    // variants, or a new variant taking a SKU one gives up, would collide
+    // halfway. Every surviving variant whose SKU is written below first moves
+    // to a placeholder only it can hold (its own id).
+    for (const variant of plan.variants) {
+      if (variant.id && variant.sku !== null) {
+        await this.products.updateVariant(tx, scope, variant.id, { sku: `PARKED-${variant.id}` });
+      }
+    }
+
     for (const variant of plan.variants) {
       let variantId = variant.id;
       if (variantId) {

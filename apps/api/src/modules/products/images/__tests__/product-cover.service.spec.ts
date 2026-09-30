@@ -6,7 +6,7 @@ import {
   openCatalogTestDb,
   type CatalogTestDb,
 } from '../../../database/__tests__/catalog-test-db';
-import { productsService } from '../../__tests__/products-service.fixture';
+import { documentOf, productsService } from '../../__tests__/products-service.fixture';
 import { ProductsRepository } from '../../products.repository';
 import type { ProductsService } from '../../products.service';
 import { ProductImageRepository } from '../product-image.repository';
@@ -85,5 +85,22 @@ describeDb('ProductImagesService — the cover', () => {
     await images.upload(scope(), created.id, await jpeg());
     await images.delete(scope(), created.id, upload.id);
     expect((await products.get(t.merchantA, created.id)).version).toBe(created.version);
+  });
+
+  it('still saves a page that read photos deleted since, falling back to the cover', async () => {
+    const created = await product();
+    const first = await images.upload(scope(), created.id, await jpeg());
+    const second = await images.upload(scope(), created.id, await jpeg());
+    const read = await products.get(t.merchantA, created.id);
+    const doc = documentOf(read);
+    doc.variants[0]!.imageId = second.id;
+
+    await images.delete(scope(), created.id, first.id);
+    await images.delete(scope(), created.id, second.id);
+    const third = await images.upload(scope(), created.id, await jpeg());
+
+    const saved = await products.save(t.merchantA, created.id, doc);
+    expect(saved.coverImageId).toBe(third.id);
+    expect(saved.variants[0]?.imageId).toBeNull();
   });
 });
