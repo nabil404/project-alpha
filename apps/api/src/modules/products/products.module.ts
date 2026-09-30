@@ -6,16 +6,18 @@ import { ProductImagesController } from './images/product-images.controller';
 import { ProductImagesService } from './images/product-images.service';
 import { ProductOptionsRepository } from './options/product-options.repository';
 import { ProductWriter } from './options/product-writer';
+import { ProductsController } from './products.controller';
 import { ProductsRepository } from './products.repository';
 import { ProductsService } from './products.service';
 
 /**
- * Depends on categories, never the reverse. The image routes are the first
- * controller; the catalog API design adds the product routes beside them.
+ * Depends on categories, never the reverse. Products and their images are
+ * separate controllers: the product document is saved as a whole, while the
+ * gallery changes one photo at a time.
  */
 @Module({
   imports: [CategoriesModule, StorageModule],
-  controllers: [ProductImagesController],
+  controllers: [ProductsController, ProductImagesController],
   providers: [
     ProductsRepository,
     ProductsService,
