@@ -185,6 +185,42 @@ describeDb('product routes over HTTP', () => {
     await request(server()).delete(path).expect(404);
   });
 
+  it('patches one variant, which makes an older save stale', async () => {
+    const created = await request(server()).post('/api/v1/products').send(newProduct).expect(201);
+    const variantId = created.body.variants[1].id;
+
+    const patched = await request(server())
+      .patch(`/api/v1/products/${created.body.id}/variants/${variantId}`)
+      .send({ stock: 2, price: 150000 })
+      .expect(200);
+    expect(productSchema.parse(patched.body).variants[1]).toMatchObject({
+      id: variantId,
+      stock: 2,
+      price: 150000,
+    });
+
+    await request(server())
+      .put(`/api/v1/products/${created.body.id}`)
+      .send({ ...newProduct, version: created.body.version })
+      .expect(409);
+  });
+
+  it("refuses a variant patch for a missing variant, bad fields, or another merchant's product", async () => {
+    const created = await request(server()).post('/api/v1/products').send(newProduct).expect(201);
+    const path = `/api/v1/products/${created.body.id}/variants`;
+    const variantId = created.body.variants[0].id;
+
+    await request(server()).patch(`${path}/${created.body.id}`).send({ stock: 1 }).expect(404);
+    const invalid = await request(server())
+      .patch(`${path}/${variantId}`)
+      .send({ stock: -1 })
+      .expect(400);
+    expect(invalid.body.error.fields.stock[0].code).toBe('MIN_VALUE');
+
+    merchantId = t.merchantB;
+    await request(server()).patch(`${path}/${variantId}`).send({ stock: 1 }).expect(404);
+  });
+
   it('refuses a malformed id with 400', async () => {
     await request(server()).get('/api/v1/products/not-a-uuid').expect(400);
   });

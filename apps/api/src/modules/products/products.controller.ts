@@ -26,10 +26,12 @@ import {
   productSchema,
   saveProductSchema,
   updateProductSchema,
+  updateVariantSchema,
   type CreateProduct,
   type Product,
   type SaveProduct,
   type UpdateProduct,
+  type UpdateVariant,
 } from '@app/shared';
 import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
@@ -119,6 +121,26 @@ export class ProductsController {
     @Body(new ZodValidationPipe(updateProductSchema)) body: UpdateProduct,
   ): Promise<Product> {
     return this.products.update(tenantScope(request).merchantId, id, body);
+  }
+
+  @Patch(':id/variants/:variantId')
+  @ApiOperation({
+    summary: 'Update one variant',
+    description:
+      "Changes a live variant's SKU, price, stock or image without the whole document. Its option values change only through a save. Bumps the product's version.",
+  })
+  @ApiBody({ schema: json(updateVariantSchema, 'input') })
+  @ApiOkResponse({ description: 'The product.', schema: productJson })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'VARIANT_NOT_FOUND', 'PRODUCT_IMAGE_NOT_FOUND'])
+  @ApiCodedError(409, ['SKU_TAKEN'])
+  updateVariant(
+    @Req() request: TenantRequest,
+    @Param('id', uuidParam) id: string,
+    @Param('variantId', uuidParam) variantId: string,
+    @Body(new ZodValidationPipe(updateVariantSchema)) body: UpdateVariant,
+  ): Promise<Product> {
+    return this.products.updateVariant(tenantScope(request).merchantId, id, variantId, body);
   }
 
   @Delete(':id')

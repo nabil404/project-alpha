@@ -7,6 +7,8 @@ import {
   type Product,
   type SaveProduct,
   type UpdateProduct,
+  type UpdateVariant,
+  updateVariantSchema,
 } from '@app/shared';
 import { parseOrThrow } from '../../common/parse-or-throw';
 import type { TenantScope, Transaction } from '../database/base.repository';
@@ -22,9 +24,17 @@ import { ProductImageRepository } from './images/product-image.repository';
 import { EMPTY_PRODUCT_STATE, planProductDocument } from './options/product-document-plan';
 import { ProductOptionsRepository } from './options/product-options.repository';
 import { ProductWriter } from './options/product-writer';
-import { productInUse, productNotFound, productStale } from './product-errors';
+import {
+  guardSku,
+  productImageNotFound,
+  productInUse,
+  productNotFound,
+  productStale,
+  variantNotFound,
+} from './product-errors';
 import { toProduct, toProductImage } from './product-mappers';
 import { ProductsRepository, type ProductRow } from './products.repository';
+import { normalizeSku } from './sku';
 
 /** What the AI may quote from: nothing a seller has drafted, archived or deleted. */
 export interface SellableCatalog {
@@ -118,6 +128,44 @@ export class ProductsService {
       }
       if (categoryIds !== undefined) await this.linkCategories(tx, scope, id, categoryIds);
       return this.load(tx, scope, id);
+    });
+  }
+
+  /**
+   * One live variant's own fields, outside the document save (a quick stock
+   * change, say). It bumps the product's version, so an edit page still
+   * holding the old one cannot overwrite the change with a stale save.
+   */
+  async updateVariant(
+    merchantId: string,
+    productId: string,
+    variantId: string,
+    input: UpdateVariant,
+  ): Promise<Product> {
+    const fields = parseOrThrow(updateVariantSchema, input);
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const scope = { merchantId };
+      if (!(await this.products.findProduct(tx, scope, productId, { lock: true }))) {
+        throw productNotFound(productId);
+      }
+      const live = await this.products.liveVariants(tx, scope, [productId]);
+      if (!live.some((variant) => variant.id === variantId)) throw variantNotFound(variantId);
+      // The foreign key keeps the image within the merchant; this keeps it within the product.
+      if (fields.imageId) {
+        const own = await this.images.listForProducts(tx, scope, [productId]);
+        if (!own.some((image) => image.id === fields.imageId)) {
+          throw productImageNotFound(fields.imageId);
+        }
+      }
+
+      if (Object.values(fields).some((value) => value !== undefined)) {
+        const sku = fields.sku === undefined ? undefined : (normalizeSku(fields.sku) ?? undefined);
+        await guardSku(sku, () =>
+          this.products.updateVariant(tx, scope, variantId, { ...fields, sku }),
+        );
+        await this.products.updateProduct(tx, scope, productId, {});
+      }
+      return this.load(tx, scope, productId);
     });
   }
 

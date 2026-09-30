@@ -41,8 +41,9 @@ delivery address.
   cascades to its variants and is refused once orders reference one. The
   cover is the photo the assistant sends when no variant is picked, and for
   variants without their own; gallery order does not change it. The dashboard
-  saves a product's options and variants as one document, and every write to
-  them bumps the product's revision, so a save from an outdated page is
+  saves a product's options and variants as one document; a single
+  variant's SKU, price, stock or image can also change on its own. Every write
+  to them bumps the product's revision, so a save from an outdated page is
   refused. Order confirmation and cancellation, which change stock, must bump
   it too. The AI sees only active products and their live variants. Stock is
   decremented when an order is confirmed and restored if it is cancelled.
