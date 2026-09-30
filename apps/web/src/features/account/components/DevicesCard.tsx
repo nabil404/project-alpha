@@ -67,9 +67,7 @@ function DeviceRow({
   const { formatDate, formatRelativeDay } = useFormatters();
   const { browser, os } = session;
   const name =
-    browser && os
-      ? t('account.devices.device', { browser, os })
-      : (browser ?? os ?? t('account.devices.unknown'));
+    browser && os ? t('account.devices.device', { browser, os }) : t('account.devices.unknown');
 
   return (
     <li className="flex items-center gap-4 py-3">
