@@ -92,7 +92,9 @@ export class ProductsService {
         categoryIds:
           query.categoryId === undefined
             ? undefined
-            : await this.categories.liveSubtreeIds(tx, scope, query.categoryId),
+            : (await this.categories.findLive(tx, scope, query.categoryId))
+              ? [query.categoryId]
+              : [],
       };
       const total = await this.products.countList(tx, scope, filters);
       const rows = await this.products.listPage(tx, scope, {
@@ -329,7 +331,7 @@ export class ProductsService {
     if (ids.length > 0) {
       // Category deletion holds the same lock, so a category cannot be deleted
       // between this liveness check and the link being written.
-      await this.categories.lockTree(tx, scope);
+      await this.categories.lockCategories(tx, scope);
       if ((await this.categories.countLive(tx, scope, ids)) !== ids.length) {
         throw categoryNotFound();
       }

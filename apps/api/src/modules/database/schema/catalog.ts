@@ -256,7 +256,6 @@ export const category = pgTable(
   {
     id: id(),
     merchantId: merchantId(),
-    parentId: text('parent_id'),
     name: text('name').notNull(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: createdAt(),
@@ -264,17 +263,9 @@ export const category = pgTable(
   },
   (t) => [
     unique('category_merchant_id_uq').on(t.merchantId, t.id),
-    // MATCH SIMPLE (the default): a null parent_id skips the check, so roots need nothing.
-    foreignKey({
-      name: 'category_parent_fk',
-      columns: [t.merchantId, t.parentId],
-      foreignColumns: [t.merchantId, t.id],
-    }),
-    check('category_not_own_parent_ck', sql`${t.parentId} is null or ${t.parentId} <> ${t.id}`),
     uniqueIndex(CATEGORY_NAME_LIVE_UIDX)
       .on(t.merchantId, sql`lower(${t.name})`)
       .where(sql`${t.deletedAt} is null`),
-    index('category_merchant_parent_idx').on(t.merchantId, t.parentId),
     merchantIsolation('category_merchant_isolation', t.merchantId),
   ],
 );

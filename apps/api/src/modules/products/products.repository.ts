@@ -49,7 +49,7 @@ export interface ProductListRow {
 export interface ProductListQuery {
   filter: ProductListFilter;
   q?: string;
-  /** A category and its subcategories; a product in any of them matches. */
+  /** A product in any of these matches; empty matches nothing. */
   categoryIds?: string[];
   offset: number;
   limit: number;

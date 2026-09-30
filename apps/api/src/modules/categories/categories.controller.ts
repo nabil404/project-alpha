@@ -20,8 +20,7 @@ export class CategoriesController {
   @Get()
   @ApiOperation({
     summary: 'List categories',
-    description:
-      "The seller's live categories, flat; build the tree (and paths like Women › Kurtis) from parentId.",
+    description: "The seller's live categories, a flat list, sorted by name.",
   })
   @ApiOkResponse({
     description: 'Every live category.',

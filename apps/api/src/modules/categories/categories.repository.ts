@@ -7,17 +7,14 @@ import { liveCategory } from './category-visibility';
 
 export type CategoryRow = typeof category.$inferSelect;
 
-/** Bounds the recursive walks; a valid tree stops at CATEGORY_MAX_DEPTH long before this. */
-const MAX_WALK = 16;
-
 @Injectable()
 export class CategoriesRepository {
   /**
-   * Serializes this merchant's tree writes until the transaction ends. Without
-   * it, "A under B" and "B under A" each pass the cycle check against the
-   * other's pre-move snapshot and both commit.
+   * Serializes this merchant's category deletes and product links until the
+   * transaction ends, so a product cannot be linked to a category that is
+   * being deleted.
    */
-  async lockTree(executor: Executor, { merchantId }: TenantScope): Promise<void> {
+  async lockCategories(executor: Executor, { merchantId }: TenantScope): Promise<void> {
     await executor.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`category:${merchantId}`}, 0))`,
     );
@@ -52,89 +49,10 @@ export class CategoriesRepository {
     return row?.count ?? 0;
   }
 
-  /** `id` followed by its ancestors, nearest first. Its length is the depth of `id`; a root is 1. */
-  async chainToRoot(
-    executor: Executor,
-    { merchantId }: TenantScope,
-    id: string,
-  ): Promise<string[]> {
-    const result = await executor.execute<{ id: string }>(sql`
-      with recursive chain (id, parent_id, hops) as (
-        select id, parent_id, 0
-        from category
-        where merchant_id = ${merchantId} and id = ${id}
-        union all
-        select c.id, c.parent_id, chain.hops + 1
-        from category c
-        join chain on c.id = chain.parent_id
-        where c.merchant_id = ${merchantId} and chain.hops < ${MAX_WALK}
-      )
-      select id from chain order by hops
-    `);
-    return result.rows.map((row) => row.id);
-  }
-
-  /** Levels in the live subtree rooted at `id`: 1 for a leaf. */
-  async subtreeHeight(
-    executor: Executor,
-    { merchantId }: TenantScope,
-    id: string,
-  ): Promise<number> {
-    const result = await executor.execute<{ height: number | null }>(sql`
-      with recursive subtree (id, level) as (
-        select id, 1
-        from category
-        where merchant_id = ${merchantId} and id = ${id}
-        union all
-        select c.id, subtree.level + 1
-        from category c
-        join subtree on c.parent_id = subtree.id
-        where c.merchant_id = ${merchantId} and c.deleted_at is null and subtree.level < ${MAX_WALK}
-      )
-      select max(level)::int as height from subtree
-    `);
-    return result.rows[0]?.height ?? 0;
-  }
-
-  /** `id` and every live category under it; empty when `id` itself is not live. */
-  async liveSubtreeIds(
-    executor: Executor,
-    { merchantId }: TenantScope,
-    id: string,
-  ): Promise<string[]> {
-    const result = await executor.execute<{ id: string }>(sql`
-      with recursive subtree (id, level) as (
-        select id, 1
-        from category
-        where merchant_id = ${merchantId} and id = ${id} and deleted_at is null
-        union all
-        select c.id, subtree.level + 1
-        from category c
-        join subtree on c.parent_id = subtree.id
-        where c.merchant_id = ${merchantId} and c.deleted_at is null and subtree.level < ${MAX_WALK}
-      )
-      select id from subtree
-    `);
-    return result.rows.map((row) => row.id);
-  }
-
-  async hasLiveChildren(
-    executor: Executor,
-    { merchantId }: TenantScope,
-    id: string,
-  ): Promise<boolean> {
-    const [row] = await executor
-      .select({ id: category.id })
-      .from(category)
-      .where(and(eq(category.merchantId, merchantId), eq(category.parentId, id), liveCategory()))
-      .limit(1);
-    return row !== undefined;
-  }
-
   async insert(
     executor: Executor,
     { merchantId }: TenantScope,
-    values: { name: string; parentId: string | null },
+    values: { name: string },
   ): Promise<CategoryRow> {
     return one(
       await executor
@@ -146,8 +64,8 @@ export class CategoriesRepository {
   }
 
   /**
-   * `undefined` when the row lost a race to a concurrent delete: a rename-only
-   * update takes no tree lock, so its UPDATE can wait on the row lock behind a
+   * `undefined` when the row lost a race to a concurrent delete: a rename
+   * takes no lock, so its UPDATE can wait on the row lock behind a
    * `remove`, then re-check `deleted_at IS NULL` and match nothing. The caller
    * maps that to `CATEGORY_NOT_FOUND`.
    */
@@ -155,7 +73,7 @@ export class CategoriesRepository {
     executor: Executor,
     { merchantId }: TenantScope,
     id: string,
-    values: { name?: string; parentId?: string | null },
+    values: { name: string },
   ): Promise<CategoryRow | undefined> {
     const [row] = await executor
       .update(category)

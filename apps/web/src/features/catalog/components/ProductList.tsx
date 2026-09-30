@@ -7,6 +7,7 @@ import {
   PRODUCT_LIST_PAGE_SIZES,
   productListFilters,
   stockLevels,
+  type Category,
   type ListProductsQuery,
   type ProductCounts,
   type ProductListFilter,
@@ -21,7 +22,6 @@ import { statusToneDotClasses, stockLevelTones } from '@/i18n/status-tones';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-import { toCategoryEntries } from '../category-entries';
 import { CATALOG_CURRENCY } from '../currency';
 import { useCategories, useProductCounts, useProductList } from '../queries';
 import { ProductListRow } from './ProductListRow';
@@ -111,7 +111,7 @@ export function ProductList({
             <SearchInput value={query.q} onChange={(q) => onChange({ q })} />
             <CategorySelect
               value={query.categoryId}
-              options={toCategoryEntries(categories.data ?? [])}
+              options={categories.data ?? []}
               onChange={(categoryId) => onChange({ categoryId })}
             />
             <div
@@ -418,7 +418,7 @@ function CategorySelect({
   onChange,
 }: {
   value: string | undefined;
-  options: { id: string; name: string; path: string }[];
+  options: Category[];
   onChange: (categoryId: string | undefined) => void;
 }) {
   const { t } = useTranslation('catalog');
@@ -434,7 +434,7 @@ function CategorySelect({
         <option value="">{t('list.allCategories')}</option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
-            {option.path ? `${option.path} › ${option.name}` : option.name}
+            {option.name}
           </option>
         ))}
       </select>

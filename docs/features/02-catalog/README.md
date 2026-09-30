@@ -29,7 +29,7 @@ writes, CSV import, and stock movement on orders (see
 | Money            | Integer minor units (`price`, `delivery_charge`), never floats                                                      |
 | Variants         | At least one live per product; a product without options has one unnamed default variant                            |
 | SKU              | Required, unique per merchant among live variants, case-insensitive; generated when left blank                      |
-| Categories       | A tree at most 3 levels deep (`CATEGORY_MAX_DEPTH`); a product can sit in several                                   |
+| Categories       | A flat list, no nesting; a product can sit in several                                                               |
 | Images           | Up to 8 per product, 10 MB per upload, re-encoded by `sharp`, stored in R2 through the S3 API                       |
 
 ## Data model
@@ -42,13 +42,13 @@ Every table has a `text` UUID `id` (the junction table has none), a
 Every table also has `UNIQUE (merchant_id, id)`, which the composite foreign
 keys point at. RLS filters reads, but it does not check the ids a row points
 at. The composite keys do that, so a bug that writes another merchant's
-`product_id` or `parent_id` fails in the database.
+`product_id` or `category_id` fails in the database.
 
 | Table              | Key columns                                                                                             | Constraints worth knowing                                                                                                                                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `product`          | `name`, `description`, `aliases text[]`, `status`, `delivery_charge`                                    | `status` check; `delivery_charge >= 0`                                                                                                                                                                                         |
 | `product_variant`  | `product_id`, `name` (null = default), `sku`, `price`, `stock`, `is_default`, `image_id`, `archived_at` | FK to product `ON DELETE CASCADE`; `price`, `stock >= 0`; `is_default = (name IS NULL)`; partial unique `(merchant_id, sku) WHERE archived_at IS NULL`; partial unique `(product_id) WHERE is_default AND archived_at IS NULL` |
-| `category`         | `parent_id`, `name`, `deleted_at`                                                                       | Self FK on `(merchant_id, parent_id)` (`MATCH SIMPLE`, so roots need nothing); not its own parent; partial unique `(merchant_id, lower(name)) WHERE deleted_at IS NULL`                                                        |
+| `category`         | `name`, `deleted_at`                                                                                    | Partial unique `(merchant_id, lower(name)) WHERE deleted_at IS NULL`                                                                                                                                                           |
 | `product_category` | PK `(merchant_id, product_id, category_id)`                                                             | FK to product `ON DELETE CASCADE`; FK to category                                                                                                                                                                              |
 | `product_image`    | `product_id`, `storage_key`, `position`, `width`, `height`, `byte_size`                                 | FK to product `ON DELETE CASCADE`; `storage_key` unique; `position` dense `0..n-1`, `0` is the cover, deliberately not unique so a reorder needs no deferral                                                                   |
 
@@ -75,37 +75,28 @@ coded errors.
 Two Nest modules, [`modules/categories/`](../../../apps/api/src/modules/categories/)
 and [`modules/products/`](../../../apps/api/src/modules/products/), each with a
 repository and a service. The dependency runs one way: `ProductsModule` imports
-`CategoriesModule` for `CategoriesRepository` (the tree lock and liveness
+`CategoriesModule` for `CategoriesRepository` (the category lock and liveness
 checks). Categories never import from products. Every repository method takes
 an `Executor` and a `TenantScope` and filters by `merchantId`. Every service
 method runs inside `withMerchant`.
 
-### Category tree
+### Categories
 
-Any write that sets a parent (create with a parent, or move) first takes
+A flat list: a category has a name and nothing else, and there is no nesting.
+
+**Delete** is a soft delete. It takes
 `pg_advisory_xact_lock(hashtextextended('category:<merchantId>', 0))`
-(`CategoriesRepository.lockTree`), then:
-
-1. The parent must be live, else `CATEGORY_NOT_FOUND`.
-2. `chainToRoot` walks the parent's ancestors with a recursive CTE. If the
-   category being moved is on that chain → `CATEGORY_CYCLE`.
-3. The parent's depth plus the height of the moved subtree (`subtreeHeight`; a
-   new category is 1) must not exceed `CATEGORY_MAX_DEPTH`, else
-   `CATEGORY_TOO_DEEP`.
-
-The lock serializes tree writes per merchant, so two opposite moves (A under B,
-B under A) can't both pass the cycle check. `parentId: null` moves a category
-to the root; omitting `parentId` leaves it where it is.
-
-**Delete** is a soft delete under the same lock. It's refused with
-`CATEGORY_HAS_CHILDREN` while live subcategories exist. Otherwise it sets
-`deleted_at` and hard-deletes the category's `product_category` rows in the
-same transaction, so no junction join can surface a deleted category.
+(`CategoriesRepository.lockCategories`), the same lock a product takes when it
+links categories, so a product can't be linked to a category between the
+liveness check and the delete. It sets `deleted_at` and hard-deletes the
+category's `product_category` rows in the same transaction, so no junction join
+can surface a deleted category.
 
 **Names** are trimmed. A clash with another live category of the same merchant,
-anywhere in the tree and ignoring case, → `CATEGORY_NAME_TAKEN`. That is mapped
-from the unique index rather than pre-checked, so two racing requests can't
-both take the name. Deleting a category releases its name.
+ignoring case, → `CATEGORY_NAME_TAKEN`. That is mapped from the unique index
+rather than pre-checked, so two racing requests can't both take the name.
+Deleting a category releases its name. A rename takes no lock: if it loses a
+race to a delete it finds no live row and answers `CATEGORY_NOT_FOUND`.
 
 ### Variants
 
@@ -137,7 +128,7 @@ so two concurrent archives can't both pass the last-variant check.
 
 - `status` moves freely between `draft`, `active` and `archived`.
 - `categoryIds` on create or update **replaces** the product's links. It is
-  checked for liveness under the category tree lock, so a category can't be
+  checked for liveness under the category lock, so a category can't be
   deleted between the check and the link (`CATEGORY_NOT_FOUND`).
 - **Hard delete** cascades to variants, category links and image rows. The
   image objects are deleted from storage after commit, best-effort. Once orders
@@ -161,7 +152,7 @@ The dashboard's Products page reads `GET /products` and `GET /products/counts`
 - **Filters**: `all` and the three stock filters leave archived products out;
   `draft` and `archived` list those statuses. Every non-archived product counts
   under exactly one stock chip. `q` matches the name, a tag or a live SKU;
-  `categoryId` includes its subcategories. Counts ignore search and category.
+  `categoryId` keeps products in that category. Counts ignore search and category.
 - **Paging** is by page number (`page`, `limit` of 10, 25, 50 or 100), newest
   first, with a total for "Showing 1–10 of 64". A seller's catalog is small
   enough that offset paging stays cheap, and the page wants numbered pages.
@@ -296,10 +287,7 @@ the categories service, the upload interceptor, and
 | -------------------------------- | ------ | ---------------- | ----------------------------------------------------------- |
 | `PRODUCT_NOT_FOUND`              | 404    | `{ id }`         | No such product for this merchant                           |
 | `VARIANT_NOT_FOUND`              | 404    | `{ id }`         | No such live variant on the product                         |
-| `CATEGORY_NOT_FOUND`             | 404    | `{ id }` or `{}` | Missing or deleted category (as target, parent or link)     |
-| `CATEGORY_CYCLE`                 | 409    | —                | Move under itself or a descendant                           |
-| `CATEGORY_TOO_DEEP`              | 409    | `{ max }`        | Result would exceed 3 levels                                |
-| `CATEGORY_HAS_CHILDREN`          | 409    | `{ id }`         | Deleting a category with live subcategories                 |
+| `CATEGORY_NOT_FOUND`             | 404    | `{ id }` or `{}` | Missing or deleted category (as target or link)             |
 | `CATEGORY_NAME_TAKEN`            | 409    | `{ name }`       | Name used by another live category, ignoring case           |
 | `PRODUCT_NEEDS_VARIANT`          | 409    | `{ id }` or `{}` | No variants on create, or archiving the last live one       |
 | `VARIANT_NAME_REQUIRED`          | 400    | —                | An unnamed variant where the product has (or gets) several  |
@@ -328,7 +316,7 @@ is used by both apps:
   every variant is named when there are several), `updateProductSchema`,
   `addVariantSchema`, `updateVariantSchema`, `createCategorySchema`,
   `updateCategorySchema`, `reorderProductImagesSchema`, `productCsvRowSchema`.
-- **Constants:** `CATEGORY_MAX_DEPTH` (3), `PRODUCT_IMAGE_MAX_BYTES` (10 MB),
+- **Constants:** `PRODUCT_IMAGE_MAX_BYTES` (10 MB),
   `PRODUCT_IMAGE_MAX_COUNT` (8).
 - **Enums:** `productStatusSchema` and `stockStatusSchema`. Each has an entry
   in `apps/web/src/i18n/status-keys.ts`.
@@ -375,7 +363,7 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | [`database/__tests__/catalog-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-schema.spec.ts)                     | Constraints: composite keys, checks, partial unique indexes                                            |
 | [`database/__tests__/catalog-rls.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-rls.spec.ts)                           | Two-merchant isolation under RLS                                                                       |
-| [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)         | Tree rules, concurrent opposite moves, delete, name clashes                                            |
+| [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)         | Create, rename, delete, name clashes, two-merchant isolation                                           |
 | [`products/__tests__/products.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/products.service.spec.ts)                 | Product create, update, delete, category links                                                         |
 | [`products/__tests__/product-variants.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-variants.service.spec.ts) | Last-variant guard, default-variant rule, SKUs, variant images                                         |
 | [`products/__tests__/product-gallery.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-gallery.service.spec.ts)   | Images embedded in products; object cleanup on product delete                                          |
@@ -420,8 +408,8 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
 ## Key files
 
 - [`apps/api/src/modules/database/schema/catalog.ts`](../../../apps/api/src/modules/database/schema/catalog.ts): all five tables
-- [`apps/api/src/modules/categories/categories.service.ts`](../../../apps/api/src/modules/categories/categories.service.ts): tree rules
-- [`apps/api/src/modules/categories/categories.repository.ts`](../../../apps/api/src/modules/categories/categories.repository.ts): tree lock, recursive walks, soft delete
+- [`apps/api/src/modules/categories/categories.service.ts`](../../../apps/api/src/modules/categories/categories.service.ts): create, rename, delete
+- [`apps/api/src/modules/categories/categories.repository.ts`](../../../apps/api/src/modules/categories/categories.repository.ts): category lock, soft delete
 - [`apps/api/src/modules/products/products.service.ts`](../../../apps/api/src/modules/products/products.service.ts): product and variant rules, `findSellableCatalog`
 - [`apps/api/src/modules/products/products.repository.ts`](../../../apps/api/src/modules/products/products.repository.ts): queries, SKU generation retries
 - [`apps/api/src/modules/products/images/product-images.service.ts`](../../../apps/api/src/modules/products/images/product-images.service.ts): upload, delete, reorder

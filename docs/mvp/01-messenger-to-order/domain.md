@@ -48,9 +48,9 @@ delivery address.
   refused. Order confirmation and cancellation, which change stock, must bump
   it too. The AI sees only active products and their live variants. Stock is
   decremented when an order is confirmed and restored if it is cancelled.
-- **Category** — a seller's tree, at most 3 levels deep; names unique per seller.
-  A product can sit in several categories. Deleting one is a soft delete, refused
-  while it has subcategories, and removes it from its products.
+- **Category** — a seller's flat list, no nesting; names unique per seller.
+  A product can sit in several categories. Deleting one is a soft delete and
+  removes it from its products.
 - **Customer** — Messenger PSID, name, picture, phone, address (phone and
   address are stored from the orders work on). The picture is Facebook's
   profile link, which expires after a few days: it is re-read every three days,

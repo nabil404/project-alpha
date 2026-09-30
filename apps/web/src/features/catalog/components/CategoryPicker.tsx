@@ -1,4 +1,5 @@
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
+import type { Category } from '@app/shared';
 import { Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-import { toCategoryEntries, type CategoryEntry } from '../category-entries';
 import { useCategories } from '../queries';
 
 interface CategoryPickerProps {
@@ -24,19 +24,18 @@ export function CategoryPicker({ value, onChange, labelId }: CategoryPickerProps
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
 
-  const entries = useMemo(() => toCategoryEntries(categories.data ?? []), [categories.data]);
+  // The API lists them by name.
+  const entries = useMemo(() => categories.data ?? [], [categories.data]);
   const byId = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
   const selected = value.map((id) => byId.get(id)).filter((e) => e !== undefined);
 
   const needle = query.trim().toLowerCase();
   const matches = entries.filter(
-    (e) =>
-      !value.includes(e.id) &&
-      (!needle || e.name.toLowerCase().includes(needle) || e.path.toLowerCase().includes(needle)),
+    (e) => !value.includes(e.id) && (!needle || e.name.toLowerCase().includes(needle)),
   );
   const expanded = open && categories.isSuccess;
 
-  const pick = (entry: CategoryEntry) => {
+  const pick = (entry: Category) => {
     onChange([...value, entry.id]);
     setQuery('');
     setActive(0);
@@ -69,12 +68,7 @@ export function CategoryPicker({ value, onChange, labelId }: CategoryPickerProps
               key={entry.id}
               className="flex items-center gap-2 rounded-md border border-accent bg-accent-soft py-1.5 pr-1 pl-3"
             >
-              <span className="flex min-w-0 grow flex-col">
-                <span className="truncate text-body font-medium">{entry.name}</span>
-                {entry.path && (
-                  <span className="truncate text-small text-ink-muted">{entry.path}</span>
-                )}
-              </span>
+              <span className="min-w-0 grow truncate text-body font-medium">{entry.name}</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -145,7 +139,6 @@ export function CategoryPicker({ value, onChange, labelId }: CategoryPickerProps
                   onMouseEnter={() => setActive(index)}
                 >
                   <span className="text-body">{entry.name}</span>
-                  {entry.path && <span className="text-small text-ink-muted">{entry.path}</span>}
                 </li>
               ))
             )}

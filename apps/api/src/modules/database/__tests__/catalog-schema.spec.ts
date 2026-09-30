@@ -33,13 +33,6 @@ describeDb('catalog schema constraints', () => {
       });
     });
 
-    it("rejects a category under another merchant's category", async () => {
-      const parentOfA = await seedCategory(t.db, t.merchantA);
-      await expect(
-        pgErrorOf(seedCategory(t.db, t.merchantB, { parentId: parentOfA.id })),
-      ).resolves.toEqual({ code: '23503', constraint: 'category_parent_fk' });
-    });
-
     it("rejects linking a product to another merchant's category", async () => {
       const productOfA = await seedProduct(t.db, t.merchantA);
       const categoryOfB = await seedCategory(t.db, t.merchantB);
@@ -52,18 +45,6 @@ describeDb('catalog schema constraints', () => {
           }),
         ),
       ).resolves.toEqual({ code: '23503', constraint: 'product_category_category_fk' });
-    });
-
-    it('rejects a category as its own parent', async () => {
-      const cat = await seedCategory(t.db, t.merchantA);
-      await expect(
-        pgErrorOf(
-          t.db
-            .update(schema.category)
-            .set({ parentId: cat.id })
-            .where(eq(schema.category.id, cat.id)),
-        ),
-      ).resolves.toEqual({ code: '23514', constraint: 'category_not_own_parent_ck' });
     });
   });
 
@@ -131,11 +112,10 @@ describeDb('catalog schema constraints', () => {
       ).resolves.toMatchObject({ sku: 'SCHEMA-SKU-1' });
     });
 
-    it('keeps category names unique per merchant across the tree, ignoring case, released on delete', async () => {
+    it('keeps category names unique per merchant ignoring case, released on delete', async () => {
       const root = await seedCategory(t.db, t.merchantA, { name: 'Schema Kids' });
-      const other = await seedCategory(t.db, t.merchantA, { name: 'Schema Men' });
       await expect(
-        pgErrorOf(seedCategory(t.db, t.merchantA, { name: 'SCHEMA KIDS', parentId: other.id })),
+        pgErrorOf(seedCategory(t.db, t.merchantA, { name: 'SCHEMA KIDS' })),
       ).resolves.toEqual({ code: '23505', constraint: 'category_merchant_name_live_uidx' });
 
       await expect(seedCategory(t.db, t.merchantB, { name: 'Schema Kids' })).resolves.toBeDefined();
