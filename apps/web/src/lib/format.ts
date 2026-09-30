@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatMinorUnits, type MinorUnits } from '@app/shared';
+import { formatMinorUnits, formatMinorUnitsAmount, type MinorUnits } from '@app/shared';
 
 import i18n from '@/i18n';
 
@@ -68,6 +68,13 @@ export function useFormatters() {
     [locale],
   );
 
+  /** Without the currency, for a table whose header names it ("Price (৳)"). */
+  const formatAmount = useCallback(
+    (amount: MinorUnits, currency: string): string =>
+      formatMinorUnitsAmount(amount, currency, locale),
+    [locale],
+  );
+
   const formatDate = useCallback(
     (value: Date | string | number, preset: DatePreset = 'date'): string =>
       dateTimeFormatter(locale, preset).format(new Date(value)),
@@ -112,8 +119,24 @@ export function useFormatters() {
   );
 
   return useMemo(
-    () => ({ locale, formatMoney, formatDate, formatRelativeDay, currencySymbol, formatFileSize }),
-    [locale, formatMoney, formatDate, formatRelativeDay, currencySymbol, formatFileSize],
+    () => ({
+      locale,
+      formatMoney,
+      formatAmount,
+      formatDate,
+      formatRelativeDay,
+      currencySymbol,
+      formatFileSize,
+    }),
+    [
+      locale,
+      formatMoney,
+      formatAmount,
+      formatDate,
+      formatRelativeDay,
+      currencySymbol,
+      formatFileSize,
+    ],
   );
 }
 

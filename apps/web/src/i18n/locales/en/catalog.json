@@ -65,8 +65,83 @@
   },
   "list": {
     "addProduct": "Add product",
+    "alert": {
+      "hint": "The assistant tells customers when something is unavailable.",
+      "lowCount_one": "{{count}} product is running low.",
+      "lowCount_other": "{{count}} products are running low.",
+      "outCount_one": "{{count}} product is out of stock.",
+      "outCount_other": "{{count}} products are out of stock.",
+      "showLow": "Show low stock",
+      "showOut": "Show out of stock"
+    },
+    "allCategories": "All categories",
+    "categoryLabel": "Category",
+    "clearFilters": "Clear filters",
+    "columns": {
+      "category": "Category",
+      "expand": "Variants",
+      "options": "By",
+      "price": "Price ({{symbol}})",
+      "product": "Product",
+      "status": "Status",
+      "stock": "Stock",
+      "variants": "Variants"
+    },
+    "description": "What the assistant can sell. It quotes these prices and checks this stock when customers ask.",
+    "editStock": "Edit stock",
     "empty": "Products you add appear here.",
-    "title": "Catalog"
+    "emptyFiltered": "No products match these filters.",
+    "filters": {
+      "all": "All",
+      "archived": "Archived",
+      "draft": "Draft",
+      "in_stock": "In stock",
+      "label": "Filter by stock and status",
+      "low_stock": "Low stock",
+      "out_of_stock": "Out of stock"
+    },
+    "label": "Products",
+    "legend": {
+      "in": "more than {{threshold}} left",
+      "label": "Stock",
+      "low": "{{threshold}} or fewer left",
+      "out": "none left"
+    },
+    "moreCategories": "Also in {{list}}",
+    "noOptions": "No options",
+    "pagination": {
+      "label": "Pages",
+      "next": "Next",
+      "page": "Page {{page}}",
+      "perPageAfter": "per page",
+      "perPageBefore": "Show",
+      "perPageLabel": "Products per page",
+      "previous": "Previous",
+      "showing_one": "Showing {{from}}–{{to}} of {{count}} product",
+      "showing_other": "Showing {{from}}–{{to}} of {{count}} products"
+    },
+    "priceRange": "{{min}} – {{max}}",
+    "searchLabel": "Search products",
+    "searchPlaceholder": "Search by name, tag or SKU",
+    "showMore_one": "Show {{count}} more variant",
+    "showMore_other": "Show {{count}} more variants",
+    "stockNote": {
+      "low": "{{n}} low",
+      "out": "{{n}} out"
+    },
+    "tabs": {
+      "categories": "Categories",
+      "label": "Catalog sections",
+      "products": "Products",
+      "soon": "Coming soon"
+    },
+    "title": "Catalog",
+    "toggle": {
+      "hide": "Hide variants of {{name}}",
+      "show": "Show variants of {{name}}"
+    },
+    "variantsFailed": "Couldn't load the variants of {{name}}.",
+    "variantsLoading": "Loading the variants of {{name}}"
   },
   "options": {
     "add": "Add option",

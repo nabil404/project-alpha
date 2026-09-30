@@ -24,6 +24,27 @@ export function formatMinorUnits(
   );
 }
 
+/**
+ * The amount alone, for a column whose header carries the currency: the
+ * currency's own decimals, dropped when they are zero ("1,600", "1,600.50").
+ */
+export function formatMinorUnitsAmount(
+  amount: MinorUnits,
+  currency: string,
+  locale = 'en-US',
+  unitsPerMajor = 100,
+): string {
+  const { minimumFractionDigits, maximumFractionDigits } = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+  }).resolvedOptions();
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits,
+    maximumFractionDigits,
+    trailingZeroDisplay: 'stripIfInteger',
+  }).format(amount / unitsPerMajor);
+}
+
 export function sumMinorUnits(amounts: readonly MinorUnits[]): MinorUnits {
   return amounts.reduce((total, amount) => total + amount, 0);
 }
