@@ -86,6 +86,9 @@ export const errorCodes = [
   'PRODUCT_IMAGE_LIMIT_REACHED',
   'PRODUCT_IMAGE_ORDER_MISMATCH',
   'PRODUCT_IMAGE_NOT_FOUND',
+  'PRODUCT_OPTION_NOT_FOUND',
+  'PRODUCT_STALE',
+  'PRODUCT_IN_USE',
 
   // Field-level, derived from Zod issues
   'REQUIRED',
@@ -102,6 +105,11 @@ export const errorCodes = [
   'UNRECOGNIZED_KEYS',
   'INVALID_INPUT',
   'INVALID_PHONE',
+  // Field-level, from the product document's refinements
+  'DUPLICATE',
+  'UNKNOWN_OPTION_VALUE',
+  'OPTION_VALUES_MISMATCH',
+  'VARIANTS_NEED_OPTION',
 ] as const;
 
 export const errorCodeSchema = z.enum(errorCodes);

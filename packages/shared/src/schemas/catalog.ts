@@ -14,6 +14,12 @@ export const CATEGORY_MAX_DEPTH = 3;
 export const PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const PRODUCT_IMAGE_MAX_COUNT = 8;
 
+/** A product varies on at most this many options; each has at most this many values. */
+export const PRODUCT_OPTION_MAX_COUNT = 3;
+export const PRODUCT_OPTION_VALUE_MAX_COUNT = 30;
+/** Live variants per product. Options multiply; this caps what one save can create. */
+export const PRODUCT_VARIANT_MAX_COUNT = 100;
+
 /** A stored product image as the API returns it. URLs are public; `position` 0 is the cover. */
 export const productImageSchema = z.object({
   id: z.string().uuid(),
@@ -146,6 +152,167 @@ export const updateVariantSchema = z.object({
   imageId: z.string().uuid().nullable().optional(),
 });
 export type UpdateVariant = z.infer<typeof updateVariantSchema>;
+
+const optionNameSchema = z.string().trim().min(1).max(40);
+const optionValueTextSchema = z.string().trim().min(1).max(40);
+
+/** `id` keeps (and may rename) an existing option or value; omit it to create one. */
+export const productOptionInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: optionNameSchema,
+  values: z
+    .array(z.object({ id: z.string().uuid().optional(), value: optionValueTextSchema }))
+    .min(1)
+    .max(PRODUCT_OPTION_VALUE_MAX_COUNT),
+});
+export type ProductOptionInput = z.infer<typeof productOptionInputSchema>;
+
+/**
+ * `optionValues` picks one value per option by its text, in the options'
+ * order, so a variant can point at a value created in the same save. It is
+ * empty exactly when the product has no options. `id` keeps an existing
+ * variant; omit it to add one.
+ */
+export const productVariantInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  optionValues: z.array(optionValueTextSchema).max(PRODUCT_OPTION_MAX_COUNT).default([]),
+  sku: skuInputSchema,
+  price: moneySchema,
+  stock: stockSchema.default(0),
+  /** One of the product's own images; null shows the product's cover. */
+  imageId: z.string().uuid().nullable().default(null),
+});
+export type ProductVariantInput = z.infer<typeof productVariantInputSchema>;
+
+/** Values compare trimmed and case-insensitively, as a customer would read them. */
+const sameText = (text: string) => text.trim().toLowerCase();
+
+type DocumentIssueCode =
+  'DUPLICATE' | 'UNKNOWN_OPTION_VALUE' | 'OPTION_VALUES_MISMATCH' | 'VARIANTS_NEED_OPTION';
+
+/**
+ * The rules a product document must satisfy beyond its field types. Shared,
+ * so the edit page's form reports the same field codes the API would. The API
+ * runs it again for callers that skip the schema, and the product row lock
+ * serializes writers, which is why the database carries no uniqueness index
+ * for these.
+ */
+export function refineProductDocument(
+  doc: { options: ProductOptionInput[]; variants: ProductVariantInput[] },
+  ctx: z.RefinementCtx,
+): void {
+  const issue = (path: (string | number)[], code: DocumentIssueCode, message: string) =>
+    ctx.addIssue({ code: 'custom', path, message, params: { code } });
+
+  const unique = <T>(
+    items: T[],
+    key: (item: T) => string | undefined,
+    path: (index: number) => (string | number)[],
+    message: string,
+  ) => {
+    const seen = new Set<string>();
+    items.forEach((item, index) => {
+      const k = key(item);
+      if (k === undefined) return;
+      if (seen.has(k)) issue(path(index), 'DUPLICATE', message);
+      seen.add(k);
+    });
+  };
+
+  unique(
+    doc.options,
+    (o) => sameText(o.name),
+    (i) => ['options', i, 'name'],
+    'Two options share this name',
+  );
+  unique(
+    doc.options,
+    (o) => o.id,
+    (i) => ['options', i, 'id'],
+    'Option listed twice',
+  );
+  doc.options.forEach((option, i) => {
+    unique(
+      option.values,
+      (v) => sameText(v.value),
+      (j) => ['options', i, 'values', j, 'value'],
+      'This option already has this value',
+    );
+    unique(
+      option.values,
+      (v) => v.id,
+      (j) => ['options', i, 'values', j, 'id'],
+      'Value listed twice',
+    );
+  });
+
+  if (doc.options.length === 0 && doc.variants.length > 1) {
+    issue(['variants'], 'VARIANTS_NEED_OPTION', 'A product without options is sold as one variant');
+  }
+
+  doc.variants.forEach((variant, k) => {
+    if (variant.optionValues.length !== doc.options.length) {
+      issue(['variants', k, 'optionValues'], 'OPTION_VALUES_MISMATCH', 'Pick one value per option');
+      return;
+    }
+    variant.optionValues.forEach((text, i) => {
+      if (!doc.options[i]!.values.some((v) => sameText(v.value) === sameText(text))) {
+        issue(
+          ['variants', k, 'optionValues', i],
+          'UNKNOWN_OPTION_VALUE',
+          'Not a value of this option',
+        );
+      }
+    });
+  });
+
+  if (doc.options.length > 0) {
+    unique(
+      doc.variants,
+      (v) => v.optionValues.map(sameText).join('\u0000'),
+      (k) => ['variants', k, 'optionValues'],
+      'Another variant has the same values',
+    );
+  }
+  unique(
+    doc.variants,
+    (v) => v.id,
+    (k) => ['variants', k, 'id'],
+    'Variant listed twice',
+  );
+  unique(
+    doc.variants,
+    (v) => v.sku?.trim().toUpperCase() || undefined,
+    (k) => ['variants', k, 'sku'],
+    'Another variant of this product uses this SKU',
+  );
+}
+
+const productDocumentShape = {
+  name: productNameSchema,
+  description: descriptionSchema.default(null),
+  status: productStatusSchema.default('draft'),
+  aliases: z.array(z.string().trim().min(1)).default([]),
+  deliveryCharge: moneySchema,
+  categoryIds: z.array(z.string().uuid()).default([]),
+  options: z.array(productOptionInputSchema).max(PRODUCT_OPTION_MAX_COUNT).default([]),
+  variants: z.array(productVariantInputSchema).min(1).max(PRODUCT_VARIANT_MAX_COUNT),
+};
+
+/**
+ * The edit page's whole document, saved at once. Options, values and variants
+ * left out are removed (variants archived). `version` is the product's
+ * `version` as the page read it; a save from an older read is refused.
+ */
+export const saveProductSchema = z
+  .object({
+    ...productDocumentShape,
+    version: z.string().min(1),
+    /** Null picks the first photo, so a product with photos always has a cover. */
+    coverImageId: z.string().uuid().nullable().default(null),
+  })
+  .superRefine(refineProductDocument);
+export type SaveProduct = z.infer<typeof saveProductSchema>;
 
 /** CSV import carries no images or categories; sellers add those in the dashboard afterwards. */
 export const productCsvRowSchema = z.object({
