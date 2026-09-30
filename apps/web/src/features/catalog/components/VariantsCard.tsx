@@ -2,13 +2,16 @@ import { useId, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useFieldArray, useFormContext, useWatch, type FieldErrors } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { PRODUCT_OPTION_MAX_COUNT, productOptionInputSchema, type Product } from '@app/shared';
+import {
+  PRODUCT_OPTION_MAX_COUNT,
+  VARIANT_NAME_MAX_LENGTH,
+  productOptionInputSchema,
+  type Product,
+} from '@app/shared';
 
 import { Button } from '@/components/ui/button';
 import { FormControl, FormField, FormItem, FormMessage, useFormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useStatusLabels } from '@/i18n/status-keys';
-import { statusToneClasses, stockStatusTones } from '@/i18n/status-tones';
 import { cn } from '@/lib/utils';
 
 import {
@@ -21,6 +24,7 @@ import {
   removeValue,
   sameText,
   updateOption,
+  valuesLabel,
   variantLabel,
   type OptionState,
 } from '../options';
@@ -73,7 +77,7 @@ export function VariantsCard({ product }: { product?: Product }) {
     <section className="relative flex flex-col rounded-lg border border-border bg-surface shadow-card">
       <div className="flex flex-col gap-4 p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-60 flex-1 flex-col gap-0.5">
+          <div className="flex min-w-0 flex-1 basis-60 flex-col gap-0.5">
             <h2 className="text-heading">{t('variants.title')}</h2>
             <p className="text-body text-ink-muted">
               {options.length === 0
@@ -83,10 +87,13 @@ export function VariantsCard({ product }: { product?: Product }) {
                   : t('variants.descriptionMany')}
             </p>
           </div>
-          <AddOptionMenu
-            taken={options.map((o) => o.name)}
-            onChoose={(name) => setPanel({ kind: 'new', name })}
-          />
+          {/* Past the heading's 24px line and the 2px gap: level with the description's first line. */}
+          <div className="mt-6.5">
+            <AddOptionMenu
+              taken={options.map((o) => o.name)}
+              onChoose={(name) => setPanel({ kind: 'new', name })}
+            />
+          </div>
         </div>
 
         {single && (
@@ -123,27 +130,28 @@ export function VariantsCard({ product }: { product?: Product }) {
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Relative: the sr-only header is absolute, and must scroll with the table, not widen the page. */}
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-160 border-collapse">
           <thead>
             <tr className="text-left text-label text-ink-muted">
-              <th scope="col" className="border-b border-border py-3 pr-4 pl-6 font-medium">
+              <th scope="col" className="border-b border-border py-3 pr-3 pl-6 font-medium">
                 {t('variants.image')}
               </th>
-              <th scope="col" className="border-b border-border px-4 py-3 font-medium">
+              <th scope="col" className="border-b border-border px-3 py-3 font-medium">
                 {variantColumn}
               </th>
-              <th scope="col" className="border-b border-border px-4 py-3 font-medium">
+              <th scope="col" className="border-b border-border px-3 py-3 font-medium">
                 {t('variants.price')}
               </th>
-              <th scope="col" className="border-b border-border px-4 py-3 font-medium">
+              <th scope="col" className="border-b border-border px-3 py-3 font-medium">
                 {t('variants.stock')}
               </th>
               <th
                 scope="col"
                 className={cn(
-                  'border-b border-border py-3 pl-4 font-medium',
-                  options.length > 1 ? 'pr-4' : 'pr-6',
+                  'border-b border-border py-3 pl-3 font-medium',
+                  options.length > 1 ? 'pr-3' : 'pr-6',
                 )}
               >
                 {t('variants.sku')}
@@ -161,7 +169,7 @@ export function VariantsCard({ product }: { product?: Product }) {
               const label = variantLabel(variant) || t('variants.only');
               return (
                 <tr key={field.key} className="align-top">
-                  <td className="border-t border-border py-3 pr-4 pl-6">
+                  <td className="border-t border-border py-3 pr-3 pl-6">
                     <FormField
                       control={form.control}
                       name={`variants.${index}.imageId`}
@@ -177,12 +185,43 @@ export function VariantsCard({ product }: { product?: Product }) {
                   </td>
                   <th
                     scope="row"
-                    className="border-t border-border px-4 py-3 text-left text-body font-medium whitespace-nowrap"
+                    className="border-t border-border px-3 py-3 text-left text-body font-medium whitespace-nowrap"
                   >
-                    <span className="flex h-12 items-center">{label}</span>
+                    {options.length === 0 ? (
+                      <span className="flex h-12 items-center">{label}</span>
+                    ) : (
+                      <FormField
+                        control={form.control}
+                        name={`variants.${index}.name`}
+                        render={({ field: nameField }) => (
+                          <FormItem className="w-36 pt-1">
+                            <FormControl>
+                              <Input
+                                aria-label={t('variants.nameFor', {
+                                  variant: valuesLabel(variant),
+                                })}
+                                placeholder={valuesLabel(variant)}
+                                maxLength={VARIANT_NAME_MAX_LENGTH}
+                                autoComplete="off"
+                                className="font-medium"
+                                {...nameField}
+                              />
+                            </FormControl>
+                            {options.length > 1 && (
+                              <span className="truncate text-small font-normal text-ink-muted">
+                                {options
+                                  .map((option, i) => `${option.name} ${variant.optionValues[i]}`)
+                                  .join(' · ')}
+                              </span>
+                            )}
+                            <FormMessage className="font-normal whitespace-normal" />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     <RowError index={index} />
                   </th>
-                  <td className="border-t border-border px-4 py-3">
+                  <td className="border-t border-border px-3 py-3">
                     <FormField
                       control={form.control}
                       name={`variants.${index}.price`}
@@ -203,33 +242,30 @@ export function VariantsCard({ product }: { product?: Product }) {
                       )}
                     />
                   </td>
-                  <td className="border-t border-border px-4 py-3">
+                  <td className="border-t border-border px-3 py-3">
                     <FormField
                       control={form.control}
                       name={`variants.${index}.stock`}
                       render={({ field: stockField }) => (
                         <FormItem className="pt-1">
-                          <div className="flex items-center gap-2">
-                            <FormControl>
-                              <Input
-                                aria-label={t('variants.stockFor', { variant: label })}
-                                inputMode="numeric"
-                                className="w-20 tabular-nums"
-                                name={stockField.name}
-                                ref={stockField.ref}
-                                onBlur={stockField.onBlur}
-                                value={Number.isNaN(stockField.value) ? '' : stockField.value}
-                                onChange={(event) =>
-                                  stockField.onChange(
-                                    /^\d+$/.test(event.target.value.trim())
-                                      ? Number(event.target.value)
-                                      : Number.NaN,
-                                  )
-                                }
-                              />
-                            </FormControl>
-                            {stockField.value === 0 && <OutOfStockBadge />}
-                          </div>
+                          <FormControl>
+                            <Input
+                              aria-label={t('variants.stockFor', { variant: label })}
+                              inputMode="numeric"
+                              className="w-20 tabular-nums"
+                              name={stockField.name}
+                              ref={stockField.ref}
+                              onBlur={stockField.onBlur}
+                              value={Number.isNaN(stockField.value) ? '' : stockField.value}
+                              onChange={(event) =>
+                                stockField.onChange(
+                                  /^\d+$/.test(event.target.value.trim())
+                                    ? Number(event.target.value)
+                                    : Number.NaN,
+                                )
+                              }
+                            />
+                          </FormControl>
                           <NumberMessage invalid={Number.isNaN(stockField.value)} kind="stock" />
                         </FormItem>
                       )}
@@ -237,8 +273,8 @@ export function VariantsCard({ product }: { product?: Product }) {
                   </td>
                   <td
                     className={cn(
-                      'border-t border-border py-3 pl-4',
-                      options.length > 1 ? 'pr-4' : 'pr-6',
+                      'border-t border-border py-3 pl-3',
+                      options.length > 1 ? 'pr-3' : 'pr-6',
                     )}
                   >
                     <FormField
@@ -266,7 +302,7 @@ export function VariantsCard({ product }: { product?: Product }) {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-ink-muted"
+                        className="mt-1 text-ink-muted"
                         aria-label={t('variants.removeVariant', { variant: label })}
                         title={t('variants.remove')}
                         disabled={fields.length === 1}
@@ -518,20 +554,6 @@ function AddCombination({
           : t('variants.noneMissing')}
       </p>
     </div>
-  );
-}
-
-function OutOfStockBadge() {
-  const { stockStatus } = useStatusLabels();
-  return (
-    <span
-      className={cn(
-        'inline-flex h-6 items-center rounded-full px-2.5 text-label whitespace-nowrap',
-        statusToneClasses[stockStatusTones.out_of_stock],
-      )}
-    >
-      {stockStatus('out_of_stock')}
-    </span>
   );
 }
 

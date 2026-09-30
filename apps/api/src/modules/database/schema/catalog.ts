@@ -77,9 +77,9 @@ export const productVariant = pgTable(
     merchantId: merchantId(),
     productId: text('product_id').notNull(),
     /**
-     * Null exactly for the default variant. Otherwise its option values joined
-     * with " / " ("M / Short"): derived from the links on every write, and kept
-     * on archived variants so their order lines still read.
+     * Null exactly for the default variant. Otherwise the name the seller gave
+     * it, or its option values joined with " / " ("M / Short"), set on every
+     * write and kept on archived variants so their order lines still read.
      */
     name: text('name'),
     sku: text('sku').notNull(),

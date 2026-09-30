@@ -34,8 +34,9 @@ delivery address.
   each variant is one combination of values, one per option, with its own
   SKU (unique per seller among live variants), price, stock count and
   optional image. A product always has at least one live variant; one with
-  no options has a single unnamed default variant. A variant's name is its
-  values joined ("M / Short"), kept on archived variants for their orders.
+  no options has a single unnamed default variant. A variant's name is the
+  one the seller gives it, or else its values joined ("M / Short"); it is
+  unique within the product and kept on archived variants for their orders.
   Variants are archived, never deleted individually, so orders keep pointing
   at them; removing a value archives its variants. A product hard delete
   cascades to its variants and is refused once orders reference one. The

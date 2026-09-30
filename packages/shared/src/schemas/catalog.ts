@@ -77,7 +77,10 @@ export type ProductOption = z.infer<typeof productOptionSchema>;
 
 export const variantSchema = z.object({
   id: z.string().uuid(),
-  /** Null only for the default variant; otherwise its option values joined ("M / Short"). Never written. */
+  /**
+   * Null only for the default variant. Otherwise the name the seller gave it,
+   * or its option values joined ("M / Short") when they gave none.
+   */
   name: z.string().min(1).nullable(),
   sku: z.string().min(1),
   /** Minor units. */
@@ -157,14 +160,20 @@ export const productOptionInputSchema = z.object({
 });
 export type ProductOptionInput = z.infer<typeof productOptionInputSchema>;
 
+/** Room for three 40-character values joined with " / ". */
+export const VARIANT_NAME_MAX_LENGTH = 128;
+
 /**
  * `optionValues` picks one value per option by its text, in the options'
  * order, so a variant can point at a value created in the same save. It is
  * empty exactly when the product has no options. `id` keeps an existing
- * variant; omit it to add one.
+ * variant; omit it to add one. `name` is what customers and the assistant call
+ * it; blank or absent, it is the values joined, and the default variant of a
+ * product without options stays unnamed whatever it says.
  */
 export const productVariantInputSchema = z.object({
   id: z.string().uuid().optional(),
+  name: z.string().trim().max(VARIANT_NAME_MAX_LENGTH).optional(),
   optionValues: z.array(optionValueTextSchema).max(PRODUCT_OPTION_MAX_COUNT).default([]),
   sku: skuInputSchema,
   price: moneySchema,
@@ -263,6 +272,17 @@ export function refineProductDocument(
       (k) => ['variants', k, 'optionValues'],
       'Another variant has the same values',
     );
+    // Unnamed variants that clash already share their values, reported above.
+    const names = new Map<string, boolean>();
+    doc.variants.forEach((v, k) => {
+      const named = Boolean(v.name);
+      const key = sameText(v.name || v.optionValues.join(' / '));
+      const earlier = names.get(key);
+      if (earlier !== undefined && (named || earlier)) {
+        issue(['variants', k, 'name'], 'DUPLICATE', 'Another variant has this name');
+      }
+      if (!earlier) names.set(key, named);
+    });
   }
   unique(
     doc.variants,

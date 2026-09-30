@@ -25,6 +25,12 @@ describe('variantLabel', () => {
     expect(variantLabel(['M', 'Short'])).toBe('M / Short');
     expect(variantLabel([])).toBeNull();
   });
+
+  it("prefers the seller's name, but never names the default variant", () => {
+    expect(variantLabel(['S', 'Short'], 'Small, short')).toBe('Small, short');
+    expect(variantLabel(['S', 'Short'], '')).toBe('S / Short');
+    expect(variantLabel([], 'Anything')).toBeNull();
+  });
 });
 
 describe('planProductDocument', () => {
@@ -116,6 +122,14 @@ describe('planProductDocument', () => {
     ]);
     expect(plan.archiveVariantIds).toEqual([]);
     expect(plan.deleteValueIds).toEqual([]);
+  });
+
+  it("keeps the seller's name through a value rename", () => {
+    const plan = planProductDocument(stored, {
+      options: [sizeOption([{ id: ids.s, value: 'Small' }])],
+      variants: [variant({ id: ids.vS, name: 'Petite', optionValues: ['Small'] })],
+    });
+    expect(plan.variants[0]?.name).toBe('Petite');
   });
 
   it('deletes the values left out and archives the variants left out', () => {

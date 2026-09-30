@@ -13,6 +13,8 @@ export interface OptionDraft {
 
 export interface VariantDraft {
   id?: string;
+  /** Blank: the variant is called by its values ("M / Short"). */
+  name: string;
   /** One value's text per option, in the options' order. */
   optionValues: string[];
   /** Blank: the API generates one. */
@@ -49,7 +51,7 @@ export const emptyProduct: ProductFormValues = {
   categoryIds: [],
   coverImageId: null,
   options: [],
-  variants: [{ optionValues: [], sku: '', price: 0, stock: 0, imageId: null }],
+  variants: [{ name: '', optionValues: [], sku: '', price: 0, stock: 0, imageId: null }],
 };
 
 export function toFormValues(product: Product): ProductFormValues {
@@ -70,22 +72,36 @@ export function toFormValues(product: Product): ProductFormValues {
       name: option.name,
       values: option.values.map((v) => ({ id: v.id, value: v.value })),
     })),
-    variants: product.variants.map((variant) => ({
-      id: variant.id,
-      optionValues: variant.optionValueIds.map((id) => valueText.get(id) ?? ''),
-      sku: variant.sku,
-      price: variant.price,
-      stock: variant.stock,
-      imageId: variant.imageId,
-    })),
+    variants: product.variants.map((variant) => {
+      const optionValues = variant.optionValueIds.map((id) => valueText.get(id) ?? '');
+      // A name that is only its values is no name of the seller's: it keeps
+      // following them when a value is renamed.
+      const name = variant.name === optionValues.join(' / ') ? '' : (variant.name ?? '');
+      return {
+        id: variant.id,
+        name,
+        optionValues,
+        sku: variant.sku,
+        price: variant.price,
+        stock: variant.stock,
+        imageId: variant.imageId,
+      };
+    }),
   };
 }
 
-/** A blank description is no description; a blank SKU asks the API for one. */
+/**
+ * A blank description is no description; a blank SKU asks the API for one; a
+ * blank variant name leaves the variant called by its values.
+ */
 export function toDocument(values: CreateProduct): CreateProduct {
   return {
     ...values,
     description: values.description || null,
-    variants: values.variants.map((variant) => ({ ...variant, sku: variant.sku || undefined })),
+    variants: values.variants.map((variant) => ({
+      ...variant,
+      name: variant.name || undefined,
+      sku: variant.sku || undefined,
+    })),
   };
 }
