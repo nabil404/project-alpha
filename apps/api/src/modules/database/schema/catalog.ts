@@ -15,8 +15,8 @@ import {
 import { createdAt, id, merchantId, merchantIsolation, updatedAt } from './columns';
 
 /**
- * The catalog: products, their variants, a category tree, and product↔category
- * links. Every child points at its parent through a composite
+ * The catalog: products, their options and variants, a category tree, and
+ * product↔category links. Every child points at its parent through a composite
  * (merchant_id, id) foreign key, so no row can reference another merchant's
  * row - RLS filters reads but does not validate the ids a row points at.
  */
@@ -42,6 +42,20 @@ export const product = pgTable(
       .notNull()
       .default('draft'),
     deliveryCharge: integer('delivery_charge').notNull().default(0),
+    /**
+     * The default photo: sent when a customer hasn't picked a variant, and for
+     * variants without their own. Null exactly when the product has no images.
+     * Its foreign key, (merchant_id, cover_image_id) -> product_image ON DELETE
+     * SET NULL (cover_image_id), lives in migration 0014 for the same reason as
+     * product_variant.image_id's.
+     */
+    coverImageId: text('cover_image_id'),
+    /**
+     * Bumped by every write to the product's fields, options or variants; its
+     * `version` on the wire. A save made from an older revision is refused.
+     * Gallery changes do not bump it: the edit page does not hold the gallery.
+     */
+    revision: integer('revision').notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -49,6 +63,7 @@ export const product = pgTable(
     unique('product_merchant_id_uq').on(t.merchantId, t.id),
     check('product_status_ck', sql`${t.status} in ('draft', 'active', 'archived')`),
     check('product_delivery_charge_ck', sql`${t.deliveryCharge} >= 0`),
+    check('product_revision_ck', sql`${t.revision} >= 0`),
     index('product_merchant_status_idx').on(t.merchantId, t.status),
     index('product_merchant_created_idx').on(t.merchantId, t.createdAt),
     merchantIsolation('product_merchant_isolation', t.merchantId),
@@ -61,7 +76,11 @@ export const productVariant = pgTable(
     id: id(),
     merchantId: merchantId(),
     productId: text('product_id').notNull(),
-    /** Null exactly for the default variant. */
+    /**
+     * Null exactly for the default variant. Otherwise its option values joined
+     * with " / " ("M / Short"): derived from the links on every write, and kept
+     * on archived variants so their order lines still read.
+     */
     name: text('name'),
     sku: text('sku').notNull(),
     price: integer('price').notNull(),
@@ -101,9 +120,106 @@ export const productVariant = pgTable(
 );
 
 /**
+ * A dimension a product varies on ("Size"). position is dense (0..n-1) and is
+ * the order customers are asked in; like product_image.position it is
+ * deliberately not unique. Name uniqueness within a product is the service's
+ * rule, held under the product row lock: an index would trip mid-save when two
+ * names are swapped.
+ */
+export const productOption = pgTable(
+  'product_option',
+  {
+    id: id(),
+    merchantId: merchantId(),
+    productId: text('product_id').notNull(),
+    name: text('name').notNull(),
+    position: integer('position').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('product_option_merchant_id_uq').on(t.merchantId, t.id),
+    foreignKey({
+      name: 'product_option_product_fk',
+      columns: [t.merchantId, t.productId],
+      foreignColumns: [product.merchantId, product.id],
+    }).onDelete('cascade'),
+    check('product_option_position_ck', sql`${t.position} >= 0`),
+    index('product_option_merchant_product_idx').on(t.merchantId, t.productId),
+    merchantIsolation('product_option_merchant_isolation', t.merchantId),
+  ],
+);
+
+/** One value of an option ("M"), in the order customers see them. */
+export const productOptionValue = pgTable(
+  'product_option_value',
+  {
+    id: id(),
+    merchantId: merchantId(),
+    optionId: text('option_id').notNull(),
+    value: text('value').notNull(),
+    position: integer('position').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('product_option_value_merchant_id_uq').on(t.merchantId, t.id),
+    // The target of the link table's key, which proves a value is its option's.
+    unique('product_option_value_merchant_option_id_uq').on(t.merchantId, t.optionId, t.id),
+    foreignKey({
+      name: 'product_option_value_option_fk',
+      columns: [t.merchantId, t.optionId],
+      foreignColumns: [productOption.merchantId, productOption.id],
+    }).onDelete('cascade'),
+    check('product_option_value_position_ck', sql`${t.position} >= 0`),
+    index('product_option_value_merchant_option_idx').on(t.merchantId, t.optionId),
+    merchantIsolation('product_option_value_merchant_isolation', t.merchantId),
+  ],
+);
+
+/**
+ * Which value a variant has for each option: the primary key allows one per
+ * option, and the value key carries option_id, so the value must be that
+ * option's. That the option is the variant's own product's is the service's
+ * rule. Deleting a value removes its links, archived variants' included; those
+ * keep their name.
+ */
+export const productVariantOptionValue = pgTable(
+  'product_variant_option_value',
+  {
+    merchantId: merchantId(),
+    variantId: text('variant_id').notNull(),
+    optionId: text('option_id').notNull(),
+    optionValueId: text('option_value_id').notNull(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'product_variant_option_value_pk',
+      columns: [t.merchantId, t.variantId, t.optionId],
+    }),
+    foreignKey({
+      name: 'product_variant_option_value_variant_fk',
+      columns: [t.merchantId, t.variantId],
+      foreignColumns: [productVariant.merchantId, productVariant.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'product_variant_option_value_value_fk',
+      columns: [t.merchantId, t.optionId, t.optionValueId],
+      foreignColumns: [
+        productOptionValue.merchantId,
+        productOptionValue.optionId,
+        productOptionValue.id,
+      ],
+    }).onDelete('cascade'),
+    index('product_variant_option_value_merchant_value_idx').on(t.merchantId, t.optionValueId),
+    merchantIsolation('product_variant_option_value_merchant_isolation', t.merchantId),
+  ],
+);
+
+/**
  * A product's photo gallery. The objects live in object storage at keys built
  * from (merchant_id, id); storage_key is the full image's, and the thumbnail's
- * is derived. position is dense (0..n-1) and 0 is the cover; it is deliberately
+ * is derived. position is dense (0..n-1) and is only the gallery order - product.cover_image_id names the cover; it is deliberately
  * not unique, so a reorder rewrites positions without deferral.
  */
 export const productImage = pgTable(

@@ -6,6 +6,8 @@ import {
   pgErrorOf,
   seedCategory,
   seedImage,
+  seedOption,
+  seedOptionValue,
   seedProduct,
   seedVariant,
   type CatalogTestDb,
@@ -217,6 +219,108 @@ describeDb('catalog schema constraints', () => {
       await expect(
         t.db.select().from(schema.productImage).where(eq(schema.productImage.id, image.id)),
       ).resolves.toHaveLength(0);
+    });
+  });
+
+  describe('product options', () => {
+    const link = (merchantId: string, variantId: string, optionId: string, optionValueId: string) =>
+      t.db
+        .insert(schema.productVariantOptionValue)
+        .values({ merchantId, variantId, optionId, optionValueId });
+
+    it('holds one value per option per variant', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      const variant = await seedVariant(t.db, t.merchantA, product.id);
+      const size = await seedOption(t.db, t.merchantA, product.id, { name: 'Size' });
+      const m = await seedOptionValue(t.db, t.merchantA, size.id, { value: 'M' });
+      const l = await seedOptionValue(t.db, t.merchantA, size.id, { value: 'L', position: 1 });
+
+      await link(t.merchantA, variant.id, size.id, m.id);
+      await expect(pgErrorOf(link(t.merchantA, variant.id, size.id, l.id))).resolves.toEqual({
+        code: '23505',
+        constraint: 'product_variant_option_value_pk',
+      });
+    });
+
+    it('rejects a link whose value belongs to a different option', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      const variant = await seedVariant(t.db, t.merchantA, product.id);
+      const size = await seedOption(t.db, t.merchantA, product.id, { name: 'Size' });
+      const sleeve = await seedOption(t.db, t.merchantA, product.id, {
+        name: 'Sleeve',
+        position: 1,
+      });
+      const short = await seedOptionValue(t.db, t.merchantA, sleeve.id, { value: 'Short' });
+
+      await expect(pgErrorOf(link(t.merchantA, variant.id, size.id, short.id))).resolves.toEqual({
+        code: '23503',
+        constraint: 'product_variant_option_value_value_fk',
+      });
+    });
+
+    it("rejects an option on another merchant's product", async () => {
+      const productOfA = await seedProduct(t.db, t.merchantA);
+      await expect(pgErrorOf(seedOption(t.db, t.merchantB, productOfA.id))).resolves.toEqual({
+        code: '23503',
+        constraint: 'product_option_product_fk',
+      });
+    });
+
+    it('removes its values and their variant links with an option', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      const variant = await seedVariant(t.db, t.merchantA, product.id);
+      const size = await seedOption(t.db, t.merchantA, product.id);
+      const m = await seedOptionValue(t.db, t.merchantA, size.id);
+      await link(t.merchantA, variant.id, size.id, m.id);
+
+      await t.db.delete(schema.productOption).where(eq(schema.productOption.id, size.id));
+
+      await expect(
+        t.db
+          .select()
+          .from(schema.productOptionValue)
+          .where(eq(schema.productOptionValue.optionId, size.id)),
+      ).resolves.toHaveLength(0);
+      await expect(
+        t.db
+          .select()
+          .from(schema.productVariantOptionValue)
+          .where(eq(schema.productVariantOptionValue.variantId, variant.id)),
+      ).resolves.toHaveLength(0);
+    });
+  });
+
+  describe('the cover image', () => {
+    it('clears only cover_image_id when its image is deleted', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      const image = await seedImage(t.db, t.merchantA, product.id);
+      const byId = eq(schema.product.id, product.id);
+      await t.db.update(schema.product).set({ coverImageId: image.id }).where(byId);
+
+      await t.db.delete(schema.productImage).where(eq(schema.productImage.id, image.id));
+
+      const [row] = await t.db.select().from(schema.product).where(byId);
+      expect(row).toMatchObject({ coverImageId: null, merchantId: t.merchantA });
+    });
+
+    it("rejects another merchant's image as the cover", async () => {
+      const productOfA = await seedProduct(t.db, t.merchantA);
+      const productOfB = await seedProduct(t.db, t.merchantB);
+      const imageOfB = await seedImage(t.db, t.merchantB, productOfB.id);
+
+      await expect(
+        pgErrorOf(
+          t.db
+            .update(schema.product)
+            .set({ coverImageId: imageOfB.id })
+            .where(eq(schema.product.id, productOfA.id)),
+        ),
+      ).resolves.toEqual({ code: '23503', constraint: 'product_cover_image_fk' });
+    });
+
+    it('starts a new product at revision 0 with no cover', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      expect(product).toMatchObject({ revision: 0, coverImageId: null });
     });
   });
 });

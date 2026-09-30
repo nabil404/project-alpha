@@ -7,7 +7,10 @@ import {
   openCatalogTestDb,
   pgErrorOf,
   seedImage,
+  seedOption,
+  seedOptionValue,
   seedProduct,
+  seedVariant,
   type CatalogTestDb,
 } from './catalog-test-db';
 
@@ -76,5 +79,36 @@ describeDb('catalog row-level security (as app_runtime)', () => {
     await expect(
       asRuntime(t.merchantB, (tx) => tx.delete(schema.productImage).where(byId).returning()),
     ).resolves.toHaveLength(0);
+  });
+
+  it("hides a merchant's options, values and variant links from another merchant", async () => {
+    const product = await seedProduct(t.db, t.merchantA);
+    const variant = await seedVariant(t.db, t.merchantA, product.id);
+    const option = await seedOption(t.db, t.merchantA, product.id);
+    const value = await seedOptionValue(t.db, t.merchantA, option.id);
+    await t.db.insert(schema.productVariantOptionValue).values({
+      merchantId: t.merchantA,
+      variantId: variant.id,
+      optionId: option.id,
+      optionValueId: value.id,
+    });
+
+    const reads: ((tx: Transaction) => Promise<unknown[]>)[] = [
+      (tx) => tx.select().from(schema.productOption).where(eq(schema.productOption.id, option.id)),
+      (tx) =>
+        tx
+          .select()
+          .from(schema.productOptionValue)
+          .where(eq(schema.productOptionValue.id, value.id)),
+      (tx) =>
+        tx
+          .select()
+          .from(schema.productVariantOptionValue)
+          .where(eq(schema.productVariantOptionValue.variantId, variant.id)),
+    ];
+    for (const read of reads) {
+      await expect(asRuntime(t.merchantA, read)).resolves.toHaveLength(1);
+      await expect(asRuntime(t.merchantB, read)).resolves.toHaveLength(0);
+    }
   });
 });
