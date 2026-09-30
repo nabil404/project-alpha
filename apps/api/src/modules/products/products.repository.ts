@@ -27,6 +27,7 @@ export interface NewVariantValues {
   sku: string | null;
   price: number;
   stock: number;
+  imageId: string | null;
 }
 
 /** Each generated SKU collides with odds of roughly 1 in 10^12; five tries is plenty. */
@@ -63,16 +64,37 @@ export class ProductsRepository {
     return row;
   }
 
+  /**
+   * Every call bumps `revision`, the product's version on the wire, even with
+   * no fields: category links and variants are part of the document too, and
+   * their writers call this to mark the change.
+   */
   async updateProduct(
     executor: Executor,
     { merchantId }: TenantScope,
     id: string,
-    values: Partial<NewProductValues>,
+    values: Partial<NewProductValues> & { coverImageId?: string | null },
   ): Promise<void> {
     await executor
       .update(product)
-      .set(values)
+      .set({ ...values, revision: sql`${product.revision} + 1` })
       .where(and(eq(product.merchantId, merchantId), eq(product.id, id)));
+  }
+
+  /**
+   * Leaves `revision` alone: the gallery is saved as it changes, not with the
+   * edit page's document, so a photo upload must not make that page's save stale.
+   */
+  async setCoverImage(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    productId: string,
+    imageId: string | null,
+  ): Promise<void> {
+    await executor
+      .update(product)
+      .set({ coverImageId: imageId })
+      .where(and(eq(product.merchantId, merchantId), eq(product.id, productId)));
   }
 
   /** False when there was no such product. Variants and links cascade. */
@@ -132,6 +154,7 @@ export class ProductsRepository {
       name: values.name,
       price: values.price,
       stock: values.stock,
+      imageId: values.imageId,
       isDefault: values.name === null,
     };
 
