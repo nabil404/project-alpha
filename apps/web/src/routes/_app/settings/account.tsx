@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { accountSettingsSearchSchema, type AccountSettingsSearch } from '@app/shared';
 
+import { ProfileCard } from '@/features/account';
 import { linkedAccountsQueryOptions, SignInMethodsCard } from '@/features/auth';
 
 /** Also where linking Google or Facebook lands: `?error=<code>` after a refused link. */
@@ -14,5 +15,10 @@ export const Route = createFileRoute('/_app/settings/account')({
 function AccountSettingsPage() {
   const { error } = Route.useSearch();
 
-  return <SignInMethodsCard error={error} />;
+  return (
+    <div className="flex flex-col gap-6">
+      <ProfileCard />
+      <SignInMethodsCard error={error} />
+    </div>
+  );
 }
