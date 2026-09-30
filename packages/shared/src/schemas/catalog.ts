@@ -128,6 +128,19 @@ export const updateProductSchema = z.object({
 });
 export type UpdateProduct = z.infer<typeof updateProductSchema>;
 
+/**
+ * One variant's own fields, outside the edit page's document save: a quick
+ * stock or price change. Its option values change only through that save.
+ */
+export const updateVariantSchema = z.object({
+  sku: z.string().trim().min(1).max(64).optional(),
+  price: moneySchema.optional(),
+  stock: stockSchema.optional(),
+  /** One of the product's own images; null shows the product's cover. */
+  imageId: z.string().uuid().nullable().optional(),
+});
+export type UpdateVariant = z.infer<typeof updateVariantSchema>;
+
 const optionNameSchema = z.string().trim().min(1).max(40);
 const optionValueTextSchema = z.string().trim().min(1).max(40);
 
