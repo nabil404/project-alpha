@@ -48,12 +48,10 @@ export function conversationEventStream(
 ): Observable<MessageEvent> {
   const ready = of<MessageEvent>({ type: 'ready', data: {}, retry: RETRY_MS });
   const updates = events.pipe(
-    map(
-      (event): MessageEvent => ({
-        type: CONVERSATION_UPDATED_EVENT,
-        data: { conversationId: event.conversationId },
-      }),
-    ),
+    map((event): MessageEvent => ({
+      type: CONVERSATION_UPDATED_EVENT,
+      data: { conversationId: event.conversationId },
+    })),
     catchError((error: unknown) =>
       error instanceof StreamEvicted
         ? of<MessageEvent>({ type: CONVERSATION_STREAM_EVICTED_EVENT, data: {} })
