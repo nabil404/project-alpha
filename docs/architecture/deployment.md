@@ -285,12 +285,23 @@ billed while the instance is stopped.
 ## Later: stage and prod
 
 The workflows already exist. What remains is the AWS and GitHub setup, the same
-steps as dev with `stage` or `prod` in place of `dev`:
+steps as dev with `stage` or `prod` in place of `dev`. Stage serves
+`stage.socialglider.online` and prod serves the apex `socialglider.online`. The
+domains are set in `stage.params` / `prod.params` and in the `url` of
+`deploy-stage.yml` / `deploy-prod.yml`; change both together.
 
-1. Confirm `Domain` in `prod.params`; it currently says the apex `socialglider.online`. If it changes, change `url` in `deploy-prod.yml` too.
-2. **Stage:** pin `ImageId` in `stage.params` and run `deploy.sh stage`. It uses the same `app-bootstrap` as dev.
-3. **Prod:** run `deploy.sh bootstrap-prod` first, then pin `ImageId` in `prod.params` and run `deploy.sh prod`.
-4. Add the Namecheap A records (host `stage`, and `@` for the apex) and the `/app/<env>/` secrets.
+1. **Stage:** pin `ImageId` in `stage.params` and run `deploy.sh stage`. It uses the same `app-bootstrap` as dev.
+2. **Prod:** run `deploy.sh bootstrap-prod` first, then pin `ImageId` in `prod.params` and run `deploy.sh prod`.
+3. **Namecheap:** add the A records under Advanced DNS, each pointing at its stack's `PublicIp`:
+
+   | Type     | Host    | Value                  | Serves                      |
+   | -------- | ------- | ---------------------- | --------------------------- |
+   | A Record | `stage` | `app-stage` `PublicIp` | `stage.socialglider.online` |
+   | A Record | `@`     | `app-prod` `PublicIp`  | `socialglider.online`       |
+
+   Namecheap's default records for a new domain include a parking-page record on `@`, and often a `www` CNAME. Remove them, or `@` will not resolve to the server. `www.socialglider.online` is not served; Caddy only answers for the domain in `DOMAIN`.
+
+4. Add the `/app/stage/` and `/app/prod/` secrets.
 5. Create the GitHub environments, each with the four variables from its own stacks' outputs. For prod, `ARTIFACTS_BUCKET` comes from `app-bootstrap-prod`.
    - `stage`: deployment branch `stage`.
    - `prod`: **required reviewers**, and two more variables, `ECR_API_REPOSITORY=app-prod-api` and `ECR_WEB_REPOSITORY=app-prod-web`. Run `deploy-prod.yml` from the default branch.
