@@ -1,13 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  One environment: a single EC2 instance running docker/compose.yml (Caddy,
-  api, worker, Postgres, Redis), its data volume, backups, logs, and the role
-  GitHub Actions assumes to deploy to it. See docs/architecture/deployment.md.
+  One environment (dev, stage or prod): a single EC2 instance running
+  docker/compose.yml plus that environment's overlay, its data volume, backups,
+  logs, and the role GitHub Actions assumes to deploy to it. Deployed per
+  environment with infra/cloudformation/deploy.sh <env>, which reads
+  environments/<env>.params. See docs/architecture/deployment.md.
 
 Parameters:
   EnvName:
     Type: String
-    AllowedValues: [dev, production]
+    AllowedValues: [dev, stage, prod]
     Description: Also the GitHub environment name and the /app/<env>/ parameter path.
   Domain:
     Type: String
@@ -47,7 +49,7 @@ Parameters:
     Description: Optional. Receives instance-recovery alarms; confirm the subscription email.
 
 Conditions:
-  IsProduction: !Equals [!Ref EnvName, production]
+  IsProduction: !Equals [!Ref EnvName, prod]
   HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
 
 Resources:

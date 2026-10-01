@@ -1,0 +1,12 @@
+# Parameters for stack app-stage (environment.yml). One KEY=VALUE per line.
+# Deploy with: infra/cloudformation/deploy.sh stage
+EnvName=stage
+Domain=stage.socialglider.online
+# Sized together with docker/compose.stage.yml - change both.
+InstanceType=t3.small
+DataVolumeSizeGiB=20
+BackupRetentionDays=14
+# Pinned: a changed ImageId replaces the instance. deploy.sh prints the current
+# Amazon Linux 2023 AMI when this is empty.
+ImageId=
+AlarmEmail=

@@ -1,11 +1,14 @@
-# Production stack on the single VPS.
+# The server stack, shared by every deployed environment: Caddy, api, worker,
+# Postgres, Redis. Never run on its own - each environment layers its overlay,
+# which sizes the stack to that environment's instance:
+#   docker compose --env-file apps/api/.env \
+#     -f docker/compose.yml -f docker/compose.<dev|stage|prod>.yml up -d
+# infra/server/deploy.sh does exactly that on the server. Local development uses
+# compose.local.yml instead.
 #
 # apps/api/.env is the repo's only env file, and compose needs it passed
-# explicitly - without --env-file it would look for docker/.env instead:
-#   docker compose --env-file apps/api/.env -f docker/compose.yml up -d
-#
-# Staging runs this same file with a separate env file and project name:
-#   docker compose -p app-staging --env-file apps/api/.env.staging -f docker/compose.yml up -d
+# explicitly - without --env-file it would look for docker/.env instead. On a
+# server, deploy.sh renders it from Parameter Store.
 name: app
 
 # apps/api/.env is authored for the host, where localhost is Postgres and Redis;

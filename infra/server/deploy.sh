@@ -10,17 +10,13 @@
 set -euo pipefail
 
 sha="$1"
-# shellcheck source=/dev/null
-. /etc/app.env
 release="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=infra/server/lib.sh
+. "$release/infra/server/lib.sh"
 current_link=/opt/app/current
 previous="$(readlink -f "$current_link" || true)"
 
 log() { echo "deploy[$APP_ENV ${sha:0:7}]: $*"; }
-
-compose_in() {
-  docker compose --env-file "$1/apps/api/.env" -f "$1/docker/compose.yml" "${@:2}"
-}
 
 # --- 1. apps/api/.env, the only env file, from /app/<env>/ in Parameter Store.
 # Values are single-quoted so MAIL_FROM="Orders <orders@x>" stays literal for
