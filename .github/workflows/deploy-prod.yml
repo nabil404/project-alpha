@@ -1,0 +1,52 @@
+name: Deploy prod
+
+# Manual only: promotes a commit already on main - so already tested, and
+# already run on stage - to production. It never builds: the images must be
+# the ones stage ran. The `prod` GitHub environment's required reviewers
+# approve each run.
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full 40-character commit SHA on main, as deployed to stage
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify commit is on main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::sha must be a full 40-character commit SHA"; exit 1
+          fi
+          git merge-base --is-ancestor "$SHA" origin/main \
+            || { echo "::error::$SHA is not on main"; exit 1; }
+
+  deploy:
+    needs: verify
+    # Repository variable, set to 'true' once the prod stack exists.
+    if: vars.PROD_DEPLOY_ENABLED == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: prod
+      url: https://socialglider.online
+      sha: ${{ inputs.sha }}
+      build: false

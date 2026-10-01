@@ -1,20 +1,20 @@
 # Deployment: AWS, CloudFormation, GitHub Actions
 
 Status: **dev server built, not yet provisioned**. The templates, server scripts
-and CI job are in the repo; the account steps under
+and workflows are in the repo; the account steps under
 [Setting up the dev server](#setting-up-the-dev-server) have not been run.
-**stage** and **prod** have their parameter and compose files, but no stack and
-no CI job yet. When they land, update this page and the Hosting and CI/CD rows
+**stage** and **prod** have their parameter files, compose overlays and
+workflows, but no stack yet, so their workflows only test. When they land, update this page and the Hosting and CI/CD rows
 of [`tech-stack.md`](tech-stack.md).
 
 ## Environments
 
-| Environment | Compose                                                    | Stack (params)                            | Domain                      | Deployed by                      |
-| ----------- | ---------------------------------------------------------- | ----------------------------------------- | --------------------------- | -------------------------------- |
-| local       | `docker/compose.local.yml`: dependencies, apps on the host | none                                      | `localhost`                 | `pnpm dev:up`                    |
-| dev         | `docker/compose.yml` + `docker/compose.dev.yml`            | `app-dev` (`environments/dev.params`)     | `dev.socialglider.online`   | CI, every merge to **`develop`** |
-| stage       | `docker/compose.yml` + `docker/compose.stage.yml`          | `app-stage` (`environments/stage.params`) | `stage.socialglider.online` | not wired yet                    |
-| prod        | `docker/compose.yml` + `docker/compose.prod.yml`           | `app-prod` (`environments/prod.params`)   | `socialglider.online`       | not wired yet                    |
+| Environment | Compose                                                    | Stack (params)                            | Domain                      | Deployed by                                                  |
+| ----------- | ---------------------------------------------------------- | ----------------------------------------- | --------------------------- | ------------------------------------------------------------ |
+| local       | `docker/compose.local.yml`: dependencies, apps on the host | none                                      | `localhost`                 | `pnpm dev:up`                                                |
+| dev         | `docker/compose.yml` + `docker/compose.dev.yml`            | `app-dev` (`environments/dev.params`)     | `dev.socialglider.online`   | `deploy-dev.yml`: every merge to **`develop`**               |
+| stage       | `docker/compose.yml` + `docker/compose.stage.yml`          | `app-stage` (`environments/stage.params`) | `stage.socialglider.online` | `deploy-stage.yml`: every push to **`main`**                 |
+| prod        | `docker/compose.yml` + `docker/compose.prod.yml`           | `app-prod` (`environments/prod.params`)   | `socialglider.online`       | `deploy-prod.yml`: manual, approved, a SHA already on `main` |
 
 **One template, one parameter file per environment.**
 [`environment.yml`](../../infra/cloudformation/environment.yml) is the only
@@ -99,18 +99,31 @@ work with the previous release still running: add first, remove in a later
 release. Recreating the api container costs a few seconds of 502s per deploy.
 Meta retries webhook deliveries, so that is fine for dev and for the pilot.
 
-**CI** (`deploy-dev` in [`ci.yml`](../../.github/workflows/ci.yml)) runs after
-`test` on every push to `develop`, which is every merge, once the repository
-variable `DEV_DEPLOY_ENABLED` is `true`:
+### Workflows
 
-1. Assume the role and build and push both images, skipping any already in ECR because tags are immutable.
+One workflow per environment, all running one shared deploy procedure:
+
+| Workflow                                                       | Trigger                                     | Does                                                                                                                                                                                              |
+| -------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ci.yml`](../../.github/workflows/ci.yml)                     | every pull request; called by the two below | Checks only: lint, format, typecheck, migrate, test, RLS check, migration-drift check.                                                                                                            |
+| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml)     | push to `develop`, i.e. every merge         | `ci.yml`, then deploys the commit to dev, building its images.                                                                                                                                    |
+| [`deploy-stage.yml`](../../.github/workflows/deploy-stage.yml) | push to `main`                              | `ci.yml`, then deploys the commit to stage. Fast-forward `main` to `develop` and dev's images are reused; a merge commit is a new SHA and builds its own.                                         |
+| [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml)   | manual (**Run workflow** with a full SHA)   | Checks the SHA is on `main`, waits for a `prod` environment reviewer, then deploys it **without building**: it fails unless ECR already holds that SHA's images, i.e. the exact images stage ran. |
+| [`deploy.yml`](../../.github/workflows/deploy.yml) (reusable)  | called by the three above                   | The procedure, listed below.                                                                                                                                                                      |
+
+Each deploy job is gated by a repository variable (`DEV_DEPLOY_ENABLED`,
+`STAGE_DEPLOY_ENABLED`, `PROD_DEPLOY_ENABLED`) that you set to `true` once that
+environment's stack exists. Until then its workflow still tests the branch.
+Deploys to one environment queue and are never cancelled, because a cancelled
+deploy could stop halfway.
+
+`deploy.yml` runs in the GitHub environment it was given, so it assumes that
+environment's role with that environment's variables:
+
+1. Build and push the images ECR lacks. Tags are immutable, so existing ones are skipped. With `build: false` (prod), a missing image fails the run instead.
 2. Upload the bundle.
 3. Run [`infra/ci/ssm-deploy.sh`](../../infra/ci/ssm-deploy.sh), which sends the SSM command, waits and prints its output.
-4. `curl` `https://dev.socialglider.online/health`.
-
-CI runs on pushes to `main` and `develop`, and on every pull request. A newer
-push cancels a pull request's run, but never a branch run, because that could
-cut a deploy off halfway.
+4. `curl` the environment's `/health`.
 
 ## Setting up the dev server
 
@@ -225,7 +238,7 @@ The next merge to `develop`, or a re-run of its latest CI run, deploys.
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shell on the server   | `aws ssm start-session --target <InstanceId>` (needs the Session Manager plugin), then `sudo -i`.                                                                                                                                                                                     |
 | Logs                  | CloudWatch Logs → `/app/<env>`, one stream per container. `aws logs tail /app/dev --follow`.                                                                                                                                                                                          |
-| Redeploy a commit     | Re-run its `develop` CI run, or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                                                                                                                                      |
+| Redeploy a commit     | Re-run its deploy workflow run (or **Run workflow** on `deploy-dev.yml`), or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                                                                                         |
 | Compose on the server | `cd /opt/app/current && . infra/server/lib.sh && compose_in . ps`                                                                                                                                                                                                                     |
 | Backup now            | `systemctl start app-backup.service`, then check `journalctl -u app-backup`.                                                                                                                                                                                                          |
 | Restore drill         | Copy a dump from the backups bucket, `pg_restore` it into a scratch `postgres:17-alpine` container, and run `db:verify-rls` against it. Do this once before prod.                                                                                                                     |
@@ -247,7 +260,11 @@ billed while the instance is stopped.
 
 ## Later: stage and prod
 
-1. Pin `ImageId` in `stage.params` / `prod.params`, then run `deploy.sh stage` / `deploy.sh prod`. Confirm `Domain` in `prod.params` first; it currently says the apex `socialglider.online`.
-2. Add GitHub environments `stage` and `prod`; prod gets required reviewers.
-3. Add deploy jobs that reuse the image tags already built for `develop`, never rebuilding. Suggested flow: fast-forward `main` to `develop` to deploy to stage, then an approval on that run promotes the same SHA to prod. A merge commit would get a new SHA, and with it a rebuild.
-4. Run the restore drill before prod takes real traffic.
+The workflows already exist. What remains is the AWS and GitHub setup, the same
+steps as dev with `stage` or `prod` in place of `dev`:
+
+1. Confirm `Domain` in `prod.params`; it currently says the apex `socialglider.online`. If it changes, change `url` in `deploy-prod.yml` too.
+2. Pin `ImageId`, then run `deploy.sh stage` / `deploy.sh prod`. Add the Namecheap A record (host `stage`, or `@` for the apex) and the `/app/<env>/` secrets.
+3. Create GitHub environments `stage` (deployment branch `main`) and `prod` (deployment branch `main`, **required reviewers**), each with the four variables from its stack's outputs.
+4. Set `STAGE_DEPLOY_ENABLED` / `PROD_DEPLOY_ENABLED` to `true`.
+5. Run the restore drill before prod takes real traffic.
