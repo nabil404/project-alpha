@@ -21,9 +21,7 @@ jobs:
 
   deploy:
     needs: test
-    # DEV_DEPLOY_ENABLED is a repository variable, set to 'true' once the dev
-    # stack exists; until then this workflow only tests.
-    if: vars.DEV_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/develop'
     permissions:
       contents: read
       id-token: write

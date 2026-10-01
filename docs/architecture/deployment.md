@@ -135,9 +135,10 @@ One workflow per environment, all running one shared deploy procedure:
 | [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml)   | manual (**Run workflow** with a full SHA)                             | Checks the SHA is on `stage`, waits for a `prod` environment reviewer, then **copies** that SHA's images from `social-glider-api`/`social-glider-web` into `social-glider-prod-api`/`social-glider-prod-web` and deploys them. It never builds; if stage never had the images, it fails. |
 | [`deploy.yml`](../../.github/workflows/deploy.yml) (reusable)  | called by the three above                                             | The procedure, listed below.                                                                                                                                                                                                                                                             |
 
-Each deploy job is gated by a repository variable (`DEV_DEPLOY_ENABLED`,
-`STAGE_DEPLOY_ENABLED`, `PROD_DEPLOY_ENABLED`) that you set to `true` once that
-environment's stack exists. Until then its workflow still tests the branch.
+Dev deploys on every push to `develop`. The stage and prod deploy jobs are
+gated by a repository variable (`STAGE_DEPLOY_ENABLED`, `PROD_DEPLOY_ENABLED`)
+that you set to `true` once that environment's stack exists. Until then its
+workflow still tests the branch.
 Deploys to one environment queue and are never cancelled, because a cancelled
 deploy could stop halfway.
 
@@ -262,8 +263,6 @@ Rules:
    | `AWS_DEPLOY_ROLE_ARN` | `DeployRoleArn` output                  |
    | `INSTANCE_ID`         | `InstanceId` output                     |
    | `ARTIFACTS_BUCKET`    | `ArtifactsBucketName` output, bootstrap |
-
-3. **Settings → Secrets and variables → Actions → Variables (repository):** `DEV_DEPLOY_ENABLED` = `true`.
 
 The next merge to `develop`, or a re-run of its latest CI run, deploys.
 
