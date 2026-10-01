@@ -40,6 +40,7 @@ _None yet._
 | `pnpm --filter api db:verify-rls`                                  | Fails if a table carrying `merchant_id` lacks `ENABLE`/`FORCE` row-level security or a policy. Run after `db:migrate`; CI runs it too, because drizzle-kit generates `ENABLE` and the policy but not `FORCE`, so nothing else would catch a half-protected table. |
 | `pnpm --filter api db:custom`                                      | An empty migration for DDL drizzle-kit does not model: `FORCE ROW LEVEL SECURITY`, roles, grants, default privileges, functions, triggers.                                                                                                                        |
 | `pnpm --filter api db:auth-schema`                                 | Regenerate Better Auth SQL, then paste `src/modules/database/schema/auth.ts`, then `db:generate` to migrate it.                                                                                                                                                   |
+| `pnpm --filter api load <test>`                                    | Run a k6 load test from `apps/api/load/tests/` (no argument lists them) against a local api; needs `k6` installed. See [`apps/api/load/README.md`](apps/api/load/README.md).                                                                                      |
 
 **Schema loop:** edit `apps/api/src/modules/database/schema/` → `db:generate` → review
 the SQL by hand → `db:migrate` → `db:verify-rls`.

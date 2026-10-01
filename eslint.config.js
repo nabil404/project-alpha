@@ -49,5 +49,16 @@ export default tseslint.config(
     languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
     rules: { 'no-console': 'off' },
   },
+  {
+    // Load-test runner and post-run checks: Node CLI scripts, like the above.
+    files: ['apps/api/load/**/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    rules: { 'no-console': 'off' },
+  },
+  {
+    // k6 scripts run in k6's own runtime, which provides these globals.
+    files: ['apps/api/load/**/*.js'],
+    languageOptions: { globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly' } },
+  },
   prettier,
 );
