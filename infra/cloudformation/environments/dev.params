@@ -9,4 +9,4 @@ InstanceType=t3.small
 DataVolumeSizeGiB=20
 # Pinned: a changed ImageId replaces the instance. deploy.sh prints the current
 # Amazon Linux 2023 AMI when this is empty.
-ImageId=
+ImageId=ami-08e3b3155fc937a94
