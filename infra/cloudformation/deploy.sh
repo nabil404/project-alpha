@@ -28,13 +28,13 @@ case "$target" in
     ;;
   dev | stage | prod)
     params="$dir/environments/$target.params"
-    mapfile -t overrides < <(grep -Ev '^[[:space:]]*(#|$)' "$params")
+    lines="$(grep -Ev '^[[:space:]]*(#|$)' "$params")"
 
-    if ! printf '%s\n' "${overrides[@]}" | grep -qx "EnvName=$target"; then
+    if ! grep -qx "EnvName=$target" <<<"$lines"; then
       echo "$params must set EnvName=$target" >&2
       exit 1
     fi
-    if ! printf '%s\n' "${overrides[@]}" | grep -q '^ImageId=ami-'; then
+    if ! grep -q '^ImageId=ami-' <<<"$lines"; then
       latest="$(aws ssm get-parameter \
         --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
         --query Parameter.Value --output text)"
@@ -43,8 +43,15 @@ case "$target" in
       exit 1
     fi
     # CloudFormation rejects an empty value for a String parameter on the
-    # command line; leaving it out keeps the template default instead.
-    mapfile -t overrides < <(printf '%s\n' "${overrides[@]}" | grep -v '=$')
+    # command line; leaving it out keeps the template default instead. A plain
+    # read loop, not mapfile: macOS ships bash 3.2, which has no mapfile.
+    overrides=()
+    while IFS= read -r line; do
+      case "$line" in
+        *=) ;;
+        *) overrides+=("$line") ;;
+      esac
+    done <<<"$lines"
 
     aws cloudformation deploy --stack-name "app-$target" \
       --template-file "$dir/environment.yml" \
