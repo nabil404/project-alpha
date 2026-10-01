@@ -20,6 +20,17 @@ Parameters:
   BootstrapStackName:
     Type: String
     Default: app-bootstrap
+    Description: >-
+      The bootstrap stack whose ECR repositories and bundle bucket this
+      environment uses: app-bootstrap for dev and stage, app-bootstrap-prod
+      for prod.
+  SourceBootstrapStackName:
+    Type: String
+    Default: ''
+    Description: >-
+      Prod only: the bootstrap stack whose images this environment promotes.
+      Its deploy role may read those repositories, to copy the images stage
+      ran into its own. Empty for environments that build.
   ImageId:
     Type: AWS::EC2::Image::Id
     Description: >-
@@ -51,6 +62,7 @@ Parameters:
 Conditions:
   IsProduction: !Equals [!Ref EnvName, prod]
   HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
+  PromotesImages: !Not [!Equals [!Ref SourceBootstrapStackName, '']]
 
 Resources:
   # --- Network: one public subnet. The instance is reachable on 80/443 only;
@@ -323,6 +335,8 @@ Resources:
             ARTIFACTS_BUCKET=${ArtifactsBucket}
             BACKUPS_BUCKET=${BackupsBucket}
             REGISTRY=${Registry}
+            API_REPOSITORY=${ApiRepository}
+            WEB_REPOSITORY=${WebRepository}
             EOF
 
             # The attachment completes after boot starts, so wait for the device.
@@ -378,6 +392,8 @@ Resources:
             chmod 700 /opt/app/bin/deploy
           - ArtifactsBucket: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ArtifactsBucket' }
             Registry: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-RegistryUri' }
+            ApiRepository: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ApiRepositoryName' }
+            WebRepository: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-WebRepositoryName' }
 
   ElasticIp:
     Type: AWS::EC2::EIP
@@ -478,6 +494,18 @@ Resources:
               - Effect: Allow
                 Action: [ssm:GetCommandInvocation, ssm:ListCommandInvocations]
                 Resource: '*'
+              - !If
+                - PromotesImages
+                - Effect: Allow
+                  Action:
+                    - ecr:BatchCheckLayerAvailability
+                    - ecr:BatchGetImage
+                    - ecr:DescribeImages
+                    - ecr:GetDownloadUrlForLayer
+                  Resource:
+                    - { 'Fn::ImportValue': !Sub '${SourceBootstrapStackName}-ApiRepositoryArn' }
+                    - { 'Fn::ImportValue': !Sub '${SourceBootstrapStackName}-WebRepositoryArn' }
+                - !Ref 'AWS::NoValue'
 
 Outputs:
   PublicIp:

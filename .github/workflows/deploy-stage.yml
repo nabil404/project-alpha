@@ -1,11 +1,11 @@
 name: Deploy stage
 
-# Every push to main: test, then deploy that commit to stage. Fast-forward main
-# to develop and the images dev already ran are reused; a merge commit is a new
-# SHA and builds its own.
+# Every push to the stage branch: test, then deploy that commit to stage.
+# Fast-forward stage to develop and the images dev already ran are reused; a
+# merge commit is a new SHA and builds its own.
 on:
   push:
-    branches: [main]
+    branches: [stage]
   workflow_dispatch:
 
 concurrency:
@@ -22,7 +22,7 @@ jobs:
   deploy:
     needs: test
     # Repository variable, set to 'true' once the stage stack exists.
-    if: vars.STAGE_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    if: vars.STAGE_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/stage'
     permissions:
       contents: read
       id-token: write

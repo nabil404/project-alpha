@@ -9,12 +9,12 @@ of [`tech-stack.md`](tech-stack.md).
 
 ## Environments
 
-| Environment | Compose                                                    | Stack (params)                            | Domain                      | Deployed by                                                  |
-| ----------- | ---------------------------------------------------------- | ----------------------------------------- | --------------------------- | ------------------------------------------------------------ |
-| local       | `docker/compose.local.yml`: dependencies, apps on the host | none                                      | `localhost`                 | `pnpm dev:up`                                                |
-| dev         | `docker/compose.yml` + `docker/compose.dev.yml`            | `app-dev` (`environments/dev.params`)     | `dev.socialglider.online`   | `deploy-dev.yml`: every merge to **`develop`**               |
-| stage       | `docker/compose.yml` + `docker/compose.stage.yml`          | `app-stage` (`environments/stage.params`) | `stage.socialglider.online` | `deploy-stage.yml`: every push to **`main`**                 |
-| prod        | `docker/compose.yml` + `docker/compose.prod.yml`           | `app-prod` (`environments/prod.params`)   | `socialglider.online`       | `deploy-prod.yml`: manual, approved, a SHA already on `main` |
+| Environment | Compose                                                    | Stack (params)                            | Domain                      | Deployed by                                                   |
+| ----------- | ---------------------------------------------------------- | ----------------------------------------- | --------------------------- | ------------------------------------------------------------- |
+| local       | `docker/compose.local.yml`: dependencies, apps on the host | none                                      | `localhost`                 | `pnpm dev:up`                                                 |
+| dev         | `docker/compose.yml` + `docker/compose.dev.yml`            | `app-dev` (`environments/dev.params`)     | `dev.socialglider.online`   | `deploy-dev.yml`: every merge to **`develop`**                |
+| stage       | `docker/compose.yml` + `docker/compose.stage.yml`          | `app-stage` (`environments/stage.params`) | `stage.socialglider.online` | `deploy-stage.yml`: every push to **`stage`**                 |
+| prod        | `docker/compose.yml` + `docker/compose.prod.yml`           | `app-prod` (`environments/prod.params`)   | `socialglider.online`       | `deploy-prod.yml`: manual, approved, a SHA already on `stage` |
 
 **One template, one parameter file per environment.**
 [`environment.yml`](../../infra/cloudformation/environment.yml) is the only
@@ -35,22 +35,27 @@ Parameter Store under `/app/<env>/`. `docker/compose.local.yml`, which was
 
 ## Shape
 
-| Decision  | Choice                                                                                                                                                                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Hosting   | One EC2 instance per environment running the compose stack: Caddy, api, worker, Postgres, Redis. This keeps the low-cost principle in `tech-stack.md`.                                                                                                       |
-| Infra     | CloudFormation: [`bootstrap.yml`](../../infra/cloudformation/bootstrap.yml) once per account, `environment.yml` once per environment.                                                                                                                        |
-| DNS       | Namecheap. Each stack outputs an Elastic IP and you add one A record by hand. Caddy gets the TLS certificate itself.                                                                                                                                         |
-| CI → AWS  | GitHub OIDC. No AWS keys are stored in GitHub. Each environment's deploy role trusts only the GitHub environment of the same name in this repository.                                                                                                        |
-| Deploy    | Images are built once in CI and pushed to ECR, tagged with the commit SHA. The server never builds and never clones; it pulls images and a small bundle (`docker/`, `static/`, `infra/server/`). The deploy runs over SSM Run Command, so port 22 is closed. |
-| Secrets   | SSM Parameter Store `SecureString` under `/app/<env>/`. On each deploy the server renders `apps/api/.env` (mode 600) from them, so it stays the only env file.                                                                                               |
-| Unchanged | Cloudflare R2, the SMTP provider and the LLM provider are reached through env vars as today. Each environment gets its own R2 bucket and its own Meta app.                                                                                                   |
+| Decision  | Choice                                                                                                                                                                                                                                                                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hosting   | One EC2 instance per environment running the compose stack: Caddy, api, worker, Postgres, Redis. This keeps the low-cost principle in `tech-stack.md`.                                                                                                                                                                                     |
+| Infra     | CloudFormation: [`bootstrap.yml`](../../infra/cloudformation/bootstrap.yml) shared by dev and stage, [`bootstrap-prod.yml`](../../infra/cloudformation/bootstrap-prod.yml) for prod alone, `environment.yml` once per environment.                                                                                                         |
+| DNS       | Namecheap. Each stack outputs an Elastic IP and you add one A record by hand. Caddy gets the TLS certificate itself.                                                                                                                                                                                                                       |
+| CI → AWS  | GitHub OIDC. No AWS keys are stored in GitHub. Each environment's deploy role trusts only the GitHub environment of the same name in this repository.                                                                                                                                                                                      |
+| Deploy    | Images are built once, by dev or stage, and pushed to ECR tagged with the commit SHA; prod copies them into its own repositories rather than rebuilding. The server never builds and never clones; it pulls images and a small bundle (`docker/`, `static/`, `infra/server/`). The deploy runs over SSM Run Command, so port 22 is closed. |
+| Secrets   | SSM Parameter Store `SecureString` under `/app/<env>/`. On each deploy the server renders `apps/api/.env` (mode 600) from them, so it stays the only env file.                                                                                                                                                                             |
+| Unchanged | Cloudflare R2, the SMTP provider and the LLM provider are reached through env vars as today. Each environment gets its own R2 bucket and its own Meta app.                                                                                                                                                                                 |
 
 ```
 GitHub Actions ──OIDC──▶ app-<env> deploy role
-  │ build, push                │ ssm:SendCommand (that instance only)
+  │ build (dev, stage)         │ ssm:SendCommand (that instance only)
+  │ or copy (prod)             │
   ▼                            ▼
-ECR app-api, app-web ◀─pull── EC2 app-<env> (Elastic IP; 80/443 open, no SSH)
-S3 artifacts/bundles ◀─fetch─   compose.yml + compose.<env>.yml
+ECR app-api, app-web ─────── copy ──▶ ECR app-prod-api, app-prod-web
+  (app-bootstrap)                       (app-bootstrap-prod)
+  ▲ pull: dev, stage                    ▲ pull: prod
+EC2 app-<env> (Elastic IP; 80/443 open, no SSH)
+  fetches its bundle from its bootstrap's S3 bucket
+  runs compose.yml + compose.<env>.yml
                                 Docker data on its own EBS volume (daily snapshots)
                                 nightly pg_dump ──▶ S3 backups bucket
                                 container logs  ──▶ CloudWatch /app/<env>
@@ -58,11 +63,26 @@ S3 artifacts/bundles ◀─fetch─   compose.yml + compose.<env>.yml
 
 ## What each piece does
 
-**`bootstrap.yml`** creates the account-wide pieces:
+**`bootstrap.yml`** (stack `app-bootstrap`) creates what dev and stage share:
 
 - the GitHub OIDC provider;
 - ECR repositories `app-api` and `app-web` (immutable tags, scan on push, keep 30 images);
 - the artifacts bucket for deploy bundles, which expire after 30 days.
+
+**`bootstrap-prod.yml`** (stack `app-bootstrap-prod`) is prod's own copy, with
+repositories `app-prod-api` and `app-prod-web` and its own bundle bucket. For
+now it is a deliberate duplicate of `bootstrap.yml`, so prod can diverge later
+without touching dev and stage. That could mean its own AWS account, or
+stricter retention or scanning. Its `CreateOidcProvider` defaults to `false`
+because, while prod shares the account, `app-bootstrap` already created the
+provider; set it to `true` if prod moves to an account of its own. In that
+case the non-prod repositories also need a repository policy that lets prod's
+account pull from them.
+
+`prod.params` points prod at `app-bootstrap-prod` (`BootstrapStackName`) and
+names `app-bootstrap` as `SourceBootstrapStackName`. That grants prod's deploy
+role read access to the non-prod repositories so it can copy images out of
+them.
 
 **`environment.yml`** creates one environment:
 
@@ -103,13 +123,13 @@ Meta retries webhook deliveries, so that is fine for dev and for the pilot.
 
 One workflow per environment, all running one shared deploy procedure:
 
-| Workflow                                                       | Trigger                                     | Does                                                                                                                                                                                              |
-| -------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`ci.yml`](../../.github/workflows/ci.yml)                     | every pull request; called by the two below | Checks only: lint, format, typecheck, migrate, test, RLS check, migration-drift check.                                                                                                            |
-| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml)     | push to `develop`, i.e. every merge         | `ci.yml`, then deploys the commit to dev, building its images.                                                                                                                                    |
-| [`deploy-stage.yml`](../../.github/workflows/deploy-stage.yml) | push to `main`                              | `ci.yml`, then deploys the commit to stage. Fast-forward `main` to `develop` and dev's images are reused; a merge commit is a new SHA and builds its own.                                         |
-| [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml)   | manual (**Run workflow** with a full SHA)   | Checks the SHA is on `main`, waits for a `prod` environment reviewer, then deploys it **without building**: it fails unless ECR already holds that SHA's images, i.e. the exact images stage ran. |
-| [`deploy.yml`](../../.github/workflows/deploy.yml) (reusable)  | called by the three above                   | The procedure, listed below.                                                                                                                                                                      |
+| Workflow                                                       | Trigger                                                               | Does                                                                                                                                                                                                                                             |
+| -------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`ci.yml`](../../.github/workflows/ci.yml)                     | every pull request; called by `deploy-dev.yml` and `deploy-stage.yml` | Checks only: lint, format, typecheck, migrate, test, RLS check, migration-drift check.                                                                                                                                                           |
+| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml)     | push to `develop`, i.e. every merge                                   | `ci.yml`, then deploys the commit to dev, building its images.                                                                                                                                                                                   |
+| [`deploy-stage.yml`](../../.github/workflows/deploy-stage.yml) | push to `stage`                                                       | `ci.yml`, then deploys the commit to stage. Fast-forward `stage` to `develop` and dev's images are reused; a merge commit is a new SHA and builds its own.                                                                                       |
+| [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml)   | manual (**Run workflow** with a full SHA)                             | Checks the SHA is on `stage`, waits for a `prod` environment reviewer, then **copies** that SHA's images from `app-api`/`app-web` into `app-prod-api`/`app-prod-web` and deploys them. It never builds; if stage never had the images, it fails. |
+| [`deploy.yml`](../../.github/workflows/deploy.yml) (reusable)  | called by the three above                                             | The procedure, listed below.                                                                                                                                                                                                                     |
 
 Each deploy job is gated by a repository variable (`DEV_DEPLOY_ENABLED`,
 `STAGE_DEPLOY_ENABLED`, `PROD_DEPLOY_ENABLED`) that you set to `true` once that
@@ -120,7 +140,9 @@ deploy could stop halfway.
 `deploy.yml` runs in the GitHub environment it was given, so it assumes that
 environment's role with that environment's variables:
 
-1. Build and push the images ECR lacks. Tags are immutable, so existing ones are skipped. With `build: false` (prod), a missing image fails the run instead.
+1. Get the images into this environment's repositories, which are `ECR_API_REPOSITORY`/`ECR_WEB_REPOSITORY` and default to `app-api`/`app-web`. Tags are immutable, so images that already exist are skipped.
+   - With `images: build` (dev, stage), it builds what is missing.
+   - With `images: promote` (prod), it copies the manifest from the non-prod repositories. The copy happens inside the registry, so the digest is the one stage ran.
 2. Upload the bundle.
 3. Run [`infra/ci/ssm-deploy.sh`](../../infra/ci/ssm-deploy.sh), which sends the SSM command, waits and prints its output.
 4. `curl` the environment's `/health`.
@@ -139,20 +161,22 @@ Set the region once:
 export AWS_REGION=ap-southeast-1   # example; pick yours
 ```
 
-### 0. The `develop` branch
+### 0. The `develop` and `stage` branches
 
-Create it from `main` and push it. Make it the default target for feature PRs,
-and protect it in **Settings → Branches** so merges go through PRs with CI
-green.
+Create both from `main` and push them. `develop` takes feature PRs and deploys
+to dev. `stage` is fast-forwarded to `develop` when a build is ready for
+stage. Protect both in **Settings → Branches** so changes go through PRs with
+CI green.
 
-### 1. Bootstrap stack (once per account)
+### 1. Bootstrap stack (shared by dev and stage)
 
 ```sh
 infra/cloudformation/deploy.sh bootstrap
 ```
 
 Prefix it with `CREATE_OIDC_PROVIDER=false` if the account already has the
-GitHub OIDC provider.
+GitHub OIDC provider. Prod's bootstrap, `deploy.sh bootstrap-prod`, waits until
+prod is set up.
 
 ### 2. Dev environment stack
 
@@ -264,7 +288,11 @@ The workflows already exist. What remains is the AWS and GitHub setup, the same
 steps as dev with `stage` or `prod` in place of `dev`:
 
 1. Confirm `Domain` in `prod.params`; it currently says the apex `socialglider.online`. If it changes, change `url` in `deploy-prod.yml` too.
-2. Pin `ImageId`, then run `deploy.sh stage` / `deploy.sh prod`. Add the Namecheap A record (host `stage`, or `@` for the apex) and the `/app/<env>/` secrets.
-3. Create GitHub environments `stage` (deployment branch `main`) and `prod` (deployment branch `main`, **required reviewers**), each with the four variables from its stack's outputs.
-4. Set `STAGE_DEPLOY_ENABLED` / `PROD_DEPLOY_ENABLED` to `true`.
-5. Run the restore drill before prod takes real traffic.
+2. **Stage:** pin `ImageId` in `stage.params` and run `deploy.sh stage`. It uses the same `app-bootstrap` as dev.
+3. **Prod:** run `deploy.sh bootstrap-prod` first, then pin `ImageId` in `prod.params` and run `deploy.sh prod`.
+4. Add the Namecheap A records (host `stage`, and `@` for the apex) and the `/app/<env>/` secrets.
+5. Create the GitHub environments, each with the four variables from its own stacks' outputs. For prod, `ARTIFACTS_BUCKET` comes from `app-bootstrap-prod`.
+   - `stage`: deployment branch `stage`.
+   - `prod`: **required reviewers**, and two more variables, `ECR_API_REPOSITORY=app-prod-api` and `ECR_WEB_REPOSITORY=app-prod-web`. Run `deploy-prod.yml` from the default branch.
+6. Set `STAGE_DEPLOY_ENABLED` / `PROD_DEPLOY_ENABLED` to `true`.
+7. Run the restore drill before prod takes real traffic.

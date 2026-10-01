@@ -1,6 +1,7 @@
 #!/bin/bash
 # Creates or updates one CloudFormation stack from the repository:
-#   infra/cloudformation/deploy.sh bootstrap       # once per account, first
+#   infra/cloudformation/deploy.sh bootstrap       # dev + stage's shared pieces, first
+#   infra/cloudformation/deploy.sh bootstrap-prod  # prod's own copy, before prod
 #   infra/cloudformation/deploy.sh dev|stage|prod  # environment.yml + environments/<env>.params
 #
 # Needs AWS CLI v2 signed in to the account, and AWS_REGION set.
@@ -16,13 +17,14 @@ outputs() {
 }
 
 case "$target" in
-  bootstrap)
-    aws cloudformation deploy --stack-name app-bootstrap \
-      --template-file "$dir/bootstrap.yml" \
+  bootstrap | bootstrap-prod)
+    stack="app-$target"
+    aws cloudformation deploy --stack-name "$stack" \
+      --template-file "$dir/$target.yml" \
       --capabilities CAPABILITY_IAM \
       --no-fail-on-empty-changeset \
       ${CREATE_OIDC_PROVIDER:+--parameter-overrides CreateOidcProvider="$CREATE_OIDC_PROVIDER"}
-    outputs app-bootstrap
+    outputs "$stack"
     ;;
   dev | stage | prod)
     params="$dir/environments/$target.params"
@@ -53,7 +55,7 @@ case "$target" in
     outputs "app-$target"
     ;;
   *)
-    echo "usage: $0 bootstrap|dev|stage|prod" >&2
+    echo "usage: $0 bootstrap|bootstrap-prod|dev|stage|prod" >&2
     exit 2
     ;;
 esac

@@ -1,7 +1,7 @@
 name: CI
 
 # Checks only. Every pull request runs it directly; the deploy workflows
-# (deploy-dev.yml, deploy-stage.yml) call it first, so a branch is tested
+# (deploy-dev.yml on develop, deploy-stage.yml on stage) call it first, so a branch is tested
 # exactly once per push and nothing deploys untested.
 on:
   pull_request:

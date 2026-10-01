@@ -1,6 +1,10 @@
 # Parameters for stack app-prod (environment.yml). One KEY=VALUE per line.
 # Deploy with: infra/cloudformation/deploy.sh prod
 EnvName=prod
+# Prod has its own bootstrap (bootstrap-prod.yml): its own ECR repositories and
+# bundle bucket. It promotes the images stage ran from app-bootstrap's.
+BootstrapStackName=app-bootstrap-prod
+SourceBootstrapStackName=app-bootstrap
 Domain=socialglider.online
 # Sized together with docker/compose.prod.yml - change both.
 InstanceType=t3.medium

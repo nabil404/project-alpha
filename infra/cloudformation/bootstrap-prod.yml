@@ -1,19 +1,21 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  Account-wide pieces shared by the non-production environments, dev and
-  stage: the GitHub OIDC provider, the ECR repositories CI builds into, and the
-  deploy-bundle bucket. Deployed once, by hand, as stack app-bootstrap, before
-  either environment stack. Production has its own copy, bootstrap-prod.yml.
-  See docs/architecture/deployment.md.
+  Account-wide pieces for production only, deployed as stack app-bootstrap-prod:
+  prod's own ECR repositories and deploy-bundle bucket. A deliberate duplicate
+  of bootstrap.yml (dev and stage) so production can diverge - its own AWS
+  account, stricter policies - without touching the other environments. Prod
+  never builds: deploy-prod.yml copies the images stage ran into these
+  repositories. See docs/architecture/deployment.md.
 
 Parameters:
   CreateOidcProvider:
     Type: String
     AllowedValues: ['true', 'false']
-    Default: 'true'
+    Default: 'false'
     Description: >-
-      An account holds one provider per URL. Set false if
-      token.actions.githubusercontent.com already exists in this account.
+      An account holds one provider per URL. While prod shares the account with
+      dev and stage, app-bootstrap already created it, so this stays false.
+      Set true when prod moves to an account of its own.
 
 Conditions:
   CreateOidc: !Equals [!Ref CreateOidcProvider, 'true']
@@ -31,7 +33,7 @@ Resources:
   ApiRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: app-api
+      RepositoryName: app-prod-api
       ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration: { ScanOnPush: true }
       EncryptionConfiguration: { EncryptionType: AES256 }
@@ -44,7 +46,7 @@ Resources:
   WebRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: app-web
+      RepositoryName: app-prod-web
       ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration: { ScanOnPush: true }
       EncryptionConfiguration: { EncryptionType: AES256 }

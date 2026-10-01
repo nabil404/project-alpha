@@ -32,8 +32,8 @@ fi
 (
   umask 077
   jq -r --arg q "'" '.Parameters[] | "\(.Name | split("/") | last)=\($q)\(.Value)\($q)"' <<<"$params"
-  echo "API_IMAGE='$REGISTRY/app-api:$sha'"
-  echo "WEB_IMAGE='$REGISTRY/app-web:$sha'"
+  echo "API_IMAGE='$REGISTRY/$API_REPOSITORY:$sha'"
+  echo "WEB_IMAGE='$REGISTRY/$WEB_REPOSITORY:$sha'"
 ) >"$env_file"
 chmod 600 "$env_file"
 

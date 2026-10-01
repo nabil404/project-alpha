@@ -1,8 +1,9 @@
 name: Deploy
 
 # The one deploy procedure, called by deploy-dev.yml, deploy-stage.yml and
-# deploy-prod.yml. Builds the images only if ECR does not hold them yet, uploads
-# the bundle, runs the deploy on the environment's server over SSM, and checks
+# deploy-prod.yml. Gets the commit's images into this environment's ECR
+# repositories - by building them, or for prod by copying the ones stage ran -
+# uploads the bundle, runs the deploy on the environment's server over SSM, and checks
 # /health. The AWS side is infra/cloudformation/; see
 # docs/architecture/deployment.md.
 on:
@@ -20,10 +21,14 @@ on:
         description: Commit to deploy. Defaults to the commit that triggered the caller.
         type: string
         default: ''
-      build:
-        description: Build images that ECR lacks. False means deploy only images that already exist.
-        type: boolean
-        default: true
+      images:
+        description: >-
+          How images ECR lacks are made. build - build them (dev, stage).
+          promote - copy them from the non-prod repositories (app-api,
+          app-web) into this environment's; never builds, and fails if stage
+          never had them (prod).
+        type: string
+        default: build
 
 jobs:
   deploy:
@@ -39,6 +44,10 @@ jobs:
       id-token: write
     env:
       SHA: ${{ inputs.sha || github.sha }}
+      # This environment's repositories; prod's GitHub environment sets its
+      # own, from the app-bootstrap-prod stack.
+      API_REPO: ${{ vars.ECR_API_REPOSITORY || 'app-api' }}
+      WEB_REPO: ${{ vars.ECR_WEB_REPOSITORY || 'app-web' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,41 +66,58 @@ jobs:
       - name: Check for existing images
         id: existing
         env:
-          BUILD: ${{ inputs.build }}
+          IMAGES: ${{ inputs.images }}
         run: |
-          for repo in api web; do
-            if aws ecr describe-images --repository-name "app-$repo" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
-              echo "$repo=true" >> "$GITHUB_OUTPUT"
-            elif [ "$BUILD" != true ]; then
-              echo "::error::app-$repo:$SHA is not in ECR. This environment deploys only images an earlier environment already ran."
-              exit 1
+          case "$IMAGES" in build | promote) ;; *) echo "::error::images must be build or promote"; exit 1 ;; esac
+          for name in api web; do
+            repo="$API_REPO"; [ "$name" = web ] && repo="$WEB_REPO"
+            if aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
             fi
           done
 
       - uses: docker/setup-buildx-action@v3
         if: steps.existing.outputs.api != 'true' || steps.existing.outputs.web != 'true'
 
+      # Prod runs exactly the images stage ran: a registry-side copy of the
+      # same manifest, so the digest is unchanged.
+      - name: Promote images from stage
+        if: inputs.images == 'promote' && (steps.existing.outputs.api != 'true' || steps.existing.outputs.web != 'true')
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          for pair in "app-api:$API_REPO" "app-web:$WEB_REPO"; do
+            src="${pair%%:*}" dst="${pair#*:}"
+            if ! aws ecr describe-images --repository-name "$src" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+              echo "::error::$src:$SHA does not exist - deploy this commit to stage first."
+              exit 1
+            fi
+            if ! aws ecr describe-images --repository-name "$dst" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+              docker buildx imagetools create --tag "$REGISTRY/$dst:$SHA" "$REGISTRY/$src:$SHA"
+            fi
+          done
+
       - name: Build and push api image
-        if: steps.existing.outputs.api != 'true'
+        if: inputs.images == 'build' && steps.existing.outputs.api != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/api/Dockerfile
           push: true
           provenance: false
-          tags: ${{ steps.ecr.outputs.registry }}/app-api:${{ env.SHA }}
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.API_REPO }}:${{ env.SHA }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
       - name: Build and push web image
-        if: steps.existing.outputs.web != 'true'
+        if: inputs.images == 'build' && steps.existing.outputs.web != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/web/Dockerfile
           push: true
           provenance: false
-          tags: ${{ steps.ecr.outputs.registry }}/app-web:${{ env.SHA }}
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.WEB_REPO }}:${{ env.SHA }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
