@@ -46,6 +46,9 @@ services:
       - api
 
   web:
+    # On a server the deploy sets these to ECR images tagged with the commit
+    # and runs `up --no-build`; locally they just name what `build` produces.
+    image: ${WEB_IMAGE:-app-web}
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
@@ -56,6 +59,7 @@ services:
     restart: 'no'
 
   api:
+    image: ${API_IMAGE:-app-api}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -79,10 +83,14 @@ services:
       retries: 3
 
   worker:
+    image: ${API_IMAGE:-app-api}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
+    # Docker's default 10 s would kill an in-flight LLM extraction on every
+    # deploy; enableShutdownHooks() in worker.ts needs time to finish the job.
+    stop_grace_period: 60s
     env_file: [../apps/api/.env]
     environment: *app-env
     command: ['node', 'dist/worker.js']

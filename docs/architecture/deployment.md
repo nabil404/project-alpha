@@ -1,191 +1,226 @@
-# Deployment plan: AWS, CloudFormation, GitHub Actions
+# Deployment: AWS, CloudFormation, GitHub Actions
 
-Status: **proposed**. Nothing below exists yet. When a phase lands, update this
-page and the Hosting and CI/CD rows of [`tech-stack.md`](tech-stack.md) in the
-same change.
+Status: **dev server built, not yet provisioned**. The templates, server scripts
+and CI job are in the repo. The AWS account steps under
+[Setting up the dev server](#setting-up-the-dev-server) have not been run.
+Production is deferred: it reuses the same template with `EnvName=production`.
+When it lands, update this page and the Hosting and CI/CD rows of
+[`tech-stack.md`](tech-stack.md).
 
-## Decisions
+## Shape
 
-| Decision       | Choice                                                                                                                                                                                                                                                                                                                                      |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hosting shape  | One EC2 instance per environment running the existing [`docker/compose.yml`](../../docker/compose.yml) unchanged in shape: Caddy, api, worker, Postgres, Redis. This keeps the low-cost principle in `tech-stack.md` and today's deploy design. Managed Postgres (Neon or RDS) can come later for production without changing the pipeline. |
-| Environments   | **staging** and **production**, each on its own instance and stack. A push to `main` deploys to staging automatically. Production gets the **same image digests**, never a rebuild, after a manual approval in the GitHub `production` environment.                                                                                         |
-| Infrastructure | **CloudFormation** templates in `infra/cloudformation/`. Nothing is created by hand in the console except the one-time steps listed under Prerequisites.                                                                                                                                                                                    |
-| CI → AWS auth  | GitHub OIDC. No long-lived AWS keys are stored in GitHub.                                                                                                                                                                                                                                                                                   |
-| Deploy channel | SSM Run Command. Port 22 is closed. The commented-out `appleboy/ssh-action` deploy in `ci.yml` is replaced.                                                                                                                                                                                                                                 |
-| Images         | Built once in CI, pushed to ECR, tagged with the commit SHA. The server only pulls and never builds.                                                                                                                                                                                                                                        |
-| Secrets        | SSM Parameter Store `SecureString` under `/app/<env>/`. The deploy script renders `apps/api/.env` on the server from those parameters; it stays the only env file, as AGENTS.md requires.                                                                                                                                                   |
-| Unchanged      | Cloudflare R2 for images, SMTP provider for email, the LLM provider. They are already reached over the network through env vars.                                                                                                                                                                                                            |
-
-## Architecture
+| Decision     | Choice                                                                                                                                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hosting      | One EC2 instance per environment running [`docker/compose.yml`](../../docker/compose.yml): Caddy, api, worker, Postgres, Redis. This keeps the low-cost principle in `tech-stack.md`.                                                                        |
+| Environments | **dev** at `dev.socialglider.online` now. Every push to `main` deploys there. **production** comes later from the same template.                                                                                                                             |
+| Infra        | CloudFormation: [`bootstrap.yml`](../../infra/cloudformation/bootstrap.yml) once per account, [`environment.yml`](../../infra/cloudformation/environment.yml) once per environment.                                                                          |
+| DNS          | Namecheap. The stack outputs an Elastic IP and you add one A record by hand. Caddy gets the TLS certificate itself.                                                                                                                                          |
+| CI → AWS     | GitHub OIDC. No AWS keys are stored in GitHub. The deploy role trusts only this repository's `dev` GitHub environment.                                                                                                                                       |
+| Deploy       | Images are built once in CI and pushed to ECR, tagged with the commit SHA. The server never builds and never clones; it pulls images and a small bundle (`docker/`, `static/`, `infra/server/`). The deploy runs over SSM Run Command, so port 22 is closed. |
+| Secrets      | SSM Parameter Store `SecureString` under `/app/dev/`. On each deploy the server renders `apps/api/.env` (mode 600) from them, so it stays the only env file.                                                                                                 |
+| Unchanged    | Cloudflare R2, the SMTP provider and the LLM provider are reached through env vars as today.                                                                                                                                                                 |
 
 ```
-GitHub Actions ──OIDC──▶ IAM deploy role
-   │  build + push               │ ssm:SendCommand (tag app:env=<env> only)
-   ▼                             ▼
-  ECR (api, web)  ◀── pull ── EC2 (per env, Elastic IP, SG: 80/443 only)
-  S3 artifacts    ◀── fetch ──   docker compose: caddy · api · worker · postgres · redis
-                                 data on a separate EBS volume (Retain + DLM snapshots)
-                                 nightly pg_dump ──▶ S3 backups bucket
-                                 container logs ──▶ CloudWatch Logs
+GitHub Actions ──OIDC──▶ app-dev deploy role
+  │ build, push                │ ssm:SendCommand (this instance only)
+  ▼                            ▼
+ECR app-api, app-web ◀─pull── EC2 app-dev (Elastic IP; 80/443 open, no SSH)
+S3 artifacts/bundles ◀─fetch─   compose: caddy · api · worker · postgres · redis
+                                Docker data on its own EBS volume (daily snapshots)
+                                nightly pg_dump ──▶ S3 backups bucket
+                                container logs  ──▶ CloudWatch /app/dev
 ```
 
-## CloudFormation stacks
+## What each piece does
 
-### `infra/cloudformation/bootstrap.yml`: once per account
+**`infra/cloudformation/bootstrap.yml`** creates the account-wide pieces:
 
-- `AWS::IAM::OIDCProvider` for `token.actions.githubusercontent.com`.
-- ECR repositories `app-api` and `app-web`. Scan on push, immutable tags, and a
-  lifecycle rule keeping the last 30 images.
-- S3 bucket `…-artifacts` for deploy bundles, versioned, expiring after 30 days.
-- IAM role `github-deploy`, trusted only for
-  `repo:nabil404/project-alpha:environment:staging` and `…:environment:production`.
-  It may push to ECR, write `artifacts/*`, and call `ssm:SendCommand` only on
-  the `AWS-RunShellScript` document and only for instances tagged
-  `app:env=<env>`. Use one role per environment if the policy gets awkward.
-- IAM role `github-infra`, trusted only from `main` and the production
-  environment, with CloudFormation change-set permissions on the stacks below.
+- the GitHub OIDC provider;
+- ECR repositories `app-api` and `app-web` (immutable tags, scan on push, keep 30 images);
+- the artifacts bucket for deploy bundles, which expire after 30 days.
 
-### `infra/cloudformation/environment.yml`: once per environment (`EnvName` parameter)
+**`infra/cloudformation/environment.yml`** creates one environment:
 
-- **EC2**: `t4g.medium` for production, `t4g.small` for staging (Graviton,
-  arm64). Amazon Linux 2023. Instance-profile role with `AmazonSSMManagedInstanceCore`,
-  ECR pull, `ssm:GetParametersByPath` on `/app/<env>/*` plus `kms:Decrypt`, read
-  on `artifacts/*`, and write on its own backups prefix.
-- **AMI is a pinned parameter**, not the `/aws/service/ami-amazon-linux-latest/…`
-  resolver. The resolver changes over time, and a changed `ImageId` makes
-  CloudFormation _replace_ the instance. OS patching goes through
-  `dnf upgrade` with the SSM Patch Manager baseline.
-- **Data volume**: a separate `AWS::EC2::Volume` (gp3, encrypted,
-  `DeletionPolicy: Snapshot`, `UpdateReplacePolicy: Snapshot`) mounted at
-  `/srv/data`. Docker's `data-root` points there, so Postgres, Redis AOF and
-  Caddy certificates outlive any instance replacement. Its Availability Zone is
-  a stack parameter that both the volume and the instance use.
-- **`AWS::DLM::LifecyclePolicy`**: daily snapshots of the data volume, keeping 7.
-- **Elastic IP** and a **security group** with only 80 and 443 inbound. No 22.
-- **S3 backups bucket** (or a prefix in one shared bucket): versioned, blocks
-  public access, lifecycle 30 days to Infrequent Access, expires at 90 days.
-- **CloudWatch**: log group `/app/<env>` with 30-day retention (containers use
-  the `awslogs` driver). An alarm on `StatusCheckFailed` that auto-recovers
-  the instance, plus an SNS email topic.
-- **Route 53 record** (optional, only if the domain's zone is in Route 53).
-  Otherwise output the Elastic IP and set an A record at your DNS host. Caddy
-  can only get a certificate once DNS points at the instance.
-- **UserData** runs only at first boot. It installs Docker and the compose
-  plugin, mounts the volume, writes `/opt/app/bin/deploy` and
-  `/opt/app/bin/backup`, and enables the backup systemd timer. Anything that
-  changes later is delivered by the deploy, not by UserData.
+- **Network:** its own VPC with one public subnet, and a security group open only on 80 and 443.
+- **Instance:** EC2 (default `t3.small`, x86 to match the amd64 images CI builds) with an Elastic IP.
+  - It uses IMDSv2 with a hop limit of 1, so containers can't read the instance's AWS credentials.
+  - The AMI is a **pinned parameter**. A changed AMI makes CloudFormation replace the instance.
+- **Data volume:** a separate encrypted EBS volume holds Docker's data-root, so Postgres, Redis and Caddy's certificates outlive any instance replacement.
+  - It carries `DeletionPolicy: Snapshot`.
+  - DLM takes daily snapshots and keeps 7.
+- **Backups:** an S3 bucket for the nightly `pg_dump`, kept 14 days.
+- **Monitoring:**
+  - The CloudWatch log group `/app/dev`. Docker's `awslogs` driver sends every container's output there.
+  - An alarm that auto-recovers the instance, and optional alarm emails.
+- **Parameters:** the String parameters `DOMAIN`, `POSTGRES_USER` and `POSTGRES_DB`.
+- **Deploy role:** the GitHub deploy role, scoped to these two repositories, the bundle prefix, and `ssm:SendCommand` on this one instance.
 
-Secrets are **not** CloudFormation parameters: they would show up in stack
-events and the console. Create them once per environment with
-`aws ssm put-parameter --type SecureString`: `POSTGRES_PASSWORD`,
-`APP_RUNTIME_PASSWORD`, `BETTER_AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, the
-`META_*`, `STORAGE_*`, `SMTP_URL`, `LLM_API_KEY` and OAuth values. Non-secret
-values (`DOMAIN`, `META_GRAPH_VERSION`, `LOG_LEVEL`) go in as `String`
-parameters.
+UserData runs only at first boot. It mounts the volume, installs Docker and
+the compose plugin, and writes `/opt/app/bin/deploy`. Everything that changes
+later ships in the bundle, so it is reviewed with the code.
 
-## Repo changes outside `infra/`
+**`infra/server/deploy.sh`** runs on the server for each commit:
 
-1. **`docker/compose.yml`**: give `api`, `worker` and `web` an
-   `image: ${API_IMAGE:-app-api}` / `${WEB_IMAGE:-app-web}` alongside `build:`.
-   That way local builds still work and the server runs
-   `docker compose pull && up -d --no-build`.
-2. **Worker `stop_grace_period: 60s`**: Docker's default 10 s would kill an
-   in-flight LLM extraction on every deploy. `enableShutdownHooks()` is
-   already in place in `worker.ts`; it needs time to finish the job.
-3. **`logging` driver `awslogs`** on the app services, through an
-   `x-logging` anchor, driven by env vars so local development keeps the
-   default.
-4. **Deploy bundle**: CI tars `docker/` and `static/` into
-   `s3://…-artifacts/<sha>.tgz`. The server never clones the repository and
-   holds no GitHub credentials.
-5. **arm64 images**: build on a GitHub `ubuntu-24.04-arm` runner, or use
-   `docker/build-push-action` with `platforms: linux/arm64` under QEMU (slower).
-   If arm runners are not available on your plan, switch the instances to
-   `t3.small`/`t3.medium` and build amd64 instead.
+1. Render `apps/api/.env` from `/app/dev/*`. Fail if a required value is missing, or if a database password is not URL-safe.
+2. Log in to ECR and `docker compose pull`.
+3. Run migrations as the owner (`scripts/migrate.mjs`) while the old release is still serving.
+4. `up -d --no-build`, then wait up to 3 minutes for the api healthcheck and for the worker to be running.
+5. On failure, print the logs, start the previous release's images again and exit non-zero, which turns the CI job red. On success, point `/opt/app/current` at the release, install the backup timer, and keep the last three releases.
 
-## Pipeline (`.github/workflows/ci.yml`)
+**Rollback restores images, never the database.** A migration must therefore
+work with the previous release still running: add first, remove in a later
+release. Recreating the api container costs a few seconds of 502s per deploy.
+Meta retries webhook deliveries, so that is fine for dev and for the pilot.
 
-| Job                 | Runs on                                                               | Does                                                                                                                                                                           |
-| ------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `test`              | every PR and push                                                     | Unchanged: lint, format, typecheck, migrate, test, RLS check, migration-drift check.                                                                                           |
-| `build`             | push to `main`, needs `test`                                          | OIDC → ECR login → build and push `app-api:<sha>` and `app-web:<sha>` with GHA cache → upload the deploy bundle. Outputs the image digests.                                    |
-| `deploy-staging`    | needs `build`, environment `staging`                                  | `ssm send-command` → `/opt/app/bin/deploy <sha>` on `app:env=staging`, then wait for the command and fail the job if it fails. Smoke test: `curl -f https://<staging>/health`. |
-| `deploy-production` | needs `deploy-staging`, environment `production` (required reviewers) | Same command and same SHA against `app:env=production`. Approval happens in the GitHub UI on the same run.                                                                     |
-| `infra` (own file)  | PRs touching `infra/**`                                               | `cfn-lint` + `aws cloudformation validate-template`, then create a **change set** and post its summary. Applying it is `workflow_dispatch` only, staging first.                |
+**CI** (`deploy-dev` in [`ci.yml`](../../.github/workflows/ci.yml)) runs after
+`test` on pushes to `main`, once the repository variable `DEV_DEPLOY_ENABLED`
+is `true`:
 
-`concurrency: deploy-<env>` with `cancel-in-progress: false`, so two deploys to
-one environment never overlap.
+1. Assume the role and build and push both images, skipping any already in ECR because tags are immutable.
+2. Upload the bundle.
+3. Run [`infra/ci/ssm-deploy.sh`](../../infra/ci/ssm-deploy.sh), which sends the SSM command, waits and prints its output.
+4. `curl` `https://dev.socialglider.online/health`.
 
-### `/opt/app/bin/deploy <sha>` on the server
+The workflow no longer cancels `main` runs on a newer push, because that could
+cut a deploy off halfway.
 
-1. Download and unpack `<sha>.tgz` to `/opt/app/releases/<sha>`.
-2. Render `apps/api/.env` (mode 600) from `/app/<env>/*` parameters.
-3. `aws ecr get-login-password | docker login …`, then `docker compose pull`.
-4. Run migrations as the owner, exactly as the commented-out deploy job does:
-   `compose run --rm -e DATABASE_ADMIN_URL=… api node scripts/migrate.mjs`.
-5. `compose up -d --no-build --remove-orphans`, then wait for the api
-   healthcheck to report healthy (up to about 90 s).
-6. On success, repoint `/opt/app/current` and write the SHA to
-   `/opt/app/deployed`. On failure, `up -d` the previous SHA's images and exit
-   non-zero so the job turns red.
-7. `docker image prune -f`, keeping the previous release for rollback.
+## Setting up the dev server
 
-**Rollback restores images, never the database.** Every migration therefore
-has to be safe for the _previous_ release to run against (expand, then
-contract in a later release). Migrations run while the old containers are still
-serving, so the same rule covers the deploy window too.
+You need AWS CLI **v2** (v1 would fetch the contents of a `--value https://…`
+instead of storing the URL), signed in to the account as an administrator, and a
+**region** chosen. Pick one close to your sellers and use it for every command
+below. Set it once:
 
-**Downtime**: recreating the api container means a few seconds of 502s per
-deploy. Meta retries failed webhook deliveries, and the queue absorbs the
-rest. That is acceptable for the pilot. Zero-downtime would need a second api
-container behind Caddy, and it is not planned.
+```sh
+export AWS_REGION=ap-southeast-1   # example; pick yours
+```
 
-## Backups and restore
+### 1. Bootstrap stack (once per account)
 
-- `/opt/app/bin/backup` runs nightly from a systemd timer:
-  `pg_dump -Fc` in the postgres container → `s3://…-backups/<env>/<date>.dump`.
-- DLM EBS snapshots are the second, crash-consistent layer.
-- **A backup counts only after a restore has worked.** Phase 6 includes
-  restoring the latest dump into a scratch container and running
-  `db:verify-rls` against it.
+```sh
+aws cloudformation deploy --stack-name app-bootstrap \
+  --template-file infra/cloudformation/bootstrap.yml \
+  --capabilities CAPABILITY_IAM
+```
 
-## Phases
+Pass `--parameter-overrides CreateOidcProvider=false` if the account already
+has the GitHub OIDC provider.
 
-| #   | Phase                                                                                                  | Done when                                                                      |
-| --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| 0   | Prerequisites: AWS account with MFA on root, region chosen, budget alarm, domain, GitHub environments  | `staging` and `production` environments exist; production requires review.     |
-| 1   | `bootstrap.yml` deployed by hand (it creates the role CI would use)                                    | CI can assume `github-deploy` and push a test image to ECR.                    |
-| 2   | `environment.yml` for staging and SSM parameters                                                       | Instance reachable through SSM Session Manager; Docker running on `/srv/data`. |
-| 3   | Compose changes and deploy/backup scripts                                                              | A manual `deploy <sha>` brings staging up on HTTPS and `/health` is green.     |
-| 4   | `build` + `deploy-staging` jobs                                                                        | A merge to `main` reaches staging with no manual steps.                        |
-| 5   | Production stack, parameters, `deploy-production` job                                                  | An approved run promotes the staging SHA to production.                        |
-| 6   | Backups, restore drill, alarms, uptime checks; update `tech-stack.md` and the AGENTS.md commands table | A restore from S3 passes `db:verify-rls`; an alarm email has been received.    |
+### 2. Dev environment stack
 
-Staging needs its own Meta app (or test app) with its own webhook URL and
-verify token, so staging never receives production Page traffic.
+```sh
+AMI=$(aws ssm get-parameter \
+  --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
+  --query Parameter.Value --output text)
 
-## Rough monthly cost (on-demand, us-east-1; Asian regions run about 10–20% higher)
+aws cloudformation deploy --stack-name app-dev \
+  --template-file infra/cloudformation/environment.yml \
+  --capabilities CAPABILITY_IAM \
+  --parameter-overrides EnvName=dev Domain=dev.socialglider.online \
+    ImageId="$AMI" AlarmEmail=you@example.com
 
-| Item                                   | Production | Staging  |
-| -------------------------------------- | ---------- | -------- |
-| EC2 (`t4g.medium` / `t4g.small`)       | ~$24.50    | ~$12.30  |
-| EBS root 20 GB + data 20 GB gp3        | ~$3.20     | ~$3.20   |
-| Public IPv4 (Elastic IP)               | ~$3.65     | ~$3.65   |
-| Snapshots, S3 backups, ECR, CloudWatch | ~$3–5      | ~$1–2    |
-| **Total**                              | **~$35**   | **~$20** |
+aws cloudformation describe-stacks --stack-name app-dev \
+  --query 'Stacks[0].Outputs' --output table
+```
 
-A one-year Compute Savings Plan cuts the EC2 lines by about 30%. Staging can
-also be stopped outside working hours.
+Write down `PublicIp`, `InstanceId` and `DeployRoleArn`, and `ArtifactsBucketName`
+from the `app-bootstrap` stack.
 
-## Open questions
+### 3. DNS at Namecheap
 
-1. **Region.** Put it close to the sellers, because every Messenger message
-   takes a lock on a conversation row and LLM latency already dominates.
-2. **DNS.** Is the domain's zone in Route 53, or elsewhere (for example
-   Cloudflare, next to R2)? This decides whether the stack creates the record.
-3. **Instance architecture.** Graviton (arm64, cheaper, needs arm builds) or
-   x86 (simpler builds)?
-4. **Uptime monitoring.** Keep Uptime Kuma as `tech-stack.md` plans (it needs
-   somewhere to run _outside_ the server it watches), or use a Route 53 health
-   check with a CloudWatch alarm (~$0.50/month)?
+In **Domain List → socialglider.online → Manage → Advanced DNS**, add:
+
+| Type     | Host  | Value        | TTL       |
+| -------- | ----- | ------------ | --------- |
+| A Record | `dev` | `<PublicIp>` | Automatic |
+
+Check it with `dig +short dev.socialglider.online`. Caddy can't get a
+certificate until this resolves, but the deploy itself doesn't wait for it.
+
+### 4. Secrets
+
+Each one is a `SecureString` under `/app/dev/`. The names match
+`apps/api/src/config/env.schema.ts`; `DOMAIN`, `POSTGRES_USER` and
+`POSTGRES_DB` already exist from the stack.
+
+```sh
+put() { aws ssm put-parameter --name "/app/dev/$1" --type SecureString --value "$2" --overwrite; }
+
+put POSTGRES_PASSWORD     "$(openssl rand -hex 32)"
+put APP_RUNTIME_PASSWORD  "$(openssl rand -hex 32)"
+put BETTER_AUTH_SECRET    "$(openssl rand -base64 32)"
+put TOKEN_ENCRYPTION_KEY  "$(openssl rand -base64 32)"
+put META_APP_SECRET       '…'
+put META_VERIFY_TOKEN     "$(openssl rand -hex 24)"
+put META_GRAPH_VERSION    'v21.0'
+put SMTP_URL              'smtp://user:pass@smtp.provider.com:587'
+put MAIL_FROM             'Social Glider <no-reply@socialglider.online>'
+put STORAGE_ENDPOINT      'https://<account>.r2.cloudflarestorage.com'
+put STORAGE_BUCKET        '…'      # a dev bucket, never production's
+put STORAGE_ACCESS_KEY_ID '…'
+put STORAGE_SECRET_ACCESS_KEY '…'
+put STORAGE_PUBLIC_BASE_URL '…'
+put LLM_API_KEY           '…'
+# Optional: META_APP_ID, GOOGLE_CLIENT_ID/SECRET, FACEBOOK_CLIENT_ID/SECRET,
+# LOG_LEVEL, SENTRY_DSN
+```
+
+Rules:
+
+- Values may not contain a single quote or a newline. The deploy refuses them.
+- `POSTGRES_PASSWORD` and `APP_RUNTIME_PASSWORD` are set **before the first deploy and never changed afterwards**. Postgres reads them only when its data volume is empty; changing one later needs `ALTER ROLE` by hand.
+- A secret change takes effect on the next deploy.
+
+### 5. GitHub
+
+1. **Settings → Environments → New environment `dev`.** Optionally limit deployment branches to `main`.
+2. In that environment, add these **variables** (not secrets; none of them is sensitive):
+
+   | Variable              | Value                                   |
+   | --------------------- | --------------------------------------- |
+   | `AWS_REGION`          | your region                             |
+   | `AWS_DEPLOY_ROLE_ARN` | `DeployRoleArn` output                  |
+   | `INSTANCE_ID`         | `InstanceId` output                     |
+   | `ARTIFACTS_BUCKET`    | `ArtifactsBucketName` output, bootstrap |
+
+3. **Settings → Secrets and variables → Actions → Variables (repository):** `DEV_DEPLOY_ENABLED` = `true`.
+
+The next push to `main`, or a re-run of the latest `main` CI run, deploys.
+
+### 6. Outside AWS
+
+- **Meta:** use a separate test app, or the dev app, for dev. Its webhook URL is `https://dev.socialglider.online/api/v1/…` with `/app/dev/META_VERIFY_TOKEN`. Dev must never receive real Page traffic.
+- **Google / Facebook login:** add `https://dev.socialglider.online` to the OAuth redirect and origin lists.
+
+## Operating the dev server
+
+| Task                       | How                                                                                                                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell on the server        | `aws ssm start-session --target <InstanceId>` (needs the Session Manager plugin), then `sudo -i`.                                                                       |
+| Logs                       | CloudWatch Logs → `/app/dev`, one stream per container. `aws logs tail /app/dev --follow`.                                                                              |
+| Redeploy a commit          | Re-run its `main` CI run, or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                           |
+| Compose on the server      | `cd /opt/app/current && docker compose --env-file apps/api/.env -f docker/compose.yml ps`                                                                               |
+| Backup now                 | `systemctl start app-backup.service`, then check `journalctl -u app-backup`.                                                                                            |
+| Restore drill              | Copy a dump from the backups bucket, `pg_restore` it into a scratch `postgres:17-alpine` container, and run `db:verify-rls` against it. Do this once before production. |
+| Change instance size, etc. | Edit parameters and re-run step 2. Changing `ImageId` **replaces** the instance; the data volume survives and is reattached.                                            |
+
+## Rough monthly cost (dev, us-east-1 on-demand; Asian regions run about 10–20% higher)
+
+| Item                              | Cost        |
+| --------------------------------- | ----------- |
+| EC2 `t3.small`                    | ~$15.20     |
+| EBS: 20 GB root + 20 GB data, gp3 | ~$3.20      |
+| Public IPv4 (Elastic IP)          | ~$3.65      |
+| Snapshots, S3, ECR, CloudWatch    | ~$1–3       |
+| **Total**                         | **~$23–25** |
+
+Stopping the instance outside working hours cuts the EC2 line. The data volume
+and IP stay, and the IP is still billed while the instance is stopped.
+
+## Later: production
+
+1. Deploy `environment.yml` again as stack `app-production` with `EnvName=production`. That turns on termination protection and 30-day log retention.
+2. Add a `production` GitHub environment with required reviewers.
+3. Add a `deploy-production` job that `needs: deploy-dev` and reuses the same image tags, never rebuilding.
+4. Use a size of `t3.medium` or larger.
+5. Run the restore drill first.
