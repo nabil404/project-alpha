@@ -31,7 +31,7 @@ import { CapturingMailer } from './capturing-mailer';
 
 // Needs a real Postgres: Better Auth, the organization bootstrap and the token
 // tables are all server behaviour. CI sets DATABASE_ADMIN_URL; locally, export
-// it (pointing at docker/compose.dev.yml) to run these.
+// it (pointing at docker/compose.local.yml) to run these.
 const url = process.env.DATABASE_ADMIN_URL;
 const describeDb = url ? describe : describe.skip;
 

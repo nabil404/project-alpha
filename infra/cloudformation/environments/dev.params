@@ -1,0 +1,12 @@
+# Parameters for stack social-glider-dev (environment.yml). One KEY=VALUE per line.
+# Dev has no backups, CloudWatch logs or alarms, so it sets none of their
+# parameters (BackupRetentionDays, AlarmEmail).
+# Deploy with: infra/cloudformation/deploy.sh dev
+EnvName=dev
+Domain=dev.socialglider.online
+# Sized together with docker/compose.dev.yml - change both.
+InstanceType=t3.small
+DataVolumeSizeGiB=20
+# Pinned: a changed ImageId replaces the instance. deploy.sh prints the current
+# Amazon Linux 2023 AMI when this is empty.
+ImageId=ami-08e3b3155fc937a94

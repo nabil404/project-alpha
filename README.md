@@ -38,7 +38,7 @@ credentials. Compose has to be pointed at it, since it would otherwise look for
 `docker/.env` — that is all `pnpm dev:up` / `pnpm dev:down` do:
 
 ```bash
-docker compose --env-file apps/api/.env -f docker/compose.dev.yml up -d
+docker compose --env-file apps/api/.env -f docker/compose.local.yml up -d
 ```
 
 The file is written for host development. `docker/compose.yml` overrides
@@ -84,6 +84,11 @@ Schema tooling connects as the owner through `DATABASE_ADMIN_URL`.
 
 ## Environments
 
-- **local** — dependencies in `docker/compose.dev.yml`, apps on the host.
-- **staging** — `docker compose -p app-staging --env-file apps/api/.env.staging -f docker/compose.yml up -d`
-- **production** — `docker/compose.yml` on the VPS, deployed by CI over SSH.
+| Environment | Compose                                                     | Where                                                     | Deployed                                   |
+| ----------- | ----------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------ |
+| local       | `docker/compose.local.yml` (dependencies; apps on the host) | your machine                                              | `pnpm dev:up`                              |
+| dev         | `docker/compose.yml` + `docker/compose.dev.yml`             | AWS, stack `social-glider-dev`, `dev.socialglider.online` | `deploy-dev.yml`, every merge to `develop` |
+| stage       | `docker/compose.yml` + `docker/compose.stage.yml`           | AWS, stack `social-glider-stage`                          | `deploy-stage.yml`, every push to `stage`  |
+| prod        | `docker/compose.yml` + `docker/compose.prod.yml`            | AWS, stack `social-glider-prod`                           | `deploy-prod.yml`, manual with approval    |
+
+How the servers are built and deployed: [docs/architecture/deployment.md](docs/architecture/deployment.md).

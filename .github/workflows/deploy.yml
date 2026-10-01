@@ -1,0 +1,141 @@
+name: Deploy
+
+# The one deploy procedure, called by deploy-dev.yml, deploy-stage.yml and
+# deploy-prod.yml. Gets the commit's images into this environment's ECR
+# repositories - by building them, or for prod by copying the ones stage ran -
+# uploads the bundle, runs the deploy on the environment's server over SSM, and checks
+# /health. The AWS side is infra/cloudformation/; see
+# docs/architecture/deployment.md.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: dev, stage or prod - the GitHub environment and the stack's EnvName.
+        type: string
+        required: true
+      url:
+        description: The environment's public URL, without a trailing slash.
+        type: string
+        required: true
+      sha:
+        description: Commit to deploy. Defaults to the commit that triggered the caller.
+        type: string
+        default: ''
+      images:
+        description: >-
+          How images ECR lacks are made. build - build them (dev, stage).
+          promote - copy them from the non-prod repositories (social-glider-api,
+          social-glider-web) into this environment's; never builds, and fails if stage
+          never had them (prod).
+        type: string
+        default: build
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    # The deploy role trusts only this repository's GitHub environment of the
+    # same name; its variables come from that stack's outputs.
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ inputs.url }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SHA: ${{ inputs.sha || github.sha }}
+      # This environment's repositories; prod's GitHub environment sets its
+      # own, from the social-glider-bootstrap-prod stack.
+      API_REPO: ${{ vars.ECR_API_REPOSITORY || 'social-glider-api' }}
+      WEB_REPO: ${{ vars.ECR_WEB_REPOSITORY || 'social-glider-web' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Tags are immutable in ECR, so a re-run, or a commit an earlier
+      # environment already built, must not push the same tag again.
+      - name: Check for existing images
+        id: existing
+        env:
+          IMAGES: ${{ inputs.images }}
+        run: |
+          case "$IMAGES" in build | promote) ;; *) echo "::error::images must be build or promote"; exit 1 ;; esac
+          for name in api web; do
+            repo="$API_REPO"; [ "$name" = web ] && repo="$WEB_REPO"
+            if aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.existing.outputs.api != 'true' || steps.existing.outputs.web != 'true'
+
+      # Prod runs exactly the images stage ran: a registry-side copy of the
+      # same manifest, so the digest is unchanged.
+      - name: Promote images from stage
+        if: inputs.images == 'promote' && (steps.existing.outputs.api != 'true' || steps.existing.outputs.web != 'true')
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          for pair in "social-glider-api:$API_REPO" "social-glider-web:$WEB_REPO"; do
+            src="${pair%%:*}" dst="${pair#*:}"
+            if ! aws ecr describe-images --repository-name "$src" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+              echo "::error::$src:$SHA does not exist - deploy this commit to stage first."
+              exit 1
+            fi
+            if ! aws ecr describe-images --repository-name "$dst" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+              docker buildx imagetools create --tag "$REGISTRY/$dst:$SHA" "$REGISTRY/$src:$SHA"
+            fi
+          done
+
+      - name: Build and push api image
+        if: inputs.images == 'build' && steps.existing.outputs.api != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.API_REPO }}:${{ env.SHA }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push web image
+        if: inputs.images == 'build' && steps.existing.outputs.web != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.WEB_REPO }}:${{ env.SHA }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # What the server needs besides images: compose, Caddy, the legal pages
+      # and its own scripts. It never clones the repository.
+      - name: Upload deploy bundle
+        env:
+          BUCKET: ${{ vars.ARTIFACTS_BUCKET }}
+        run: |
+          tar czf "$RUNNER_TEMP/bundle.tgz" docker static infra/server
+          aws s3 cp "$RUNNER_TEMP/bundle.tgz" "s3://$BUCKET/bundles/$SHA.tgz"
+
+      - name: Deploy
+        env:
+          INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+        run: infra/ci/ssm-deploy.sh "$INSTANCE_ID" "$SHA"
+
+      - name: Smoke test
+        env:
+          URL: ${{ inputs.url }}
+        run: curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "$URL/health"

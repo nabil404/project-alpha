@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Account-wide pieces for production only, deployed as stack social-glider-bootstrap-prod:
+  prod's own ECR repositories and deploy-bundle bucket. A deliberate duplicate
+  of bootstrap.yml (dev and stage) so production can diverge - its own AWS
+  account, stricter policies - without touching the other environments. Prod
+  never builds: deploy-prod.yml copies the images stage ran into these
+  repositories. See docs/architecture/deployment.md.
+
+Parameters:
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: >-
+      An account holds one provider per URL. While prod shares the account with
+      dev and stage, social-glider-bootstrap already created it, so this stays false.
+      Set true when prod moves to an account of its own.
+
+Conditions:
+  CreateOidc: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  # Tags are commit SHAs and immutable, so an image can never change under a
+  # tag that has already been deployed.
+  ApiRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: social-glider-prod-api
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration: { ScanOnPush: true }
+      EncryptionConfiguration: { EncryptionType: AES256 }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep the last 30 images",
+            "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},
+            "action":{"type":"expire"}}]}
+
+  WebRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: social-glider-prod-web
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration: { ScanOnPush: true }
+      EncryptionConfiguration: { EncryptionType: AES256 }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep the last 30 images",
+            "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},
+            "action":{"type":"expire"}}]}
+
+  # Deploy bundles: docker/, static/ and infra/server/ of one commit, which the
+  # server fetches instead of cloning the repository.
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-bundles
+            Status: Enabled
+            Prefix: bundles/
+            ExpirationInDays: 30
+
+  ArtifactsBucketTlsOnly:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt ArtifactsBucket.Arn
+              - !Sub '${ArtifactsBucket.Arn}/*'
+            Condition: { Bool: { 'aws:SecureTransport': 'false' } }
+
+Outputs:
+  ApiRepositoryName:
+    Value: !Ref ApiRepository
+    Export: { Name: !Sub '${AWS::StackName}-ApiRepositoryName' }
+  WebRepositoryName:
+    Value: !Ref WebRepository
+    Export: { Name: !Sub '${AWS::StackName}-WebRepositoryName' }
+  ApiRepositoryArn:
+    Value: !GetAtt ApiRepository.Arn
+    Export: { Name: !Sub '${AWS::StackName}-ApiRepositoryArn' }
+  WebRepositoryArn:
+    Value: !GetAtt WebRepository.Arn
+    Export: { Name: !Sub '${AWS::StackName}-WebRepositoryArn' }
+  RegistryUri:
+    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com'
+    Export: { Name: !Sub '${AWS::StackName}-RegistryUri' }
+  ArtifactsBucketName:
+    Description: GitHub variable ARTIFACTS_BUCKET.
+    Value: !Ref ArtifactsBucket
+    Export: { Name: !Sub '${AWS::StackName}-ArtifactsBucket' }
+  ArtifactsBucketArn:
+    Value: !GetAtt ArtifactsBucket.Arn
+    Export: { Name: !Sub '${AWS::StackName}-ArtifactsBucketArn' }
