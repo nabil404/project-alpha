@@ -23,7 +23,7 @@ log "writing env file"
 mkdir -p /opt/app/apps/api
 (
   umask 077
-  aws ssm get-parameter --name "/app/$APP_ENV/env" --with-decryption \
+  aws ssm get-parameter --name "/social-glider/$APP_ENV/env" --with-decryption \
     --query Parameter.Value --output text
   echo "API_IMAGE=$REGISTRY/$API_REPOSITORY:$sha"
   echo "WEB_IMAGE=$REGISTRY/$WEB_REPOSITORY:$sha"

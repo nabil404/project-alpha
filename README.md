@@ -84,11 +84,11 @@ Schema tooling connects as the owner through `DATABASE_ADMIN_URL`.
 
 ## Environments
 
-| Environment | Compose                                                     | Where                                           | Deployed                                   |
-| ----------- | ----------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------ |
-| local       | `docker/compose.local.yml` (dependencies; apps on the host) | your machine                                    | `pnpm dev:up`                              |
-| dev         | `docker/compose.yml` + `docker/compose.dev.yml`             | AWS, stack `app-dev`, `dev.socialglider.online` | `deploy-dev.yml`, every merge to `develop` |
-| stage       | `docker/compose.yml` + `docker/compose.stage.yml`           | AWS, stack `app-stage`                          | `deploy-stage.yml`, every push to `stage`  |
-| prod        | `docker/compose.yml` + `docker/compose.prod.yml`            | AWS, stack `app-prod`                           | `deploy-prod.yml`, manual with approval    |
+| Environment | Compose                                                     | Where                                                     | Deployed                                   |
+| ----------- | ----------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------ |
+| local       | `docker/compose.local.yml` (dependencies; apps on the host) | your machine                                              | `pnpm dev:up`                              |
+| dev         | `docker/compose.yml` + `docker/compose.dev.yml`             | AWS, stack `social-glider-dev`, `dev.socialglider.online` | `deploy-dev.yml`, every merge to `develop` |
+| stage       | `docker/compose.yml` + `docker/compose.stage.yml`           | AWS, stack `social-glider-stage`                          | `deploy-stage.yml`, every push to `stage`  |
+| prod        | `docker/compose.yml` + `docker/compose.prod.yml`            | AWS, stack `social-glider-prod`                           | `deploy-prod.yml`, manual with approval    |
 
 How the servers are built and deployed: [docs/architecture/deployment.md](docs/architecture/deployment.md).

@@ -2,7 +2,7 @@ name: Deploy prod
 
 # Manual only: promotes a commit already on the stage branch - so already
 # tested, and already run on stage - to production. It never builds: it copies
-# the images stage ran into prod's own repositories (app-bootstrap-prod). The
+# the images stage ran into prod's own repositories (social-glider-bootstrap-prod). The
 # `prod` GitHub environment's required reviewers approve each run.
 on:
   workflow_dispatch:

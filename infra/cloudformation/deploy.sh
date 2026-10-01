@@ -18,7 +18,7 @@ outputs() {
 
 case "$target" in
   bootstrap | bootstrap-prod)
-    stack="app-$target"
+    stack="social-glider-$target"
     aws cloudformation deploy --stack-name "$stack" \
       --template-file "$dir/$target.yml" \
       --capabilities CAPABILITY_IAM \
@@ -53,13 +53,13 @@ case "$target" in
       esac
     done <<<"$lines"
 
-    aws cloudformation deploy --stack-name "app-$target" \
+    aws cloudformation deploy --stack-name "social-glider-$target" \
       --template-file "$dir/environment.yml" \
       --capabilities CAPABILITY_IAM \
       --no-fail-on-empty-changeset \
-      --tags "app:env=$target" \
+      --tags "social-glider:env=$target" \
       --parameter-overrides "${overrides[@]}"
-    outputs "app-$target"
+    outputs "social-glider-$target"
     ;;
   *)
     echo "usage: $0 bootstrap|bootstrap-prod|dev|stage|prod" >&2

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  Account-wide pieces for production only, deployed as stack app-bootstrap-prod:
+  Account-wide pieces for production only, deployed as stack social-glider-bootstrap-prod:
   prod's own ECR repositories and deploy-bundle bucket. A deliberate duplicate
   of bootstrap.yml (dev and stage) so production can diverge - its own AWS
   account, stricter policies - without touching the other environments. Prod
@@ -14,7 +14,7 @@ Parameters:
     Default: 'false'
     Description: >-
       An account holds one provider per URL. While prod shares the account with
-      dev and stage, app-bootstrap already created it, so this stays false.
+      dev and stage, social-glider-bootstrap already created it, so this stays false.
       Set true when prod moves to an account of its own.
 
 Conditions:
@@ -33,7 +33,7 @@ Resources:
   ApiRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: app-prod-api
+      RepositoryName: social-glider-prod-api
       ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration: { ScanOnPush: true }
       EncryptionConfiguration: { EncryptionType: AES256 }
@@ -46,7 +46,7 @@ Resources:
   WebRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: app-prod-web
+      RepositoryName: social-glider-prod-web
       ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration: { ScanOnPush: true }
       EncryptionConfiguration: { EncryptionType: AES256 }

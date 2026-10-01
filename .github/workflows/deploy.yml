@@ -24,8 +24,8 @@ on:
       images:
         description: >-
           How images ECR lacks are made. build - build them (dev, stage).
-          promote - copy them from the non-prod repositories (app-api,
-          app-web) into this environment's; never builds, and fails if stage
+          promote - copy them from the non-prod repositories (social-glider-api,
+          social-glider-web) into this environment's; never builds, and fails if stage
           never had them (prod).
         type: string
         default: build
@@ -45,9 +45,9 @@ jobs:
     env:
       SHA: ${{ inputs.sha || github.sha }}
       # This environment's repositories; prod's GitHub environment sets its
-      # own, from the app-bootstrap-prod stack.
-      API_REPO: ${{ vars.ECR_API_REPOSITORY || 'app-api' }}
-      WEB_REPO: ${{ vars.ECR_WEB_REPOSITORY || 'app-web' }}
+      # own, from the social-glider-bootstrap-prod stack.
+      API_REPO: ${{ vars.ECR_API_REPOSITORY || 'social-glider-api' }}
+      WEB_REPO: ${{ vars.ECR_WEB_REPOSITORY || 'social-glider-web' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -86,7 +86,7 @@ jobs:
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          for pair in "app-api:$API_REPO" "app-web:$WEB_REPO"; do
+          for pair in "social-glider-api:$API_REPO" "social-glider-web:$WEB_REPO"; do
             src="${pair%%:*}" dst="${pair#*:}"
             if ! aws ecr describe-images --repository-name "$src" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
               echo "::error::$src:$SHA does not exist - deploy this commit to stage first."

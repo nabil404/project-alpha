@@ -9,12 +9,12 @@ of [`tech-stack.md`](tech-stack.md).
 
 ## Environments
 
-| Environment | Compose                                                    | Stack (params)                            | Domain                      | Deployed by                                                   |
-| ----------- | ---------------------------------------------------------- | ----------------------------------------- | --------------------------- | ------------------------------------------------------------- |
-| local       | `docker/compose.local.yml`: dependencies, apps on the host | none                                      | `localhost`                 | `pnpm dev:up`                                                 |
-| dev         | `docker/compose.yml` + `docker/compose.dev.yml`            | `app-dev` (`environments/dev.params`)     | `dev.socialglider.online`   | `deploy-dev.yml`: every merge to **`develop`**                |
-| stage       | `docker/compose.yml` + `docker/compose.stage.yml`          | `app-stage` (`environments/stage.params`) | `stage.socialglider.online` | `deploy-stage.yml`: every push to **`stage`**                 |
-| prod        | `docker/compose.yml` + `docker/compose.prod.yml`           | `app-prod` (`environments/prod.params`)   | `socialglider.online`       | `deploy-prod.yml`: manual, approved, a SHA already on `stage` |
+| Environment | Compose                                                    | Stack (params)                                      | Domain                      | Deployed by                                                   |
+| ----------- | ---------------------------------------------------------- | --------------------------------------------------- | --------------------------- | ------------------------------------------------------------- |
+| local       | `docker/compose.local.yml`: dependencies, apps on the host | none                                                | `localhost`                 | `pnpm dev:up`                                                 |
+| dev         | `docker/compose.yml` + `docker/compose.dev.yml`            | `social-glider-dev` (`environments/dev.params`)     | `dev.socialglider.online`   | `deploy-dev.yml`: every merge to **`develop`**                |
+| stage       | `docker/compose.yml` + `docker/compose.stage.yml`          | `social-glider-stage` (`environments/stage.params`) | `stage.socialglider.online` | `deploy-stage.yml`: every push to **`stage`**                 |
+| prod        | `docker/compose.yml` + `docker/compose.prod.yml`           | `social-glider-prod` (`environments/prod.params`)   | `socialglider.online`       | `deploy-prod.yml`: manual, approved, a SHA already on `stage` |
 
 **One template, one parameter file per environment.**
 [`environment.yml`](../../infra/cloudformation/environment.yml) is the only
@@ -30,7 +30,7 @@ meant to catch.
 share and is never run alone. `docker/compose.<env>.yml` holds only container
 sizing (memory limits, Postgres buffers) matched to that environment's
 instance type. Application settings are not in compose: they come from
-the one Parameter Store entry `/app/<env>/env`. `docker/compose.local.yml`, which was
+the one Parameter Store entry `/social-glider/<env>/env`. `docker/compose.local.yml`, which was
 `compose.dev.yml`, stays local-only.
 
 ## Shape
@@ -42,7 +42,7 @@ the one Parameter Store entry `/app/<env>/env`. `docker/compose.local.yml`, whic
 | DNS       | Namecheap. Each stack outputs an Elastic IP and you add one A record by hand. Caddy gets the TLS certificate itself.                                                                                                                                                                                                                       |
 | CI → AWS  | GitHub OIDC. No AWS keys are stored in GitHub. Each environment's deploy role trusts only the GitHub environment of the same name in this repository.                                                                                                                                                                                      |
 | Deploy    | Images are built once, by dev or stage, and pushed to ECR tagged with the commit SHA; prod copies them into its own repositories rather than rebuilding. The server never builds and never clones; it pulls images and a small bundle (`docker/`, `static/`, `infra/server/`). The deploy runs over SSM Run Command, so port 22 is closed. |
-| Secrets   | One SSM Parameter Store `SecureString` per environment, `/app/<env>/env`, holding the whole env file. On each deploy the server writes it to `apps/api/.env` (mode 600), so that stays the only env file.                                                                                                                                  |
+| Secrets   | One SSM Parameter Store `SecureString` per environment, `/social-glider/<env>/env`, holding the whole env file. On each deploy the server writes it to `apps/api/.env` (mode 600), so that stays the only env file.                                                                                                                        |
 | Unchanged | Cloudflare R2, the SMTP provider and the LLM provider are reached through env vars as today. Each environment gets its own R2 bucket and its own Meta app.                                                                                                                                                                                 |
 
 ```
@@ -50,8 +50,8 @@ GitHub Actions ──OIDC──▶ app-<env> deploy role
   │ build (dev, stage)         │ ssm:SendCommand (that instance only)
   │ or copy (prod)             │
   ▼                            ▼
-ECR app-api, app-web ─────── copy ──▶ ECR app-prod-api, app-prod-web
-  (app-bootstrap)                       (app-bootstrap-prod)
+ECR social-glider-api, social-glider-web ─────── copy ──▶ ECR social-glider-prod-api, social-glider-prod-web
+  (social-glider-bootstrap)                       (social-glider-bootstrap-prod)
   ▲ pull: dev, stage                    ▲ pull: prod
 EC2 app-<env> (Elastic IP; 80/443 open, no SSH)
   fetches its bundle from its bootstrap's S3 bucket
@@ -59,29 +59,29 @@ EC2 app-<env> (Elastic IP; 80/443 open, no SSH)
                                 Docker data on its own EBS volume
                                 stage, prod only: daily snapshots,
                                   nightly pg_dump ──▶ S3 backups bucket,
-                                  container logs  ──▶ CloudWatch /app/<env>
+                                  container logs  ──▶ CloudWatch /social-glider/<env>
 ```
 
 ## What each piece does
 
-**`bootstrap.yml`** (stack `app-bootstrap`) creates what dev and stage share:
+**`bootstrap.yml`** (stack `social-glider-bootstrap`) creates what dev and stage share:
 
 - the GitHub OIDC provider;
-- ECR repositories `app-api` and `app-web` (immutable tags, scan on push, keep 30 images);
+- ECR repositories `social-glider-api` and `social-glider-web` (immutable tags, scan on push, keep 30 images);
 - the artifacts bucket for deploy bundles, which expire after 30 days.
 
-**`bootstrap-prod.yml`** (stack `app-bootstrap-prod`) is prod's own copy, with
-repositories `app-prod-api` and `app-prod-web` and its own bundle bucket. For
+**`bootstrap-prod.yml`** (stack `social-glider-bootstrap-prod`) is prod's own copy, with
+repositories `social-glider-prod-api` and `social-glider-prod-web` and its own bundle bucket. For
 now it is a deliberate duplicate of `bootstrap.yml`, so prod can diverge later
 without touching dev and stage. That could mean its own AWS account, or
 stricter retention or scanning. Its `CreateOidcProvider` defaults to `false`
-because, while prod shares the account, `app-bootstrap` already created the
+because, while prod shares the account, `social-glider-bootstrap` already created the
 provider; set it to `true` if prod moves to an account of its own. In that
 case the non-prod repositories also need a repository policy that lets prod's
 account pull from them.
 
-`prod.params` points prod at `app-bootstrap-prod` (`BootstrapStackName`) and
-names `app-bootstrap` as `SourceBootstrapStackName`. That grants prod's deploy
+`prod.params` points prod at `social-glider-bootstrap-prod` (`BootstrapStackName`) and
+names `social-glider-bootstrap` as `SourceBootstrapStackName`. That grants prod's deploy
 role read access to the non-prod repositories so it can copy images out of
 them.
 
@@ -94,7 +94,7 @@ them.
 - **Data volume:** a separate encrypted EBS volume holds Docker's data-root, so Postgres, Redis and Caddy's certificates outlive the instance. It carries `DeletionPolicy: Snapshot`, so deleting the stack leaves one final snapshot, in dev too.
 - **Stage and prod only** (dev is disposable, so it gets none of these):
   - **Backups:** DLM takes daily snapshots of the data volume and keeps 7, and an S3 bucket receives the nightly `pg_dump`.
-  - **Logs:** the log group `/app/<env>`, kept 30 days in prod and 14 in stage. Docker's `awslogs` driver sends every container's output there. On dev, logs stay on the instance (Docker's `local` driver, rotated), readable with `app_compose logs`.
+  - **Logs:** the log group `/social-glider/<env>`, kept 30 days in prod and 14 in stage. Docker's `awslogs` driver sends every container's output there. On dev, logs stay on the instance (Docker's `local` driver, rotated), readable with `app_compose logs`.
   - **Alarms:** an alarm that recovers the instance when AWS's system check fails, and optional alarm emails. EC2 still recovers dev from hardware failures on its own, without an alarm.
 - **Deploy role:** the GitHub deploy role, scoped to the two ECR repositories, the bundle prefix, and `ssm:SendCommand` on this one instance.
 
@@ -112,7 +112,7 @@ code.
 calls go through `app_compose` in `lib.sh`, which adds the overlay for the
 server's environment.
 
-1. Write `apps/api/.env` from the one SecureString `/app/<env>/env`, adding the commit's image tags.
+1. Write `apps/api/.env` from the one SecureString `/social-glider/<env>/env`, adding the commit's image tags.
 2. Log in to ECR and `docker compose pull`.
 3. `compose run --rm migrate` applies migrations as the owner while the old release is still serving. `migrate` is a compose service behind a profile, and it is the only one that gets the admin URL.
 4. `compose up --wait` starts the release. Compose itself waits up to 3 minutes for every healthcheck to pass and every container to be running.
@@ -127,13 +127,13 @@ Meta retries webhook deliveries, so that is fine for dev and for the pilot.
 
 One workflow per environment, all running one shared deploy procedure:
 
-| Workflow                                                       | Trigger                                                               | Does                                                                                                                                                                                                                                             |
-| -------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`ci.yml`](../../.github/workflows/ci.yml)                     | every pull request; called by `deploy-dev.yml` and `deploy-stage.yml` | Checks only: lint, format, typecheck, migrate, test, RLS check, migration-drift check.                                                                                                                                                           |
-| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml)     | push to `develop`, i.e. every merge                                   | `ci.yml`, then deploys the commit to dev, building its images.                                                                                                                                                                                   |
-| [`deploy-stage.yml`](../../.github/workflows/deploy-stage.yml) | push to `stage`                                                       | `ci.yml`, then deploys the commit to stage. Fast-forward `stage` to `develop` and dev's images are reused; a merge commit is a new SHA and builds its own.                                                                                       |
-| [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml)   | manual (**Run workflow** with a full SHA)                             | Checks the SHA is on `stage`, waits for a `prod` environment reviewer, then **copies** that SHA's images from `app-api`/`app-web` into `app-prod-api`/`app-prod-web` and deploys them. It never builds; if stage never had the images, it fails. |
-| [`deploy.yml`](../../.github/workflows/deploy.yml) (reusable)  | called by the three above                                             | The procedure, listed below.                                                                                                                                                                                                                     |
+| Workflow                                                       | Trigger                                                               | Does                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ci.yml`](../../.github/workflows/ci.yml)                     | every pull request; called by `deploy-dev.yml` and `deploy-stage.yml` | Checks only: lint, format, typecheck, migrate, test, RLS check, migration-drift check.                                                                                                                                                                                                   |
+| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml)     | push to `develop`, i.e. every merge                                   | `ci.yml`, then deploys the commit to dev, building its images.                                                                                                                                                                                                                           |
+| [`deploy-stage.yml`](../../.github/workflows/deploy-stage.yml) | push to `stage`                                                       | `ci.yml`, then deploys the commit to stage. Fast-forward `stage` to `develop` and dev's images are reused; a merge commit is a new SHA and builds its own.                                                                                                                               |
+| [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml)   | manual (**Run workflow** with a full SHA)                             | Checks the SHA is on `stage`, waits for a `prod` environment reviewer, then **copies** that SHA's images from `social-glider-api`/`social-glider-web` into `social-glider-prod-api`/`social-glider-prod-web` and deploys them. It never builds; if stage never had the images, it fails. |
+| [`deploy.yml`](../../.github/workflows/deploy.yml) (reusable)  | called by the three above                                             | The procedure, listed below.                                                                                                                                                                                                                                                             |
 
 Each deploy job is gated by a repository variable (`DEV_DEPLOY_ENABLED`,
 `STAGE_DEPLOY_ENABLED`, `PROD_DEPLOY_ENABLED`) that you set to `true` once that
@@ -144,7 +144,7 @@ deploy could stop halfway.
 `deploy.yml` runs in the GitHub environment it was given, so it assumes that
 environment's role with that environment's variables:
 
-1. Get the images into this environment's repositories, which are `ECR_API_REPOSITORY`/`ECR_WEB_REPOSITORY` and default to `app-api`/`app-web`. Tags are immutable, so images that already exist are skipped.
+1. Get the images into this environment's repositories, which are `ECR_API_REPOSITORY`/`ECR_WEB_REPOSITORY` and default to `social-glider-api`/`social-glider-web`. Tags are immutable, so images that already exist are skipped.
    - With `images: build` (dev, stage), it builds what is missing.
    - With `images: promote` (prod), it copies the manifest from the non-prod repositories. The copy happens inside the registry, so the digest is the one stage ran.
 2. Upload the bundle.
@@ -208,7 +208,7 @@ certificate until this resolves, but the deploy itself doesn't wait for it.
 ### 4. The env file
 
 All of an environment's settings live in **one** `SecureString`,
-`/app/<env>/env`. It holds a normal `.env` file in the same format as
+`/social-glider/<env>/env`. It holds a normal `.env` file in the same format as
 `apps/api/.env`, and the deploy writes it to the server as it is. Write it
 locally, outside the repo, and upload it:
 
@@ -234,7 +234,7 @@ STORAGE_PUBLIC_BASE_URL=…
 LLM_API_KEY=…
 ENV
 
-aws ssm put-parameter --name /app/dev/env --type SecureString \
+aws ssm put-parameter --name /social-glider/dev/env --type SecureString \
   --value file://$HOME/dev.env --overwrite
 ```
 
@@ -247,7 +247,7 @@ Rules:
 
 - **Database passwords:** use `openssl rand -hex`. They go into connection URLs unencoded.
 - **Never change the database passwords.** `POSTGRES_PASSWORD` and `APP_RUNTIME_PASSWORD` are set before the first deploy and stay that way. Postgres reads them only when its data volume is empty; changing one later needs `ALTER ROLE` by hand.
-- **Changes take effect on the next deploy.** To edit, fetch the file with `aws ssm get-parameter --name /app/dev/env --with-decryption --query Parameter.Value --output text`, change it, and upload it again.
+- **Changes take effect on the next deploy.** To edit, fetch the file with `aws ssm get-parameter --name /social-glider/dev/env --with-decryption --query Parameter.Value --output text`, change it, and upload it again.
 - **Size limit:** a standard parameter holds 4 KB, far more than this file needs.
 - **Delete the local copy** once it's uploaded.
 
@@ -269,7 +269,7 @@ The next merge to `develop`, or a re-run of its latest CI run, deploys.
 
 ### 6. Outside AWS
 
-- **Meta:** use a separate test app for dev. Its webhook URL is `https://dev.socialglider.online/api/v1/…` with `/app/dev/META_VERIFY_TOKEN`. Dev must never receive real Page traffic.
+- **Meta:** use a separate test app for dev. Its webhook URL is `https://dev.socialglider.online/api/v1/…` and the `META_VERIFY_TOKEN` from dev's env file. Dev must never receive real Page traffic.
 - **Google / Facebook login:** add `https://dev.socialglider.online` to the OAuth redirect and origin lists.
 
 ## Operating a server
@@ -277,7 +277,7 @@ The next merge to `develop`, or a re-run of its latest CI run, deploys.
 | Task                  | How                                                                                                                                                                                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shell on the server   | `aws ssm start-session --target <InstanceId>` (needs the Session Manager plugin), then `sudo -i`.                                                                                                                                                                                     |
-| Logs                  | Stage and prod: CloudWatch Logs → `/app/<env>`, one stream per container, e.g. `aws logs tail /app/stage --follow`. Dev: on the server, `. /opt/app/infra/server/lib.sh && app_compose logs -f api`.                                                                                  |
+| Logs                  | Stage and prod: CloudWatch Logs → `/social-glider/<env>`, one stream per container, e.g. `aws logs tail /social-glider/stage --follow`. Dev: on the server, `. /opt/app/infra/server/lib.sh && app_compose logs -f api`.                                                              |
 | Redeploy a commit     | Re-run its deploy workflow run (or **Run workflow** on `deploy-dev.yml`), or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                                                                                         |
 | Compose on the server | `. /opt/app/infra/server/lib.sh && app_compose ps`                                                                                                                                                                                                                                    |
 | Backup now            | Stage and prod: `systemctl start app-backup.service`, then check `journalctl -u app-backup`. Dev has no backups.                                                                                                                                                                      |
@@ -306,20 +306,20 @@ steps as dev with `stage` or `prod` in place of `dev`. Stage serves
 domains are set in `stage.params` / `prod.params` and in the `url` of
 `deploy-stage.yml` / `deploy-prod.yml`; change both together.
 
-1. **Stage:** pin `ImageId` in `stage.params` and run `deploy.sh stage`. It uses the same `app-bootstrap` as dev.
+1. **Stage:** pin `ImageId` in `stage.params` and run `deploy.sh stage`. It uses the same `social-glider-bootstrap` as dev.
 2. **Prod:** run `deploy.sh bootstrap-prod` first, then pin `ImageId` in `prod.params` and run `deploy.sh prod`.
 3. **Namecheap:** add the A records under Advanced DNS, each pointing at its stack's `PublicIp`:
 
-   | Type     | Host    | Value                  | Serves                      |
-   | -------- | ------- | ---------------------- | --------------------------- |
-   | A Record | `stage` | `app-stage` `PublicIp` | `stage.socialglider.online` |
-   | A Record | `@`     | `app-prod` `PublicIp`  | `socialglider.online`       |
+   | Type     | Host    | Value                            | Serves                      |
+   | -------- | ------- | -------------------------------- | --------------------------- |
+   | A Record | `stage` | `social-glider-stage` `PublicIp` | `stage.socialglider.online` |
+   | A Record | `@`     | `social-glider-prod` `PublicIp`  | `socialglider.online`       |
 
    Namecheap's default records for a new domain include a parking-page record on `@`, and often a `www` CNAME. Remove them, or `@` will not resolve to the server. `www.socialglider.online` is not served; Caddy only answers for the domain in `DOMAIN`.
 
-4. Upload `/app/stage/env` and `/app/prod/env`, as in step 4 of the dev setup.
-5. Create the GitHub environments, each with the four variables from its own stacks' outputs. For prod, `ARTIFACTS_BUCKET` comes from `app-bootstrap-prod`.
+4. Upload `/social-glider/stage/env` and `/social-glider/prod/env`, as in step 4 of the dev setup.
+5. Create the GitHub environments, each with the four variables from its own stacks' outputs. For prod, `ARTIFACTS_BUCKET` comes from `social-glider-bootstrap-prod`.
    - `stage`: deployment branch `stage`.
-   - `prod`: **required reviewers**, and two more variables, `ECR_API_REPOSITORY=app-prod-api` and `ECR_WEB_REPOSITORY=app-prod-web`. Run `deploy-prod.yml` from the default branch.
+   - `prod`: **required reviewers**, and two more variables, `ECR_API_REPOSITORY=social-glider-prod-api` and `ECR_WEB_REPOSITORY=social-glider-prod-web`. Run `deploy-prod.yml` from the default branch.
 6. Set `STAGE_DEPLOY_ENABLED` / `PROD_DEPLOY_ENABLED` to `true`.
 7. Run the restore drill before prod takes real traffic.

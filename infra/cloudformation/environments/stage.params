@@ -1,4 +1,4 @@
-# Parameters for stack app-stage (environment.yml). One KEY=VALUE per line.
+# Parameters for stack social-glider-stage (environment.yml). One KEY=VALUE per line.
 # Deploy with: infra/cloudformation/deploy.sh stage
 EnvName=stage
 Domain=stage.socialglider.online

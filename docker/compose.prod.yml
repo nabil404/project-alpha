@@ -4,7 +4,7 @@
 # Only what differs per environment belongs here: container sizing, sized to
 # the instance in infra/cloudformation/environments/prod.params (t3.medium, 4 GiB).
 # Change the two together. Application settings are not here - they come from
-# Parameter Store under /app/prod/, rendered into apps/api/.env on deploy.
+# Parameter Store under /social-glider/prod/, rendered into apps/api/.env on deploy.
 #
 # Limits leave headroom for the OS and Docker; a container that exceeds one is
 # killed and restarted rather than starving Postgres.

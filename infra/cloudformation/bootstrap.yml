@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   Account-wide pieces shared by the non-production environments, dev and
   stage: the GitHub OIDC provider, the ECR repositories CI builds into, and the
-  deploy-bundle bucket. Deployed once, by hand, as stack app-bootstrap, before
+  deploy-bundle bucket. Deployed once, by hand, as stack social-glider-bootstrap, before
   either environment stack. Production has its own copy, bootstrap-prod.yml.
   See docs/architecture/deployment.md.
 
@@ -31,7 +31,7 @@ Resources:
   ApiRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: app-api
+      RepositoryName: social-glider-api
       ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration: { ScanOnPush: true }
       EncryptionConfiguration: { EncryptionType: AES256 }
@@ -44,7 +44,7 @@ Resources:
   WebRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: app-web
+      RepositoryName: social-glider-web
       ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration: { ScanOnPush: true }
       EncryptionConfiguration: { EncryptionType: AES256 }

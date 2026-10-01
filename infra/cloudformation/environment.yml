@@ -11,7 +11,7 @@ Parameters:
   EnvName:
     Type: String
     AllowedValues: [dev, stage, prod]
-    Description: Also the GitHub environment name and the /app/<env>/ parameter path.
+    Description: Also the GitHub environment name and the /social-glider/<env>/ parameter path.
   Domain:
     Type: String
     Description: >-
@@ -22,10 +22,10 @@ Parameters:
     Default: nabil404/project-alpha
   BootstrapStackName:
     Type: String
-    Default: app-bootstrap
+    Default: social-glider-bootstrap
     Description: >-
       The bootstrap stack whose ECR repositories and bundle bucket this
-      environment uses: app-bootstrap for dev and stage, app-bootstrap-prod
+      environment uses: social-glider-bootstrap for dev and stage, social-glider-bootstrap-prod
       for prod.
   SourceBootstrapStackName:
     Type: String
@@ -234,7 +234,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Condition: IsMonitored
     Properties:
-      LogGroupName: !Sub '/app/${EnvName}'
+      LogGroupName: !Sub '/social-glider/${EnvName}'
       RetentionInDays: !If [IsProduction, 30, 14]
 
   # --- Instance.
@@ -266,8 +266,8 @@ Resources:
               - Effect: Allow
                 Action: [ssm:GetParametersByPath, ssm:GetParameters, ssm:GetParameter]
                 Resource:
-                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/app/${EnvName}'
-                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/app/${EnvName}/*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/social-glider/${EnvName}'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/social-glider/${EnvName}/*'
               - Effect: Allow
                 Action: kms:Decrypt
                 Resource: '*'
@@ -316,7 +316,7 @@ Resources:
           Ebs: { VolumeSize: 20, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
       Tags:
         - { Key: Name, Value: !Sub 'app-${EnvName}' }
-        - { Key: 'app:env', Value: !Ref EnvName }
+        - { Key: 'social-glider:env', Value: !Ref EnvName }
       # First boot only. Anything that changes later ships in the deploy bundle
       # (infra/server/), so it is versioned and reviewed with the code.
       UserData:
