@@ -56,9 +56,10 @@ ECR app-api, app-web ─────── copy ──▶ ECR app-prod-api, app-
 EC2 app-<env> (Elastic IP; 80/443 open, no SSH)
   fetches its bundle from its bootstrap's S3 bucket
   runs compose.yml + compose.<env>.yml
-                                Docker data on its own EBS volume (daily snapshots)
-                                nightly pg_dump ──▶ S3 backups bucket
-                                container logs  ──▶ CloudWatch /app/<env>
+                                Docker data on its own EBS volume
+                                stage, prod only: daily snapshots,
+                                  nightly pg_dump ──▶ S3 backups bucket,
+                                  container logs  ──▶ CloudWatch /app/<env>
 ```
 
 ## What each piece does
@@ -90,13 +91,11 @@ them.
 - **Instance:** EC2 with an Elastic IP. It is x86, to match the amd64 images CI builds.
   - It uses IMDSv2 with a hop limit of 1, so containers can't read the instance's AWS credentials.
   - Termination protection is on for `prod`.
-- **Data volume:** a separate encrypted EBS volume holds Docker's data-root, so Postgres, Redis and Caddy's certificates outlive the instance.
-  - It carries `DeletionPolicy: Snapshot`.
-  - DLM takes daily snapshots and keeps 7.
-- **Backups:** an S3 bucket for the nightly `pg_dump`.
-- **Monitoring:**
-  - The log group `/app/<env>`, kept 30 days in prod and 14 elsewhere. Docker's `awslogs` driver sends every container's output there.
-  - An alarm that auto-recovers the instance, and optional alarm emails.
+- **Data volume:** a separate encrypted EBS volume holds Docker's data-root, so Postgres, Redis and Caddy's certificates outlive the instance. It carries `DeletionPolicy: Snapshot`, so deleting the stack leaves one final snapshot, in dev too.
+- **Stage and prod only** (dev is disposable, so it gets none of these):
+  - **Backups:** DLM takes daily snapshots of the data volume and keeps 7, and an S3 bucket receives the nightly `pg_dump`.
+  - **Logs:** the log group `/app/<env>`, kept 30 days in prod and 14 in stage. Docker's `awslogs` driver sends every container's output there. On dev, logs stay on the instance (Docker's `local` driver, rotated), readable with `app_compose logs`.
+  - **Alarms:** an alarm that recovers the instance when AWS's system check fails, and optional alarm emails. EC2 still recovers dev from hardware failures on its own, without an alarm.
 - **Deploy role:** the GitHub deploy role, scoped to the two ECR repositories, the bundle prefix, and `ssm:SendCommand` on this one instance.
 
 UserData runs only at first boot. It does four things:
@@ -190,8 +189,8 @@ infra/cloudformation/deploy.sh dev
 ```
 
 The first run stops and prints the current Amazon Linux 2023 AMI for your
-region. Put it in `infra/cloudformation/environments/dev.params` as `ImageId=…`
-(and `AlarmEmail=` if you want alarm emails), commit, and run it again. It
+region. Put it in `infra/cloudformation/environments/dev.params` as `ImageId=…`,
+commit, and run it again. It
 prints the stack's outputs. Write down `PublicIp`, `InstanceId` and
 `DeployRoleArn`, plus `ArtifactsBucketName` from the bootstrap output.
 
@@ -278,23 +277,23 @@ The next merge to `develop`, or a re-run of its latest CI run, deploys.
 | Task                  | How                                                                                                                                                                                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shell on the server   | `aws ssm start-session --target <InstanceId>` (needs the Session Manager plugin), then `sudo -i`.                                                                                                                                                                                     |
-| Logs                  | CloudWatch Logs → `/app/<env>`, one stream per container. `aws logs tail /app/dev --follow`.                                                                                                                                                                                          |
+| Logs                  | Stage and prod: CloudWatch Logs → `/app/<env>`, one stream per container, e.g. `aws logs tail /app/stage --follow`. Dev: on the server, `. /opt/app/infra/server/lib.sh && app_compose logs -f api`.                                                                                  |
 | Redeploy a commit     | Re-run its deploy workflow run (or **Run workflow** on `deploy-dev.yml`), or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                                                                                         |
 | Compose on the server | `. /opt/app/infra/server/lib.sh && app_compose ps`                                                                                                                                                                                                                                    |
-| Backup now            | `systemctl start app-backup.service`, then check `journalctl -u app-backup`.                                                                                                                                                                                                          |
+| Backup now            | Stage and prod: `systemctl start app-backup.service`, then check `journalctl -u app-backup`. Dev has no backups.                                                                                                                                                                      |
 | Restore drill         | Copy a dump from the backups bucket, `pg_restore` it into a scratch `postgres:17-alpine` container, and run `db:verify-rls` against it. Do this once before prod.                                                                                                                     |
 | Resize                | Change `InstanceType` in `<env>.params` **and** the limits in `docker/compose.<env>.yml`, then `deploy.sh <env>`. The instance stops and starts; data and IP stay.                                                                                                                    |
 | OS updates            | Patch in place: `dnf upgrade --releasever=latest`, then reboot. Do **not** bump `ImageId` to patch. A new AMI replaces the instance, and CloudFormation would try to attach the data volume to the new instance while the old one still holds it, so the update fails and rolls back. |
 
 ## Rough monthly cost (us-east-1 on-demand; Asian regions run about 10–20% higher)
 
-| Item                           | dev / stage (`t3.small`) | prod (`t3.medium`, 40 GB) |
-| ------------------------------ | ------------------------ | ------------------------- |
-| EC2                            | ~$15.20                  | ~$30.40                   |
-| EBS root 20 GB + data, gp3     | ~$3.20                   | ~$4.80                    |
-| Public IPv4 (Elastic IP)       | ~$3.65                   | ~$3.65                    |
-| Snapshots, S3, ECR, CloudWatch | ~$1–3                    | ~$3–5                     |
-| **Total**                      | **~$23–25 each**         | **~$42–44**               |
+| Item                           | dev / stage (`t3.small`)       | prod (`t3.medium`, 40 GB) |
+| ------------------------------ | ------------------------------ | ------------------------- |
+| EC2                            | ~$15.20                        | ~$30.40                   |
+| EBS root 20 GB + data, gp3     | ~$3.20                         | ~$4.80                    |
+| Public IPv4 (Elastic IP)       | ~$3.65                         | ~$3.65                    |
+| Snapshots, S3, ECR, CloudWatch | dev ~$0.50, stage ~$1–3        | ~$3–5                     |
+| **Total**                      | **dev ~$22.50, stage ~$23–25** | **~$42–44**               |
 
 Dev and stage can be stopped outside working hours. Their Elastic IP is still
 billed while the instance is stopped.

@@ -1,8 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   One environment (dev, stage or prod): a single EC2 instance running
-  docker/compose.yml plus that environment's overlay, its data volume, backups,
-  logs, and the role GitHub Actions assumes to deploy to it. Deployed per
+  docker/compose.yml plus that environment's overlay, its data volume, the
+  role GitHub Actions assumes to deploy to it, and - for stage and prod, not
+  dev - backups, CloudWatch logs and alarms. Deployed per
   environment with infra/cloudformation/deploy.sh <env>, which reads
   environments/<env>.params. See docs/architecture/deployment.md.
 
@@ -52,6 +53,7 @@ Parameters:
   BackupRetentionDays:
     Type: Number
     Default: 14
+    Description: Stage and prod only; dev keeps no backups.
   ComposeVersion:
     Type: String
     Default: v2.32.4
@@ -59,11 +61,16 @@ Parameters:
   AlarmEmail:
     Type: String
     Default: ''
-    Description: Optional. Receives instance-recovery alarms; confirm the subscription email.
+    Description: >-
+      Optional, stage and prod only. Receives instance alarms; confirm the
+      subscription email.
 
 Conditions:
   IsProduction: !Equals [!Ref EnvName, prod]
-  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
+  # Dev is disposable: no backups, no CloudWatch logs, no alarms. Stage and
+  # prod get all three.
+  IsMonitored: !Not [!Equals [!Ref EnvName, dev]]
+  HasAlarmEmail: !And [!Condition IsMonitored, !Not [!Equals [!Ref AlarmEmail, '']]]
   PromotesImages: !Not [!Equals [!Ref SourceBootstrapStackName, '']]
 
 Resources:
@@ -153,6 +160,7 @@ Resources:
 
   SnapshotRole:
     Type: AWS::IAM::Role
+    Condition: IsMonitored
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -166,6 +174,7 @@ Resources:
   # Crash-consistent second layer under the nightly pg_dump.
   DataSnapshotPolicy:
     Type: AWS::DLM::LifecyclePolicy
+    Condition: IsMonitored
     Properties:
       Description: !Sub 'Daily snapshots of app-${EnvName}-data'
       State: ENABLED
@@ -181,6 +190,7 @@ Resources:
 
   BackupsBucket:
     Type: AWS::S3::Bucket
+    Condition: IsMonitored
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -204,6 +214,7 @@ Resources:
 
   BackupsBucketTlsOnly:
     Type: AWS::S3::BucketPolicy
+    Condition: IsMonitored
     Properties:
       Bucket: !Ref BackupsBucket
       PolicyDocument:
@@ -221,6 +232,7 @@ Resources:
   # Docker's awslogs driver writes every container here (daemon.json below).
   LogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: IsMonitored
     Properties:
       LogGroupName: !Sub '/app/${EnvName}'
       RetentionInDays: !If [IsProduction, 30, 14]
@@ -266,12 +278,18 @@ Resources:
                 Resource: !Sub
                   - '${Arn}/bundles/*'
                   - Arn: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ArtifactsBucketArn' }
-              - Effect: Allow
-                Action: s3:PutObject
-                Resource: !Sub '${BackupsBucket.Arn}/${EnvName}/*'
-              - Effect: Allow
-                Action: [logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams]
-                Resource: !Sub '${LogGroup.Arn}'
+              - !If
+                - IsMonitored
+                - Effect: Allow
+                  Action: s3:PutObject
+                  Resource: !Sub '${BackupsBucket.Arn}/${EnvName}/*'
+                - !Ref 'AWS::NoValue'
+              - !If
+                - IsMonitored
+                - Effect: Allow
+                  Action: [logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams]
+                  Resource: !Sub '${LogGroup.Arn}'
+                - !Ref 'AWS::NoValue'
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -312,7 +330,7 @@ Resources:
             AWS_REGION=${AWS::Region}
             AWS_DEFAULT_REGION=${AWS::Region}
             ARTIFACTS_BUCKET=${ArtifactsBucket}
-            BACKUPS_BUCKET=${BackupsBucket}
+            BACKUPS_BUCKET=${BackupsBucketName}
             REGISTRY=${Registry}
             API_REPOSITORY=${ApiRepository}
             WEB_REPOSITORY=${WebRepository}
@@ -331,16 +349,12 @@ Resources:
             mount -a
 
             mkdir -p /srv/data/docker /etc/docker
+            # Stage and prod ship container logs to CloudWatch; dev keeps them on
+            # the instance (`docker compose logs`), rotated by the local driver.
             cat > /etc/docker/daemon.json <<'EOF'
             {
               "data-root": "/srv/data/docker",
-              "log-driver": "awslogs",
-              "log-opts": {
-                "awslogs-region": "${AWS::Region}",
-                "awslogs-group": "${LogGroup}",
-                "tag": "{{.Name}}",
-                "mode": "non-blocking"
-              }
+              ${LogConfig}
             }
             EOF
 
@@ -365,7 +379,10 @@ Resources:
             EOF
             chmod 700 /opt/app/bin/deploy
 
-            # Nightly pg_dump to S3; the script arrives with the first deploy.
+            # Nightly pg_dump to S3, stage and prod only; the script arrives with
+            # the first deploy.
+            . /etc/app.env
+            if [ -n "$BACKUPS_BUCKET" ]; then
             cat > /etc/systemd/system/app-backup.service <<'EOF'
             [Unit]
             Description=Nightly pg_dump to S3
@@ -388,10 +405,16 @@ Resources:
             EOF
             systemctl daemon-reload
             systemctl enable --now app-backup.timer
+            fi
           - ArtifactsBucket: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ArtifactsBucket' }
             Registry: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-RegistryUri' }
             ApiRepository: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ApiRepositoryName' }
             WebRepository: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-WebRepositoryName' }
+            BackupsBucketName: !If [IsMonitored, !Ref BackupsBucket, '']
+            LogConfig: !If
+              - IsMonitored
+              - !Sub '"log-driver": "awslogs", "log-opts": {"awslogs-region": "${AWS::Region}", "awslogs-group": "${LogGroup}", "tag": "{{.Name}}", "mode": "non-blocking"}'
+              - '"log-driver": "local"'
 
   ElasticIp:
     Type: AWS::EC2::EIP
@@ -411,6 +434,7 @@ Resources:
   # volume and Elastic IP follow it.
   RecoverAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: IsMonitored
     Properties:
       AlarmDescription: !Sub 'app-${EnvName}: system status check failed, recovering'
       Namespace: AWS/EC2
@@ -518,6 +542,8 @@ Outputs:
     Description: GitHub environment variable AWS_DEPLOY_ROLE_ARN.
     Value: !GetAtt GitHubDeployRole.Arn
   BackupsBucketName:
+    Condition: IsMonitored
     Value: !Ref BackupsBucket
   LogGroupName:
+    Condition: IsMonitored
     Value: !Ref LogGroup
