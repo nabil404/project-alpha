@@ -180,7 +180,10 @@ export type ProductVariantInput = z.infer<typeof productVariantInputSchema>;
 const sameText = (text: string) => text.trim().toLowerCase();
 
 type DocumentIssueCode =
-  'DUPLICATE' | 'UNKNOWN_OPTION_VALUE' | 'OPTION_VALUES_MISMATCH' | 'VARIANTS_NEED_OPTION';
+  | 'DUPLICATE'
+  | 'UNKNOWN_OPTION_VALUE'
+  | 'OPTION_VALUES_MISMATCH'
+  | 'VARIANTS_NEED_OPTION';
 
 /**
  * The rules a product document must satisfy beyond its field types. Shared,

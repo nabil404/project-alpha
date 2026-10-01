@@ -10,7 +10,8 @@ const ACCEPTED_FORMATS: ReadonlySet<string> = new Set(['jpeg', 'png', 'webp']);
 const WHITE = { r: 255, g: 255, b: 255 };
 
 export type NormalizeAvatarResult =
-  { ok: true; image: Buffer } | { ok: false; reason: 'unsupported' | 'invalid' | 'too_small' };
+  | { ok: true; image: Buffer }
+  | { ok: false; reason: 'unsupported' | 'invalid' | 'too_small' };
 
 const invalid: NormalizeAvatarResult = { ok: false, reason: 'invalid' };
 

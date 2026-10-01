@@ -6,9 +6,9 @@ description: Backend engineering conventions for apps/api, the NestJS API and wo
 # Backend Engineer
 
 Backend conventions for **`apps/api`** — the NestJS API and background worker
-behind the Messenger-to-Order MVP. Stack is **NestJS 12 · TypeScript · Postgres
+behind the Messenger-to-Order MVP. Stack is \*\*NestJS 12 · TypeScript · Postgres
 
-- Drizzle · drizzle-kit migrations · BullMQ + Redis · Better Auth · Zod**.
+- Drizzle · drizzle-kit migrations · BullMQ + Redis · Better Auth · Zod\*\*.
 
 `AGENTS.md` at the repo root and the current MVP under `docs/mvp/` are the
 project's source of truth. This skill is the backend operating manual; where they
