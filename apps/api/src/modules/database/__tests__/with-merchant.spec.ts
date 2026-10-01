@@ -47,7 +47,7 @@ describe('withMerchant (no database)', () => {
 
 // The rest needs a real Postgres: transaction-locality is a server behaviour,
 // not something a fake can demonstrate. CI sets DATABASE_ADMIN_URL; locally,
-// export it (pointing at docker/compose.dev.yml) to run these.
+// export it (pointing at docker/compose.local.yml) to run these.
 const url = process.env.DATABASE_ADMIN_URL;
 const describeDb = url ? describe : describe.skip;
 

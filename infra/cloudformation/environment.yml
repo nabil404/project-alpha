@@ -1,0 +1,549 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  One environment (dev, stage or prod): a single EC2 instance running
+  docker/compose.yml plus that environment's overlay, its data volume, the
+  role GitHub Actions assumes to deploy to it, and - for stage and prod, not
+  dev - backups, CloudWatch logs and alarms. Deployed per
+  environment with infra/cloudformation/deploy.sh <env>, which reads
+  environments/<env>.params. See docs/architecture/deployment.md.
+
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [dev, stage, prod]
+    Description: Also the GitHub environment name and the /social-glider/<env>/ parameter path.
+  Domain:
+    Type: String
+    Description: >-
+      Hostname Caddy serves, e.g. dev.socialglider.online. Caddy reads DOMAIN
+      from the environment's env file; this records it alongside the stack.
+  GitHubRepo:
+    Type: String
+    Default: nabil404/project-alpha
+  BootstrapStackName:
+    Type: String
+    Default: social-glider-bootstrap
+    Description: >-
+      The bootstrap stack whose ECR repositories and bundle bucket this
+      environment uses: social-glider-bootstrap for dev and stage, social-glider-bootstrap-prod
+      for prod.
+  SourceBootstrapStackName:
+    Type: String
+    Default: ''
+    Description: >-
+      Prod only: the bootstrap stack whose images this environment promotes.
+      Its deploy role may read those repositories, to copy the images stage
+      ran into its own. Empty for environments that build.
+  ImageId:
+    Type: AWS::EC2::Image::Id
+    Description: >-
+      Pinned Amazon Linux 2023 AMI. Pinned on purpose - a changed ImageId
+      replaces the instance - so look it up once and change it deliberately:
+      aws ssm get-parameter --name
+      /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+      --query Parameter.Value --output text
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: x86_64, to match the amd64 images CI builds.
+  DataVolumeSizeGiB:
+    Type: Number
+    Default: 20
+    MinValue: 10
+  BackupRetentionDays:
+    Type: Number
+    Default: 14
+    Description: Stage and prod only; dev keeps no backups.
+  ComposeVersion:
+    Type: String
+    Default: v2.32.4
+    Description: docker compose plugin release; Amazon Linux 2023 does not package it.
+  AlarmEmail:
+    Type: String
+    Default: ''
+    Description: >-
+      Optional, stage and prod only. Receives instance alarms; confirm the
+      subscription email.
+
+Conditions:
+  IsProduction: !Equals [!Ref EnvName, prod]
+  # Dev is disposable: no backups, no CloudWatch logs, no alarms. Stage and
+  # prod get all three.
+  IsMonitored: !Not [!Equals [!Ref EnvName, dev]]
+  HasAlarmEmail: !And [!Condition IsMonitored, !Not [!Equals [!Ref AlarmEmail, '']]]
+  PromotesImages: !Not [!Equals [!Ref SourceBootstrapStackName, '']]
+
+Resources:
+  # --- Network: one public subnet. The instance is reachable on 80/443 only;
+  # administration goes through SSM Session Manager, never SSH.
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.40.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Sub 'app-${EnvName}' }]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.40.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: !Sub 'app-${EnvName}-public' }]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTP and HTTPS to Caddy; no SSH
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {
+            IpProtocol: tcp,
+            FromPort: 80,
+            ToPort: 80,
+            CidrIp: 0.0.0.0/0,
+            Description: ACME and redirect,
+          }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS }
+
+  # --- Storage. Docker's data-root lives here, so Postgres, Redis AOF and
+  # Caddy's certificates survive the instance being replaced.
+  DataVolume:
+    Type: AWS::EC2::Volume
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      AvailabilityZone: !GetAtt PublicSubnet.AvailabilityZone
+      Size: !Ref DataVolumeSizeGiB
+      VolumeType: gp3
+      Encrypted: true
+      Tags:
+        - { Key: Name, Value: !Sub 'app-${EnvName}-data' }
+        - { Key: 'app:snapshot', Value: !Sub '${EnvName}-data' }
+
+  DataVolumeAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      InstanceId: !Ref Instance
+      VolumeId: !Ref DataVolume
+      Device: /dev/sdf
+
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Condition: IsMonitored
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: dlm.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole
+
+  # Crash-consistent second layer under the nightly pg_dump.
+  DataSnapshotPolicy:
+    Type: AWS::DLM::LifecyclePolicy
+    Condition: IsMonitored
+    Properties:
+      Description: !Sub 'Daily snapshots of app-${EnvName}-data'
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt SnapshotRole.Arn
+      PolicyDetails:
+        ResourceTypes: [VOLUME]
+        TargetTags: [{ Key: 'app:snapshot', Value: !Sub '${EnvName}-data' }]
+        Schedules:
+          - Name: daily
+            CreateRule: { Interval: 24, IntervalUnit: HOURS, Times: ['03:30'] }
+            RetainRule: { Count: 7 }
+            CopyTags: true
+
+  BackupsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsMonitored
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      VersioningConfiguration: { Status: Enabled }
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-dumps
+            Status: Enabled
+            ExpirationInDays: !Ref BackupRetentionDays
+            NoncurrentVersionExpiration: { NoncurrentDays: 7 }
+
+  BackupsBucketTlsOnly:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsMonitored
+    Properties:
+      Bucket: !Ref BackupsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt BackupsBucket.Arn
+              - !Sub '${BackupsBucket.Arn}/*'
+            Condition: { Bool: { 'aws:SecureTransport': 'false' } }
+
+  # Docker's awslogs driver writes every container here (daemon.json below).
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsMonitored
+    Properties:
+      LogGroupName: !Sub '/social-glider/${EnvName}'
+      RetentionInDays: !If [IsProduction, 30, 14]
+
+  # --- Instance.
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: app-runtime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource:
+                  - { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ApiRepositoryArn' }
+                  - { 'Fn::ImportValue': !Sub '${BootstrapStackName}-WebRepositoryArn' }
+              - Effect: Allow
+                Action: [ssm:GetParametersByPath, ssm:GetParameters, ssm:GetParameter]
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/social-glider/${EnvName}'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/social-glider/${EnvName}/*'
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals: { 'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com' }
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub
+                  - '${Arn}/bundles/*'
+                  - Arn: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ArtifactsBucketArn' }
+              - !If
+                - IsMonitored
+                - Effect: Allow
+                  Action: s3:PutObject
+                  Resource: !Sub '${BackupsBucket.Arn}/${EnvName}/*'
+                - !Ref 'AWS::NoValue'
+              - !If
+                - IsMonitored
+                - Effect: Allow
+                  Action: [logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams]
+                  Resource: !Sub '${LogGroup.Arn}'
+                - !Ref 'AWS::NoValue'
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: DefaultRoute
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds: [!Ref WebSecurityGroup]
+      DisableApiTermination: !If [IsProduction, true, false]
+      # IMDSv2 with one hop: the host (dockerd, the AWS CLI) can read the
+      # instance role, but containers - one bridge hop further - cannot.
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 20, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
+      Tags:
+        - { Key: Name, Value: !Sub 'app-${EnvName}' }
+        - { Key: 'social-glider:env', Value: !Ref EnvName }
+      # First boot only. Anything that changes later ships in the deploy bundle
+      # (infra/server/), so it is versioned and reviewed with the code.
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            set -euxo pipefail
+
+            cat > /etc/app.env <<'EOF'
+            APP_ENV=${EnvName}
+            AWS_REGION=${AWS::Region}
+            AWS_DEFAULT_REGION=${AWS::Region}
+            ARTIFACTS_BUCKET=${ArtifactsBucket}
+            BACKUPS_BUCKET=${BackupsBucketName}
+            REGISTRY=${Registry}
+            API_REPOSITORY=${ApiRepository}
+            WEB_REPOSITORY=${WebRepository}
+            EOF
+
+            # The attachment completes after boot starts, so wait for the device.
+            vol_id="${DataVolume}"
+            dev="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$(echo "$vol_id" | tr -d -)"
+            for _ in $(seq 1 60); do [ -e "$dev" ] && break; sleep 5; done
+            [ -e "$dev" ] || { echo "data volume $vol_id never attached" >&2; exit 1; }
+            # Format only a blank volume: a reattached one already holds the data.
+            blkid "$dev" || mkfs.xfs "$dev"
+            uuid="$(blkid -s UUID -o value "$dev")"
+            mkdir -p /srv/data
+            grep -q "$uuid" /etc/fstab || echo "UUID=$uuid /srv/data xfs defaults,nofail 0 2" >> /etc/fstab
+            mount -a
+
+            mkdir -p /srv/data/docker /etc/docker
+            # Stage and prod ship container logs to CloudWatch; dev keeps them on
+            # the instance (`docker compose logs`), rotated by the local driver.
+            cat > /etc/docker/daemon.json <<'EOF'
+            {
+              "data-root": "/srv/data/docker",
+              ${LogConfig}
+            }
+            EOF
+
+            dnf install -y docker jq
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \
+              "https://github.com/docker/compose/releases/download/${ComposeVersion}/docker-compose-linux-$(uname -m)"
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            systemctl enable --now docker
+
+            # CI runs this over SSM Run Command: unpack one commit's bundle into
+            # /opt/app and run the deploy script it carries.
+            mkdir -p /opt/app/bin
+            cat > /opt/app/bin/deploy <<'EOF'
+            #!/bin/bash
+            set -euo pipefail
+            sha="$1"
+            [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: deploy <40-character commit sha>" >&2; exit 2; }
+            . /etc/app.env
+            aws s3 cp "s3://$ARTIFACTS_BUCKET/bundles/$sha.tgz" - | tar xz -C /opt/app
+            exec /opt/app/infra/server/deploy.sh "$sha"
+            EOF
+            chmod 700 /opt/app/bin/deploy
+
+            # Nightly pg_dump to S3, stage and prod only; the script arrives with
+            # the first deploy.
+            . /etc/app.env
+            if [ -n "$BACKUPS_BUCKET" ]; then
+            cat > /etc/systemd/system/app-backup.service <<'EOF'
+            [Unit]
+            Description=Nightly pg_dump to S3
+            Requires=docker.service
+            After=docker.service
+            ConditionPathExists=/opt/app/deployed
+
+            [Service]
+            Type=oneshot
+            ExecStart=/opt/app/infra/server/backup.sh
+            EOF
+            cat > /etc/systemd/system/app-backup.timer <<'EOF'
+            [Timer]
+            OnCalendar=*-*-* 03:00:00 UTC
+            RandomizedDelaySec=15m
+            Persistent=true
+
+            [Install]
+            WantedBy=timers.target
+            EOF
+            systemctl daemon-reload
+            systemctl enable --now app-backup.timer
+            fi
+          - ArtifactsBucket: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ArtifactsBucket' }
+            Registry: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-RegistryUri' }
+            ApiRepository: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ApiRepositoryName' }
+            WebRepository: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-WebRepositoryName' }
+            BackupsBucketName: !If [IsMonitored, !Ref BackupsBucket, '']
+            LogConfig: !If
+              - IsMonitored
+              - !Sub '"log-driver": "awslogs", "log-opts": {"awslogs-region": "${AWS::Region}", "awslogs-group": "${LogGroup}", "tag": "{{.Name}}", "mode": "non-blocking"}'
+              - '"log-driver": "local"'
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachment
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Instance
+      Tags: [{ Key: Name, Value: !Sub 'app-${EnvName}' }]
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: HasAlarmEmail
+    Properties:
+      Subscription: [{ Protocol: email, Endpoint: !Ref AlarmEmail }]
+
+  # Moves the instance to healthy hardware when AWS's own checks fail; the data
+  # volume and Elastic IP follow it.
+  RecoverAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsMonitored
+    Properties:
+      AlarmDescription: !Sub 'app-${EnvName}: system status check failed, recovering'
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Sub 'arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover'
+        - !If [HasAlarmEmail, !Ref AlarmTopic, !Ref 'AWS::NoValue']
+
+  InstanceCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmDescription: !Sub 'app-${EnvName}: instance status check failed'
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_Instance
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Ref AlarmTopic]
+
+  # --- The role GitHub Actions assumes, only from this repository's GitHub
+  # environment of the same name: push images, upload the bundle, and run the
+  # deploy command on this one instance.
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubRepo}:environment:${EnvName}'
+      Policies:
+        - PolicyName: deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeImages
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource:
+                  - { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ApiRepositoryArn' }
+                  - { 'Fn::ImportValue': !Sub '${BootstrapStackName}-WebRepositoryArn' }
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub
+                  - '${Arn}/bundles/*'
+                  - Arn: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ArtifactsBucketArn' }
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript'
+                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Instance}'
+              - Effect: Allow
+                Action: [ssm:GetCommandInvocation, ssm:ListCommandInvocations]
+                Resource: '*'
+              - !If
+                - PromotesImages
+                - Effect: Allow
+                  Action:
+                    - ecr:BatchCheckLayerAvailability
+                    - ecr:BatchGetImage
+                    - ecr:DescribeImages
+                    - ecr:GetDownloadUrlForLayer
+                  Resource:
+                    - { 'Fn::ImportValue': !Sub '${SourceBootstrapStackName}-ApiRepositoryArn' }
+                    - { 'Fn::ImportValue': !Sub '${SourceBootstrapStackName}-WebRepositoryArn' }
+                - !Ref 'AWS::NoValue'
+
+Outputs:
+  Url:
+    Value: !Sub 'https://${Domain}'
+  PublicIp:
+    Description: Point the domain's A record here (Namecheap > Advanced DNS).
+    Value: !Ref ElasticIp
+  InstanceId:
+    Description: GitHub environment variable INSTANCE_ID.
+    Value: !Ref Instance
+  DeployRoleArn:
+    Description: GitHub environment variable AWS_DEPLOY_ROLE_ARN.
+    Value: !GetAtt GitHubDeployRole.Arn
+  BackupsBucketName:
+    Condition: IsMonitored
+    Value: !Ref BackupsBucket
+  LogGroupName:
+    Condition: IsMonitored
+    Value: !Ref LogGroup

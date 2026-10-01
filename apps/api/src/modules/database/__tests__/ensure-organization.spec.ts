@@ -13,7 +13,7 @@ import * as schema from '../schema/index';
 // Needs a real Postgres: the uniqueness of organization.slug and the
 // transaction the helper opens are server behaviours, not something a fake can
 // demonstrate. CI sets DATABASE_ADMIN_URL; locally, export it (pointing at
-// docker/compose.dev.yml) to run these.
+// docker/compose.local.yml) to run these.
 const url = process.env.DATABASE_ADMIN_URL;
 const describeDb = url ? describe : describe.skip;
 

@@ -1,10 +1,10 @@
-# Overlay for the dev server (dev.socialglider.online), on top of compose.yml:
-#   docker compose --env-file apps/api/.env -f docker/compose.yml -f docker/compose.dev.yml …
+# Overlay for the stage server: a prod rehearsal, smaller, on top of compose.yml:
+#   docker compose --env-file apps/api/.env -f docker/compose.yml -f docker/compose.stage.yml …
 #
 # Only what differs per environment belongs here: container sizing, sized to
-# the instance in infra/cloudformation/environments/dev.params (t3.small, 2 GiB).
+# the instance in infra/cloudformation/environments/stage.params (t3.small, 2 GiB).
 # Change the two together. Application settings are not here - they come from
-# Parameter Store under /social-glider/dev/, rendered into apps/api/.env on deploy.
+# Parameter Store under /social-glider/stage/, rendered into apps/api/.env on deploy.
 #
 # Limits leave headroom for the OS and Docker; a container that exceeds one is
 # killed and restarted rather than starving Postgres.

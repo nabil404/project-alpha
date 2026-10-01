@@ -1,10 +1,10 @@
-# Overlay for the dev server (dev.socialglider.online), on top of compose.yml:
-#   docker compose --env-file apps/api/.env -f docker/compose.yml -f docker/compose.dev.yml …
+# Overlay for the production server, on top of compose.yml:
+#   docker compose --env-file apps/api/.env -f docker/compose.yml -f docker/compose.prod.yml …
 #
 # Only what differs per environment belongs here: container sizing, sized to
-# the instance in infra/cloudformation/environments/dev.params (t3.small, 2 GiB).
+# the instance in infra/cloudformation/environments/prod.params (t3.medium, 4 GiB).
 # Change the two together. Application settings are not here - they come from
-# Parameter Store under /social-glider/dev/, rendered into apps/api/.env on deploy.
+# Parameter Store under /social-glider/prod/, rendered into apps/api/.env on deploy.
 #
 # Limits leave headroom for the OS and Docker; a container that exceeds one is
 # killed and restarted rather than starving Postgres.
@@ -13,29 +13,29 @@ services:
     command:
       - postgres
       - -c
-      - shared_buffers=128MB
+      - shared_buffers=512MB
       - -c
-      - effective_cache_size=512MB
+      - effective_cache_size=1536MB
       - -c
-      - max_connections=50
+      - max_connections=100
     deploy:
       resources:
-        limits: { memory: 512M }
+        limits: { memory: 1536M }
 
   redis:
     deploy:
       resources:
-        limits: { memory: 192M }
+        limits: { memory: 384M }
 
   api:
     deploy:
       resources:
-        limits: { memory: 384M }
+        limits: { memory: 768M }
 
   worker:
     deploy:
       resources:
-        limits: { memory: 384M }
+        limits: { memory: 768M }
 
   caddy:
     deploy:

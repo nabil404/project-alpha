@@ -1,11 +1,14 @@
-# Production stack on the single VPS.
+# The server stack, shared by every deployed environment: Caddy, api, worker,
+# Postgres, Redis. Never run on its own - each environment layers its overlay,
+# which sizes the stack to that environment's instance:
+#   docker compose --env-file apps/api/.env \
+#     -f docker/compose.yml -f docker/compose.<dev|stage|prod>.yml up -d
+# infra/server/deploy.sh does exactly that on the server. Local development uses
+# compose.local.yml instead.
 #
 # apps/api/.env is the repo's only env file, and compose needs it passed
-# explicitly - without --env-file it would look for docker/.env instead:
-#   docker compose --env-file apps/api/.env -f docker/compose.yml up -d
-#
-# Staging runs this same file with a separate env file and project name:
-#   docker compose -p app-staging --env-file apps/api/.env.staging -f docker/compose.yml up -d
+# explicitly - without --env-file it would look for docker/.env instead. On a
+# server, deploy.sh renders it from Parameter Store.
 name: app
 
 # apps/api/.env is authored for the host, where localhost is Postgres and Redis;
@@ -28,15 +31,21 @@ x-app-env: &app-env
   DOMAIN: ''
 
 services:
+  # The web image is Caddy with the built SPA in /srv (apps/web/Dockerfile), so
+  # it serves the dashboard itself. On a server the deploy sets WEB_IMAGE and
+  # API_IMAGE to ECR images tagged with the commit; locally they just name what
+  # `build` produces.
   caddy:
-    image: caddy:2-alpine
+    image: ${WEB_IMAGE:-app-web}
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     ports:
       - '80:80'
       - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - web_dist:/srv:ro
       - ../static:/srv/legal:ro
       - caddy_data:/data
       - caddy_config:/config
@@ -45,17 +54,8 @@ services:
     depends_on:
       - api
 
-  web:
-    build:
-      context: ..
-      dockerfile: apps/web/Dockerfile
-    # Builds the SPA into the shared volume Caddy serves, then exits.
-    command: ['sh', '-c', 'cp -r /srv/. /dist/ && echo "spa published"']
-    volumes:
-      - web_dist:/dist
-    restart: 'no'
-
   api:
+    image: ${API_IMAGE:-app-api}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -79,16 +79,32 @@ services:
       retries: 3
 
   worker:
+    image: ${API_IMAGE:-app-api}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
+    # Docker's default 10 s would kill an in-flight LLM extraction on every
+    # deploy; enableShutdownHooks() in worker.ts needs time to finish the job.
+    stop_grace_period: 60s
     env_file: [../apps/api/.env]
     environment: *app-env
     command: ['node', 'dist/worker.js']
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+
+  # Applies migrations as the owner; the deploy runs it before starting a
+  # release (`compose run --rm migrate`). The profile keeps `up` from starting
+  # it. It alone receives the admin URL - the api and worker get it blanked.
+  migrate:
+    image: ${API_IMAGE:-app-api}
+    profiles: [migrate]
+    command: ['node', 'scripts/migrate.mjs']
+    environment:
+      DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-app}
+    depends_on:
+      postgres: { condition: service_healthy }
 
   postgres:
     image: postgres:17-alpine
@@ -129,4 +145,3 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
-  web_dist:

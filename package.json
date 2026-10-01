@@ -14,8 +14,8 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "dev": "pnpm --parallel --filter api --filter web dev",
-    "dev:up": "docker compose --env-file apps/api/.env -f docker/compose.dev.yml up -d",
-    "dev:down": "docker compose --env-file apps/api/.env -f docker/compose.dev.yml down"
+    "dev:up": "docker compose --env-file apps/api/.env -f docker/compose.local.yml up -d",
+    "dev:down": "docker compose --env-file apps/api/.env -f docker/compose.local.yml down"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

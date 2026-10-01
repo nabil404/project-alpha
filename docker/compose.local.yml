@@ -1,0 +1,53 @@
+# Local development: dependencies only - the api, worker, and SPA run on the
+# host with `pnpm dev`. drizzle-kit diffs against snapshots, so it needs no
+# database. The servers (dev, stage, prod) use compose.yml plus their overlay.
+#
+# Interpolated from apps/api/.env, the repo's only env file, so the credentials
+# Postgres is created with and the ones the app connects with cannot drift
+# apart. Compose has to be told where that file is - use `pnpm dev:up` /
+# `pnpm dev:down`, or:
+#   docker compose --env-file apps/api/.env -f docker/compose.local.yml up -d
+#
+# The project keeps its old name, app-dev, so existing local volumes survive the
+# rename from compose.dev.yml.
+name: app-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports: ['5432:5432']
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      # The api and worker connect as this restricted role so that row-level
+      # security applies to them; the owner above is a superuser and bypasses it.
+      APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:?set APP_RUNTIME_PASSWORD}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      # Runs only on a fresh volume. After a `docker compose down -v` the role is
+      # recreated automatically; on an existing volume, see apps/api/.env.example.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+    command: ['redis-server', '--maxmemory-policy', 'noeviction', '--appendonly', 'yes']
+    volumes:
+      - redis_dev_data:/data
+
+  # Catches every email the api sends - verification and password-reset links
+  # included - so auth flows work locally without a real provider. Point
+  # SMTP_URL at smtp://localhost:1025 and read the mail at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1
+    ports: ['1025:1025', '8025:8025']
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
