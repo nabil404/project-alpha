@@ -152,30 +152,6 @@ environment's role with that environment's variables:
 3. Run [`infra/ci/ssm-deploy.sh`](../../infra/ci/ssm-deploy.sh), which sends the SSM command, waits and prints its output.
 4. `curl` the environment's `/health`.
 
-### Infra workflows
-
-The CloudFormation stacks change through pull requests too. The app workflows
-never touch them, and these never touch the app.
-
-| Workflow                                                     | Trigger                                                                              | Does                                                                                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| [`infra-plan.yml`](../../.github/workflows/infra-plan.yml)   | a PR into `develop` or `stage` that touches `infra/cloudformation/**`                | Lints the templates. Previews the change to dev (PRs into `develop`) or stage (PRs into `stage`) in the job summary. |
-| [`infra-dev.yml`](../../.github/workflows/infra-dev.yml)     | push to `develop` changing `environment.yml`, `dev.params` or `deploy.sh`; or manual | Applies the change to `app-dev`.                                                                                     |
-| [`infra-stage.yml`](../../.github/workflows/infra-stage.yml) | the same for `stage` and `stage.params`                                              | Applies the change to `app-stage`.                                                                                   |
-| [`infra-prod.yml`](../../.github/workflows/infra-prod.yml)   | manual, from `main`, for a branch or commit (default `stage`)                        | Previews the change to `app-prod`, waits for a `prod` reviewer who reads that preview, then applies it.              |
-
-All of them run `infra/cloudformation/deploy.sh <env> plan|apply`, the same
-command you can run locally:
-
-- **The preview is a change set:** a list of each resource CloudFormation would add, modify or remove, and whether it would be **replaced**. `plan` discards it; `apply` executes it.
-- **Dangerous replacements are refused.** `apply` won't replace the instance, the data volume or the Elastic IP, because that takes the server down or empties its disk. To allow it on purpose, run the workflow by hand with `allow_replacement`, or locally with `ALLOW_REPLACEMENT=true`.
-- **GitHub never gets IAM-creating permission.** CloudFormation makes every change as the **execution role** in the bootstrap stack. That role may only manage IAM roles named after its own environment stacks. The roles GitHub assumes can only hand change sets to CloudFormation:
-  - the **plan role** (pull requests, or `main` for prod) can create and discard change sets but never execute one;
-  - one **apply role** per environment, trusted only from the GitHub environment of the same name.
-- **Review infra PRs like an admin login.** Whatever a merged template asks for, the execution role builds. Keep `develop` and `stage` protected.
-- **Bootstrap stacks are applied by hand.** They create these roles and the GitHub login itself, so `infra-plan.yml` only reminds you when a PR changes them.
-- **Infra and app deploys run independently.** An infra change that restarts the instance, such as a resize, can fail an app deploy running at the same time; re-run it.
-
 ## Setting up the dev server
 
 You need:
@@ -204,9 +180,8 @@ infra/cloudformation/deploy.sh bootstrap
 ```
 
 Prefix it with `CREATE_OIDC_PROVIDER=false` if the account already has the
-GitHub OIDC provider. Its outputs include the infra workflows' roles:
-`InfraPlanRoleArn`, `InfraDevRoleArn` and `InfraStageRoleArn`. Prod's
-bootstrap, `deploy.sh bootstrap-prod`, waits until prod is set up.
+GitHub OIDC provider. Prod's bootstrap, `deploy.sh bootstrap-prod`, waits until
+prod is set up.
 
 ### 2. Dev environment stack
 
@@ -216,10 +191,8 @@ infra/cloudformation/deploy.sh dev
 
 The first run stops and prints the current Amazon Linux 2023 AMI for your
 region. Put it in `infra/cloudformation/environments/dev.params` as `ImageId=…`
-(and `AlarmEmail=` if you want alarm emails), commit, and run it again. This
-first creation is the only time you run it by hand; afterwards, changes to the
-template or `dev.params` go through a PR and `infra-dev.yml`. It prints the
-stack's outputs. Write down `PublicIp`, `InstanceId` and
+(and `AlarmEmail=` if you want alarm emails), commit, and run it again. It
+prints the stack's outputs. Write down `PublicIp`, `InstanceId` and
 `DeployRoleArn`, plus `ArtifactsBucketName` from the bootstrap output.
 
 ### 3. DNS at Namecheap
@@ -286,18 +259,12 @@ Rules:
 
    | Variable              | Value                                   |
    | --------------------- | --------------------------------------- |
+   | `AWS_REGION`          | your region                             |
    | `AWS_DEPLOY_ROLE_ARN` | `DeployRoleArn` output                  |
    | `INSTANCE_ID`         | `InstanceId` output                     |
    | `ARTIFACTS_BUCKET`    | `ArtifactsBucketName` output, bootstrap |
-   | `AWS_INFRA_ROLE_ARN`  | `InfraDevRoleArn` output, bootstrap     |
 
-3. **Settings → Secrets and variables → Actions → Variables (repository):**
-
-   | Variable                  | Value                                                                                 |
-   | ------------------------- | ------------------------------------------------------------------------------------- |
-   | `AWS_REGION`              | your region. Repository-level, because infra PR previews run outside any environment. |
-   | `AWS_INFRA_PLAN_ROLE_ARN` | `InfraPlanRoleArn` output, bootstrap. Turns on the infra workflows for dev and stage. |
-   | `DEV_DEPLOY_ENABLED`      | `true`. Turns on app deploys to dev.                                                  |
+3. **Settings → Secrets and variables → Actions → Variables (repository):** `DEV_DEPLOY_ENABLED` = `true`.
 
 The next merge to `develop`, or a re-run of its latest CI run, deploys.
 
@@ -308,16 +275,16 @@ The next merge to `develop`, or a re-run of its latest CI run, deploys.
 
 ## Operating a server
 
-| Task                  | How                                                                                                                                                                                                                                                                                                                         |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell on the server   | `aws ssm start-session --target <InstanceId>` (needs the Session Manager plugin), then `sudo -i`.                                                                                                                                                                                                                           |
-| Logs                  | CloudWatch Logs → `/app/<env>`, one stream per container. `aws logs tail /app/dev --follow`.                                                                                                                                                                                                                                |
-| Redeploy a commit     | Re-run its deploy workflow run (or **Run workflow** on `deploy-dev.yml`), or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                                                                                                                               |
-| Compose on the server | `. /opt/app/infra/server/lib.sh && app_compose ps`                                                                                                                                                                                                                                                                          |
-| Backup now            | `systemctl start app-backup.service`, then check `journalctl -u app-backup`.                                                                                                                                                                                                                                                |
-| Restore drill         | Copy a dump from the backups bucket, `pg_restore` it into a scratch `postgres:17-alpine` container, and run `db:verify-rls` against it. Do this once before prod.                                                                                                                                                           |
-| Resize                | In a PR to `develop`, change `InstanceType` in `dev.params` **and** the limits in `docker/compose.dev.yml`. The PR shows the preview, and merging applies both: the instance stops and starts, and data and IP stay.                                                                                                        |
-| OS updates            | Patch in place: `dnf upgrade --releasever=latest`, then reboot. Do **not** bump `ImageId` to patch. A new AMI replaces the instance, which `deploy.sh` refuses by default, and CloudFormation would try to attach the data volume to the new instance while the old one still holds it, so the update fails and rolls back. |
+| Task                  | How                                                                                                                                                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell on the server   | `aws ssm start-session --target <InstanceId>` (needs the Session Manager plugin), then `sudo -i`.                                                                                                                                                                                     |
+| Logs                  | CloudWatch Logs → `/app/<env>`, one stream per container. `aws logs tail /app/dev --follow`.                                                                                                                                                                                          |
+| Redeploy a commit     | Re-run its deploy workflow run (or **Run workflow** on `deploy-dev.yml`), or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                                                                                         |
+| Compose on the server | `. /opt/app/infra/server/lib.sh && app_compose ps`                                                                                                                                                                                                                                    |
+| Backup now            | `systemctl start app-backup.service`, then check `journalctl -u app-backup`.                                                                                                                                                                                                          |
+| Restore drill         | Copy a dump from the backups bucket, `pg_restore` it into a scratch `postgres:17-alpine` container, and run `db:verify-rls` against it. Do this once before prod.                                                                                                                     |
+| Resize                | Change `InstanceType` in `<env>.params` **and** the limits in `docker/compose.<env>.yml`, then `deploy.sh <env>`. The instance stops and starts; data and IP stay.                                                                                                                    |
+| OS updates            | Patch in place: `dnf upgrade --releasever=latest`, then reboot. Do **not** bump `ImageId` to patch. A new AMI replaces the instance, and CloudFormation would try to attach the data volume to the new instance while the old one still holds it, so the update fails and rolls back. |
 
 ## Rough monthly cost (us-east-1 on-demand; Asian regions run about 10–20% higher)
 
@@ -352,8 +319,8 @@ domains are set in `stage.params` / `prod.params` and in the `url` of
    Namecheap's default records for a new domain include a parking-page record on `@`, and often a `www` CNAME. Remove them, or `@` will not resolve to the server. `www.socialglider.online` is not served; Caddy only answers for the domain in `DOMAIN`.
 
 4. Upload `/app/stage/env` and `/app/prod/env`, as in step 4 of the dev setup.
-5. Create the GitHub environments, each with the same four variables as dev, from its own stacks' outputs. `AWS_INFRA_ROLE_ARN` is `InfraStageRoleArn` from `app-bootstrap` for stage, and `InfraProdRoleArn` from `app-bootstrap-prod` for prod. For prod, `ARTIFACTS_BUCKET` also comes from `app-bootstrap-prod`.
+5. Create the GitHub environments, each with the four variables from its own stacks' outputs. For prod, `ARTIFACTS_BUCKET` comes from `app-bootstrap-prod`.
    - `stage`: deployment branch `stage`.
    - `prod`: **required reviewers**, and two more variables, `ECR_API_REPOSITORY=app-prod-api` and `ECR_WEB_REPOSITORY=app-prod-web`. Run `deploy-prod.yml` from the default branch.
-6. Set the repository variables `STAGE_DEPLOY_ENABLED` / `PROD_DEPLOY_ENABLED` to `true`, and `AWS_PROD_INFRA_PLAN_ROLE_ARN` to `InfraPlanRoleArn` from `app-bootstrap-prod`, which turns on `infra-prod.yml`.
+6. Set `STAGE_DEPLOY_ENABLED` / `PROD_DEPLOY_ENABLED` to `true`.
 7. Run the restore drill before prod takes real traffic.
