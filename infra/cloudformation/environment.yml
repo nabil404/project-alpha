@@ -13,7 +13,9 @@ Parameters:
     Description: Also the GitHub environment name and the /app/<env>/ parameter path.
   Domain:
     Type: String
-    Description: Hostname Caddy serves and gets a certificate for, e.g. dev.socialglider.online.
+    Description: >-
+      Hostname Caddy serves, e.g. dev.socialglider.online. Caddy reads DOMAIN
+      from the environment's env file; this records it alongside the stack.
   GitHubRepo:
     Type: String
     Default: nabil404/project-alpha
@@ -223,29 +225,6 @@ Resources:
       LogGroupName: !Sub '/app/${EnvName}'
       RetentionInDays: !If [IsProduction, 30, 14]
 
-  # Non-secret configuration. Secrets are put by hand as SecureString under the
-  # same path - never as stack parameters, which show in events and the console.
-  DomainParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub '/app/${EnvName}/DOMAIN'
-      Type: String
-      Value: !Ref Domain
-
-  PostgresUserParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub '/app/${EnvName}/POSTGRES_USER'
-      Type: String
-      Value: app
-
-  PostgresDbParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub '/app/${EnvName}/POSTGRES_DB'
-      Type: String
-      Value: app
-
   # --- Instance.
   InstanceRole:
     Type: AWS::IAM::Role
@@ -372,24 +351,43 @@ Resources:
             chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
             systemctl enable --now docker
 
-            # CI runs this over SSM Run Command. It only fetches one commit's
-            # bundle and hands over to the deploy script inside it.
-            mkdir -p /opt/app/bin /opt/app/releases
+            # CI runs this over SSM Run Command: unpack one commit's bundle into
+            # /opt/app and run the deploy script it carries.
+            mkdir -p /opt/app/bin
             cat > /opt/app/bin/deploy <<'EOF'
             #!/bin/bash
             set -euo pipefail
             sha="$1"
             [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "usage: deploy <40-character commit sha>" >&2; exit 2; }
             . /etc/app.env
-            release="/opt/app/releases/$sha"
-            rm -rf "$release.tmp"
-            mkdir -p "$release.tmp"
-            aws s3 cp "s3://$ARTIFACTS_BUCKET/bundles/$sha.tgz" - | tar xz -C "$release.tmp"
-            rm -rf "$release"
-            mv "$release.tmp" "$release"
-            exec "$release/infra/server/deploy.sh" "$sha"
+            aws s3 cp "s3://$ARTIFACTS_BUCKET/bundles/$sha.tgz" - | tar xz -C /opt/app
+            exec /opt/app/infra/server/deploy.sh "$sha"
             EOF
             chmod 700 /opt/app/bin/deploy
+
+            # Nightly pg_dump to S3; the script arrives with the first deploy.
+            cat > /etc/systemd/system/app-backup.service <<'EOF'
+            [Unit]
+            Description=Nightly pg_dump to S3
+            Requires=docker.service
+            After=docker.service
+            ConditionPathExists=/opt/app/deployed
+
+            [Service]
+            Type=oneshot
+            ExecStart=/opt/app/infra/server/backup.sh
+            EOF
+            cat > /etc/systemd/system/app-backup.timer <<'EOF'
+            [Timer]
+            OnCalendar=*-*-* 03:00:00 UTC
+            RandomizedDelaySec=15m
+            Persistent=true
+
+            [Install]
+            WantedBy=timers.target
+            EOF
+            systemctl daemon-reload
+            systemctl enable --now app-backup.timer
           - ArtifactsBucket: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ArtifactsBucket' }
             Registry: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-RegistryUri' }
             ApiRepository: { 'Fn::ImportValue': !Sub '${BootstrapStackName}-ApiRepositoryName' }
@@ -508,6 +506,8 @@ Resources:
                 - !Ref 'AWS::NoValue'
 
 Outputs:
+  Url:
+    Value: !Sub 'https://${Domain}'
   PublicIp:
     Description: Point the domain's A record here (Namecheap > Advanced DNS).
     Value: !Ref ElasticIp

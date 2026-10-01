@@ -31,15 +31,21 @@ x-app-env: &app-env
   DOMAIN: ''
 
 services:
+  # The web image is Caddy with the built SPA in /srv (apps/web/Dockerfile), so
+  # it serves the dashboard itself. On a server the deploy sets WEB_IMAGE and
+  # API_IMAGE to ECR images tagged with the commit; locally they just name what
+  # `build` produces.
   caddy:
-    image: caddy:2-alpine
+    image: ${WEB_IMAGE:-app-web}
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     ports:
       - '80:80'
       - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - web_dist:/srv:ro
       - ../static:/srv/legal:ro
       - caddy_data:/data
       - caddy_config:/config
@@ -47,19 +53,6 @@ services:
       DOMAIN: ${DOMAIN}
     depends_on:
       - api
-
-  web:
-    # On a server the deploy sets these to ECR images tagged with the commit
-    # and runs `up --no-build`; locally they just name what `build` produces.
-    image: ${WEB_IMAGE:-app-web}
-    build:
-      context: ..
-      dockerfile: apps/web/Dockerfile
-    # Builds the SPA into the shared volume Caddy serves, then exits.
-    command: ['sh', '-c', 'cp -r /srv/. /dist/ && echo "spa published"']
-    volumes:
-      - web_dist:/dist
-    restart: 'no'
 
   api:
     image: ${API_IMAGE:-app-api}
@@ -101,6 +94,18 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
+  # Applies migrations as the owner; the deploy runs it before starting a
+  # release (`compose run --rm migrate`). The profile keeps `up` from starting
+  # it. It alone receives the admin URL - the api and worker get it blanked.
+  migrate:
+    image: ${API_IMAGE:-app-api}
+    profiles: [migrate]
+    command: ['node', 'scripts/migrate.mjs']
+    environment:
+      DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-app}
+    depends_on:
+      postgres: { condition: service_healthy }
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -140,4 +145,3 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
-  web_dist:

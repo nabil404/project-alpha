@@ -30,7 +30,7 @@ meant to catch.
 share and is never run alone. `docker/compose.<env>.yml` holds only container
 sizing (memory limits, Postgres buffers) matched to that environment's
 instance type. Application settings are not in compose: they come from
-Parameter Store under `/app/<env>/`. `docker/compose.local.yml`, which was
+the one Parameter Store entry `/app/<env>/env`. `docker/compose.local.yml`, which was
 `compose.dev.yml`, stays local-only.
 
 ## Shape
@@ -42,7 +42,7 @@ Parameter Store under `/app/<env>/`. `docker/compose.local.yml`, which was
 | DNS       | Namecheap. Each stack outputs an Elastic IP and you add one A record by hand. Caddy gets the TLS certificate itself.                                                                                                                                                                                                                       |
 | CI → AWS  | GitHub OIDC. No AWS keys are stored in GitHub. Each environment's deploy role trusts only the GitHub environment of the same name in this repository.                                                                                                                                                                                      |
 | Deploy    | Images are built once, by dev or stage, and pushed to ECR tagged with the commit SHA; prod copies them into its own repositories rather than rebuilding. The server never builds and never clones; it pulls images and a small bundle (`docker/`, `static/`, `infra/server/`). The deploy runs over SSM Run Command, so port 22 is closed. |
-| Secrets   | SSM Parameter Store `SecureString` under `/app/<env>/`. On each deploy the server renders `apps/api/.env` (mode 600) from them, so it stays the only env file.                                                                                                                                                                             |
+| Secrets   | One SSM Parameter Store `SecureString` per environment, `/app/<env>/env`, holding the whole env file. On each deploy the server writes it to `apps/api/.env` (mode 600), so that stays the only env file.                                                                                                                                  |
 | Unchanged | Cloudflare R2, the SMTP provider and the LLM provider are reached through env vars as today. Each environment gets its own R2 bucket and its own Meta app.                                                                                                                                                                                 |
 
 ```
@@ -97,22 +97,27 @@ them.
 - **Monitoring:**
   - The log group `/app/<env>`, kept 30 days in prod and 14 elsewhere. Docker's `awslogs` driver sends every container's output there.
   - An alarm that auto-recovers the instance, and optional alarm emails.
-- **Parameters:** the String parameters `DOMAIN`, `POSTGRES_USER` and `POSTGRES_DB`.
 - **Deploy role:** the GitHub deploy role, scoped to the two ECR repositories, the bundle prefix, and `ssm:SendCommand` on this one instance.
 
-UserData runs only at first boot. It mounts the volume, installs Docker and
-the compose plugin, and writes `/opt/app/bin/deploy`. Everything that changes
-later ships in the bundle, so it is reviewed with the code.
+UserData runs only at first boot. It does four things:
 
-**`infra/server/deploy.sh`** runs on the server for each commit. Every compose
-call goes through `compose_in` in `lib.sh`, which adds the overlay for the
+- mounts the volume;
+- installs Docker and the compose plugin;
+- writes `/opt/app/bin/deploy`, which unpacks a commit's bundle into `/opt/app` and runs its `deploy.sh`;
+- installs the nightly backup timer.
+
+Everything that changes later ships in the bundle, so it is reviewed with the
+code.
+
+**`infra/server/deploy.sh`** runs on the server for each commit. Its compose
+calls go through `app_compose` in `lib.sh`, which adds the overlay for the
 server's environment.
 
-1. Render `apps/api/.env` from `/app/<env>/*`. Fail if a required value is missing, or if a database password is not URL-safe.
+1. Write `apps/api/.env` from the one SecureString `/app/<env>/env`, adding the commit's image tags.
 2. Log in to ECR and `docker compose pull`.
-3. Run migrations as the owner (`scripts/migrate.mjs`) while the old release is still serving.
-4. `up -d --no-build`, then wait up to 3 minutes for the api healthcheck and for the worker to be running.
-5. On failure, print the logs, start the previous release's images again and exit non-zero, which turns the CI job red. On success, point `/opt/app/current` at the release, install the backup timer, and keep the last three releases.
+3. `compose run --rm migrate` applies migrations as the owner while the old release is still serving. `migrate` is a compose service behind a profile, and it is the only one that gets the admin URL.
+4. `compose up --wait` starts the release. Compose itself waits up to 3 minutes for every healthcheck to pass and every container to be running.
+5. On failure, print the logs, start the previous commit's images again (recorded in `/opt/app/deployed`) and exit non-zero, which turns the CI job red.
 
 **Rollback restores images, never the database.** A migration must therefore
 work with the previous release still running: add first, remove in a later
@@ -201,39 +206,51 @@ In **Domain List → socialglider.online → Manage → Advanced DNS**, add:
 Check it with `dig +short dev.socialglider.online`. Caddy can't get a
 certificate until this resolves, but the deploy itself doesn't wait for it.
 
-### 4. Secrets
+### 4. The env file
 
-Each one is a `SecureString` under `/app/dev/`. The names match
-`apps/api/src/config/env.schema.ts`; `DOMAIN`, `POSTGRES_USER` and
-`POSTGRES_DB` already exist from the stack.
+All of an environment's settings live in **one** `SecureString`,
+`/app/<env>/env`. It holds a normal `.env` file in the same format as
+`apps/api/.env`, and the deploy writes it to the server as it is. Write it
+locally, outside the repo, and upload it:
 
 ```sh
-put() { aws ssm put-parameter --name "/app/dev/$1" --type SecureString --value "$2" --overwrite; }
+cat > ~/dev.env <<ENV
+DOMAIN=dev.socialglider.online
+POSTGRES_USER=app
+POSTGRES_DB=app
+POSTGRES_PASSWORD=$(openssl rand -hex 32)
+APP_RUNTIME_PASSWORD=$(openssl rand -hex 32)
+BETTER_AUTH_SECRET=$(openssl rand -base64 32)
+TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)
+META_VERIFY_TOKEN=$(openssl rand -hex 24)
+META_APP_SECRET=…
+META_GRAPH_VERSION=v21.0
+SMTP_URL=smtp://user:pass@smtp.provider.com:587
+MAIL_FROM="Social Glider <no-reply@socialglider.online>"
+STORAGE_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+STORAGE_BUCKET=…
+STORAGE_ACCESS_KEY_ID=…
+STORAGE_SECRET_ACCESS_KEY=…
+STORAGE_PUBLIC_BASE_URL=…
+LLM_API_KEY=…
+ENV
 
-put POSTGRES_PASSWORD     "$(openssl rand -hex 32)"
-put APP_RUNTIME_PASSWORD  "$(openssl rand -hex 32)"
-put BETTER_AUTH_SECRET    "$(openssl rand -base64 32)"
-put TOKEN_ENCRYPTION_KEY  "$(openssl rand -base64 32)"
-put META_APP_SECRET       '…'
-put META_VERIFY_TOKEN     "$(openssl rand -hex 24)"
-put META_GRAPH_VERSION    'v21.0'
-put SMTP_URL              'smtp://user:pass@smtp.provider.com:587'
-put MAIL_FROM             'Social Glider <no-reply@socialglider.online>'
-put STORAGE_ENDPOINT      'https://<account>.r2.cloudflarestorage.com'
-put STORAGE_BUCKET        '…'      # this environment's bucket only
-put STORAGE_ACCESS_KEY_ID '…'
-put STORAGE_SECRET_ACCESS_KEY '…'
-put STORAGE_PUBLIC_BASE_URL '…'
-put LLM_API_KEY           '…'
-# Optional: META_APP_ID, GOOGLE_CLIENT_ID/SECRET, FACEBOOK_CLIENT_ID/SECRET,
-# LOG_LEVEL, WORKER_CONCURRENCY, SENTRY_DSN
+aws ssm put-parameter --name /app/dev/env --type SecureString \
+  --value file://$HOME/dev.env --overwrite
 ```
+
+Optional keys are the same as in `apps/api/.env.example`: `META_APP_ID`,
+`GOOGLE_*`, `FACEBOOK_*`, `LOG_LEVEL`, `WORKER_CONCURRENCY` and `SENTRY_DSN`.
+You don't need `DATABASE_URL`, `REDIS_URL` or `APP_URL`; `docker/compose.yml`
+derives them.
 
 Rules:
 
-- Values may not contain a single quote or a newline. The deploy refuses them.
-- `POSTGRES_PASSWORD` and `APP_RUNTIME_PASSWORD` are set **before the first deploy and never changed afterwards**. Postgres reads them only when its data volume is empty; changing one later needs `ALTER ROLE` by hand.
-- A secret change takes effect on the next deploy.
+- **Database passwords:** use `openssl rand -hex`. They go into connection URLs unencoded.
+- **Never change the database passwords.** `POSTGRES_PASSWORD` and `APP_RUNTIME_PASSWORD` are set before the first deploy and stay that way. Postgres reads them only when its data volume is empty; changing one later needs `ALTER ROLE` by hand.
+- **Changes take effect on the next deploy.** To edit, fetch the file with `aws ssm get-parameter --name /app/dev/env --with-decryption --query Parameter.Value --output text`, change it, and upload it again.
+- **Size limit:** a standard parameter holds 4 KB, far more than this file needs.
+- **Delete the local copy** once it's uploaded.
 
 ### 5. GitHub
 
@@ -263,7 +280,7 @@ The next merge to `develop`, or a re-run of its latest CI run, deploys.
 | Shell on the server   | `aws ssm start-session --target <InstanceId>` (needs the Session Manager plugin), then `sudo -i`.                                                                                                                                                                                     |
 | Logs                  | CloudWatch Logs → `/app/<env>`, one stream per container. `aws logs tail /app/dev --follow`.                                                                                                                                                                                          |
 | Redeploy a commit     | Re-run its deploy workflow run (or **Run workflow** on `deploy-dev.yml`), or on the server: `/opt/app/bin/deploy <full sha>`.                                                                                                                                                         |
-| Compose on the server | `cd /opt/app/current && . infra/server/lib.sh && compose_in . ps`                                                                                                                                                                                                                     |
+| Compose on the server | `. /opt/app/infra/server/lib.sh && app_compose ps`                                                                                                                                                                                                                                    |
 | Backup now            | `systemctl start app-backup.service`, then check `journalctl -u app-backup`.                                                                                                                                                                                                          |
 | Restore drill         | Copy a dump from the backups bucket, `pg_restore` it into a scratch `postgres:17-alpine` container, and run `db:verify-rls` against it. Do this once before prod.                                                                                                                     |
 | Resize                | Change `InstanceType` in `<env>.params` **and** the limits in `docker/compose.<env>.yml`, then `deploy.sh <env>`. The instance stops and starts; data and IP stay.                                                                                                                    |
@@ -301,7 +318,7 @@ domains are set in `stage.params` / `prod.params` and in the `url` of
 
    Namecheap's default records for a new domain include a parking-page record on `@`, and often a `www` CNAME. Remove them, or `@` will not resolve to the server. `www.socialglider.online` is not served; Caddy only answers for the domain in `DOMAIN`.
 
-4. Add the `/app/stage/` and `/app/prod/` secrets.
+4. Upload `/app/stage/env` and `/app/prod/env`, as in step 4 of the dev setup.
 5. Create the GitHub environments, each with the four variables from its own stacks' outputs. For prod, `ARTIFACTS_BUCKET` comes from `app-bootstrap-prod`.
    - `stage`: deployment branch `stage`.
    - `prod`: **required reviewers**, and two more variables, `ECR_API_REPOSITORY=app-prod-api` and `ECR_WEB_REPOSITORY=app-prod-web`. Run `deploy-prod.yml` from the default branch.
