@@ -14,6 +14,9 @@ Parameters:
     Description: >-
       An account holds one provider per URL. Set false if
       token.actions.githubusercontent.com already exists in this account.
+  GitHubRepo:
+    Type: String
+    Default: nabil404/project-alpha
 
 Conditions:
   CreateOidc: !Equals [!Ref CreateOidcProvider, 'true']
@@ -94,7 +97,199 @@ Resources:
               - !Sub '${ArtifactsBucket.Arn}/*'
             Condition: { Bool: { 'aws:SecureTransport': 'false' } }
 
+  # --- Infra workflows (docs/architecture/deployment.md, "Infra workflows").
+  # CloudFormation applies changes to app-dev and app-stage as this role, so the roles
+  # GitHub assumes below only hand change sets to CloudFormation; none of them
+  # can create IAM roles itself. It manages only IAM roles and instance
+  # profiles named after those stacks, which CloudFormation's generated names
+  # are. Anything a merged template asks for, it does - so review infra PRs as
+  # you would an AWS admin login.
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: !Sub 'CloudFormation applies app-dev and app-stage as this role (${AWS::StackName})'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudformation.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/PowerUserAccess'
+      Policies:
+        - PolicyName: environment-iam
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:AttachRolePolicy
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:DeleteRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:GetRole
+                  - iam:GetRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListInstanceProfilesForRole
+                  - iam:ListRolePolicies
+                  - iam:PassRole
+                  - iam:PutRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:UpdateRole
+                  - iam:UpdateRoleDescription
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/app-dev-*'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/app-stage-*'
+              - Effect: Allow
+                Action:
+                  - iam:AddRoleToInstanceProfile
+                  - iam:CreateInstanceProfile
+                  - iam:DeleteInstanceProfile
+                  - iam:GetInstanceProfile
+                  - iam:RemoveRoleFromInstanceProfile
+                  - iam:TagInstanceProfile
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/app-dev-*'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/app-stage-*'
+
+  # Previews changes on pull requests (infra-plan.yml). Creates and discards change sets; cannot execute one.
+  InfraPlanRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubRepo}:pull_request'
+      Policies:
+        - PolicyName: plan
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DescribeStacks
+                  - cloudformation:TagResource
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/app-dev/*'
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/app-stage/*'
+              # Finds the execution role in this stack's outputs.
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+                Condition:
+                  StringEquals: { 'iam:PassedToService': cloudformation.amazonaws.com }
+
+  # Applies app-dev from the `dev` GitHub environment only.
+  InfraDevRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubRepo}:environment:dev'
+      Policies:
+        - PolicyName: apply
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStacks
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:TagResource
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/app-dev/*'
+              # Finds the execution role in this stack's outputs.
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+                Condition:
+                  StringEquals: { 'iam:PassedToService': cloudformation.amazonaws.com }
+
+  # Applies app-stage from the `stage` GitHub environment only.
+  InfraStageRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubRepo}:environment:stage'
+      Policies:
+        - PolicyName: apply
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStacks
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:TagResource
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/app-stage/*'
+              # Finds the execution role in this stack's outputs.
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+                Condition:
+                  StringEquals: { 'iam:PassedToService': cloudformation.amazonaws.com }
+
 Outputs:
+  CloudFormationExecutionRoleArn:
+    Description: Read by infra/cloudformation/deploy.sh.
+    Value: !GetAtt CloudFormationExecutionRole.Arn
+  InfraPlanRoleArn:
+    Description: GitHub repository variable AWS_INFRA_PLAN_ROLE_ARN.
+    Value: !GetAtt InfraPlanRole.Arn
+  InfraDevRoleArn:
+    Description: Variable AWS_INFRA_ROLE_ARN of the `dev` GitHub environment.
+    Value: !GetAtt InfraDevRole.Arn
+  InfraStageRoleArn:
+    Description: Variable AWS_INFRA_ROLE_ARN of the `stage` GitHub environment.
+    Value: !GetAtt InfraStageRole.Arn
   ApiRepositoryName:
     Value: !Ref ApiRepository
     Export: { Name: !Sub '${AWS::StackName}-ApiRepositoryName' }

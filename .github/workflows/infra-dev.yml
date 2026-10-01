@@ -1,0 +1,51 @@
+name: Infra dev
+
+# Applies CloudFormation changes to app-dev when they reach develop: the
+# template, dev.params, or the script that applies them. Bootstrap stacks are
+# applied by hand. Run it manually with allow_replacement to let a change
+# replace the instance, its data volume or its IP, which deploy.sh otherwise
+# refuses.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - infra/cloudformation/environment.yml
+      - infra/cloudformation/environments/dev.params
+      - infra/cloudformation/deploy.sh
+  workflow_dispatch:
+    inputs:
+      allow_replacement:
+        description: Allow replacing the instance, data volume or IP
+        type: boolean
+        default: false
+
+concurrency:
+  group: infra-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    name: Apply app-dev
+    runs-on: ubuntu-latest
+    # Set once app-bootstrap has the infra roles.
+    if: vars.AWS_INFRA_PLAN_ROLE_ARN != '' && github.ref == 'refs/heads/develop'
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Trusted only from the `dev` GitHub environment, and only for app-dev.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Apply
+        env:
+          ALLOW_REPLACEMENT: ${{ inputs.allow_replacement && 'true' || '' }}
+        run: infra/cloudformation/deploy.sh dev apply

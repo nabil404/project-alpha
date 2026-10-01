@@ -1,0 +1,66 @@
+name: Infra prod
+
+# Manual only. Previews the CloudFormation changes to app-prod from a branch
+# (stage by default, what prod's app is promoted from), then waits for a `prod`
+# environment reviewer, who reads the preview in this run's summary, before
+# applying them. Bootstrap stacks are applied by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit whose infra/cloudformation to apply
+        type: string
+        default: stage
+      allow_replacement:
+        description: Allow replacing the instance, data volume or IP
+        type: boolean
+        default: false
+
+concurrency:
+  group: infra-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Preview app-prod
+    runs-on: ubuntu-latest
+    # Set once app-bootstrap-prod has the infra roles. The plan role trusts
+    # runs started from main only.
+    if: vars.AWS_PROD_INFRA_PLAN_ROLE_ARN != '' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PROD_INFRA_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: infra/cloudformation/deploy.sh prod plan
+
+  apply:
+    name: Apply app-prod
+    needs: plan
+    runs-on: ubuntu-latest
+    # Required reviewers approve here, after reading the preview above.
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Apply
+        env:
+          ALLOW_REPLACEMENT: ${{ inputs.allow_replacement && 'true' || '' }}
+        run: infra/cloudformation/deploy.sh prod apply
