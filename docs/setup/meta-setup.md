@@ -31,10 +31,10 @@ Meta does not let the consumer **Facebook Login** use case share an app with
 the **Messenger** use case ("Some use cases can't be combined on the same
 app"). So there are two apps per environment:
 
-| App                                              | Use case                                                       | Used for                                             |
-| ------------------------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------- |
-| **Sign-in app**, e.g. `Messenger to Order Login` | _Authenticate and request data from users with Facebook Login_ | "Continue with Facebook" (`public_profile`, `email`) |
-| **Messenger app**, e.g. `Messenger to Order`     | _Engage with customers on Messenger from Meta_                 | Page connection and the Messenger webhook            |
+| App                                         | Use case                                                       | Used for                                             |
+| ------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| **Sign-in app**, e.g. `Social Glider Login` | _Authenticate and request data from users with Facebook Login_ | "Continue with Facebook" (`public_profile`, `email`) |
+| **Messenger app**, e.g. `Social Glider`     | _Engage with customers on Messenger from Meta_                 | Page connection and the Messenger webhook            |
 
 The Page connection **must** go through the Messenger app. Page access tokens
 and webhook subscriptions belong to the app that obtained them, and the webhook
@@ -100,7 +100,7 @@ their Facebook sign-in identity.
 ### 2. Create the sign-in app
 
 1. Go to <https://developers.facebook.com/apps> → **Create app**.
-2. App name: for example `Messenger to Order Login (dev)`. Contact email: a
+2. App name: for example `Social Glider Login (dev)`. Contact email: a
    team inbox.
 3. **Use cases:** select **Authenticate and request data from users with
    Facebook Login** only.
@@ -141,7 +141,7 @@ If Facebook still answers "URL blocked" locally, see
 ### 4. Create the Messenger app
 
 1. Back at <https://developers.facebook.com/apps> → **Create app**.
-2. App name: for example `Messenger to Order (dev)`.
+2. App name: for example `Social Glider (dev)`.
 3. **Use cases:** select **Engage with customers on Messenger from Meta**. If
    the dashboard asks for an app type instead, choose **Business**.
 4. **Business:** skip or connect, as in step 2.
@@ -338,8 +338,8 @@ restart the API and worker.
 ## Environments
 
 Create a separate pair of apps per environment (for example
-`Messenger to Order Login (dev)` + `Messenger to Order (dev)`, and
-`Messenger to Order Login` + `Messenger to Order`), each with its own redirect
+`Social Glider Login (dev)` + `Social Glider (dev)`, and
+`Social Glider Login` + `Social Glider`), each with its own redirect
 URIs, webhook URL, App Secrets and verify token. A leaked development secret
 then cannot forge production webhooks.
 

@@ -30,7 +30,7 @@ const SESSION_COOKIE = 'better-auth.session_token';
  */
 export async function setupOpenApi(app: INestApplication, auth: Auth): Promise<void> {
   const config = new DocumentBuilder()
-    .setTitle('Messenger-to-Order API')
+    .setTitle('Social Glider API')
     .setDescription(
       'Seller dashboard API, Messenger webhook and Better Auth. Every error is the coded ' +
         'envelope `{ error: { code, message, params } }`.\n\n' +

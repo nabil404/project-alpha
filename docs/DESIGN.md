@@ -4,7 +4,7 @@ The seller dashboard (`apps/web`) is a calm, rounded admin panel: titles lead,
 body copy follows, and nothing competes with the seller's orders.
 
 - **Live reference** (previews of every component in each theme):
-  [Messenger-to-Order design system](https://claude.ai/artifact/9SnvbLDLkpRqKURDoLnpfm)
+  [Social Glider design system](https://claude.ai/artifact/9SnvbLDLkpRqKURDoLnpfm)
 - **Source of truth in code:** [`apps/web/src/index.css`](../apps/web/src/index.css)
   — every token below is defined there. If this document and `index.css`
   disagree, `index.css` wins; fix this document.

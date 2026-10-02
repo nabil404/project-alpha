@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens — the Messenger-to-Order design system.
+ * Design tokens — the Social Glider design system.
  *
  * Components use the semantic names below (bg-surface, text-ink-muted,
  * bg-accent …), never raw colours and never `dark:` variants. A theme is one

@@ -1,4 +1,4 @@
-# Messenger-to-Order — Agent Instructions
+# Social Glider — Agent Instructions
 
 Turns Facebook/Messenger customer conversations into confirmed orders for
 sellers on Facebook Pages. What each MVP builds and why — scope, rules and
