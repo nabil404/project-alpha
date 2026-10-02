@@ -1,4 +1,4 @@
-# Messenger-to-Order
+# Social Glider
 
 Turns Facebook/Messenger conversations into confirmed orders. Product context,
 non-negotiable rules, and database rules live in [docs/mvp/](./docs/mvp/README.md);

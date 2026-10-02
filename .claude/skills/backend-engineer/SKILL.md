@@ -1,12 +1,12 @@
 ---
 name: backend-engineer
-description: Backend engineering conventions for apps/api, the NestJS API and worker behind the Messenger-to-Order MVP (Drizzle, drizzle-kit migrations, BullMQ + Redis, Better Auth, Meta Messenger webhooks, LLM order extraction). Use this skill for ANY backend work — writing a repository or query, changing the schema, adding a module, wiring a queue job, handling a webhook, calling the LLM, or adding config. Trigger it even when the user doesn't name the stack explicitly. Calling the LLM inside a database transaction, or a repository method that forgets merchantId, is a stuck connection pool or a cross-seller data leak rather than a style nit, so consult this before writing code rather than after.
+description: Backend engineering conventions for apps/api, the NestJS API and worker behind the Social Glider MVP (Drizzle, drizzle-kit migrations, BullMQ + Redis, Better Auth, Meta Messenger webhooks, LLM order extraction). Use this skill for ANY backend work — writing a repository or query, changing the schema, adding a module, wiring a queue job, handling a webhook, calling the LLM, or adding config. Trigger it even when the user doesn't name the stack explicitly. Calling the LLM inside a database transaction, or a repository method that forgets merchantId, is a stuck connection pool or a cross-seller data leak rather than a style nit, so consult this before writing code rather than after.
 ---
 
 # Backend Engineer
 
 Backend conventions for **`apps/api`** — the NestJS API and background worker
-behind the Messenger-to-Order MVP. Stack is \*\*NestJS 12 · TypeScript · Postgres
+behind the Social Glider MVP. Stack is \*\*NestJS 12 · TypeScript · Postgres
 
 - Drizzle · drizzle-kit migrations · BullMQ + Redis · Better Auth · Zod\*\*.
 
