@@ -5,6 +5,7 @@
       "activity": "Signed in {{signedIn}} · Active {{active}}",
       "description": "Sign out anywhere you don't recognise.",
       "device": "{{browser}} on {{os}}",
+      "signedOut": "Signed out of that device.",
       "signOut": "Sign out",
       "signOutLabel": "Sign out {{device}}",
       "thisDevice": "This device",
@@ -55,6 +56,7 @@
     "unlink": {
       "confirm": "Unlink",
       "description": "You won't be able to sign in with {{name}} until you link it again. Your connected Facebook Page isn't affected.",
+      "done": "{{name}} unlinked.",
       "title": "Unlink {{name}}?"
     }
   },
@@ -69,6 +71,7 @@
     "choose": {
       "cancel": "Cancel",
       "connect": "Connect",
+      "connected": "{{name}} connected.",
       "description": "Pick the Page customers message to order from you.",
       "empty": "Facebook didn't give us access to any Page. Start again and select your Page on Facebook.",
       "noMessaging": "Your role on this Page doesn't include messaging.",
@@ -107,6 +110,7 @@
     "disconnect": {
       "confirm": "Disconnect Page",
       "description": "The assistant stops reading and answering chats on {{name}}. Orders already created stay here.",
+      "done": "{{name}} disconnected.",
       "title": "Disconnect this Page?"
     },
     "notConnected": {

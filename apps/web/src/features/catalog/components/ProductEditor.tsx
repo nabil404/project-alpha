@@ -37,6 +37,7 @@ import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { ApiError } from '@/lib/api-error';
 import { applyServerFieldErrors, useZodResolver } from '@/lib/form';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 import { emptyProduct, toDocument, toFormValues, type ProductFormValues } from '../product-form';
@@ -71,6 +72,7 @@ export function ProductEditor({ product }: { product?: Product }) {
   const { forError, forField } = useErrorMessages();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const create = useCreateProduct();
   const save = useSaveProduct();
   const [baseVersion, setBaseVersion] = useState(product?.version);
@@ -132,6 +134,8 @@ export function ProductEditor({ product }: { product?: Product }) {
       create.mutate(document, {
         onSuccess: (created) => {
           form.reset(toFormValues(created));
+          // The page swaps to the new product's, so the inline "Saved" never shows.
+          toast.success(t('editor.created'));
           void leave(() =>
             navigate({
               to: '/catalog/products/$productId',

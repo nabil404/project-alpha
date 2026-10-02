@@ -8,6 +8,7 @@
   "delete": {
     "confirm": "Delete product",
     "description": "Its variants and photos go with it. This can't be undone. If you only want to stop selling it, set its status to Archived instead.",
+    "done": "{{name}} deleted.",
     "title": "Delete {{name}}?"
   },
   "editor": {
@@ -20,6 +21,7 @@
     },
     "backToCatalog": "Back to catalog",
     "breadcrumb": "Breadcrumb",
+    "created": "Product created.",
     "leave": {
       "confirm": "Leave without saving",
       "description": "Your changes to this product haven't been saved.",
