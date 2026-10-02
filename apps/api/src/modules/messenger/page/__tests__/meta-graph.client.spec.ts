@@ -233,6 +233,29 @@ describe('MetaGraphClient', () => {
       expect((error as GraphError).message).not.toContain('page-token');
     });
 
+    it("names Facebook's subcode and reason, with token-shaped text masked", async () => {
+      const leaked = 'EAAG'.padEnd(60, 'x');
+      const client = new MetaGraphClient(
+        settings,
+        fakeFetch({
+          status: 400,
+          body: {
+            error: {
+              code: 2022,
+              error_subcode: 2018108,
+              message: `This person isn't available right now (${leaked})`,
+            },
+          },
+        }).fn,
+      );
+
+      const error = await client.sendText('page-token', 'psid-1', 'hi').catch((e: unknown) => e);
+      expect(error).toMatchObject({ status: 400, graphCode: 2022, graphSubcode: 2018108 });
+      expect((error as GraphError).message).toBe(
+        "Graph POST /me/messages failed with 400 (code 2022, subcode 2018108): This person isn't available right now ([redacted])",
+      );
+    });
+
     it('fails a send answered without a message id', async () => {
       const client = new MetaGraphClient(
         settings,
