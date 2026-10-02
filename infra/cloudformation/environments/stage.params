@@ -9,4 +9,3 @@ BackupRetentionDays=14
 # Pinned: a changed ImageId replaces the instance. deploy.sh prints the current
 # Amazon Linux 2023 AMI when this is empty.
 ImageId=
-AlarmEmail=

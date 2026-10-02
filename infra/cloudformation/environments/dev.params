@@ -1,6 +1,6 @@
 # Parameters for stack social-glider-dev (environment.yml). One KEY=VALUE per line.
-# Dev has no backups, CloudWatch logs or alarms, so it sets none of their
-# parameters (BackupRetentionDays, AlarmEmail).
+# Dev has no backups or CloudWatch logs, so it sets none of their
+# parameters (BackupRetentionDays).
 # Deploy with: infra/cloudformation/deploy.sh dev
 EnvName=dev
 Domain=dev.socialglider.online
