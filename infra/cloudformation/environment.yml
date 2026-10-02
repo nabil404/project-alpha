@@ -82,7 +82,7 @@ Resources:
       CidrBlock: 10.40.0.0/16
       EnableDnsSupport: true
       EnableDnsHostnames: true
-      Tags: [{ Key: Name, Value: !Sub 'app-${EnvName}' }]
+      Tags: [{ Key: Name, Value: !Sub 'social-glider-${EnvName}' }]
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -100,7 +100,7 @@ Resources:
       CidrBlock: 10.40.0.0/24
       AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
-      Tags: [{ Key: Name, Value: !Sub 'app-${EnvName}-public' }]
+      Tags: [{ Key: Name, Value: !Sub 'social-glider-${EnvName}-public' }]
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -148,8 +148,8 @@ Resources:
       VolumeType: gp3
       Encrypted: true
       Tags:
-        - { Key: Name, Value: !Sub 'app-${EnvName}-data' }
-        - { Key: 'app:snapshot', Value: !Sub '${EnvName}-data' }
+        - { Key: Name, Value: !Sub 'social-glider-${EnvName}-data' }
+        - { Key: 'social-glider:snapshot', Value: !Sub '${EnvName}-data' }
 
   DataVolumeAttachment:
     Type: AWS::EC2::VolumeAttachment
@@ -176,12 +176,12 @@ Resources:
     Type: AWS::DLM::LifecyclePolicy
     Condition: IsMonitored
     Properties:
-      Description: !Sub 'Daily snapshots of app-${EnvName}-data'
+      Description: !Sub 'Daily snapshots of social-glider-${EnvName}-data'
       State: ENABLED
       ExecutionRoleArn: !GetAtt SnapshotRole.Arn
       PolicyDetails:
         ResourceTypes: [VOLUME]
-        TargetTags: [{ Key: 'app:snapshot', Value: !Sub '${EnvName}-data' }]
+        TargetTags: [{ Key: 'social-glider:snapshot', Value: !Sub '${EnvName}-data' }]
         Schedules:
           - Name: daily
             CreateRule: { Interval: 24, IntervalUnit: HOURS, Times: ['03:30'] }
@@ -250,7 +250,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Policies:
-        - PolicyName: app-runtime
+        - PolicyName: social-glider-runtime
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -315,7 +315,7 @@ Resources:
         - DeviceName: /dev/xvda
           Ebs: { VolumeSize: 20, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
       Tags:
-        - { Key: Name, Value: !Sub 'app-${EnvName}' }
+        - { Key: Name, Value: !Sub 'social-glider-${EnvName}' }
         - { Key: 'social-glider:env', Value: !Ref EnvName }
       # First boot only. Anything that changes later ships in the deploy bundle
       # (infra/server/), so it is versioned and reviewed with the code.
@@ -422,7 +422,7 @@ Resources:
     Properties:
       Domain: vpc
       InstanceId: !Ref Instance
-      Tags: [{ Key: Name, Value: !Sub 'app-${EnvName}' }]
+      Tags: [{ Key: Name, Value: !Sub 'social-glider-${EnvName}' }]
 
   AlarmTopic:
     Type: AWS::SNS::Topic
@@ -436,7 +436,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: IsMonitored
     Properties:
-      AlarmDescription: !Sub 'app-${EnvName}: system status check failed, recovering'
+      AlarmDescription: !Sub 'social-glider-${EnvName}: system status check failed, recovering'
       Namespace: AWS/EC2
       MetricName: StatusCheckFailed_System
       Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
@@ -453,7 +453,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasAlarmEmail
     Properties:
-      AlarmDescription: !Sub 'app-${EnvName}: instance status check failed'
+      AlarmDescription: !Sub 'social-glider-${EnvName}: instance status check failed'
       Namespace: AWS/EC2
       MetricName: StatusCheckFailed_Instance
       Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
