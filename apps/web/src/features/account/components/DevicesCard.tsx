@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { ApiError } from '@/lib/api-error';
 import { useFormatters } from '@/lib/format';
+import { useToast } from '@/lib/toast';
 
 import { deviceSessionsQueryOptions, useRevokeDeviceSession } from '../queries';
 import { CardSkeleton } from './CardSkeleton';
@@ -20,6 +21,7 @@ export function DevicesCard() {
   const { t } = useTranslation('settings');
   const { forError } = useErrorMessages();
   const sessions = useQuery(deviceSessionsQueryOptions());
+  const toast = useToast();
   const revoke = useRevokeDeviceSession();
 
   if (sessions.isPending) {
@@ -49,7 +51,12 @@ export function DevicesCard() {
             // One mutation serves every row, so a second click would move its
             // variables off the row still being signed out.
             disabled={revoke.isPending}
-            onSignOut={() => revoke.mutate(session.id)}
+            onSignOut={() =>
+              revoke.mutate(session.id, {
+                // The row just drops off the list; say why.
+                onSuccess: () => toast.success(t('account.devices.signedOut')),
+              })
+            }
           />
         ))}
       </ul>

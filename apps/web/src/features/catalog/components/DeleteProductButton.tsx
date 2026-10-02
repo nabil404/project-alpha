@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
+import { useToast } from '@/lib/toast';
 
 import { useDeleteProduct } from '../queries';
 
@@ -34,6 +35,7 @@ export function DeleteProductButton({
   const { t } = useTranslation(['catalog', 'common']);
   const { forError } = useErrorMessages();
   const [open, setOpen] = useState(false);
+  const toast = useToast();
   const remove = useDeleteProduct(productId);
 
   return (
@@ -67,7 +69,15 @@ export function DeleteProductButton({
             type="button"
             variant="danger"
             disabled={remove.isPending}
-            onClick={() => remove.mutate(undefined, { onSuccess: onDeleted })}
+            onClick={() =>
+              remove.mutate(undefined, {
+                onSuccess: () => {
+                  // The seller is sent back to the catalog, where nothing else says it worked.
+                  toast.success(t('delete.done', { name }));
+                  onDeleted();
+                },
+              })
+            }
           >
             {t('delete.confirm')}
           </Button>
