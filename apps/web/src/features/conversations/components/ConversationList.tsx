@@ -106,7 +106,7 @@ export function ConversationList({
         ) : (
           <ul className="flex flex-col divide-y divide-border lg:gap-0.5 lg:divide-y-0">
             {conversations.map((conversation) => (
-              <li key={conversation.id}>
+              <li key={conversation.id} className="animate-in fade-in-0 duration-200">
                 <ConversationRow
                   conversation={conversation}
                   selected={conversation.id === selectedId}

@@ -135,7 +135,11 @@ function FormMessage({ className, ...props }: React.ComponentProps<'p'>) {
     <p
       data-slot="form-message"
       id={formMessageId}
-      className={cn('text-small text-danger', className)}
+      className={cn(
+        'text-small text-danger',
+        error && 'animate-in fade-in-0 duration-200',
+        className,
+      )}
       {...props}
     >
       {body}

@@ -19,7 +19,7 @@ function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxP
     >
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"
-        className="grid place-content-center text-current"
+        className="grid place-content-center text-current animate-in fade-in-0 duration-[120ms]"
       >
         <CheckIcon className="size-3.5" strokeWidth={2} />
       </CheckboxPrimitive.Indicator>

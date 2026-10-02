@@ -188,7 +188,7 @@ function MessageBubble({
   return (
     <div
       className={cn(
-        'flex max-w-[82%] flex-col gap-1 lg:max-w-[70%]',
+        'flex max-w-[82%] flex-col gap-1 animate-in fade-in-0 duration-200 lg:max-w-[70%]',
         inbound ? 'items-start self-start' : 'items-end self-end',
       )}
     >

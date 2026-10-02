@@ -57,10 +57,10 @@ function MobileTopBar() {
         </span>
       </header>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-overlay lg:hidden" />
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-overlay data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 duration-200 lg:hidden" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed inset-y-0 left-0 z-50 w-75 max-w-[calc(100%-3rem)] overflow-y-auto rounded-r-xl bg-surface p-4 text-ink shadow-popover lg:hidden"
+          className="fixed inset-y-0 left-0 z-50 w-75 max-w-[calc(100%-3rem)] overflow-y-auto rounded-r-xl bg-surface p-4 text-ink shadow-popover data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 duration-200 lg:hidden"
         >
           <Dialog.Title className="sr-only">{t('nav.menu')}</Dialog.Title>
           <SidebarContent

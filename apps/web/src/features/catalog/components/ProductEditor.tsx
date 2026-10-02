@@ -189,7 +189,7 @@ export function ProductEditor({ product }: { product?: Product }) {
   const stale = mutation.error instanceof ApiError && mutation.error.code === 'PRODUCT_STALE';
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 animate-in fade-in-0 duration-200">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
           <header className="flex flex-col gap-1">
