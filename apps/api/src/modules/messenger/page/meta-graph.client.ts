@@ -50,6 +50,7 @@ export class GraphError extends Error {
     readonly status: number,
     readonly graphCode: number | undefined,
     message: string,
+    readonly graphSubcode?: number,
   ) {
     super(message);
     this.name = 'GraphError';
@@ -253,17 +254,41 @@ export class MetaGraphClient {
     }
 
     if (!response.ok) {
-      const graphError = (body as { error?: { code?: unknown; message?: unknown } } | undefined)
-        ?.error;
+      const graphError = (
+        body as
+          { error?: { code?: unknown; error_subcode?: unknown; message?: unknown } } | undefined
+      )?.error;
       const graphCode = typeof graphError?.code === 'number' ? graphError.code : undefined;
+      const graphSubcode =
+        typeof graphError?.error_subcode === 'number' ? graphError.error_subcode : undefined;
+      const detail = [
+        graphCode === undefined ? undefined : `code ${graphCode}`,
+        graphSubcode === undefined ? undefined : `subcode ${graphSubcode}`,
+      ].filter(Boolean);
+      const reason =
+        typeof graphError?.message === 'string' ? scrubGraphMessage(graphError.message) : '';
       throw new GraphError(
         response.status,
         graphCode,
-        `Graph ${method} ${path} failed with ${response.status}${graphCode === undefined ? '' : ` (code ${graphCode})`}`,
+        `Graph ${method} ${path} failed with ${response.status}${detail.length ? ` (${detail.join(', ')})` : ''}${reason ? `: ${reason}` : ''}`,
+        graphSubcode,
       );
     }
     return body as T;
   }
+}
+
+/**
+ * Facebook's own error text names the cause a code alone does not, but it is
+ * external input headed for the logs: anything token-shaped is masked and the
+ * length capped, so a message that echoes a credential cannot leak it.
+ */
+function scrubGraphMessage(message: string): string {
+  return message
+    .replace(/[A-Za-z0-9_\-.|]{32,}/g, '[redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
 }
 
 /** HMAC-SHA256 of the token keyed with the app secret, as Graph's "Require App Secret" setting expects. */
