@@ -66,7 +66,9 @@ EC2 app-<env> (Elastic IP; 80/443 open, no SSH)
 
 **`bootstrap.yml`** (stack `social-glider-bootstrap`) creates what dev and stage share:
 
-- the GitHub OIDC provider;
+- the GitHub OIDC provider, retained on delete: deleting the stack, or
+  updating it with `CreateOidcProvider=false`, leaves it in the account, so
+  recreating the stack afterwards needs `CreateOidcProvider=false`;
 - ECR repositories `social-glider-api` and `social-glider-web` (immutable tags, scan on push, keep 30 images);
 - the artifacts bucket for deploy bundles, which expire after 30 days.
 
