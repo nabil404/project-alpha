@@ -194,6 +194,59 @@ commit, and run it again. It
 prints the stack's outputs. Write down `PublicIp`, `InstanceId` and
 `DeployRoleArn`, plus `ArtifactsBucketName` from the bootstrap output.
 
+### Steps 1–2 by hand, in the console
+
+`deploy.sh` is only a wrapper around `aws cloudformation deploy`; you can skip
+it and create both stacks in the AWS Console. Do this in the same region you
+would have put in `AWS_REGION`: check the region selector at the top right
+before each stack.
+
+**Stack 1: bootstrap**
+
+1. Open **CloudFormation → Stacks → Create stack → With new resources (standard)**.
+2. **Specify template:** _Upload a template file_ → choose `infra/cloudformation/bootstrap.yml` → **Next**.
+3. **Stack name:** exactly `social-glider-bootstrap`. The environment stacks look it up by this name (`BootstrapStackName`).
+4. **Parameters:** leave `CreateOidcProvider` at `true`. Set it to `false` if the account already has the GitHub OIDC provider (**IAM → Identity providers**, `token.actions.githubusercontent.com`); a second one fails the stack.
+5. **Next** through _Configure stack options_ with the defaults.
+6. On the review page, tick **I acknowledge that AWS CloudFormation might create IAM resources**, then **Submit**.
+7. Wait for `CREATE_COMPLETE` (a minute or two). Open the **Outputs** tab and note `ArtifactsBucketName`.
+
+**Stack 2: dev environment**
+
+1. Find the current Amazon Linux 2023 AMI for your region: **Systems Manager → Parameter Store**, open `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` and copy its value (`ami-…`). Then open `infra/cloudformation/environments/dev.params`, set `ImageId=` to it, and commit. Skipping the commit leaves the file out of step with the stack.
+2. **CloudFormation → Create stack → With new resources**, upload `infra/cloudformation/environment.yml`, **Next**.
+3. **Stack name:** `social-glider-dev`.
+4. **Parameters:** enter the values from `dev.params`:
+
+   | Parameter           | Value                     |
+   | ------------------- | ------------------------- |
+   | `EnvName`           | `dev`                     |
+   | `Domain`            | `dev.socialglider.online` |
+   | `ImageId`           | the AMI from step 1       |
+   | `InstanceType`      | `t3.small`                |
+   | `DataVolumeSizeGiB` | `20`                      |
+
+   Leave every other parameter at its default. In particular, keep
+   `BootstrapStackName` as `social-glider-bootstrap`, leave
+   `SourceBootstrapStackName` empty and don't touch `GitHubRepo`; it is the
+   immutable-subject form `owner@id/name@id` and a plain `owner/name` makes
+   every deploy fail with "Not authorized to perform sts:AssumeRoleWithWebIdentity".
+
+5. **Next.** Under **Tags**, add key `social-glider:env`, value `dev`. Everything else stays at the defaults.
+6. Tick the IAM acknowledgement and **Submit**.
+7. Wait for `CREATE_COMPLETE` (about 5 minutes). If it ends in `ROLLBACK_COMPLETE`, read the **Events** tab for the first `CREATE_FAILED` row, delete the stack and create it again; a rolled-back stack can't be updated.
+8. From the **Outputs** tab, note `PublicIp`, `InstanceId` and `DeployRoleArn`.
+
+To change the stack later (for example a resize), open it, choose **Update →
+Make a direct update → Replace existing template**, upload the current
+`environment.yml`, adjust the parameters and submit. Keep `dev.params` in step
+with what you entered.
+
+For stage and prod, repeat the same steps with that environment's params file;
+prod needs its own bootstrap first (`bootstrap-prod.yml`, stack name
+`social-glider-bootstrap-prod`) and sets the two bootstrap parameters listed in
+[Later: stage and prod](#later-stage-and-prod).
+
 ### 3. DNS at Namecheap
 
 In **Domain List → socialglider.online → Manage → Advanced DNS**, add:
