@@ -3,7 +3,7 @@ Description: >-
   One environment (dev, stage or prod): a single EC2 instance running
   docker/compose.yml plus that environment's overlay, its data volume, the
   role GitHub Actions assumes to deploy to it, and - for stage and prod, not
-  dev - backups, CloudWatch logs and alarms. Deployed per
+  dev - backups and CloudWatch logs. Deployed per
   environment with infra/cloudformation/deploy.sh <env>, which reads
   environments/<env>.params. See docs/architecture/deployment.md.
 
@@ -58,19 +58,11 @@ Parameters:
     Type: String
     Default: v2.32.4
     Description: docker compose plugin release; Amazon Linux 2023 does not package it.
-  AlarmEmail:
-    Type: String
-    Default: ''
-    Description: >-
-      Optional, stage and prod only. Receives instance alarms; confirm the
-      subscription email.
 
 Conditions:
   IsProduction: !Equals [!Ref EnvName, prod]
-  # Dev is disposable: no backups, no CloudWatch logs, no alarms. Stage and
-  # prod get all three.
+  # Dev is disposable: no backups, no CloudWatch logs. Stage and prod get both.
   IsMonitored: !Not [!Equals [!Ref EnvName, dev]]
-  HasAlarmEmail: !And [!Condition IsMonitored, !Not [!Equals [!Ref AlarmEmail, '']]]
   PromotesImages: !Not [!Equals [!Ref SourceBootstrapStackName, '']]
 
 Resources:
@@ -423,46 +415,6 @@ Resources:
       Domain: vpc
       InstanceId: !Ref Instance
       Tags: [{ Key: Name, Value: !Sub 'social-glider-${EnvName}' }]
-
-  AlarmTopic:
-    Type: AWS::SNS::Topic
-    Condition: HasAlarmEmail
-    Properties:
-      Subscription: [{ Protocol: email, Endpoint: !Ref AlarmEmail }]
-
-  # Moves the instance to healthy hardware when AWS's own checks fail; the data
-  # volume and Elastic IP follow it.
-  RecoverAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Condition: IsMonitored
-    Properties:
-      AlarmDescription: !Sub 'social-glider-${EnvName}: system status check failed, recovering'
-      Namespace: AWS/EC2
-      MetricName: StatusCheckFailed_System
-      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
-      Statistic: Maximum
-      Period: 60
-      EvaluationPeriods: 2
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      AlarmActions:
-        - !Sub 'arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover'
-        - !If [HasAlarmEmail, !Ref AlarmTopic, !Ref 'AWS::NoValue']
-
-  InstanceCheckAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Condition: HasAlarmEmail
-    Properties:
-      AlarmDescription: !Sub 'social-glider-${EnvName}: instance status check failed'
-      Namespace: AWS/EC2
-      MetricName: StatusCheckFailed_Instance
-      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
-      Statistic: Maximum
-      Period: 60
-      EvaluationPeriods: 3
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      AlarmActions: [!Ref AlarmTopic]
 
   # --- The role GitHub Actions assumes, only from this repository's GitHub
   # environment of the same name: push images, upload the bundle, and run the

@@ -95,7 +95,6 @@ them.
 - **Stage and prod only** (dev is disposable, so it gets none of these):
   - **Backups:** DLM takes daily snapshots of the data volume and keeps 7, and an S3 bucket receives the nightly `pg_dump`.
   - **Logs:** the log group `/social-glider/<env>`, kept 30 days in prod and 14 in stage. Docker's `awslogs` driver sends every container's output there. On dev, logs stay on the instance (Docker's `local` driver, rotated), readable with `app_compose logs`.
-  - **Alarms:** an alarm that recovers the instance when AWS's system check fails, and optional alarm emails. EC2 still recovers dev from hardware failures on its own, without an alarm.
 - **Deploy role:** the GitHub deploy role, scoped to the two ECR repositories, the bundle prefix, and `ssm:SendCommand` on this one instance.
 
 UserData runs only at first boot. It does four things:
