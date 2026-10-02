@@ -19,7 +19,13 @@ Parameters:
       from the environment's env file; this records it alongside the stack.
   GitHubRepo:
     Type: String
-    Default: nabil404/project-alpha
+    Default: nabil404@53196922/project-alpha@1380995215
+    Description: >-
+      The repository as it appears in GitHub's OIDC subject claim, after
+      "repo:". This repository uses immutable subject claims (Settings ->
+      Actions -> General -> Subject claim), so it is owner@id/name@id, not
+      owner/name. A mismatch fails the deploy with "Not authorized to perform
+      sts:AssumeRoleWithWebIdentity".
   BootstrapStackName:
     Type: String
     Default: social-glider-bootstrap
