@@ -19,9 +19,13 @@ Conditions:
   CreateOidc: !Equals [!Ref CreateOidcProvider, 'true']
 
 Resources:
+  # Retained: every stack in the account trusts it, so deleting this stack or
+  # flipping CreateOidcProvider to false must not take it down with them.
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
     Condition: CreateOidc
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Url: https://token.actions.githubusercontent.com
       ClientIdList: [sts.amazonaws.com]
