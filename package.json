@@ -1,5 +1,6 @@
 {
   "name": "social-glider",
+  "version": "1.0.0",
   "description": "Turns Facebook Messenger customer conversations into confirmed orders for sellers on Facebook Pages.",
   "private": true,
   "type": "module",
