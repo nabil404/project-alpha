@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
+import { useToast } from '@/lib/toast';
 
 import { useDisconnectPage } from '../queries';
 
@@ -22,6 +23,7 @@ export function DisconnectPageDialog({ pageName }: { pageName: string }) {
   const { t } = useTranslation(['settings', 'common']);
   const { forError } = useErrorMessages();
   const [open, setOpen] = useState(false);
+  const toast = useToast();
   const disconnect = useDisconnectPage();
 
   return (
@@ -53,7 +55,14 @@ export function DisconnectPageDialog({ pageName }: { pageName: string }) {
           <Button
             variant="danger"
             disabled={disconnect.isPending}
-            onClick={() => disconnect.mutate(undefined, { onSuccess: () => setOpen(false) })}
+            onClick={() =>
+              disconnect.mutate(undefined, {
+                onSuccess: () => {
+                  setOpen(false);
+                  toast.success(t('messenger.disconnect.done', { name: pageName }));
+                },
+              })
+            }
           >
             {t('messenger.disconnect.confirm')}
           </Button>

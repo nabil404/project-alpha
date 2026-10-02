@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
+import { useToast } from '@/lib/toast';
 
 import { useConnectPage, usePageCandidates, useStartPageConnect } from '../queries';
 import { PageAvatar } from './PageAvatar';
@@ -21,6 +22,7 @@ export function ChoosePageCard({
   const { t } = useTranslation('settings');
   const { forError } = useErrorMessages();
   const candidates = usePageCandidates(true);
+  const toast = useToast();
   const connect = useConnectPage();
   const startAgain = useStartPageConnect();
   const failure = candidates.error ?? connect.error ?? startAgain.error;
@@ -62,7 +64,17 @@ export function ChoosePageCard({
                 <Button
                   disabled={!page.canMessage || connect.isPending}
                   aria-label={`${label} ${page.name}`}
-                  onClick={() => connect.mutate({ pageId: page.pageId }, { onSuccess: onDone })}
+                  onClick={() =>
+                    connect.mutate(
+                      { pageId: page.pageId },
+                      {
+                        onSuccess: () => {
+                          toast.success(t('messenger.choose.connected', { name: page.name }));
+                          onDone();
+                        },
+                      },
+                    )
+                  }
                 >
                   {label}
                 </Button>

@@ -8,6 +8,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useFormatters } from '@/lib/format';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 import { useConversation, useMarkRead, useUpdateConversation } from '../queries';
@@ -95,14 +96,15 @@ function ThreadHeader({
   assistantActive: boolean;
 }) {
   const { t } = useTranslation('conversations');
-  const { forError } = useErrorMessages();
+  const toast = useToast();
   const customerName = useCustomerName();
   const update = useUpdateConversation(conversation.id);
   const modeLabel = assistantActive ? t('thread.mode.assistant') : t('thread.mode.seller');
   const toggle = (
     <Button
       disabled={update.isPending}
-      onClick={() => update.mutate({ botPaused: assistantActive })}
+      // A toast, not a banner: on a phone a banner pushes the whole thread down.
+      onClick={() => update.mutate({ botPaused: assistantActive }, { onError: toast.error })}
       className="max-sm:h-8 max-sm:px-3 max-sm:text-label"
     >
       {assistantActive ? t('thread.takeOver') : t('thread.handBack')}
@@ -138,10 +140,6 @@ function ThreadHeader({
         <span className="grow text-label">{modeLabel}</span>
         {toggle}
       </div>
-
-      {update.isError && (
-        <ErrorBanner className="mx-4 mt-3 lg:mx-6">{forError(update.error)}</ErrorBanner>
-      )}
     </>
   );
 }

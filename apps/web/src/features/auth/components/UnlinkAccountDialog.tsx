@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
+import { useToast } from '@/lib/toast';
 
 import { useUnlinkAccount, type SocialProvider } from '../queries';
 
@@ -33,6 +34,7 @@ export function UnlinkAccountDialog({
   const { t } = useTranslation(['settings', 'common']);
   const { forError } = useErrorMessages();
   const [open, setOpen] = useState(false);
+  const toast = useToast();
   const unlink = useUnlinkAccount();
   const name = t(`account.signInMethods.providers.${provider}`);
 
@@ -65,7 +67,14 @@ export function UnlinkAccountDialog({
           <Button
             variant="danger"
             disabled={unlink.isPending}
-            onClick={() => unlink.mutate(accountId, { onSuccess: () => setOpen(false) })}
+            onClick={() =>
+              unlink.mutate(accountId, {
+                onSuccess: () => {
+                  setOpen(false);
+                  toast.success(t('account.unlink.done', { name }));
+                },
+              })
+            }
           >
             {t('account.unlink.confirm')}
           </Button>
