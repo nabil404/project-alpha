@@ -56,7 +56,7 @@ Go to **APIs & Services → OAuth consent screen** (shown as **Google Auth
 Platform** in newer consoles) and click **Get started**.
 
 1. **App information**
-   - App name: the name sellers will see, for example `Messenger to Order`.
+   - App name: the name sellers will see, for example `Social Glider`.
    - User support email: a team inbox.
 2. **Audience:** choose **External**. (Internal is only for Google Workspace
    users inside your own organization.)

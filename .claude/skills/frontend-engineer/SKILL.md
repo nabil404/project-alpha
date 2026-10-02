@@ -1,12 +1,12 @@
 ---
 name: frontend-engineer
-description: Frontend engineering conventions for apps/web, the seller dashboard of the Messenger-to-Order MVP (React 19, Vite, TanStack Router, TanStack Query, Tailwind v4, shadcn/ui, react-hook-form, Zod schemas from @app/shared). Use this skill for ANY work in apps/web — adding a page or route, building or editing a form, wiring a query or mutation, adding a shadcn component, rendering prices or order statuses, or writing a component test. Trigger it even when the user doesn't name the stack explicitly. Getting the data layer, the shared-schema rule, or money formatting wrong here duplicates validation that must stay in sync with the API, or does float math on currency, so consult this before writing code rather than after.
+description: Frontend engineering conventions for apps/web, the seller dashboard of the Social Glider MVP (React 19, Vite, TanStack Router, TanStack Query, Tailwind v4, shadcn/ui, react-hook-form, Zod schemas from @app/shared). Use this skill for ANY work in apps/web — adding a page or route, building or editing a form, wiring a query or mutation, adding a shadcn component, rendering prices or order statuses, or writing a component test. Trigger it even when the user doesn't name the stack explicitly. Getting the data layer, the shared-schema rule, or money formatting wrong here duplicates validation that must stay in sync with the API, or does float math on currency, so consult this before writing code rather than after.
 ---
 
 # Frontend Engineer
 
 Frontend conventions for **`apps/web`**, the seller dashboard of the
-Messenger-to-Order MVP. Stack is **React 19 · Vite · TypeScript · TanStack Router
+Social Glider MVP. Stack is **React 19 · Vite · TypeScript · TanStack Router
 · TanStack Query · Tailwind CSS v4 · shadcn/ui · react-hook-form + Zod**.
 
 `AGENTS.md` at the repo root and the current MVP under `docs/mvp/` are the
