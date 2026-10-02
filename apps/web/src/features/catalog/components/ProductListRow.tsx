@@ -65,7 +65,7 @@ export function ProductListRow({
 
   return (
     <>
-      <tr className="border-t border-border">
+      <tr className="border-t border-border animate-in fade-in-0 duration-200">
         <td className="w-12 py-3 pr-0 pl-4 align-middle">
           {!single && (
             <Button

@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /*
  * Design tokens — the Social Glider design system.
@@ -170,5 +171,19 @@
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+
+  /* Honour the OS "reduce motion" setting everywhere. Durations go near zero
+   * rather than to `none`, so animationend still fires and Radix unmounts
+   * closing overlays instead of leaving them stuck open. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

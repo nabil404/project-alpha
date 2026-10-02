@@ -25,6 +25,7 @@ function PopoverContent({
         sideOffset={sideOffset}
         className={cn(
           'z-50 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface p-4 text-ink shadow-popover outline-hidden',
+          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 duration-200',
           className,
         )}
         {...props}
