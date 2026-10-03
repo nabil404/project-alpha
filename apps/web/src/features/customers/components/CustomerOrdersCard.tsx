@@ -6,7 +6,6 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { PaginationBar } from '@/components/PaginationBar';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
-import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -84,7 +83,7 @@ export function CustomerOrdersCard({ customerId }: { customerId: string }) {
                 <span className="flex justify-between gap-2 text-body">
                   <span className="min-w-0">{itemsLabel(order.items)}</span>
                   <span className="font-medium whitespace-nowrap tabular-nums">
-                    {formatMoney(order.total, SHOP_CURRENCY)}
+                    {formatMoney(order.total)}
                   </span>
                 </span>
                 <span className="text-small text-ink-muted">
@@ -122,7 +121,7 @@ export function CustomerOrdersCard({ customerId }: { customerId: string }) {
                     </td>
                     <td className="px-4 py-3 text-body">{itemsLabel(order.items)}</td>
                     <td className="px-4 py-3 text-right text-body whitespace-nowrap tabular-nums">
-                      {formatMoney(order.total, SHOP_CURRENCY)}
+                      {formatMoney(order.total)}
                     </td>
                     <td className="px-4 py-3">
                       <OrderStatusBadge status={order.status} />

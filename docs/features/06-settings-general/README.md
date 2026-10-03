@@ -7,8 +7,10 @@ canvas. Data model:
 [Merchant settings](../../mvp/01-messenger-to-order/domain.md#data-model).
 This page describes what is built.
 
-**Status (Oct 2026):** API built. The dashboard page at `/settings` is not
-wired to it yet.
+**Status (Oct 2026):** built end to end: the API, and the dashboard page at
+`/settings/general` (Settings now opens on it). Every page's money and dates
+follow the shop's region through `ShopRegionProvider` in
+`apps/web/src/features/settings`.
 
 ## Routes (session + TenantGuard unless noted)
 
@@ -60,10 +62,28 @@ Everything regional is a code - ISO 3166 country, ISO 4217 currency, IANA zone
 - **Dates** render through `formatShopDate()` (date-fns + `@date-fns/tz`) in
   the shop's zone and format, never the viewer's machine's.
 
+## Dashboard
+
+- **Shop profile card:** logo (same checks as the profile photo, before
+  upload), name, contact phone and pickup address. The phone is a searchable
+  calling code picker plus the national number, emitted as one E.164 string;
+  a saved number reads back in national format under its own country's code.
+- **Region card:** searchable pickers for country (matches other names, such
+  as "USA"), currency and time zone (the country's own zones first, each with
+  its current GMT offset), a date format list previewing today's date, and the
+  person's dashboard language. Picking a country fills in its currency (unless
+  locked), time zone and date format. A changed currency warns that prices
+  keep their numbers; a locked one says why it can't change. Names come from
+  `Intl.DisplayNames` in the dashboard's language.
+- **Everywhere else:** `useFormatters()` reads the shop's region:
+  `formatMoney` defaults to the shop's currency, dates render with date-fns
+  in the shop's zone and format, and the conversation day separators and
+  "today" checks use the shop's midnight. A currency change refetches every
+  cached amount. The dashboard switches to the person's language, or the
+  shop country's, when one is set.
+
 ## Follow-ups
 
-- Wire the dashboard page, and move `apps/web` money and date formatting onto
-  the shop's settings (`SHOP_CURRENCY` is still hardcoded) and date-fns.
 - Sign-up's `phoneSchema` still accepts any 7–15 digits as typed; move it to
   `e164PhoneSchema` with a calling code picker.
 - Only the owner should change these once a shop has teammates; there is no

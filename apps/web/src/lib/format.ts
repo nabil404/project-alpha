@@ -1,36 +1,73 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatMinorUnits, formatMinorUnitsAmount, type MinorUnits } from '@app/shared';
+import { TZDate } from '@date-fns/tz';
+import { differenceInCalendarDays, format, type Locale } from 'date-fns';
+import { enGB, enUS } from 'date-fns/locale';
+import {
+  formatMinorUnits,
+  formatMinorUnitsAmount,
+  type DateFormat,
+  type MinorUnits,
+} from '@app/shared';
 
 import i18n from '@/i18n';
+import { useShopRegion } from '@/lib/shop-region';
 
 /**
- * Named presets rather than raw Intl options at call sites, so every date in
- * the dashboard renders the same way.
+ * Named presets rather than raw patterns at call sites, so every date in the
+ * dashboard renders the same way. `date` is the shop's chosen format; the
+ * shorter ones keep its day/month order. `p` is date-fns' localized time
+ * ("8:05 PM", "20:05").
  */
-const DATE_PRESETS = {
-  date: { dateStyle: 'medium' },
-  dayMonth: { month: 'short', day: 'numeric' },
-  monthYear: { month: 'short', year: 'numeric' },
-  dateTime: { dateStyle: 'medium', timeStyle: 'short' },
-  time: { timeStyle: 'short' },
-} as const satisfies Record<string, Intl.DateTimeFormatOptions>;
+export type DatePreset = 'date' | 'dayMonth' | 'monthYear' | 'dateTime' | 'time';
 
-export type DatePreset = keyof typeof DATE_PRESETS;
+const MONTH_FIRST: ReadonlySet<DateFormat> = new Set(['MMM d, yyyy', 'MM/dd/yyyy']);
 
-// Constructing an Intl formatter is the expensive part; the format call is not.
-const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
-
-function dateTimeFormatter(locale: string, preset: DatePreset): Intl.DateTimeFormat {
-  const cacheKey = `${locale}:${preset}`;
-  const cached = dateTimeFormatters.get(cacheKey);
-  if (cached) {
-    return cached;
+function datePattern(preset: DatePreset, dateFormat: DateFormat): string {
+  switch (preset) {
+    case 'date':
+      return dateFormat;
+    case 'dayMonth':
+      return MONTH_FIRST.has(dateFormat) || dateFormat === 'yyyy-MM-dd' ? 'MMM d' : 'd MMM';
+    case 'monthYear':
+      return 'MMM yyyy';
+    case 'dateTime':
+      return `${dateFormat}, p`;
+    case 'time':
+      return 'p';
   }
+}
 
-  const formatter = new Intl.DateTimeFormat(locale, DATE_PRESETS[preset]);
-  dateTimeFormatters.set(cacheKey, formatter);
-  return formatter;
+/**
+ * date-fns locales for month names and the time format, by the dashboard's
+ * language tag. Only the ones a shipped translation can produce are bundled;
+ * add one with its locale files.
+ */
+const DATE_FNS_LOCALES: Readonly<Record<string, Locale>> = {
+  en: enUS,
+  'en-US': enUS,
+  'en-GB': enGB,
+};
+
+export function dateFnsLocale(tag: string): Locale {
+  return DATE_FNS_LOCALES[tag] ?? DATE_FNS_LOCALES[tag.split('-')[0] ?? ''] ?? enUS;
+}
+
+/**
+ * The language tag as Intl will take it. A browser can report one Intl
+ * rejects - a POSIX locale comes through as 'en-US@posix' - and every
+ * formatter would throw on it; the part before '@' is tried, then English.
+ */
+export function intlLocale(tag: string): string {
+  for (const candidate of [tag, tag.split('@')[0] ?? '']) {
+    try {
+      const [canonical] = Intl.getCanonicalLocales(candidate);
+      if (canonical) return canonical;
+    } catch {
+      // not a BCP-47 tag; try the next
+    }
+  }
+  return 'en';
 }
 
 const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>();
@@ -45,56 +82,71 @@ function relativeTimeFormatter(locale: string): Intl.RelativeTimeFormat {
   return formatter;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Local midnight, so "yesterday" means the calendar day, not 24 hours ago. */
-function startOfDay(value: Date): number {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
-}
-
 /**
- * The seam between i18next's active language and the framework-agnostic Intl
- * helpers in @app/shared — which must never import i18next themselves, so the
- * locale crosses that boundary as a plain BCP-47 string. Components use this so
- * a language change re-renders every formatted value.
+ * The seam between i18next's active language, the shop's region and the
+ * framework-agnostic helpers in @app/shared — which must never import i18next
+ * themselves, so the locale crosses that boundary as a plain BCP-47 string.
+ * Components use this so a language or region change re-renders every
+ * formatted value.
+ *
+ * Money defaults to the shop's currency and dates to the shop's time zone and
+ * format: the same order reads the same on a laptop in Dhaka and one abroad.
  */
 export function useFormatters() {
   const { i18n: instance } = useTranslation();
   // The full tag with region ('en-GB'), not resolvedLanguage — Intl wants the
   // region to pick currency and date conventions.
-  const locale = instance.language;
+  const locale = intlLocale(instance.language);
+  const { currency: shopCurrency, timeZone, dateFormat } = useShopRegion();
 
   const formatMoney = useCallback(
-    (amount: MinorUnits, currency: string): string => formatMinorUnits(amount, currency, locale),
-    [locale],
+    (amount: MinorUnits, currency: string = shopCurrency): string =>
+      formatMinorUnits(amount, currency, locale),
+    [locale, shopCurrency],
   );
 
   /** Without the currency, for a table whose header names it ("Price (৳)"). */
   const formatAmount = useCallback(
-    (amount: MinorUnits, currency: string): string =>
+    (amount: MinorUnits, currency: string = shopCurrency): string =>
       formatMinorUnitsAmount(amount, currency, locale),
-    [locale],
+    [locale, shopCurrency],
   );
 
   const formatDate = useCallback(
     (value: Date | string | number, preset: DatePreset = 'date'): string =>
-      dateTimeFormatter(locale, preset).format(new Date(value)),
-    [locale],
+      format(new TZDate(new Date(value).getTime(), timeZone), datePattern(preset, dateFormat), {
+        locale: dateFnsLocale(locale),
+      }),
+    [locale, timeZone, dateFormat],
+  );
+
+  /** Calendar days from `now` to `value` in the shop's zone: 0 today, -1 yesterday. */
+  const dayOffset = useCallback(
+    (value: Date | string | number, now: Date = new Date()): number =>
+      differenceInCalendarDays(
+        new TZDate(new Date(value).getTime(), timeZone),
+        new TZDate(now.getTime(), timeZone),
+      ),
+    [timeZone],
+  );
+
+  /** Whether two instants fall on the same day in the shop's zone. */
+  const isSameDay = useCallback(
+    (a: Date | string | number, b: Date | string | number = new Date()): boolean =>
+      dayOffset(a, new Date(b)) === 0,
+    [dayOffset],
   );
 
   /** "today", "yesterday", "3 days ago" — for values only accurate to the day. */
   const formatRelativeDay = useCallback(
-    (value: Date | string | number, now: Date = new Date()): string => {
-      // Rounded: a DST change makes one calendar day 23 or 25 hours long.
-      const days = Math.round((startOfDay(new Date(value)) - startOfDay(now)) / DAY_MS);
-      return relativeTimeFormatter(locale).format(days, 'day');
-    },
-    [locale],
+    (value: Date | string | number, now: Date = new Date()): string =>
+      relativeTimeFormatter(locale).format(dayOffset(value, now), 'day'),
+    [locale, dayOffset],
   );
 
   /** "৳" for BDT: the prefix inside an amount field. */
   const currencySymbol = useCallback(
-    (currency: string): string =>
+    (currency: string = shopCurrency): string =>
       new Intl.NumberFormat(locale, {
         style: 'currency',
         currency,
@@ -102,7 +154,7 @@ export function useFormatters() {
       })
         .formatToParts(0)
         .find((part) => part.type === 'currency')?.value ?? currency,
-    [locale],
+    [locale, shopCurrency],
   );
 
   /** A count with the locale's grouping: "1,284". */
@@ -150,6 +202,7 @@ export function useFormatters() {
       formatAmount,
       formatDate,
       formatRelativeDay,
+      isSameDay,
       currencySymbol,
       formatFileSize,
       formatNumber,
@@ -162,6 +215,7 @@ export function useFormatters() {
       formatAmount,
       formatDate,
       formatRelativeDay,
+      isSameDay,
       currencySymbol,
       formatFileSize,
       formatNumber,
@@ -177,5 +231,5 @@ export function useFormatters() {
  * re-render on a language change.
  */
 export function currentLocale(): string {
-  return i18n.language;
+  return intlLocale(i18n.language);
 }

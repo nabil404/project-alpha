@@ -63,6 +63,42 @@
   "breadcrumb": {
     "label": "Breadcrumb"
   },
+  "general": {
+    "noMatch": "No matches.",
+    "profile": {
+      "callingCode": "Country calling code",
+      "description": "Customers see this in order summaries and receipts.",
+      "logo": "Shop logo",
+      "logoAlt": "Shop logo",
+      "logoHint": "Square PNG, JPG or WebP, at least {{minSide}} × {{minSide}} px.",
+      "name": "Shop name",
+      "phone": "Contact phone",
+      "pickupAddress": "Pickup address",
+      "removeLogo": "Remove",
+      "searchCountry": "Search country or code",
+      "title": "Shop profile",
+      "uploadLogo": "Upload logo"
+    },
+    "region": {
+      "country": "Country",
+      "currency": "Currency",
+      "currencyChange": "Prices keep their numbers in the new currency. Nothing is converted.",
+      "currencyLocked": "Fixed once your shop has taken an order.",
+      "dateFormat": "Date format",
+      "description": "Your shop can be in any country. This sets the currency, time zone, phone code and date format, and you can change each one below.",
+      "language": "Dashboard language",
+      "languageAuto": "Same as shop country ({{language}})",
+      "languageHint": "Just for you. Teammates choose their own.",
+      "otherZones": "All time zones",
+      "searchCountry": "Search countries",
+      "searchCurrency": "Search currencies",
+      "searchTimeZone": "Search time zones",
+      "timeZone": "Time zone",
+      "title": "Region",
+      "zonesIn": "In {{country}}"
+    },
+    "saved": "Saved."
+  },
   "header": {
     "description": "Your shop, your Messenger Page and how the order assistant works.",
     "title": "Settings"
