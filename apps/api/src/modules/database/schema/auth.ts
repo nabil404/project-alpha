@@ -13,6 +13,7 @@ export const user = pgTable('user', {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   phone: text('phone'),
+  locale: text('locale'),
 });
 
 export const session = pgTable(

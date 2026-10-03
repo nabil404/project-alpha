@@ -37,6 +37,13 @@ export const errorCodes = [
   'SESSION_NOT_FOUND',
   'SESSION_IS_CURRENT',
 
+  // Settings > General
+  'CURRENCY_LOCKED',
+  'LOGO_UNSUPPORTED_TYPE',
+  'LOGO_INVALID',
+  'LOGO_TOO_LARGE',
+  'LOGO_TOO_SMALL',
+
   // Tenancy
   'TENANT_NO_ACTIVE_MERCHANT',
 

@@ -41,6 +41,7 @@ export async function seedOrder(
       subtotal,
       deliveryCharge,
       total: subtotal + deliveryCharge,
+      currency: 'BDT',
       customerName: 'Nusrat Jahan',
       phone: '01712-345678',
       deliveryAddress: 'House 12, Road 4, Mirpur 10, Dhaka',

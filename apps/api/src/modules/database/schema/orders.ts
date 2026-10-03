@@ -19,7 +19,8 @@ export const ORDER_NUMBER_UQ = 'order_merchant_number_uq';
 /**
  * `number` is the shop's own sequence, shown to the seller and sent to the
  * customer. The delivery fields are a snapshot taken at confirmation, so
- * editing the customer later never rewrites an order. Totals are minor units.
+ * editing the customer later never rewrites an order. Totals are minor units
+ * of `currency`, copied from the shop's settings when the order is placed.
  */
 export const order = pgTable(
   'order',
@@ -34,6 +35,8 @@ export const order = pgTable(
     subtotal: integer('subtotal').notNull(),
     deliveryCharge: integer('delivery_charge').notNull().default(0),
     total: integer('total').notNull(),
+    /** ISO 4217: the shop's currency when the order was placed. */
+    currency: text('currency').notNull(),
     customerName: text('customer_name').notNull(),
     phone: text('phone').notNull(),
     deliveryAddress: text('delivery_address').notNull(),
@@ -57,6 +60,7 @@ export const order = pgTable(
     }),
     check('order_status_ck', oneOf(t.status, ORDER_STATUSES)),
     check('order_number_ck', sql`${t.number} > 0`),
+    check('order_currency_ck', sql`${t.currency} ~ '^[A-Z]{3}$'`),
     check(
       'order_amounts_ck',
       sql`${t.subtotal} >= 0 and ${t.deliveryCharge} >= 0 and ${t.total} = ${t.subtotal} + ${t.deliveryCharge}`,
