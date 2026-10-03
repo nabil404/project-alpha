@@ -7,7 +7,8 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import type {
-  Category,
+  CategoryWithCount,
+  CreateCategory,
   CreateProduct,
   ListProductsQuery,
   Product,
@@ -15,6 +16,7 @@ import type {
   ProductImage,
   ProductListResponse,
   SaveProduct,
+  UpdateCategory,
 } from '@app/shared';
 
 import { apiFetch, apiUpload, type UploadOptions } from '@/lib/api';
@@ -35,9 +37,15 @@ export const catalogKeys = {
   categories: () => [...catalogKeys.all, 'categories'] as const,
 };
 
-/** Any product write moves its row, its sums, or which chip it counts under. */
+/**
+ * Any product write moves its row, its sums, which chip it counts under, or
+ * a category's product count.
+ */
 const refreshLists = (queryClient: QueryClient) =>
-  queryClient.invalidateQueries({ queryKey: catalogKeys.productLists() });
+  Promise.all([
+    queryClient.invalidateQueries({ queryKey: catalogKeys.productLists() }),
+    queryClient.invalidateQueries({ queryKey: catalogKeys.categories() }),
+  ]);
 
 function listSearch({ filter, q, categoryId, page, limit }: ListProductsQuery): string {
   const params = new URLSearchParams({ filter, page: String(page), limit: String(limit) });
@@ -52,6 +60,19 @@ export function useProductList(query: ListProductsQuery) {
     queryKey: catalogKeys.productList(query),
     queryFn: () => apiFetch<ProductListResponse>(`/products?${listSearch(query)}`),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * The products a category is on, for its delete confirmation: one page of
+ * the largest size, and no placeholder, so switching categories never shows
+ * another category's products.
+ */
+export function useCategoryProducts(categoryId: string) {
+  const query: ListProductsQuery = { filter: 'all', categoryId, page: 1, limit: 100 };
+  return useQuery({
+    queryKey: catalogKeys.productList(query),
+    queryFn: () => apiFetch<ProductListResponse>(`/products?${listSearch(query)}`),
   });
 }
 
@@ -77,11 +98,54 @@ export function useProduct(id: string) {
 export const categoriesQueryOptions = () =>
   queryOptions({
     queryKey: catalogKeys.categories(),
-    queryFn: () => apiFetch<Category[]>('/categories'),
+    queryFn: () => apiFetch<CategoryWithCount[]>('/categories'),
   });
 
 export function useCategories() {
   return useQuery(categoriesQueryOptions());
+}
+
+const categoryPath = (id: string) => `/categories/${encodeURIComponent(id)}`;
+
+const refreshCategories = (queryClient: QueryClient) =>
+  queryClient.invalidateQueries({ queryKey: catalogKeys.categories() });
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateCategory) =>
+      apiFetch<CategoryWithCount>('/categories', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => refreshCategories(queryClient),
+  });
+}
+
+/** A rename shows in the products' category column too. */
+export function useRenameCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateCategory }) =>
+      apiFetch<CategoryWithCount>(categoryPath(id), {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => refreshCategories(queryClient),
+  });
+}
+
+/** The category leaves every product it was on, so their rows and details refresh too. */
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(categoryPath(id), { method: 'DELETE' }),
+    onSuccess: () =>
+      Promise.all([
+        refreshLists(queryClient),
+        queryClient.invalidateQueries({ queryKey: catalogKeys.products() }),
+      ]),
+  });
 }
 
 export function useCreateProduct() {

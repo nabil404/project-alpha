@@ -19,6 +19,7 @@ import { Route as AuthResetPasswordRouteImport } from './routes/_auth/reset-pass
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
 import { Route as AppCatalogIndexRouteImport } from './routes/_app/catalog/index'
+import { Route as AppCatalogCategoriesRouteImport } from './routes/_app/catalog/categories'
 import { Route as AppConversationsIndexRouteImport } from './routes/_app/conversations/index'
 import { Route as AppConversationsConversationIdRouteImport } from './routes/_app/conversations/$conversationId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
@@ -75,6 +76,11 @@ const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
   path: '/catalog/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCatalogCategoriesRoute = AppCatalogCategoriesRouteImport.update({
+  id: '/catalog/categories',
+  path: '/catalog/categories',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConversationsIndexRoute = AppConversationsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof AuthResetPasswordRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/catalog/categories': typeof AppCatalogCategoriesRoute
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof AuthResetPasswordRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/catalog/categories': typeof AppCatalogCategoriesRoute
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/catalog/categories': typeof AppCatalogCategoriesRoute
   '/_app/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/_app/settings/account': typeof AppSettingsAccountRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/catalog/categories'
     | '/conversations/$conversationId'
     | '/settings/account'
     | '/settings/messenger'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/sign-up'
+    | '/catalog/categories'
     | '/conversations/$conversationId'
     | '/settings/account'
     | '/settings/messenger'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_app/'
+    | '/_app/catalog/categories'
     | '/_app/conversations/$conversationId'
     | '/_app/settings/account'
     | '/_app/settings/messenger'
@@ -296,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCatalogIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/catalog/categories': {
+      id: '/_app/catalog/categories'
+      path: '/catalog/categories'
+      fullPath: '/catalog/categories'
+      preLoaderRoute: typeof AppCatalogCategoriesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/conversations/': {
       id: '/_app/conversations/'
       path: '/'
@@ -381,6 +400,7 @@ interface AppRouteChildren {
   AppConversationsRoute: typeof AppConversationsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
+  AppCatalogCategoriesRoute: typeof AppCatalogCategoriesRoute
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
   AppCatalogProductsProductIdRoute: typeof AppCatalogProductsProductIdRoute
   AppCatalogProductsNewRoute: typeof AppCatalogProductsNewRoute
@@ -390,6 +410,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppConversationsRoute: AppConversationsRouteWithChildren,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
+  AppCatalogCategoriesRoute: AppCatalogCategoriesRoute,
   AppCatalogIndexRoute: AppCatalogIndexRoute,
   AppCatalogProductsProductIdRoute: AppCatalogProductsProductIdRoute,
   AppCatalogProductsNewRoute: AppCatalogProductsNewRoute,
