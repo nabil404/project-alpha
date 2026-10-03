@@ -19,10 +19,12 @@ and are marked ⚠️ below.
 
 ## Platform facts
 
-- **The API and the worker are one codebase.** The worker boots the same
-  `AppModule` through `NestFactory.createApplicationContext` (`src/worker.ts`),
-  with no HTTP server, so config, repositories and the queue behave identically
-  in both processes. Anything you register in a module is live in both.
+- **The API and the worker are one codebase.** The worker boots `WorkerModule`
+  through `NestFactory.createApplicationContext` (`src/worker.ts`), with no HTTP
+  server. `WorkerModule` imports the whole `AppModule` plus the queue
+  processors' modules, so config, repositories and the queue behave
+  identically in both processes; anything registered in a module `AppModule`
+  imports is live in both, and only the processors are worker-only.
 - **NestJS 12 is ESM-only, but imports are extensionless.** The package is
   `"type": "module"`, and TypeScript resolves with `moduleResolution: Bundler`,
   so write `./foo`, never `./foo.js`. `nest build` compiles with SWC
@@ -154,9 +156,10 @@ predicate is the leak to catch in review.**
   customer rows, so `UNIQUE (merchant_id, psid)` and not `UNIQUE (psid)`.
 
   **The one deliberate exception is the connected Facebook Page**, which is
-  globally unique — `UNIQUE (page_id)`, with no `merchant_id`. The webhook
+  globally unique — `UNIQUE (page_id)`, with no `merchant_id`. The worker
   resolves `pageId → merchant` with no session to go on
-  (`src/modules/messenger/webhook-payload.ts`), so a Page claimed by two tenants
+  (`resolvePageMerchant()` in `src/modules/conversations/ingest/page-merchant.ts`),
+  so a Page claimed by two tenants
   has no resolvable owner. Scoping that constraint by merchant would let the
   second seller connect a Page the first already owns and silently split their
   conversations. It is the exception, not a missed `merchant_id`.
@@ -294,9 +297,10 @@ the two-merchant repository tests are for.
   The one sanctioned exception is DDL drizzle-kit does not model, authored with
   `pnpm --filter api db:custom`. drizzle-kit still owns ordering and apply.
 - **Migrations are applied by `scripts/migrate.mjs`**, drizzle-orm's programmatic
-  migrator, so the same command works locally and in the production image — which
-  carries `db/migrations` but not drizzle-kit. `db:generate` still needs
-  drizzle-kit, but only ever on a developer's machine or in CI.
+  migrator, so the same command works locally and in the production image,
+  which ships `db/migrations` and `scripts/` and runs it as the compose
+  `migrate` service. Applying never goes through drizzle-kit; generating a
+  migration (`db:generate`) is done only on a developer's machine.
 - **drizzle-kit diffs against JSON snapshots in `db/migrations/meta`**, not a
   shadow database, so no Docker is needed to generate a migration. Commit the
   snapshot with the migration; CI fails if a schema change has none.
@@ -325,9 +329,11 @@ the two-merchant repository tests are for.
   lock on the conversation inside a short transaction. Note it is available on
   the query builder but **not** on the relational `db.query.*` API. Combined with invariant #1:
   lock, re-check state, write, commit — with the LLM call already done outside.
-- **`WORKER_CONCURRENCY` must stay at or below `DATABASE_POOL_MAX`** (5 and 10
-  today). Concurrency above the pool size just queues workers on connections and
-  makes lock timeouts fire.
+- **`WORKER_CONCURRENCY` must stay at or below `DATABASE_POOL_MAX`** (defaults
+  5 and 10). Concurrency above the pool size just queues workers on connections
+  and makes lock timeouts fire. The variable is validated but not yet passed to
+  any processor: they run at BullMQ's default concurrency of 1. Wire it through
+  `@Processor`'s options when a queue needs more.
 - Retry and backoff defaults are set once in
   `src/modules/queue/queue.module.ts` — configure there, not per `add()` call.
 - **A job carries a Page id, not a merchant.** Resolve the merchant from the
@@ -339,9 +345,10 @@ the two-merchant repository tests are for.
 - **Everything goes through `ObjectStorage`** (`src/modules/storage/`); nothing
   else imports `@aws-sdk/*`. Tests use `InMemoryObjectStorage` from
   `src/modules/storage/__tests__/`.
-- **Keys are built only by `productImageKeys()`**, from the session's merchant
-  id and a server-made uuid — never from a request. Objects are immutable; a
-  new photo is a new key.
+- **Keys are built only by their helpers** — `productImageKeys()` from the
+  session's merchant id and a server-made uuid, `avatarKey()` from the signed-in
+  user's id and a server-made uuid — never from a request. Objects are
+  immutable; a new photo is a new key.
 - **Storage calls follow invariant #1**: never inside a transaction. Store the
   object first, then open the short transaction that writes the row; on
   failure, delete the object best-effort and let the daily sweep catch misses.
@@ -358,13 +365,17 @@ the two-merchant repository tests are for.
 
 ## Messenger webhooks
 
-- **The HMAC is computed over the unparsed body.** `rawBody: true` in
-  `src/main.ts` and `verifyMetaSignature`
-  (`src/modules/messenger/signature.ts`) are load-bearing: any middleware that
-  reparses or re-stringifies the body breaks verification. The comparison uses
+- **The HMAC is computed over the unparsed body.** `bodyParser: { rawBody: true }`
+  in `src/modules/auth/auth.module.ts` (Nest's own parser is off) and
+  `verifyMetaSignature` (`src/modules/messenger/signature.ts`) are
+  load-bearing: any middleware that reparses or re-stringifies the body breaks
+  verification. The comparison uses
   `timingSafeEqual` against a length check — keep it that way.
-- `parseInboundJobs` deliberately **skips echoes**. An echo is the seller's own
-  reply, which _pauses the bot_ rather than being customer input.
+- `parseInboundJobs` turns a customer's text into a `customer-message` job and
+  an echo (`is_echo`) into a `page-echo` job. The ingest drops an echo carrying
+  our `META_APP_ID` (our own send, already stored by the sender); any other
+  echo is the seller replying from Facebook's inbox, stored as `sender = seller`,
+  and **pauses the bot** rather than being customer input.
 - The Graph API version is pinned through `META_GRAPH_VERSION`.
 - Respect the **Messenger 24-hour messaging window**.
 
@@ -380,7 +391,8 @@ The strictest rules in the project. The LLM is a parser, not the driver.
   only ever quotes prices, variants, stock and delivery charges _from the
   catalog_. It never invents a discount or availability.
 - **Structured JSON output with Zod schemas from `@app/shared`**, behind an
-  `extractOrder()` wrapper. Provider and model come from env — `LLM_PROVIDER`,
+  `extractOrder()` wrapper (not built yet; its output schema is in
+  `packages/shared/src/schemas/llm.ts`). Provider and model come from env — `LLM_PROVIDER`,
   `LLM_MODEL_ROUTING`, `LLM_MODEL_EXTRACTION` — with the smaller model for
   intent and routing and the larger one only for extraction.
 - **Hand off instead of guessing**: low confidence, repeated confusion, a
@@ -399,9 +411,10 @@ The strictest rules in the project. The LLM is a parser, not the driver.
 - **Page access tokens are encrypted with `CryptoService`** (AES-256-GCM, layout
   `base64(iv | authTag | ciphertext)`). Store the ciphertext; decrypt at the
   point of use.
-- **The pino `redact` list in `src/app.module.ts`** covers the `authorization`
-  and `cookie` headers, `x-hub-signature-256`, and any `*.accessToken` /
-  `*.pageAccessToken` field. **Extend it whenever you add a new secret-bearing
+- **The pino `redact` list in `src/app.module.ts`** covers the `authorization`,
+  `cookie` and `x-hub-signature-256` request headers, the `set-cookie` response
+  header, and any `*.accessToken`, `*.pageAccessToken`, `*.userToken`,
+  `*.password`, `*.newPassword`, `*.token` or `*.secretAccessKey` field. **Extend it whenever you add a new secret-bearing
   field** — redaction is opt-in, so a new field name is unredacted by default.
 
 ## Validation
