@@ -14,6 +14,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { MessengerModule } from './modules/messenger/messenger.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
+import { CustomersModule } from './modules/customers/customers.module';
 import { AccountModule } from './modules/account/account.module';
 import { CryptoService } from './common/crypto.service';
 import { serializeRequest } from './common/request-log';
@@ -66,6 +67,7 @@ import { serializeRequest } from './common/request-log';
     HealthModule,
     MessengerModule,
     ConversationsModule,
+    CustomersModule,
     AccountModule,
   ],
   providers: [

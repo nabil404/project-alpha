@@ -69,6 +69,9 @@ export const errorCodes = [
   'MESSAGE_NOT_FOUND',
   'MESSAGE_NOT_DELETABLE',
 
+  // Customers
+  'CUSTOMER_NOT_FOUND',
+
   // Catalog
   'PRODUCT_NOT_FOUND',
   'VARIANT_NOT_FOUND',
