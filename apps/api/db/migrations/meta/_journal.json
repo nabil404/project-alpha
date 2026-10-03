@@ -113,6 +113,20 @@
       "when": 1790804443869,
       "tag": "0015_magical_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791056251944,
+      "tag": "0016_customers_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791056258088,
+      "tag": "0017_customers_orders_force_rls",
+      "breakpoints": true
     }
   ]
 }
