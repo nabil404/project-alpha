@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
-import { categorySchema, productSchema } from '@app/shared';
+import { categoryWithCountSchema, productSchema } from '@app/shared';
 import request from 'supertest';
 import { AuthModule } from '../../auth/auth.module';
 import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
@@ -101,7 +101,7 @@ describeDb('category routes over HTTP', () => {
   it('creates, lists, renames and deletes', async () => {
     const name = fresh('Kids');
     const created = await create(`  ${name}  `).expect(201);
-    const category = categorySchema.parse(created.body);
+    const category = categoryWithCountSchema.parse(created.body);
     expect(category.name).toBe(name);
 
     const listed = await request(server()).get('/api/v1/categories').expect(200);
@@ -111,7 +111,7 @@ describeDb('category routes over HTTP', () => {
       .patch(`/api/v1/categories/${category.id}`)
       .send({ name: `${name} wear` })
       .expect(200);
-    expect(renamed.body).toEqual({ id: category.id, name: `${name} wear` });
+    expect(renamed.body).toEqual({ id: category.id, name: `${name} wear`, productCount: 0 });
 
     await request(server()).delete(`/api/v1/categories/${category.id}`).expect(204);
     const after = await request(server()).get('/api/v1/categories').expect(200);
@@ -169,8 +169,10 @@ describeDb('category routes over HTTP', () => {
   });
 
   it('takes a deleted category off its products, leaving the products', async () => {
-    const kept = categorySchema.parse((await create(fresh('Kept')).expect(201)).body);
-    const dropped = categorySchema.parse((await create(fresh('Dropped')).expect(201)).body);
+    const kept = categoryWithCountSchema.parse((await create(fresh('Kept')).expect(201)).body);
+    const dropped = categoryWithCountSchema.parse(
+      (await create(fresh('Dropped')).expect(201)).body,
+    );
     const created = await request(server())
       .post('/api/v1/products')
       .send({
@@ -180,6 +182,9 @@ describeDb('category routes over HTTP', () => {
         variants: [{ optionValues: [], price: 160000, stock: 9 }],
       })
       .expect(201);
+
+    const listed = await request(server()).get('/api/v1/categories').expect(200);
+    expect(listed.body).toContainEqual({ ...dropped, productCount: 1 });
 
     await request(server()).delete(`/api/v1/categories/${dropped.id}`).expect(204);
 
@@ -205,6 +210,6 @@ describeDb('category routes over HTTP', () => {
 
     merchantId = t.merchantA;
     const stillThere = await request(server()).get('/api/v1/categories').expect(200);
-    expect(stillThere.body).toContainEqual({ id: created.body.id, name });
+    expect(stillThere.body).toContainEqual({ id: created.body.id, name, productCount: 0 });
   });
 });

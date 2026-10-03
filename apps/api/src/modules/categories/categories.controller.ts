@@ -21,10 +21,10 @@ import {
   type SchemaObject,
 } from '@nestjs/swagger';
 import {
-  categorySchema,
+  categoryWithCountSchema,
   createCategorySchema,
   updateCategorySchema,
-  type Category,
+  type CategoryWithCount,
   type CreateCategory,
   type UpdateCategory,
 } from '@app/shared';
@@ -37,7 +37,7 @@ import { CategoriesService } from './categories.service';
 const uuidParam = new ZodValidationPipe(z.string().uuid());
 const json = (schema: z.ZodType, io: 'input' | 'output') =>
   z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
-const categoryJson = json(categorySchema, 'output');
+const categoryJson = json(categoryWithCountSchema, 'output');
 
 /** The merchant always comes from the session via TenantGuard, never the request. */
 @ApiTags('Categories')
@@ -49,13 +49,14 @@ export class CategoriesController {
   @Get()
   @ApiOperation({
     summary: 'List categories',
-    description: "The seller's live categories, a flat list, sorted by name.",
+    description:
+      "The seller's live categories, a flat list, sorted by name. `productCount` counts every product in the category, whatever its status.",
   })
   @ApiOkResponse({
     description: 'Every live category.',
     schema: { type: 'array', items: categoryJson },
   })
-  list(@Req() request: TenantRequest): Promise<Category[]> {
+  list(@Req() request: TenantRequest): Promise<CategoryWithCount[]> {
     return this.categories.list(tenantScope(request).merchantId);
   }
 
@@ -71,7 +72,7 @@ export class CategoriesController {
   create(
     @Req() request: TenantRequest,
     @Body(new ZodValidationPipe(createCategorySchema)) body: CreateCategory,
-  ): Promise<Category> {
+  ): Promise<CategoryWithCount> {
     return this.categories.create(tenantScope(request).merchantId, body);
   }
 
@@ -89,7 +90,7 @@ export class CategoriesController {
     @Req() request: TenantRequest,
     @Param('id', uuidParam) id: string,
     @Body(new ZodValidationPipe(updateCategorySchema)) body: UpdateCategory,
-  ): Promise<Category> {
+  ): Promise<CategoryWithCount> {
     return this.categories.update(tenantScope(request).merchantId, id, body);
   }
 

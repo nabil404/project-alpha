@@ -32,7 +32,11 @@ describeDb('CategoriesService', () => {
       const kids = await service.create(t.merchantA, { name: fresh('Kids') });
       const boys = await service.create(t.merchantA, { name: fresh('Boys') });
 
-      expect(kids).toEqual({ id: expect.any(String), name: expect.stringContaining('Kids') });
+      expect(kids).toEqual({
+        id: expect.any(String),
+        name: expect.stringContaining('Kids'),
+        productCount: 0,
+      });
       const listed = await service.list(t.merchantA);
       expect(listed.map((c) => c.id)).toEqual(expect.arrayContaining([kids.id, boys.id]));
     });
@@ -156,6 +160,57 @@ describeDb('CategoriesService', () => {
       const ofA = await service.create(t.merchantA, { name: fresh('Keep') });
       await expectCoded(service.remove(t.merchantB, ofA.id), 'CATEGORY_NOT_FOUND');
       expect((await service.list(t.merchantB)).map((c) => c.id)).not.toContain(ofA.id);
+    });
+  });
+
+  describe('product counts', () => {
+    const link = (merchantId: string, productId: string, categoryId: string) =>
+      t.db.insert(schema.productCategory).values({ merchantId, productId, categoryId });
+    const countOf = async (merchantId: string, id: string) =>
+      (await service.list(merchantId)).find((c) => c.id === id)?.productCount;
+
+    it('counts linked products of every status, and zero for an empty category', async () => {
+      const full = await service.create(t.merchantA, { name: fresh('Full') });
+      const empty = await service.create(t.merchantA, { name: fresh('Empty') });
+      for (const status of ['draft', 'active', 'archived'] as const) {
+        const product = await seedProduct(t.db, t.merchantA, { status });
+        await link(t.merchantA, product.id, full.id);
+      }
+
+      expect(await countOf(t.merchantA, full.id)).toBe(3);
+      expect(await countOf(t.merchantA, empty.id)).toBe(0);
+    });
+
+    it('drops a deleted product from the count', async () => {
+      const cat = await service.create(t.merchantA, { name: fresh('Shrinks') });
+      const kept = await seedProduct(t.db, t.merchantA);
+      const gone = await seedProduct(t.db, t.merchantA);
+      await link(t.merchantA, kept.id, cat.id);
+      await link(t.merchantA, gone.id, cat.id);
+
+      await t.db.delete(schema.product).where(eq(schema.product.id, gone.id));
+
+      expect(await countOf(t.merchantA, cat.id)).toBe(1);
+    });
+
+    it('returns the count from a rename', async () => {
+      const cat = await service.create(t.merchantA, { name: fresh('Counted') });
+      await link(t.merchantA, (await seedProduct(t.db, t.merchantA)).id, cat.id);
+      await link(t.merchantA, (await seedProduct(t.db, t.merchantA)).id, cat.id);
+
+      const renamed = await service.update(t.merchantA, cat.id, { name: fresh('Recounted') });
+      expect(renamed.productCount).toBe(2);
+    });
+
+    it("counts only the merchant's own links", async () => {
+      const ofA = await service.create(t.merchantA, { name: fresh('A only') });
+      const ofB = await service.create(t.merchantB, { name: fresh('B only') });
+      await link(t.merchantA, (await seedProduct(t.db, t.merchantA)).id, ofA.id);
+      await link(t.merchantB, (await seedProduct(t.db, t.merchantB)).id, ofB.id);
+      await link(t.merchantB, (await seedProduct(t.db, t.merchantB)).id, ofB.id);
+
+      expect(await countOf(t.merchantA, ofA.id)).toBe(1);
+      expect(await countOf(t.merchantB, ofB.id)).toBe(2);
     });
   });
 });

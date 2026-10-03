@@ -44,6 +44,16 @@ export const categorySchema = z.object({
 });
 export type Category = z.infer<typeof categorySchema>;
 
+/**
+ * A category as the category routes return it, for the Categories page.
+ * `productCount` counts every product linked to it, whatever the status, so it
+ * is the number a delete takes the category off.
+ */
+export const categoryWithCountSchema = categorySchema.extend({
+  productCount: z.number().int().nonnegative(),
+});
+export type CategoryWithCount = z.infer<typeof categoryWithCountSchema>;
+
 export const createCategorySchema = z.object({
   name: categoryNameSchema,
 });
