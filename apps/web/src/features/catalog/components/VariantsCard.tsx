@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { FormControl, FormField, FormItem, FormMessage, useFormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
 import {
   addCombinations,
@@ -63,6 +62,15 @@ export function VariantsCard({ product }: { product?: Product }) {
     if (form.formState.isSubmitted) void form.trigger(['options', 'variants']);
     // An edit panel points at an option by position, which this may have moved.
     setPanel((open) => (open?.kind === 'edit' ? null : open));
+  };
+
+  // With one option a variant is its value, so the value goes with it; with
+  // more, only that combination goes and its values stay for the others.
+  const removeVariant = (index: number) => {
+    if (!single) return remove(index);
+    const value = variants[index]!.optionValues[0]!;
+    const valueIndex = single.values.findIndex((v) => sameText(v.value, value));
+    apply(removeValue(state, 0, valueIndex));
   };
 
   const onPanelSubmit = (option: OptionDraft) => {
@@ -147,20 +155,12 @@ export function VariantsCard({ product }: { product?: Product }) {
               <th scope="col" className="border-b border-border px-3 py-3 font-medium">
                 {t('variants.stock')}
               </th>
-              <th
-                scope="col"
-                className={cn(
-                  'border-b border-border py-3 pl-3 font-medium',
-                  options.length > 1 ? 'pr-3' : 'pr-6',
-                )}
-              >
+              <th scope="col" className="border-b border-border px-3 py-3 font-medium">
                 {t('variants.sku')}
               </th>
-              {options.length > 1 && (
-                <th scope="col" className="border-b border-border py-3 pr-6 pl-2">
-                  <span className="sr-only">{t('variants.remove')}</span>
-                </th>
-              )}
+              <th scope="col" className="border-b border-border py-3 pr-6 pl-2">
+                <span className="sr-only">{t('variants.remove')}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -271,12 +271,7 @@ export function VariantsCard({ product }: { product?: Product }) {
                       )}
                     />
                   </td>
-                  <td
-                    className={cn(
-                      'border-t border-border py-3 pl-3',
-                      options.length > 1 ? 'pr-3' : 'pr-6',
-                    )}
-                  >
+                  <td className="border-t border-border px-3 py-3">
                     <FormField
                       control={form.control}
                       name={`variants.${index}.sku`}
@@ -296,22 +291,20 @@ export function VariantsCard({ product }: { product?: Product }) {
                       )}
                     />
                   </td>
-                  {options.length > 1 && (
-                    <td className="border-t border-border py-3 pr-6 pl-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="mt-1 text-ink-muted"
-                        aria-label={t('variants.removeVariant', { variant: label })}
-                        title={t('variants.remove')}
-                        disabled={fields.length === 1}
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 aria-hidden strokeWidth={1.5} />
-                      </Button>
-                    </td>
-                  )}
+                  <td className="border-t border-border py-3 pr-6 pl-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="mt-1 text-ink-muted"
+                      aria-label={t('variants.removeVariant', { variant: label })}
+                      title={t('variants.remove')}
+                      disabled={fields.length === 1}
+                      onClick={() => removeVariant(index)}
+                    >
+                      <Trash2 aria-hidden strokeWidth={1.5} />
+                    </Button>
+                  </td>
                 </tr>
               );
             })}
