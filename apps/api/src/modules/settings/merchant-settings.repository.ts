@@ -23,6 +23,18 @@ export class MerchantSettingsRepository {
     return row;
   }
 
+  /** Writes the shop's row unless it already has one, which is left exactly as it was. */
+  async insertIfAbsent(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    values: MerchantSettingsValues,
+  ): Promise<void> {
+    await executor
+      .insert(merchantSettings)
+      .values({ merchantId, ...values })
+      .onConflictDoNothing({ target: merchantSettings.merchantId });
+  }
+
   /**
    * The shop's row, created from `defaults` if it has none, locked until the
    * transaction ends. A save that reads the currency and one that changes it
@@ -30,13 +42,11 @@ export class MerchantSettingsRepository {
    */
   async lockOrCreate(
     executor: Executor,
-    { merchantId }: TenantScope,
+    scope: TenantScope,
     defaults: MerchantSettingsValues,
   ): Promise<MerchantSettingsRow> {
-    await executor
-      .insert(merchantSettings)
-      .values({ merchantId, ...defaults })
-      .onConflictDoNothing({ target: merchantSettings.merchantId });
+    const { merchantId } = scope;
+    await this.insertIfAbsent(executor, scope, defaults);
     const rows = await executor
       .select()
       .from(merchantSettings)

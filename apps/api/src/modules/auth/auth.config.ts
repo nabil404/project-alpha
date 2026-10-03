@@ -21,6 +21,7 @@ import {
 import * as schema from '../database/schema/index';
 import type { Mailer } from '../mail/mail.service';
 import { existingAccountEmail, resetPasswordEmail, verificationEmail } from '../mail/templates';
+import { seedRegionFromPhone } from '../settings/region-from-phone';
 import { toAuthErrorBody, toOAuthErrorLocation } from './auth-errors';
 
 /** The settings createAuth reads, so nothing here touches process.env. */
@@ -277,8 +278,21 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
           //
           // An email sign-up names the shop; a social one has no shop name
           // to give, so its organization starts out under the seller's name.
+          //
+          // The sign-up phone's country also sets the shop's region, so a
+          // seller outside Bangladesh doesn't start in taka and Dhaka time.
+          // That is a convenience, not part of having an account: if it
+          // fails, the shop keeps the default region and sign-up succeeds.
           after: async (createdUser, ctx) => {
-            await ensureOrganizationForUser(db, createdUser, shopNameFrom(ctx));
+            const merchantId = await ensureOrganizationForUser(db, createdUser, shopNameFrom(ctx));
+            const { phone } = createdUser as { phone?: string | null };
+            try {
+              await seedRegionFromPhone(db, merchantId, phone);
+            } catch (error) {
+              logger.warn(
+                `Could not set the region of shop ${merchantId} from its sign-up phone: ${String(error)}`,
+              );
+            }
           },
         },
       },

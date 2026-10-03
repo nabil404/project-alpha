@@ -26,10 +26,11 @@ delivery address.
   later needs no migration. Every business table carries `merchant_id`, which
   references `organization(id)` and never `user(id)`, and all queries are scoped
   by it.
-- **Merchant settings** — one row per shop, written on its first save: country,
+- **Merchant settings** — one row per shop, written at email sign-up or on its first save: country,
   currency, time zone, date format, contact phone (E.164) and pickup address.
-  The shop's name and logo stay on the organization. A shop with no row reads
-  as the default region (Bangladesh). The currency is what every price and
+  The shop's name and logo stay on the organization. An email sign-up starts
+  the shop in the region of the seller's phone number; a shop with no row
+  reads as the default region (Bangladesh). The currency is what every price and
   order is in: it can change only until the shop's first order, and a change
   keeps each price's number (rescaling minor units when the decimals differ),
   never converting it. The dashboard language belongs to each person
