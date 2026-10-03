@@ -3,9 +3,16 @@ import { useForm } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { z } from 'zod';
-import { PASSWORD_MIN_LENGTH, signUpSchema, type SignUpInput } from '@app/shared';
+import {
+  countryOfTimeZone,
+  DEFAULT_COUNTRY,
+  PASSWORD_MIN_LENGTH,
+  signUpSchema,
+  type SignUpInput,
+} from '@app/shared';
 
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { PhoneField } from '@/components/PhoneField';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -29,6 +36,19 @@ import { SocialSignIn } from './SocialSignIn';
 
 const serverFields = ['name', 'shopName', 'email', 'phone', 'password'] as const;
 
+/**
+ * There is no shop yet to take a country from, so the calling code starts at
+ * the country of the browser's time zone - a better guess than its language,
+ * which is often English wherever the seller is.
+ */
+function guessCountry(): string {
+  try {
+    return countryOfTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone) ?? DEFAULT_COUNTRY;
+  } catch {
+    return DEFAULT_COUNTRY;
+  }
+}
+
 export type SignUpDraft = Omit<SignUpInput, 'password'>;
 
 export function SignUpForm({
@@ -42,6 +62,7 @@ export function SignUpForm({
   const { t } = useTranslation('auth');
   const { forError, forField } = useErrorMessages();
   const signUp = useSignUp();
+  const defaultCountry = useMemo(guessCountry, []);
 
   // Agreeing to the terms is the form's business alone - the API has nothing
   // to store it in yet - so it is added here rather than to the shared schema.
@@ -147,12 +168,7 @@ export function SignUpForm({
                 <FormItem>
                   <FormLabel>{t('fields.phone')}</FormLabel>
                   <FormControl>
-                    <Input
-                      type="tel"
-                      autoComplete="tel"
-                      placeholder={t('fields.phonePlaceholder')}
-                      {...field}
-                    />
+                    <PhoneField {...field} defaultCountry={defaultCountry} />
                   </FormControl>
                   <FormDescription>{t('fields.phoneHint')}</FormDescription>
                   <FormMessage />

@@ -61,7 +61,7 @@ describeDb('Settings > Account over HTTP', () => {
       password: PASSWORD,
       name: 'Nadia Rahman',
       shopName: "Nadia's Kitchen",
-      phone: '01712-345678',
+      phone: '+880 1712-345678',
       callbackURL: '/',
     }).expect(200);
     const agent = request.agent(server());
@@ -197,7 +197,7 @@ describeDb('Settings > Account over HTTP', () => {
         .select({ phone: schema.user.phone })
         .from(schema.user)
         .where(eq(schema.user.email, address));
-      expect(row?.phone).toBe('01712-345678');
+      expect(row?.phone).toBe('+8801712345678');
     });
   });
 
@@ -208,7 +208,7 @@ describeDb('Settings > Account over HTTP', () => {
         password: PASSWORD,
         name: 'Nadia Rahman',
         shopName: "Nadia's Kitchen",
-        phone: '01712-345678',
+        phone: '+880 1712-345678',
         callbackURL: '/',
         image: 'https://tracker.example.test/pixel.gif',
       }).expect(400);

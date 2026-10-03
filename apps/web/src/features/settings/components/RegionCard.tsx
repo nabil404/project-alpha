@@ -39,7 +39,7 @@ import {
   useCountryOptions,
   useCurrencyOptions,
   useTimeZoneOptions,
-} from '../region-options';
+} from '@/lib/region-options';
 import { SaveBar } from './ShopProfileCard';
 
 /**

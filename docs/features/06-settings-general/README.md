@@ -84,7 +84,5 @@ Everything regional is a code - ISO 3166 country, ISO 4217 currency, IANA zone
 
 ## Follow-ups
 
-- Sign-up's `phoneSchema` still accepts any 7–15 digits as typed; move it to
-  `e164PhoneSchema` with a calling code picker.
 - Only the owner should change these once a shop has teammates; there is no
   role check yet.

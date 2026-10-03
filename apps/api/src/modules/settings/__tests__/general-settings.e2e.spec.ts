@@ -61,7 +61,7 @@ describeDb('Settings > General over HTTP', () => {
         password: PASSWORD,
         name: 'Nadia Rahman',
         shopName,
-        phone: '01712-345678',
+        phone: '+880 1712-345678',
         callbackURL: '/',
       })
       .expect(200);

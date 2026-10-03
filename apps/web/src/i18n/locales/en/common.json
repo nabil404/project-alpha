@@ -33,6 +33,11 @@
     "perPageBefore": "Show",
     "previous": "Previous"
   },
+  "phone": {
+    "callingCode": "Country calling code",
+    "noMatch": "No matches.",
+    "searchCountry": "Search country or code"
+  },
   "status": {
     "conversation": {
       "abandoned": "Abandoned",
