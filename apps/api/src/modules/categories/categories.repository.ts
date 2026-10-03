@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { one } from '../database/rows';
 import { category, productCategory } from '../database/schema/index';
 import { liveCategory } from './category-visibility';
 
 export type CategoryRow = typeof category.$inferSelect;
+export type CategoryCountRow = CategoryRow & { productCount: number };
 
 @Injectable()
 export class CategoriesRepository {
@@ -38,6 +39,42 @@ export class CategoriesRepository {
       .from(category)
       .where(and(eq(category.merchantId, merchantId), liveCategory()))
       .orderBy(asc(category.name));
+  }
+
+  /** `listLive` with each category's linked products counted, any status. */
+  async listLiveWithCounts(
+    executor: Executor,
+    { merchantId }: TenantScope,
+  ): Promise<CategoryCountRow[]> {
+    return executor
+      .select({
+        ...getTableColumns(category),
+        productCount: sql<number>`count(${productCategory.productId})::int`,
+      })
+      .from(category)
+      .leftJoin(
+        productCategory,
+        and(
+          eq(productCategory.merchantId, category.merchantId),
+          eq(productCategory.categoryId, category.id),
+        ),
+      )
+      .where(and(eq(category.merchantId, merchantId), liveCategory()))
+      .groupBy(category.id)
+      .orderBy(asc(category.name));
+  }
+
+  /** Products linked to one category, any status. A link exists only while its product does. */
+  async countProducts(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+  ): Promise<number> {
+    const [row] = await executor
+      .select({ count: sql<number>`count(*)::int` })
+      .from(productCategory)
+      .where(and(eq(productCategory.merchantId, merchantId), eq(productCategory.categoryId, id)));
+    return row?.count ?? 0;
   }
 
   async countLive(executor: Executor, { merchantId }: TenantScope, ids: string[]): Promise<number> {

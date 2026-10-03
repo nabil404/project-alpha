@@ -277,8 +277,14 @@ beside the product routes. See [Products list](#products-list).
 
 The category routes are in
 [`categories.controller.ts`](../../../apps/api/src/modules/categories/categories.controller.ts),
-behind the same session and `TenantGuard`. The category resource is
-`{ id, name }`; see [Categories](#categories) for the rules.
+behind the same session and `TenantGuard`. They return
+`{ id, name, productCount }` (`categoryWithCountSchema`), where `productCount`
+counts every product linked to the category whatever its status, so it is the
+number a delete takes the category off. It can be higher than what the
+products list shows for that category, whose default filter leaves archived
+products out. The product picker reads the same list. The AI's
+`findSellableCatalog` keeps the plain `{ id, name }`. See
+[Categories](#categories) for the rules.
 
 | Method | Path                     | Body               | Success            | Errors                                                                       |
 | ------ | ------------------------ | ------------------ | ------------------ | ---------------------------------------------------------------------------- |
@@ -323,6 +329,7 @@ is used by both apps:
 
 - **Resources:** `productSchema` (with `variants`, `categoryIds`, `images`),
   `variantSchema` (with derived `stockStatus`), `categorySchema`,
+  `categoryWithCountSchema`,
   `productImageSchema`.
 - **Inputs:** `createProductSchema` (status defaults to `draft`; refines that
   every variant is named when there are several), `updateProductSchema`,
@@ -375,7 +382,7 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | [`database/__tests__/catalog-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-schema.spec.ts)                     | Constraints: composite keys, checks, partial unique indexes                                            |
 | [`database/__tests__/catalog-rls.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-rls.spec.ts)                           | Two-merchant isolation under RLS                                                                       |
-| [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)         | Create, rename, delete, name clashes, two-merchant isolation                                           |
+| [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)         | Create, rename, delete, name clashes, product counts, two-merchant isolation                           |
 | [`categories/__tests__/categories.e2e.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.e2e.spec.ts)                 | Category routes over HTTP: status codes, error envelopes, unlinking on delete, two-merchant isolation  |
 | [`products/__tests__/products.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/products.service.spec.ts)                 | Product create, update, delete, category links                                                         |
 | [`products/__tests__/product-variants.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-variants.service.spec.ts) | Last-variant guard, default-variant rule, SKUs, variant images                                         |
