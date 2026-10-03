@@ -4,6 +4,7 @@ import { ChevronDown, Plus, Search, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   LOW_STOCK_THRESHOLD,
+  PRODUCT_LIST_PAGE_SIZES,
   productListFilters,
   stockLevels,
   type CategoryWithCount,
@@ -13,18 +14,18 @@ import {
 } from '@app/shared';
 
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { PaginationBar } from '@/components/PaginationBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { statusToneDotClasses, stockLevelTones } from '@/i18n/status-tones';
+import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-import { CATALOG_CURRENCY } from '../currency';
 import { useCategories, useProductCounts, useProductList } from '../queries';
 import { CatalogHeader } from './CatalogHeader';
-import { PaginationBar } from './PaginationBar';
 import { ProductListRow } from './ProductListRow';
 import { productColumns as columns } from './product-table-columns';
 
@@ -197,7 +198,7 @@ export function ProductList({
                     {t('list.columns.options')}
                   </th>
                   <th scope="col" className="border-t border-border px-4 py-3 text-right">
-                    {t('list.columns.price', { symbol: currencySymbol(CATALOG_CURRENCY) })}
+                    {t('list.columns.price', { symbol: currencySymbol(SHOP_CURRENCY) })}
                   </th>
                   <th scope="col" className="border-t border-border px-4 py-3 text-right">
                     {t('list.columns.stock')}
@@ -260,6 +261,7 @@ export function ProductList({
             <PaginationBar
               page={pagination.page}
               limit={pagination.limit}
+              pageSizes={PRODUCT_LIST_PAGE_SIZES}
               totalPages={pagination.totalPages}
               summary={t('list.pagination.showing', {
                 from: Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total),

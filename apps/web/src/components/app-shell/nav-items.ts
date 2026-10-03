@@ -7,6 +7,7 @@ import {
   Package,
   ShoppingBag,
   SlidersHorizontal,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -35,5 +36,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     badge: UnreadBadge,
   },
   { id: 'catalog', label: 'nav.catalog', icon: Package, to: '/catalog' },
+  { id: 'customers', label: 'nav.customers', icon: Users, to: '/customers' },
   { id: 'settings', label: 'nav.settings', icon: SlidersHorizontal, to: '/settings' },
 ];

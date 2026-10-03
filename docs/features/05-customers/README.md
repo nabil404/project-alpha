@@ -8,11 +8,12 @@ the latest conversation and team notes. Scope comes from the MVP's
 screens are the Customers and Customer detail artboards in the design canvas.
 This page describes what is built.
 
-**Status (Oct 2026):** the API is done: list, summary, detail, contact edits,
-a customer's orders, and notes. The `order` and `order_item` tables exist
+**Status (Oct 2026):** built end to end: list, summary, detail, contact edits,
+a customer's orders, and notes, in the API and at `/customers` and
+`/customers/:id` in the dashboard. The `order` and `order_item` tables exist
 only so these pages can read order history. They are **provisional**:
 nothing creates orders yet, and the orders work owns their shape and may
-change it. Not built yet: the web routes, export, and the items under
+change it. Not built yet: export and the items under
 [Follow-ups](#follow-ups).
 
 ## Routes (`/api/v1/customers`, session + TenantGuard)
@@ -111,6 +112,33 @@ and composite `(merchant_id, id)` foreign keys.
   snapshots `product_name` and `variant_name`, `quantity` > 0,
   `unit_price` ≥ 0, `position` (`UNIQUE (merchant_id, order_id, position)`).
 
+## Web
+
+- **`/customers`**: the four figures from `/summary`, the status tabs with
+  their counts, search, and a page of customers: a table from `sm` up, with
+  Orders, Total spent and Last order sortable (a new column starts largest or
+  latest first; clicking it again flips it), and cards below it. The query
+  lives in the URL as `show`, `q`, `sort`, `direction`, `page` and `pageSize`,
+  each left out at its default. The filter is `show`, not `filter`, because
+  Conversations already uses `filter`.
+- **Figures.** The repeat rate is `repeatCustomers / customersWithOrders`: of
+  the customers who ordered, how many came back. The average order value is
+  `allTime`, and its trend compares `currentWindow` with `previousWindow`,
+  shown only when both exist. "Need a reply" links to Conversations filtered
+  to `needs_you`.
+- **`/customers/:id`**: the badge and "Customer since", Open chat (the latest
+  conversation), the three figures, the orders (paged, `ORD-<year placed>-<number
+padded to 5>`, not links until orders have a page), the latest conversation,
+  the contact card with an Edit dialog (the shared `updateCustomerSchema`; a
+  blank field clears), and the notes with a box to add one.
+- **Badges.** Repeat is accent, New success, Needs you warning, Inactive
+  neutral (`status-tones.ts`, `docs/DESIGN.md`); order statuses use the tones
+  DESIGN.md already lists.
+- Code: `apps/web/src/features/customers/`, routes under
+  `apps/web/src/routes/_app/customers/`. The pagination bar is shared from
+  `src/components/PaginationBar.tsx`, and the shop's currency is `SHOP_CURRENCY`
+  in `src/lib/currency.ts`.
+
 ## Code
 
 `apps/api/src/modules/customers/`: `CustomersRepository` holds the aggregate
@@ -131,8 +159,9 @@ HTTP) and `database/__tests__/orders-schema.spec.ts` (keys, checks, RLS).
   snapshots.
 - **Contact details from the chat:** copy phone and address into the customer
   when an order is confirmed, so the list fills without the seller typing.
-- **Web:** the Customers and Customer detail routes. The new
-  `CustomerStatus` values need labels in `status-keys.ts` / `common.json`.
+- **Web:** a sort control on phones (below `sm` the list keeps the URL's sort
+  but shows no headers to change it), and links from an order row once orders
+  have a page.
 - **Not built:** export (the design's Export button), "New order" (orders
   work), "Preferred payment" (no payment method in the domain yet), deleting
   or editing a note, and "Add customer" (see Rules).

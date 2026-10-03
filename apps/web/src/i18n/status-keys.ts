@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type {
   ConversationState,
   CustomerIntent,
+  CustomerStatus,
   MessageSender,
   MessageStatus,
   OrderStatus,
@@ -77,6 +78,13 @@ export const customerIntentKeys = {
   other: 'status.intent.other',
 } as const satisfies Record<CustomerIntent, ParseKeys<'common'>>;
 
+export const customerStatusKeys = {
+  needs_you: 'status.customer.needs_you',
+  inactive: 'status.customer.inactive',
+  repeat: 'status.customer.repeat',
+  new: 'status.customer.new',
+} as const satisfies Record<CustomerStatus, ParseKeys<'common'>>;
+
 /** Read labels through this, never by hand-writing a status key at a call site. */
 export function useStatusLabels() {
   const { t } = useTranslation('common');
@@ -90,5 +98,6 @@ export function useStatusLabels() {
     messageSender: (sender: MessageSender): string => t(messageSenderKeys[sender]),
     messageStatus: (status: MessageStatus): string => t(messageStatusKeys[status]),
     customerIntent: (intent: CustomerIntent): string => t(customerIntentKeys[intent]),
+    customerStatus: (status: CustomerStatus): string => t(customerStatusKeys[status]),
   };
 }

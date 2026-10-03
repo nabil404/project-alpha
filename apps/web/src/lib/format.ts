@@ -11,6 +11,7 @@ import i18n from '@/i18n';
 const DATE_PRESETS = {
   date: { dateStyle: 'medium' },
   dayMonth: { month: 'short', day: 'numeric' },
+  monthYear: { month: 'short', year: 'numeric' },
   dateTime: { dateStyle: 'medium', timeStyle: 'short' },
   time: { timeStyle: 'short' },
 } as const satisfies Record<string, Intl.DateTimeFormatOptions>;
@@ -104,6 +105,30 @@ export function useFormatters() {
     [locale],
   );
 
+  /** A count with the locale's grouping: "1,284". */
+  const formatNumber = useCallback(
+    (value: number): string => new Intl.NumberFormat(locale).format(value),
+    [locale],
+  );
+
+  /** A fraction as a whole percentage: 0.38 → "38%"; `signed` writes "+4%" and "-4%". */
+  const formatPercent = useCallback(
+    (fraction: number, { signed = false }: { signed?: boolean } = {}): string =>
+      new Intl.NumberFormat(locale, {
+        style: 'percent',
+        maximumFractionDigits: 0,
+        signDisplay: signed ? 'exceptZero' : 'auto',
+      }).format(fraction),
+    [locale],
+  );
+
+  /** "Blue kurti × 2, Dupatta × 1": a short list of things, no "and". */
+  const formatList = useCallback(
+    (items: string[]): string =>
+      new Intl.ListFormat(locale, { style: 'short', type: 'unit' }).format(items),
+    [locale],
+  );
+
   /** "1.6 MB", or "240 kB" under a megabyte: a file's size for the seller, not a byte count. */
   const formatFileSize = useCallback(
     (bytes: number): string => {
@@ -127,6 +152,9 @@ export function useFormatters() {
       formatRelativeDay,
       currencySymbol,
       formatFileSize,
+      formatNumber,
+      formatPercent,
+      formatList,
     }),
     [
       locale,
@@ -136,6 +164,9 @@ export function useFormatters() {
       formatRelativeDay,
       currencySymbol,
       formatFileSize,
+      formatNumber,
+      formatPercent,
+      formatList,
     ],
   );
 }
