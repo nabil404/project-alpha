@@ -10,6 +10,7 @@ import {
 } from '@app/shared';
 
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { PaginationBar } from '@/components/PaginationBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useErrorMessages } from '@/i18n/error-keys';
@@ -21,7 +22,6 @@ import { cn } from '@/lib/utils';
 import { useCategories, useCreateCategory, useRenameCategory } from '../queries';
 import { CatalogHeader } from './CatalogHeader';
 import { DeleteCategoryDialog } from './DeleteCategoryDialog';
-import { PaginationBar } from './PaginationBar';
 
 type SortKey = 'name' | 'count';
 interface Sort {
@@ -211,6 +211,7 @@ export function CategoryList() {
           <PaginationBar
             page={currentPage}
             limit={limit}
+            pageSizes={PRODUCT_LIST_PAGE_SIZES}
             totalPages={totalPages}
             summary={t('categories.pagination.showing', {
               from: (currentPage - 1) * limit + 1,

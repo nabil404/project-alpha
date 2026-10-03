@@ -2,10 +2,9 @@ import { useState, type ComponentProps } from 'react';
 import { fromMinorUnits, toMinorUnits } from '@app/shared';
 
 import { Input } from '@/components/ui/input';
+import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-import { CATALOG_CURRENCY } from '../currency';
 
 /** Digits, optional thousands commas, up to two decimals: "1,600" or "1600.50". */
 const AMOUNT = /^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/;
@@ -36,7 +35,7 @@ export function MoneyInput({ value, onChange, className, ...props }: MoneyInputP
   return (
     <div className={cn('relative flex items-center', className)}>
       <span aria-hidden className="pointer-events-none absolute left-3 text-body text-ink-muted">
-        {currencySymbol(CATALOG_CURRENCY)}
+        {currencySymbol(SHOP_CURRENCY)}
       </span>
       <Input
         {...props}

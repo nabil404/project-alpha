@@ -1,4 +1,11 @@
-import type { ConversationState, ProductStatus, StockLevel, StockStatus } from '@app/shared';
+import type {
+  ConversationState,
+  CustomerStatus,
+  OrderStatus,
+  ProductStatus,
+  StockLevel,
+  StockStatus,
+} from '@app/shared';
 
 /**
  * Status → badge tone, in one place (docs/DESIGN.md, "Status badge tones").
@@ -6,6 +13,22 @@ import type { ConversationState, ProductStatus, StockLevel, StockStatus } from '
  * upstream without a tone. `null` means the status shows no badge.
  */
 export type StatusTone = 'accent' | 'neutral' | 'success' | 'warning' | 'danger';
+
+export const orderStatusTones = {
+  new: 'accent',
+  confirmed: 'neutral',
+  packed: 'neutral',
+  shipped: 'neutral',
+  delivered: 'success',
+  cancelled: 'danger',
+} as const satisfies Record<OrderStatus, StatusTone>;
+
+export const customerStatusTones = {
+  needs_you: 'warning',
+  inactive: 'neutral',
+  repeat: 'accent',
+  new: 'success',
+} as const satisfies Record<CustomerStatus, StatusTone>;
 
 export const conversationStateTones = {
   browsing: null,

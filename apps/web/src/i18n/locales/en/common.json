@@ -17,12 +17,21 @@
     "catalog": "Catalog",
     "closeMenu": "Close menu",
     "conversations": "Conversations",
+    "customers": "Customers",
     "label": "Main",
     "menu": "Menu",
     "openMenu": "Open menu",
     "orders": "Orders",
     "overview": "Overview",
     "settings": "Settings"
+  },
+  "pagination": {
+    "label": "Pages",
+    "next": "Next",
+    "page": "Page {{page}}",
+    "perPageAfter": "per page",
+    "perPageBefore": "Show",
+    "previous": "Previous"
   },
   "status": {
     "conversation": {
@@ -32,6 +41,12 @@
       "collecting_details": "Collecting details",
       "confirmed": "Confirmed",
       "handed_off": "Needs you"
+    },
+    "customer": {
+      "inactive": "Inactive",
+      "needs_you": "Needs you",
+      "new": "New",
+      "repeat": "Repeat"
     },
     "intent": {
       "ask_question": "Question",

@@ -159,13 +159,7 @@
     "moreCategories": "Also in {{list}}",
     "noOptions": "No options",
     "pagination": {
-      "label": "Pages",
-      "next": "Next",
-      "page": "Page {{page}}",
-      "perPageAfter": "per page",
-      "perPageBefore": "Show",
       "perPageLabel": "Products per page",
-      "previous": "Previous",
       "showing_one": "Showing {{from}}–{{to}} of {{count}} product",
       "showing_other": "Showing {{from}}–{{to}} of {{count}} products"
     },

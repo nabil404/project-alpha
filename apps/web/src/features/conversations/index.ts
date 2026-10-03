@@ -8,3 +8,6 @@ export {
   messagesQueryOptions,
   useConversationEvents,
 } from './queries';
+export { ConversationStateBadge } from './components/ConversationStateBadge';
+export { CustomerAvatar } from './components/CustomerAvatar';
+export { useCustomerName } from './components/customer-name';
