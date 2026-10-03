@@ -1,12 +1,17 @@
 import { useRef, useState, type ComponentProps } from 'react';
-import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import examples from 'libphonenumber-js/mobile/examples';
+import {
+  getExampleNumber,
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from 'libphonenumber-js/max';
 import { useTranslation } from 'react-i18next';
 import { callingCodeOf, phoneCountryOf } from '@app/shared';
 
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 
-import { useCallingCodeOptions } from '../region-options';
+import { useCallingCodeOptions } from '@/lib/region-options';
 
 type PhoneFieldProps = Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'defaultValue'> & {
   /** E.164, blank, or whatever was typed when it does not parse. */
@@ -14,6 +19,8 @@ type PhoneFieldProps = Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'def
   onChange: (value: string) => void;
   /** The calling code to start with when there is no number yet. */
   defaultCountry: string;
+  /** Hint text inside the number box; defaults to an example number for the picked country. */
+  placeholder?: string;
 };
 
 function split(value: string, fallback: string): { country: string; national: string } {
@@ -32,8 +39,14 @@ function split(value: string, fallback: string): { country: string; national: st
  * The input takes the id and aria attributes a FormControl gives, so the
  * field's label and error point at the number.
  */
-export function PhoneField({ value, onChange, defaultCountry, ...inputProps }: PhoneFieldProps) {
-  const { t } = useTranslation('settings');
+export function PhoneField({
+  value,
+  onChange,
+  defaultCountry,
+  placeholder,
+  ...inputProps
+}: PhoneFieldProps) {
+  const { t } = useTranslation();
   const options = useCallingCodeOptions();
   const [state, setState] = useState(() => split(value, defaultCountry));
   const emitted = useRef(value);
@@ -58,12 +71,12 @@ export function PhoneField({ value, onChange, defaultCountry, ...inputProps }: P
   return (
     <div className="flex gap-2">
       <Combobox
-        aria-label={t('general.profile.callingCode')}
+        aria-label={t('phone.callingCode')}
         value={state.country}
         onValueChange={(country) => emit(country, state.national)}
         options={options}
-        searchPlaceholder={t('general.profile.searchCountry')}
-        emptyText={t('general.noMatch')}
+        searchPlaceholder={t('phone.searchCountry')}
+        emptyText={t('phone.noMatch')}
         className="w-32 shrink-0"
         contentClassName="w-72"
         disabled={inputProps.disabled}
@@ -72,6 +85,9 @@ export function PhoneField({ value, onChange, defaultCountry, ...inputProps }: P
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"
+        placeholder={
+          placeholder ?? getExampleNumber(state.country as CountryCode, examples)?.formatNational()
+        }
         {...inputProps}
         value={state.national}
         onChange={(event) => emit(state.country, event.target.value)}

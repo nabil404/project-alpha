@@ -66,7 +66,6 @@
   "general": {
     "noMatch": "No matches.",
     "profile": {
-      "callingCode": "Country calling code",
       "description": "Customers see this in order summaries and receipts.",
       "logo": "Shop logo",
       "logoAlt": "Shop logo",
@@ -75,7 +74,6 @@
       "phone": "Contact phone",
       "pickupAddress": "Pickup address",
       "removeLogo": "Remove",
-      "searchCountry": "Search country or code",
       "title": "Shop profile",
       "uploadLogo": "Upload logo"
     },

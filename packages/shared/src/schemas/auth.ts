@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { errorCodeSchema } from '../errors/codes';
+import { e164PhoneSchema } from '../region/phone';
 
 /**
  * Better Auth enforces these on sign-up and password reset, and the API reads
@@ -20,8 +21,9 @@ const PHONE_MAX_DIGITS = 15;
 
 /**
  * Digits with the separators people actually type - `01712-345678`,
- * `+880 1712 345678`, `(017) 1234 5678`. Stored as typed: it is how the seller
- * is reached about their account, not a key anything is looked up by.
+ * `+880 1712 345678`, `(017) 1234 5678`, stored as typed. Only for numbers
+ * whose country is unknown (a customer's, read from a chat); the seller's own
+ * is checked against its country with e164PhoneSchema.
  */
 export const phoneSchema = z
   .string()
@@ -41,13 +43,13 @@ export const phoneSchema = z
 /**
  * The email sign-up form, and what the API's hook on /auth/sign-up/email
  * validates before Better Auth sees the body. `shopName` names the seller's
- * organization; `phone` is stored on the user.
+ * organization; `phone` is stored on the user, in E.164.
  */
 export const signUpSchema = z.object({
   name: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   shopName: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   email: z.email(),
-  phone: phoneSchema,
+  phone: e164PhoneSchema,
   password: passwordSchema,
 });
 export type SignUpInput = z.infer<typeof signUpSchema>;
