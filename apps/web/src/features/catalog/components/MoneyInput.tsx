@@ -2,7 +2,6 @@ import { useState, type ComponentProps } from 'react';
 import { fromMinorUnits, toMinorUnits } from '@app/shared';
 
 import { Input } from '@/components/ui/input';
-import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +34,7 @@ export function MoneyInput({ value, onChange, className, ...props }: MoneyInputP
   return (
     <div className={cn('relative flex items-center', className)}>
       <span aria-hidden className="pointer-events-none absolute left-3 text-body text-ink-muted">
-        {currencySymbol(SHOP_CURRENCY)}
+        {currencySymbol()}
       </span>
       <Input
         {...props}

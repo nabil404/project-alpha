@@ -266,8 +266,13 @@ fully wired, so adding a locale is dropping a JSON file in, never a refactor.
   into `formatMinorUnits` and `Intl.DateTimeFormat`. **`packages/shared` must
   never import i18next** — the locale crosses that boundary as a plain BCP-47
   string. Non-React callers (CSV row builders, comparators) use
-  `currentLocale()`. There is no date library and shouldn't be one until real
-  date _arithmetic_ shows up; formatting is `Intl`'s job.
+  `currentLocale()`. Dates render with date-fns (+ `@date-fns/tz`) in the
+  **shop's** time zone and date format, never the viewer's machine's: the
+  region comes from `useShopRegion()` (`src/lib/shop-region.ts`), which
+  `ShopRegionProvider` fills from Settings > General. `formatMoney` and
+  `formatAmount` default to the shop's currency; there is no hardcoded one.
+  Compare days with `isSameDay` from `useFormatters()`, never
+  `toDateString()`. Numbers, lists and relative days stay with `Intl`.
 - **`<html lang>` and the tab title are owned by `src/i18n/index.ts`**, via a
   `languageChanged` listener. Don't set either from a component.
 - **English only, today.** Don't add a second locale directory or a language

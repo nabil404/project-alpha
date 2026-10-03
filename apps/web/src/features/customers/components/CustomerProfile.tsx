@@ -5,7 +5,6 @@ import type { CustomerDetail } from '@app/shared';
 
 import { Button } from '@/components/ui/button';
 import { CustomerAvatar, useCustomerName } from '@/features/conversations';
-import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 
 import { ContactCard } from './ContactCard';
@@ -80,16 +79,13 @@ export function CustomerProfile({ customer }: { customer: CustomerDetail }) {
           */}
           <div className="grid gap-2 sm:grid-cols-3 sm:gap-4">
             <Figure label={t('detail.figures.orders')} value={formatNumber(customer.orderCount)} />
-            <Figure
-              label={t('detail.figures.spent')}
-              value={formatMoney(customer.totalSpent, SHOP_CURRENCY)}
-            />
+            <Figure label={t('detail.figures.spent')} value={formatMoney(customer.totalSpent)} />
             <Figure
               label={t('detail.figures.average')}
               value={
                 customer.averageOrderValue === null
                   ? t('summary.none')
-                  : formatMoney(customer.averageOrderValue, SHOP_CURRENCY)
+                  : formatMoney(customer.averageOrderValue)
               }
             />
           </div>

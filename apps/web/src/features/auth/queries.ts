@@ -28,6 +28,8 @@ export interface SessionUser {
   emailVerified: boolean;
   image: string | null;
   phone: string | null;
+  /** The dashboard language this person picked; null follows the shop's country. */
+  locale: string | null;
 }
 
 export interface Session {

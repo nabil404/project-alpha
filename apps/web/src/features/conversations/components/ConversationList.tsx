@@ -236,13 +236,11 @@ function ConversationRow({
 
 /** The time for today's activity, the day for anything older. */
 function ListTime({ at }: { at: string }) {
-  const { formatDate } = useFormatters();
-  const date = new Date(at);
-  const today = new Date().toDateString() === date.toDateString();
+  const { formatDate, isSameDay } = useFormatters();
 
   return (
     <time dateTime={at} className="shrink-0 text-small text-ink-muted">
-      {formatDate(date, today ? 'time' : 'dayMonth')}
+      {formatDate(at, isSameDay(at) ? 'time' : 'dayMonth')}
     </time>
   );
 }
