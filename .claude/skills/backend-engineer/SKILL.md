@@ -59,18 +59,24 @@ and are marked ⚠️ below.
 - **`no-console` is an eslint rule** with `warn`/`error` allowed. It exists
   because tokens must never reach the logs — see Config and secrets.
 
-### This codebase is still greenfield — expect empty files
+### The schema files
 
-`src/modules/database/schema/` contains `auth.ts` — Better Auth's tables, generated,
-not hand-written — and `catalog.ts`: `product`, `product_variant`, `category`
-and `product_category`, the first business tables. Every other business table
-you reference has to come with the schema file and migration that create it.
+`src/modules/database/schema/` holds one file per area, exported in dependency
+order from `index.ts`: `auth.ts` (Better Auth's tables, generated, never
+hand-written), `pages.ts`, `catalog.ts`, `customers.ts` (with
+`customer_note`), `conversations.ts` and `orders.ts` (provisional until the
+orders work creates orders). `columns.ts` has the shared builders: `id()`,
+`merchantId()`, `createdAt()`/`updatedAt()`, `instant()` for millisecond
+timestamps that sort a keyset list, `merchantIsolation()` for the policy and
+`oneOf()` for enum checks. A business table you reference that does not exist
+yet comes with its schema and migration; don't hand-write types to work
+around a missing table.
+
 `src/modules/categories/` and `src/modules/products/` are the pattern to copy:
 repositories take `(Executor, TenantScope)`, services open `withMerchant`,
 children point at parents through composite `(merchant_id, id)` foreign keys,
 soft-delete filters come from each module's `*-visibility.ts`, and module
-dependencies run one way (products imports categories, never the reverse). Don't hand-write types to work around a
-missing table.
+dependencies run one way (products imports categories, never the reverse).
 
 ## The non-negotiable invariants
 
@@ -158,13 +164,13 @@ predicate is the leak to catch in review.**
 - **Required test, per `docs/mvp/01-messenger-to-order/rules.md`:** two merchants, proving one can never read,
   update, or confirm the other's data. Write it for every repository, not once.
 
-### Row-level security (groundwork in place — policies still to come)
+### Row-level security
 
-RLS is the defense-in-depth layer on top of the `merchant_id` filter. The
-machinery it needs now exists; **no policy does**, because no business table
-does. A policy is declared in the schema beside its table (see §"Authoring the
-policies" below) and so ships with the migration that creates it, never
-retrofitted. What that generates, per business table:
+RLS is the defense-in-depth layer on top of the `merchant_id` filter. Every
+business table has it enabled **and forced**, with one
+`<table>_merchant_isolation` policy declared in its schema file (see
+§"Authoring the policies" below), so a table and its policy ship in the same
+migration. What that produces, per business table:
 
 ```sql
 ALTER TABLE "order" ENABLE ROW LEVEL SECURITY;
@@ -175,11 +181,10 @@ CREATE POLICY "order_merchant_isolation" ON "order" AS PERMISSIVE FOR ALL TO pub
 ALTER TABLE "order" FORCE ROW LEVEL SECURITY;
 ```
 
-> ⚠️ **RLS protects every business table today.** The
-> application-level `merchant_id` predicate remains the tenant boundary, and RLS
+> ⚠️ **RLS is the backstop, not the boundary.** The application-level `merchant_id` predicate remains the tenant boundary, and RLS
 > is the backstop for a query that forgets it, never a licence to omit it.
 
-**What is now in place** (`db/migrations/*_rls_runtime_role.sql`):
+**The pieces it rests on:**
 
 - **`app_runtime`, a non-superuser role**, `NOBYPASSRLS`, with `GRANT`s on all
   tables and sequences plus `ALTER DEFAULT PRIVILEGES` so future tables are
@@ -227,7 +232,7 @@ await withMerchant(db, merchantId, (tx) => ordersRepo.listForMerchant(tx, { merc
 > opens a transaction, **never wrap an LLM or Graph API call in it** (invariant
 > #1): read state, call outside, then open it to write.
 
-**The webhook bootstrap path — settled.** `app_page_merchant(text)` resolves a
+**The webhook bootstrap path.** `app_page_merchant(text)` resolves a
 Page id to its merchant before any context exists. It is `SECURITY DEFINER`,
 owned by the `NOLOGIN` role `app_page_resolver`, which holds only
 `SELECT (page_id, merchant_id)` on `facebook_page`; the
@@ -241,34 +246,30 @@ through `resolvePageMerchant()`
 (`src/modules/conversations/ingest/page-merchant.ts`). Do **not** write a policy
 that permits reads when no context is set.
 
-**Still open, to decide with the first tables:**
-
-- **Policies themselves**, one per business table, declared in its schema file, plus the `FORCE` that `db:custom` must carry alongside.
-
 ### Authoring the policies
 
-**Policies live in the schema, beside the table they protect.** `pgPolicy` in a
-`pgTable` definition makes drizzle-kit emit `ENABLE ROW LEVEL SECURITY` and
-`CREATE POLICY`, so a table and its isolation rule are never separated:
+**Policies live in the schema, beside the table they protect.**
+`merchantIsolation()` from `schema/columns.ts` wraps `pgPolicy`, so drizzle-kit
+emits `ENABLE ROW LEVEL SECURITY` and `CREATE POLICY` with the table and the
+two are never separated:
 
 ```ts
 export const order = pgTable(
   'order',
   {
-    id: text('id').primaryKey(),
-    merchantId: text('merchant_id')
-      .notNull()
-      .references(() => organization.id),
+    id: id(),
+    merchantId: merchantId(),
+    // ...
   },
-  (table) => [
-    pgPolicy('order_merchant_isolation', {
-      for: 'all',
-      using: sql`${table.merchantId} = app_current_merchant()`,
-      withCheck: sql`${table.merchantId} = app_current_merchant()`,
-    }),
+  (t) => [
+    unique('order_merchant_id_uq').on(t.merchantId, t.id),
+    merchantIsolation('order_merchant_isolation', t.merchantId),
   ],
 );
 ```
+
+A table outside that one shape (the Page resolver's read on `facebook_page`)
+declares its extra `pgPolicy` the same way.
 
 **What drizzle-kit does not model**, and so must be hand-authored with
 `pnpm --filter api db:custom`: `FORCE ROW LEVEL SECURITY`, roles, `GRANT`s,
@@ -444,7 +445,8 @@ or the API typechecks against the stale build.
 - [ ] New business tables carry `merchant_id`; composite indexes lead with it;
       every unique constraint includes it.
 - [ ] Schema changed only through the drizzle-kit loop; migration reviewed by hand;
-      `database.types.ts` regenerated, not edited; Better Auth tables generated.
+      `FORCE` added in a `db:custom` migration for a new tenant table;
+      Better Auth tables generated.
 - [ ] Money is integer minor units; `jsonb` parsed with Zod on read; counts and
       `bigint` converted from strings explicitly.
 - [ ] Queue jobs keep the Meta message ID as `jobId`; order creation is
