@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Mail } from 'lucide-react';
@@ -13,6 +12,7 @@ import {
 } from '@/features/auth';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useFormatters } from '@/lib/format';
+import { useToast } from '@/lib/toast';
 
 import { CardSkeleton } from './CardSkeleton';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
@@ -51,7 +51,7 @@ export function PasswordCard() {
 function HasPassword({ credential }: { credential: LinkedAccount }) {
   const { t } = useTranslation('settings');
   const { formatDate } = useFormatters();
-  const [changed, setChanged] = useState(false);
+  const toast = useToast();
 
   return (
     <>
@@ -61,13 +61,8 @@ function HasPassword({ credential }: { credential: LinkedAccount }) {
           {t('account.password.lastChanged', { date: formatDate(credential.updatedAt) })}
         </p>
       </div>
-      {changed && (
-        <p role="status" className="text-small text-success">
-          {t('account.password.changed')}
-        </p>
-      )}
       <div>
-        <ChangePasswordDialog onChanged={() => setChanged(true)} />
+        <ChangePasswordDialog onChanged={() => toast.success(t('account.password.changed'))} />
       </div>
     </>
   );

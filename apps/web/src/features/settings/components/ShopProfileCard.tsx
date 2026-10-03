@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { applyServerFieldErrors, useZodResolver } from '@/lib/form';
+import { useToast } from '@/lib/toast';
 
 import { useRemoveLogo, useUpdateGeneralSettings, useUploadLogo } from '../queries';
 import { PhoneField } from '@/components/PhoneField';
@@ -58,6 +59,7 @@ const toFormValues = (settings: GeneralSettings): ProfileFormValues => ({
 export function ShopProfileCard({ settings }: { settings: GeneralSettings }) {
   const { t } = useTranslation(['settings', 'common']);
   const { forError, forCode, forField } = useErrorMessages();
+  const toast = useToast();
   const update = useUpdateGeneralSettings();
   const upload = useUploadLogo();
   const remove = useRemoveLogo();
@@ -77,7 +79,10 @@ export function ShopProfileCard({ settings }: { settings: GeneralSettings }) {
   const onSubmit = (values: UpdateGeneralSettings) =>
     update.mutate(values, {
       // The saved (trimmed, normalized) values become the baseline, so Save and Cancel go quiet.
-      onSuccess: (saved) => form.reset(toFormValues(saved)),
+      onSuccess: (saved) => {
+        form.reset(toFormValues(saved));
+        toast.success(t('general.profile.saved'));
+      },
       onError: (error) => {
         if (applyServerFieldErrors(error, form.setError, serverFields, forField)) update.reset();
       },
@@ -100,7 +105,7 @@ export function ShopProfileCard({ settings }: { settings: GeneralSettings }) {
       return;
     }
     setFileError(null);
-    upload.mutate(file);
+    upload.mutate(file, { onSuccess: () => toast.success(t('general.profile.logoUpdated')) });
   };
 
   const logoBusy = upload.isPending || remove.isPending;
@@ -173,7 +178,9 @@ export function ShopProfileCard({ settings }: { settings: GeneralSettings }) {
                     onClick={() => {
                       setFileError(null);
                       upload.reset();
-                      remove.mutate();
+                      remove.mutate(undefined, {
+                        onSuccess: () => toast.success(t('general.profile.logoRemoved')),
+                      });
                     }}
                   >
                     {t('general.profile.removeLogo')}
@@ -233,7 +240,6 @@ export function ShopProfileCard({ settings }: { settings: GeneralSettings }) {
           <SaveBar
             dirty={form.formState.isDirty}
             pending={update.isPending}
-            saved={update.isSuccess}
             onCancel={() => {
               form.reset();
               update.reset();
@@ -249,23 +255,16 @@ export function ShopProfileCard({ settings }: { settings: GeneralSettings }) {
 export function SaveBar({
   dirty,
   pending,
-  saved,
   onCancel,
 }: {
   dirty: boolean;
   pending: boolean;
-  saved: boolean;
   onCancel: () => void;
 }) {
   const { t } = useTranslation(['settings', 'common']);
 
   return (
     <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
-      {saved && !dirty && (
-        <span role="status" className="mr-auto text-small text-success">
-          {t('general.saved')}
-        </span>
-      )}
       <Button
         type="button"
         className="flex-1 sm:flex-none"

@@ -41,6 +41,7 @@
       "showing_one": "Showing {{from}}–{{to}} of {{count}} category",
       "showing_other": "Showing {{from}}–{{to}} of {{count}} categories"
     },
+    "renamed": "Renamed to {{name}}",
     "searchLabel": "Search categories",
     "searchPlaceholder": "Search categories",
     "sort": {
@@ -89,6 +90,7 @@
     "deleteDescription": "Variants using it go back to the default photo. This can't be undone.",
     "deleteShort": "Delete",
     "deleteTitle": "Delete photo {{number}}?",
+    "deleted": "Photo {{number}} deleted.",
     "description": "{{name}} · {{count}} photos",
     "done": "Done",
     "empty": "No photos yet.",
@@ -285,6 +287,8 @@
     "variantsOf": "{{count}} of {{total}}"
   },
   "upload": {
+    "added_one": "{{count}} photo added.",
+    "added_other": "{{count}} photos added.",
     "addMore": "Add more",
     "cancelUpload": "Cancel upload",
     "connection": "Couldn't upload. Check your connection.",

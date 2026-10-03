@@ -352,7 +352,16 @@ function NameEditorRow({ category, onDone }: { category?: CategoryWithCount; onD
   const onSubmit = form.handleSubmit(({ name }) => {
     if (category) {
       if (name === category.name) return onDone();
-      rename.mutate({ id: category.id, input: { name } }, { onSuccess: onDone, onError });
+      rename.mutate(
+        { id: category.id, input: { name } },
+        {
+          onSuccess: (renamed) => {
+            toast.success(t('categories.renamed', { name: renamed.name }));
+            onDone();
+          },
+          onError,
+        },
+      );
     } else {
       create.mutate(
         { name },

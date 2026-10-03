@@ -36,8 +36,10 @@
       "name": "Name",
       "photo": "Profile photo",
       "photoHint": "PNG, JPG or WebP, at least {{minSide}} × {{minSide}} px.",
+      "photoRemoved": "Profile photo removed.",
+      "photoUpdated": "Profile photo updated.",
       "removePhoto": "Remove",
-      "saved": "Saved.",
+      "saved": "Profile saved.",
       "title": "Your profile",
       "uploadPhoto": "Upload photo"
     },
@@ -70,10 +72,13 @@
       "logo": "Shop logo",
       "logoAlt": "Shop logo",
       "logoHint": "Square PNG, JPG or WebP, at least {{minSide}} × {{minSide}} px.",
+      "logoRemoved": "Shop logo removed.",
+      "logoUpdated": "Shop logo updated.",
       "name": "Shop name",
       "phone": "Contact phone",
       "pickupAddress": "Pickup address",
       "removeLogo": "Remove",
+      "saved": "Shop profile saved.",
       "title": "Shop profile",
       "uploadLogo": "Upload logo"
     },
@@ -88,14 +93,14 @@
       "languageAuto": "Same as shop country ({{language}})",
       "languageHint": "Just for you. Teammates choose their own.",
       "otherZones": "All time zones",
+      "saved": "Region saved.",
       "searchCountry": "Search countries",
       "searchCurrency": "Search currencies",
       "searchTimeZone": "Search time zones",
       "timeZone": "Time zone",
       "title": "Region",
       "zonesIn": "In {{country}}"
-    },
-    "saved": "Saved."
+    }
   },
   "header": {
     "description": "Your shop, your Messenger Page and how the order assistant works.",
