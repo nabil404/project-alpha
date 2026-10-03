@@ -58,8 +58,8 @@ Every `merchant_id` table must be `ENABLE` + `FORCE` with at least one policy;
 and the policies but not `FORCE`, which is why each table has a follow-up custom
 migration.
 
-Data backfills in migrations (the cover and "Variant" option backfill in
-`0014`) run with no merchant context, so they see these tables' rows only
+Data backfills in migrations (such as the product cover and "Variant" option
+backfill) run with no merchant context, so they see these tables' rows only
 because the owner is the cluster's superuser. `FORCE` alone would hide every
 row from a non-superuser owner, and such a backfill would silently do nothing.
 
@@ -77,6 +77,9 @@ row from a non-superuser owner, and such a backfill would silently do nothing.
 | `customer`                                                                           | yes           | yes         | yes        | `customer_merchant_isolation`                                     |
 | `conversation`                                                                       | yes           | yes         | yes        | `conversation_merchant_isolation`                                 |
 | `message`                                                                            | yes           | yes         | yes        | `message_merchant_isolation`                                      |
+| `customer_note`                                                                      | yes           | yes         | yes        | `customer_note_merchant_isolation`                                |
+| `order`                                                                              | yes           | yes         | yes        | `order_merchant_isolation`                                        |
+| `order_item`                                                                         | yes           | yes         | yes        | `order_item_merchant_isolation`                                   |
 | `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation` | no            | no          | no         | none — Better Auth tables, deliberately unprotected by RLS        |
 
 ## Policies
@@ -99,9 +102,12 @@ merchant. With no context set, both evaluate to `NULL` and nothing matches.
 | `product_variant_option_value_merchant_isolation` | `product_variant_option_value` | `ALL`    | `public`            | same                                   | same                                   | Confines variant↔value links to the current merchant.                                                                                           |
 | `facebook_page_merchant_isolation`                | `facebook_page`                | `ALL`    | `public`            | same                                   | same                                   | Confines the connected Page, including its encrypted access token, to the current merchant.                                                     |
 | `facebook_page_resolver_read`                     | `facebook_page`                | `SELECT` | `app_page_resolver` | `true`                                 | —                                      | Lets the resolver see every Page row; its column grant still limits it to `page_id` and `merchant_id`. Used only through `app_page_merchant()`. |
-| `customer_merchant_isolation`                     | `customer`                     | `ALL`    | `public`            | `merchant_id = app_current_merchant()` | `merchant_id = app_current_merchant()` | Confines Messenger customers (PSID, name) to the current merchant.                                                                              |
+| `customer_merchant_isolation`                     | `customer`                     | `ALL`    | `public`            | `merchant_id = app_current_merchant()` | `merchant_id = app_current_merchant()` | Confines Messenger customers (PSID, name, contact details) to the current merchant.                                                             |
 | `conversation_merchant_isolation`                 | `conversation`                 | `ALL`    | `public`            | same                                   | same                                   | Confines conversations and their state to the current merchant.                                                                                 |
 | `message_merchant_isolation`                      | `message`                      | `ALL`    | `public`            | same                                   | same                                   | Confines messages to the current merchant.                                                                                                      |
+| `customer_note_merchant_isolation`                | `customer_note`                | `ALL`    | `public`            | same                                   | same                                   | Confines the team's customer notes to the current merchant.                                                                                     |
+| `order_merchant_isolation`                        | `order`                        | `ALL`    | `public`            | same                                   | same                                   | Confines orders and their delivery details to the current merchant.                                                                             |
+| `order_item_merchant_isolation`                   | `order_item`                   | `ALL`    | `public`            | same                                   | same                                   | Confines order items to the current merchant.                                                                                                   |
 
 ## Triggers
 
@@ -137,6 +143,10 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `product_variant_option_value_value_fk`   | `product_variant_option_value (merchant_id, option_id, option_value_id)` → `product_option_value (merchant_id, option_id, id)` | `CASCADE`                   | A linked value must belong to the named option; deleting a value removes its links (archived variants keep their `name`). Targets `product_option_value_merchant_option_id_uq`.   |
 | `conversation_customer_fk`                | `conversation` → `customer`                                                                                                    | `NO ACTION`                 | A conversation's customer belongs to the same merchant.                                                                                                                           |
 | `message_conversation_fk`                 | `message` → `conversation`                                                                                                     | `CASCADE`                   | Deleting a conversation removes its messages.                                                                                                                                     |
+| `customer_note_customer_fk`               | `customer_note` → `customer`                                                                                                   | `CASCADE`                   | Deleting a customer removes their notes. `author_id` → `user.id` is a plain key, `SET NULL`: a deleted user leaves notes without an author.                                       |
+| `order_customer_fk`                       | `order` → `customer`                                                                                                           | `NO ACTION`                 | An order's customer belongs to the same merchant; a customer with orders cannot be deleted.                                                                                       |
+| `order_conversation_fk`                   | `order (merchant_id, conversation_id)` → `conversation`                                                                        | `NO ACTION`                 | The conversation an order was confirmed in belongs to the same merchant. Nullable; a null skips the check.                                                                        |
+| `order_item_order_fk`                     | `order_item` → `order`                                                                                                         | `CASCADE`                   | Deleting an order removes its items. `product_id` and `variant_id` have no key: items keep name and price snapshots, and products are hard-deleted.                               |
 
 ## Check constraints
 
@@ -154,6 +164,11 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `conversation_last_sender_ck`        | `conversation`         | `last_message_sender` in `customer`, `assistant`, `seller`.                                                      |
 | `message_sender_ck`                  | `message`              | `sender` in `customer`, `assistant`, `seller`.                                                                   |
 | `message_status_ck`                  | `message`              | `status` in `sending`, `sent`, `failed`.                                                                         |
+| `order_status_ck`                    | `order`                | `status` in `new`, `confirmed`, `packed`, `shipped`, `delivered`, `cancelled`.                                   |
+| `order_number_ck`                    | `order`                | `number > 0`. `UNIQUE (merchant_id, number)`: each shop has its own sequence.                                    |
+| `order_amounts_ck`                   | `order`                | `subtotal >= 0`, `delivery_charge >= 0`, `total = subtotal + delivery_charge` (minor units).                     |
+| `order_item_quantity_ck`             | `order_item`           | `quantity > 0`.                                                                                                  |
+| `order_item_unit_price_ck`           | `order_item`           | `unit_price >= 0` (minor units).                                                                                 |
 
 ## Partial and special indexes
 

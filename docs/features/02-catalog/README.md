@@ -57,14 +57,9 @@ at. The composite keys do that, so a bug that writes another merchant's
 plain composite `SET NULL` would also null `merchant_id` and fail its
 `NOT NULL`. So that key lives in a custom migration, not in `catalog.ts`.
 
-Migrations:
-
-| Migration                                                                                                    | What                                                                      |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| [`0003_catalog.sql`](../../../apps/api/db/migrations/0003_catalog.sql)                                       | Generated: the four catalog tables, `ENABLE` RLS, policies                |
-| [`0004_catalog_force_rls.sql`](../../../apps/api/db/migrations/0004_catalog_force_rls.sql)                   | Custom: `FORCE ROW LEVEL SECURITY` on those four                          |
-| [`0005_product_image.sql`](../../../apps/api/db/migrations/0005_product_image.sql)                           | Generated: `product_image`, `product_variant.image_id`                    |
-| [`0006_product_image_fk_force_rls.sql`](../../../apps/api/db/migrations/0006_product_image_fk_force_rls.sql) | Custom: `FORCE` on `product_image`, the `SET NULL (image_id)` variant key |
+drizzle-kit generates the tables, `ENABLE ROW LEVEL SECURITY` and the policies;
+`FORCE ROW LEVEL SECURITY` and the two `SET NULL (column)` image keys are custom
+migrations.
 
 The index names `VARIANT_SKU_LIVE_UIDX` and `CATEGORY_NAME_LIVE_UIDX` are
 exported from the schema, because the services map unique violations on them to
