@@ -121,6 +121,10 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
         // Collected at email sign-up (signUpSchema makes it required there),
         // but nullable: a Google or Facebook sign-up has no phone to give.
         phone: { type: 'string', required: false, input: true },
+        // The dashboard language this person picked; null follows the shop's
+        // country. Set only through PATCH /account/preferences, never sign-up
+        // or /update-user.
+        locale: { type: 'string', required: false, input: false },
       },
     },
     emailAndPassword: {
