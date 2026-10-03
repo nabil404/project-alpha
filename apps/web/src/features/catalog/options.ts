@@ -77,7 +77,8 @@ export function removeOption({ options, variants }: OptionState, index: number):
  * Replaces option `index` with its edited copy. Variants using a removed value
  * go; variants using a renamed value follow it. New values add a variant each
  * only while this is the product's one option: with more, the seller adds the
- * combinations they sell.
+ * combinations they sell. A value already there whose variant the seller
+ * removed stays without one until they add it back.
  */
 export function updateOption(state: OptionState, index: number, edited: OptionDraft): OptionState {
   const before = state.options[index]!;
@@ -102,8 +103,12 @@ export function updateOption(state: OptionState, index: number, edited: OptionDr
     });
 
   if (state.options.length === 1) {
+    const isNew = (v: OptionDraft['values'][number]) =>
+      !before.values.some((old) =>
+        v.id ? old.id === v.id : !old.id && sameText(old.value, v.value),
+      );
     const added = edited.values.filter(
-      (v) => !variants.some((variant) => sameText(variant.optionValues[0]!, v.value)),
+      (v) => isNew(v) && !variants.some((variant) => sameText(variant.optionValues[0]!, v.value)),
     );
     const template = variants[0] ?? state.variants[0]!;
     variants = [...variants, ...added.map((v) => grownFrom(template, [v.value]))];
