@@ -1,4 +1,5 @@
-import { index, pgTable, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { foreignKey, index, pgTable, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { user } from './auth';
 import { createdAt, id, merchantId, merchantIsolation, updatedAt } from './columns';
 
 /** Constraint name the ingest maps nothing from, exported for the schema spec. */
@@ -7,7 +8,6 @@ export const CUSTOMER_PSID_UQ = 'customer_merchant_psid_uq';
 /**
  * Someone who messaged the shop's Page. The PSID is Page-scoped, and the same
  * person messaging two shops is correctly two rows: UNIQUE (merchant_id, psid).
- * Phone and address arrive with the orders work, which is what collects them.
  */
 export const customer = pgTable(
   'customer',
@@ -24,6 +24,14 @@ export const customer = pgTable(
     pictureUrl: text('picture_url'),
     /** The last attempt to read the profile, successful or not. */
     profileFetchedAt: timestamp('profile_fetched_at', { withTimezone: true }),
+    /**
+     * Contact details the seller keeps on file, edited from the dashboard. Each
+     * order snapshots its own copy, so changing these never rewrites history.
+     */
+    phone: text('phone'),
+    deliveryAddress: text('delivery_address'),
+    /** A short locality for the list ("Mirpur 10, Dhaka"). */
+    area: text('area'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -37,3 +45,30 @@ export const customer = pgTable(
 );
 
 export type CustomerRow = typeof customer.$inferSelect;
+
+/**
+ * A note the seller's team keeps on a customer; the customer never sees it.
+ * `author_id` survives its user being deleted as a note without an author.
+ */
+export const customerNote = pgTable(
+  'customer_note',
+  {
+    id: id(),
+    merchantId: merchantId(),
+    customerId: text('customer_id').notNull(),
+    authorId: text('author_id').references(() => user.id, { onDelete: 'set null' }),
+    body: text('body').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'customer_note_customer_fk',
+      columns: [t.merchantId, t.customerId],
+      foreignColumns: [customer.merchantId, customer.id],
+    }).onDelete('cascade'),
+    index('customer_note_customer_idx').on(t.merchantId, t.customerId, t.createdAt.desc(), t.id),
+    merchantIsolation('customer_note_merchant_isolation', t.merchantId),
+  ],
+);
+
+export type CustomerNoteRow = typeof customerNote.$inferSelect;

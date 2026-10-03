@@ -42,6 +42,10 @@ async function purge(db: Database, merchantIds: string[]): Promise<void> {
     .where(inArray(schema.productVariant.merchantId, merchantIds));
   await db.delete(schema.product).where(inArray(schema.product.merchantId, merchantIds));
   await db.delete(schema.category).where(inArray(schema.category.merchantId, merchantIds));
+  // Orders and notes point at customers and conversations, so they go first.
+  await db.delete(schema.orderItem).where(inArray(schema.orderItem.merchantId, merchantIds));
+  await db.delete(schema.order).where(inArray(schema.order.merchantId, merchantIds));
+  await db.delete(schema.customerNote).where(inArray(schema.customerNote.merchantId, merchantIds));
   // Conversations: messages cascade from their conversation, but delete them
   // explicitly so a failed test cannot leave a row holding the merchant.
   await db.delete(schema.message).where(inArray(schema.message.merchantId, merchantIds));

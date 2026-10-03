@@ -51,11 +51,17 @@ delivery address.
 - **Category** — a seller's flat list, no nesting; names unique per seller.
   A product can sit in several categories. Deleting one is a soft delete and
   removes it from its products.
-- **Customer** — Messenger PSID, name, picture, phone, address (phone and
-  address are stored from the orders work on). The picture is Facebook's
-  profile link, which expires after a few days: it is re-read every three days,
-  when the customer writes and by a daily worker job for anyone active in the
-  last 30 days, and the dashboard falls back to initials.
+- **Customer** — Messenger PSID, name, picture, and the contact details the
+  seller keeps on file: phone, delivery address, area. Each order snapshots
+  its own copy, so editing these never rewrites an order. The picture is
+  Facebook's profile link, which expires after a few days: it is re-read every
+  three days, when the customer writes and by a daily worker job for anyone
+  active in the last 30 days, and the dashboard falls back to initials. The
+  Customers page shows one status per customer, the first that applies: needs
+  you (a conversation is handed off), inactive (no message or order for 60
+  days), repeat (two or more orders), new. Cancelled orders never count.
+- **Customer note** — free text the seller's team keeps on a customer, with
+  its author; the customer never sees it.
 - **Conversation** — customer, Page, state, collected slots, bot paused flag.
   `bot_paused` is the seller taking over (by hand, by replying from the
   dashboard, or by replying from Facebook's own inbox); `handed_off` is the
@@ -65,7 +71,8 @@ delivery address.
   (`sending`, `sent`, `failed`), timestamps, Meta message ID (none while a
   reply is `sending`).
 - **Order / OrderItem** — items, totals, delivery charge, status, notes, linked
-  conversation.
+  conversation. The tables exist so the Customers pages can read order
+  history; their shape is provisional until the orders work creates orders.
 
 Money is stored as integer minor units (e.g. paisa/cents), never floats or
 `numeric`.
