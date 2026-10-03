@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { applyServerFieldErrors, useZodResolver } from '@/lib/form';
 import { useFormatters } from '@/lib/format';
+import { useToast } from '@/lib/toast';
 
 import { useCreateCustomerNote, useCustomerNotes } from '../queries';
 
@@ -31,6 +32,7 @@ export function NotesCard({ customerId }: { customerId: string }) {
   const { t } = useTranslation(['customers', 'common']);
   const { forError, forField } = useErrorMessages();
   const { formatDate } = useFormatters();
+  const toast = useToast();
   const notes = useCustomerNotes(customerId);
   const create = useCreateCustomerNote(customerId);
 
@@ -41,7 +43,10 @@ export function NotesCard({ customerId }: { customerId: string }) {
 
   const onSubmit = (values: CreateCustomerNote) =>
     create.mutate(values, {
-      onSuccess: () => form.reset({ body: '' }),
+      onSuccess: () => {
+        form.reset({ body: '' });
+        toast.success(t('notes.added'));
+      },
       onError: (error) => {
         if (applyServerFieldErrors(error, form.setError, serverFields, forField)) create.reset();
       },

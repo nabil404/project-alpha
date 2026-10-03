@@ -134,7 +134,6 @@ export function ProductEditor({ product }: { product?: Product }) {
       create.mutate(document, {
         onSuccess: (created) => {
           form.reset(toFormValues(created));
-          // The page swaps to the new product's, so the inline "Saved" never shows.
           toast.success(t('editor.created'));
           void leave(() =>
             navigate({
@@ -162,6 +161,7 @@ export function ProductEditor({ product }: { product?: Product }) {
         onSuccess: (saved) => {
           setBaseVersion(saved.version);
           form.reset(toFormValues(saved));
+          toast.success(t('editor.saved'));
         },
         onError,
       },
@@ -238,11 +238,6 @@ export function ProductEditor({ product }: { product?: Product }) {
                 </Button>
               </div>
             </div>
-            {mutation.isSuccess && !isDirty && (
-              <p role="status" className="text-small text-success">
-                {t('editor.saved')}
-              </p>
-            )}
           </header>
 
           {mutation.isError && (

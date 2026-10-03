@@ -76,6 +76,7 @@
     "title": "Customers"
   },
   "notes": {
+    "added": "Note added.",
     "byline": "{{author}} · {{date}}",
     "empty": "No notes yet.",
     "formerMember": "Former team member",

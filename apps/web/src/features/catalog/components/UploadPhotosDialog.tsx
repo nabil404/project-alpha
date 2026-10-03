@@ -24,6 +24,7 @@ import {
 import { useErrorMessages } from '@/i18n/error-keys';
 import { ApiError } from '@/lib/api-error';
 import { useFormatters } from '@/lib/format';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 import { useUploadProductImage } from '../queries';
@@ -109,6 +110,7 @@ function UploadBody({
   const { t } = useTranslation(['catalog', 'common']);
   const { forCode, forError } = useErrorMessages();
   const { formatFileSize } = useFormatters();
+  const toast = useToast();
   const upload = useUploadProductImage(product.id);
   const inputId = useId();
   const [selected, setSelected] = useState<string | null>(null);
@@ -182,6 +184,7 @@ function UploadBody({
     const controller = new AbortController();
     abort.current = controller;
     let failed = false;
+    let uploaded = 0;
 
     for (const item of queue) {
       if (controller.signal.aborted) break;
@@ -194,6 +197,7 @@ function UploadBody({
           onProgress: (progress) => update(item.key, { progress }),
         });
         update(item.key, { status: 'done', progress: 1 });
+        uploaded += 1;
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
           update(item.key, { status: 'waiting', progress: 0 });
@@ -210,7 +214,10 @@ function UploadBody({
 
     abort.current = null;
     setRunning(false);
-    if (!failed && !controller.signal.aborted) onDone();
+    if (!failed && !controller.signal.aborted) {
+      if (uploaded > 0) toast.success(t('upload.added', { count: uploaded }));
+      onDone();
+    }
   };
 
   const cancel = () => {
