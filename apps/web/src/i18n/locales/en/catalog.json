@@ -5,6 +5,53 @@
     "name": "Product name",
     "title": "Basic details"
   },
+  "categories": {
+    "add": "Add category",
+    "added": "Added {{name}}",
+    "columns": {
+      "actions": "Actions",
+      "name": "Category name",
+      "products": "Products"
+    },
+    "delete": {
+      "alsoIn": "Also in {{list}}",
+      "confirm": "Delete category",
+      "description_one": "This removes it from <strong>{{count}} product</strong>. The product stays in your catalog and keeps its other categories.",
+      "description_other": "This removes it from <strong>{{count}} products</strong>. The products stay in your catalog and keep their other categories.",
+      "done": "Deleted {{name}}",
+      "empty": "No products are in it. Nothing else changes.",
+      "loadFailed": "Couldn't load the products in it.",
+      "more_one": "and {{count}} more product",
+      "more_other": "and {{count}} more products",
+      "onlyHere": "Only in this category",
+      "orphans_one": "<strong>{{count}} product will have no category.</strong> Customers won't find it by browsing until you add one.",
+      "orphans_other": "<strong>{{count}} products will have no category.</strong> Customers won't find them by browsing until you add one.",
+      "productsLabel": "Products in {{name}}",
+      "title": "Delete “{{name}}”?"
+    },
+    "deleteLabel": "Delete {{name}}",
+    "editLabel": "Edit {{name}}",
+    "empty": "Group your products so customers can browse them. Add your first category.",
+    "emptyFiltered": "No categories match your search.",
+    "label": "Categories",
+    "nameLabel": "Category name",
+    "newPlaceholder": "New category name",
+    "pagination": {
+      "perPageLabel": "Categories per page",
+      "showing_one": "Showing {{from}}–{{to}} of {{count}} category",
+      "showing_other": "Showing {{from}}–{{to}} of {{count}} categories"
+    },
+    "searchLabel": "Search categories",
+    "searchPlaceholder": "Search categories",
+    "sort": {
+      "byCount": "Sort by product count",
+      "byName": "Sort by name",
+      "countAsc": "Fewest products first. Select for most first",
+      "countDesc": "Most products first. Select for fewest first",
+      "nameAsc": "Sorted A to Z. Select for Z to A",
+      "nameDesc": "Sorted Z to A. Select for A to Z"
+    }
+  },
   "delete": {
     "confirm": "Delete product",
     "description": "Its variants and photos go with it. This can't be undone. If you only want to stop selling it, set its status to Archived instead.",
@@ -134,8 +181,7 @@
     "tabs": {
       "categories": "Categories",
       "label": "Catalog sections",
-      "products": "Products",
-      "soon": "Coming soon"
+      "products": "Products"
     },
     "title": "Catalog",
     "toggle": {

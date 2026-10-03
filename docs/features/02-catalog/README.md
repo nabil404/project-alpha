@@ -14,8 +14,8 @@ composite tenant keys and forced row-level security, `CategoriesService` and
 `ProductsService` with every rule below (including the AI's
 `findSellableCatalog` read), product image upload/delete/reorder over HTTP,
 object storage on Cloudflare R2, a daily orphan sweep in the worker, and the
-dashboard's products list and add/edit page, and the category routes. Not
-built yet: the Categories page, CSV import, and stock movement on orders (see
+dashboard's products list, add/edit page and Categories page, and the
+category routes. Not built yet: CSV import and stock movement on orders (see
 [Not yet built](#not-yet-built)).
 
 ## At a glance
@@ -156,6 +156,22 @@ The dashboard's Products page reads `GET /products` and `GET /products/counts`
 - **Paging** is by page number (`page`, `limit` of 10, 25, 50 or 100), newest
   first, with a total for "Showing 1–10 of 64". A seller's catalog is small
   enough that offset paging stays cheap, and the page wants numbered pages.
+
+### Categories page
+
+The dashboard's Categories page, at `/catalog/categories`, reads
+`GET /categories` once and searches, sorts (by name, or by product count) and
+pages that list in the browser: a seller has tens of categories, not
+thousands.
+
+- **Rename and add in the row.** Enter saves, Escape cancels. A taken name
+  (`CATEGORY_NAME_TAKEN`) shows under the box, which stays open.
+- **Delete asks first**, naming the products the category comes off, with the
+  other categories each keeps, and warning how many will be left with none.
+  The list is one `GET /products?categoryId=` page of 100, so archived products
+  are counted in `productCount` but not listed.
+- **Counts stay current.** Every product write also refreshes the categories,
+  since it can move a product in or out of one.
 
 ### Visibility
 
@@ -411,10 +427,13 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
   aliases, and the photo dialogs (Add photos with per-file progress, All
   photos with delete and the default choice, and a full-screen viewer). The
   default photo is saved with the page; uploads and deletes happen at once.
-  The products list at `/catalog` is built too. Still to come: reordering
-  photos, the Categories page, and fields the design shows that the API
-  doesn't hold yet: a per-product delivery charge choice, the assistant
-  notes, a per-seller low-stock threshold and sales figures.
+  The products list at `/catalog` and the Categories page at
+  `/catalog/categories` are built too. Still to come: reordering photos, the
+  Categories page's insights panel (what customers ask for, categories they
+  ask for that don't exist, and the needs-attention list), and fields the
+  design shows that the API doesn't hold yet: a per-product delivery charge
+  choice, the assistant notes, a per-seller low-stock threshold and sales
+  figures.
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
 - **Stock movement.** Decrement on order confirmation (row lock, reject if
