@@ -14,8 +14,8 @@ composite tenant keys and forced row-level security, `CategoriesService` and
 `ProductsService` with every rule below (including the AI's
 `findSellableCatalog` read), product image upload/delete/reorder over HTTP,
 object storage on Cloudflare R2, a daily orphan sweep in the worker, and the
-dashboard's products list and add/edit page. Not built yet: category
-writes, CSV import, and stock movement on orders (see
+dashboard's products list and add/edit page, and the category routes. Not
+built yet: the Categories page, CSV import, and stock movement on orders (see
 [Not yet built](#not-yet-built)).
 
 ## At a glance
@@ -252,7 +252,7 @@ processor is registered only in the worker, never in the API process.
 
 ## HTTP surface
 
-Only the image routes are exposed so far
+The image routes are in
 ([`product-images.controller.ts`](../../../apps/api/src/modules/products/images/product-images.controller.ts)).
 They need a session and carry `TenantGuard`, so the merchant always comes from
 the session.
@@ -274,6 +274,18 @@ The products list is `GET /api/v1/products` (query `filter`, `q`,
 `GET /api/v1/products/counts`, in
 [`products.controller.ts`](../../../apps/api/src/modules/products/products.controller.ts)
 beside the product routes. See [Products list](#products-list).
+
+The category routes are in
+[`categories.controller.ts`](../../../apps/api/src/modules/categories/categories.controller.ts),
+behind the same session and `TenantGuard`. The category resource is
+`{ id, name }`; see [Categories](#categories) for the rules.
+
+| Method | Path                     | Body               | Success            | Errors                                                                       |
+| ------ | ------------------------ | ------------------ | ------------------ | ---------------------------------------------------------------------------- |
+| GET    | `/api/v1/categories`     | —                  | 200, live, by name | —                                                                            |
+| POST   | `/api/v1/categories`     | `{ name: string }` | 201, the category  | 400 `VALIDATION_FAILED`, 409 `CATEGORY_NAME_TAKEN`                           |
+| PATCH  | `/api/v1/categories/:id` | `{ name: string }` | 200, the category  | 400 `VALIDATION_FAILED`, 404 `CATEGORY_NOT_FOUND`, 409 `CATEGORY_NAME_TAKEN` |
+| DELETE | `/api/v1/categories/:id` | —                  | 204                | 400 `VALIDATION_FAILED`, 404 `CATEGORY_NOT_FOUND`                            |
 
 ## Errors
 
@@ -364,6 +376,7 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 | [`database/__tests__/catalog-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-schema.spec.ts)                     | Constraints: composite keys, checks, partial unique indexes                                            |
 | [`database/__tests__/catalog-rls.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-rls.spec.ts)                           | Two-merchant isolation under RLS                                                                       |
 | [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)         | Create, rename, delete, name clashes, two-merchant isolation                                           |
+| [`categories/__tests__/categories.e2e.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.e2e.spec.ts)                 | Category routes over HTTP: status codes, error envelopes, unlinking on delete, two-merchant isolation  |
 | [`products/__tests__/products.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/products.service.spec.ts)                 | Product create, update, delete, category links                                                         |
 | [`products/__tests__/product-variants.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-variants.service.spec.ts) | Last-variant guard, default-variant rule, SKUs, variant images                                         |
 | [`products/__tests__/product-gallery.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-gallery.service.spec.ts)   | Images embedded in products; object cleanup on product delete                                          |
@@ -385,7 +398,6 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
 
 ## Not yet built
 
-- **Category write routes.** The product routes, including the list, are built.
 - **Dashboard UI, beyond the edit page.** `/catalog/products/new` and
   `/catalog/products/$productId` are built: basic details, the option editor
   and variant table, the variant image picker, status, categories and
