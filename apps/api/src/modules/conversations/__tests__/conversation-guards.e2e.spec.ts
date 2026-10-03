@@ -121,6 +121,10 @@ describeDb('conversations routes behind the real guards', () => {
         // member, session and account cascade from user; organization does not.
         await db.delete(schema.user).where(inArray(schema.user.id, userIds));
         if (orgIds.length > 0) {
+          // A sign-up with a phone gives the shop a settings row.
+          await db
+            .delete(schema.merchantSettings)
+            .where(inArray(schema.merchantSettings.merchantId, orgIds));
           await db.delete(schema.organization).where(inArray(schema.organization.id, orgIds));
         }
       }

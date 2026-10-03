@@ -77,7 +77,8 @@ the templates in
    (`countryOfTimeZone`), since there is no shop yet to take one from. Rows
    from before this change keep the number as it was typed. The seller's
    organization is created **named after `shopName`** (see
-   [below](#the-sellers-organization)). A **"Verify your email address"**
+   [below](#the-sellers-organization)), in the region of that phone's
+   country ([Settings – General](../06-settings-general/README.md#rules)). A **"Verify your email address"**
    mail is sent. The link is valid for 24 hours (`VERIFICATION_TOKEN_TTL`).
 3. The link hits `GET /api/v1/auth/verify-email?token=…`, which marks the email
    verified, **signs the seller in** (`autoSignInAfterVerification`) and
