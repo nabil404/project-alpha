@@ -1,4 +1,4 @@
-import { getCountry, getAllTimezones } from 'countries-and-timezones';
+import { getAllTimezones, getCountry, getTimezone } from 'countries-and-timezones';
 import { countries, type TCountryCode } from 'countries-list';
 import { getCountries, getCountryCallingCode, type CountryCode } from 'libphonenumber-js/max';
 
@@ -184,6 +184,17 @@ export function regionDefaults(country: string): RegionDefaults {
     dateFormat: defaultDateFormat(country),
     callingCode: callingCodeOf(country),
   };
+}
+
+/**
+ * The country a time zone belongs to, for a first guess where nothing better
+ * is known - the browser's zone at sign-up. Aliases resolve (`Asia/Calcutta`
+ * is India); a zone several countries share (`Europe/Zurich` also covers
+ * Liechtenstein) gives its first. Null for `UTC` and anything unknown.
+ */
+export function countryOfTimeZone(timeZone: string): string | null {
+  const countries = getTimezone(timeZone)?.countries ?? [];
+  return countries.find((country) => isCountryCode(country)) ?? null;
 }
 
 /** Where a shop starts before its seller picks a region: the MVP's first market. */

@@ -149,7 +149,7 @@ describeDb('conversations routes behind the real guards', () => {
         password: PASSWORD,
         name: 'Nadia Rahman',
         shopName: "Nadia's Kitchen",
-        phone: '01712-345678',
+        phone: '+880 1712-345678',
         callbackURL: '/',
       })
       .expect(200);

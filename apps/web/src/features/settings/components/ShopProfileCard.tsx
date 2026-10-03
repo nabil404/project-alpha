@@ -30,7 +30,7 @@ import { useErrorMessages } from '@/i18n/error-keys';
 import { applyServerFieldErrors, useZodResolver } from '@/lib/form';
 
 import { useRemoveLogo, useUpdateGeneralSettings, useUploadLogo } from '../queries';
-import { PhoneField } from './PhoneField';
+import { PhoneField } from '@/components/PhoneField';
 
 const profileSchema = updateGeneralSettingsSchema.pick({
   name: true,

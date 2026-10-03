@@ -75,7 +75,7 @@ describeDb('email/password auth over HTTP', () => {
       password,
       name: 'Nadia Rahman',
       shopName: "Nadia's Kitchen",
-      phone: '01712-345678',
+      phone: '+880 1712-345678',
       callbackURL: '/',
       ...overrides,
     });
@@ -246,7 +246,7 @@ describeDb('email/password auth over HTTP', () => {
       });
     });
 
-    it('names the organization after the shop and stores the phone', async () => {
+    it('names the organization after the shop and stores the phone as E.164', async () => {
       const address = email('shop');
       await signUp(address, PASSWORD, {
         shopName: "  Rahim's Kitchen ",
@@ -260,7 +260,7 @@ describeDb('email/password auth over HTTP', () => {
         .innerJoin(schema.organization, eq(schema.organization.id, schema.member.organizationId))
         .where(eq(schema.user.email, address));
 
-      expect(row).toEqual({ phone: '+880 1712 345678', shopName: "Rahim's Kitchen" });
+      expect(row).toEqual({ phone: '+8801712345678', shopName: "Rahim's Kitchen" });
     });
 
     it('rejects a sign-up missing the shop name and phone, field by field', async () => {
@@ -279,8 +279,12 @@ describeDb('email/password auth over HTTP', () => {
       expect(users).toHaveLength(0);
     });
 
-    it('rejects a phone that is not a phone number', async () => {
-      const response = await signUp(email('bad-phone'), PASSWORD, { phone: 'call me' });
+    it.each([
+      ['not a phone number', 'call me'],
+      ['without its country code', '01712-345678'],
+      ['too short for its country', '+880 1712'],
+    ])('rejects a phone %s', async (_, phone) => {
+      const response = await signUp(email('bad-phone'), PASSWORD, { phone });
 
       expect(response.status).toBe(400);
       expect(response.body.error.fields).toEqual({

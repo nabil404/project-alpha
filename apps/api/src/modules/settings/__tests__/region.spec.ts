@@ -4,6 +4,7 @@ import {
   TIME_ZONES,
   callingCodeOf,
   countryAliasesOf,
+  countryOfTimeZone,
   defaultDashboardLocale,
   formatMinorUnits,
   formatShopDate,
@@ -56,6 +57,16 @@ describe('region data', () => {
   it('has no calling code for a territory without a numbering plan', () => {
     expect(callingCodeOf('BD')).toBe('880');
     expect(callingCodeOf('PN')).toBeNull();
+  });
+
+  it.each([
+    ['Asia/Dhaka', 'BD'],
+    ['Asia/Calcutta', 'IN'],
+    ['America/Chicago', 'US'],
+    ['UTC', null],
+    ['Mars/Olympus', null],
+  ])('guesses the country of %s', (timeZone, country) => {
+    expect(countryOfTimeZone(timeZone)).toBe(country);
   });
 
   it('finds a country by its other names', () => {

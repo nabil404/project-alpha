@@ -71,7 +71,11 @@ the templates in
    form) and answers `VALIDATION_FAILED` with per-field errors before Better
    Auth sees it. Better Auth only checks the fields it knows about.
 2. The user row is created with `phone` (a Better Auth `additionalFields`
-   column, nullable because a social sign-up has none) and the seller's
+   column, nullable because a social sign-up has none), checked against its
+   country's numbering plan and stored in E.164. The form's calling code
+   picker starts at the country of the browser's time zone
+   (`countryOfTimeZone`), since there is no shop yet to take one from. Rows
+   from before this change keep the number as it was typed. The seller's
    organization is created **named after `shopName`** (see
    [below](#the-sellers-organization)). A **"Verify your email address"**
    mail is sent. The link is valid for 24 hours (`VERIFICATION_TOKEN_TTL`).
