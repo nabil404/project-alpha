@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useErrorMessages } from '@/i18n/error-keys';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 import { useDeleteProductImage } from '../queries';
@@ -52,6 +53,7 @@ export function PhotosGalleryDialog({
 }: PhotosGalleryDialogProps) {
   const { t } = useTranslation(['catalog', 'common']);
   const { forError } = useErrorMessages();
+  const toast = useToast();
   const remove = useDeleteProductImage(product.id);
   const [deleting, setDeleting] = useState<{ image: ProductImage; number: number } | null>(null);
   const images = product.images;
@@ -215,7 +217,11 @@ export function PhotosGalleryDialog({
                 disabled={remove.isPending}
                 onClick={() =>
                   deleting &&
-                  remove.mutate(deleting.image.id, { onSettled: () => setDeleting(null) })
+                  remove.mutate(deleting.image.id, {
+                    onSuccess: () =>
+                      toast.success(t('gallery.deleted', { number: deleting.number })),
+                    onSettled: () => setDeleting(null),
+                  })
                 }
               >
                 {t('gallery.deleteConfirm')}

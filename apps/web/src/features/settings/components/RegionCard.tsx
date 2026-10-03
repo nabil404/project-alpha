@@ -31,6 +31,7 @@ import { sessionQueryOptions } from '@/features/auth';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { dateFnsLocale, useFormatters } from '@/lib/format';
 import { applyServerFieldErrors, useZodResolver } from '@/lib/form';
+import { useToast } from '@/lib/toast';
 
 import { useUpdateAccountPreferences, useUpdateGeneralSettings } from '../queries';
 import {
@@ -65,6 +66,7 @@ export function RegionCard({ settings }: { settings: GeneralSettings }) {
   const { t } = useTranslation(['settings', 'common']);
   const { forError, forField } = useErrorMessages();
   const { locale } = useFormatters();
+  const toast = useToast();
   const session = useQuery(sessionQueryOptions());
   const update = useUpdateGeneralSettings();
   const updatePreferences = useUpdateAccountPreferences();
@@ -127,6 +129,7 @@ export function RegionCard({ settings }: { settings: GeneralSettings }) {
         await updatePreferences.mutateAsync({ locale: language || null });
       }
       form.reset(toFormValues(saved, language));
+      toast.success(t('general.region.saved'));
     } catch (error) {
       if (applyServerFieldErrors(error, form.setError, serverFields, forField)) update.reset();
     }
@@ -269,7 +272,6 @@ export function RegionCard({ settings }: { settings: GeneralSettings }) {
           <SaveBar
             dirty={form.formState.isDirty}
             pending={pending}
-            saved={update.isSuccess}
             onCancel={() => {
               form.reset();
               update.reset();

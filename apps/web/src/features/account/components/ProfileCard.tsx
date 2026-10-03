@@ -28,6 +28,7 @@ import { Label } from '@/components/ui/label';
 import { sessionQueryOptions, type SessionUser } from '@/features/auth';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { applyServerFieldErrors, useZodResolver } from '@/lib/form';
+import { useToast } from '@/lib/toast';
 
 import { useRemoveAvatar, useUpdateProfile, useUploadAvatar } from '../queries';
 import { CardSkeleton } from './CardSkeleton';
@@ -48,6 +49,7 @@ export function ProfileCard() {
 function ProfileForm({ user }: { user: SessionUser }) {
   const { t } = useTranslation(['settings', 'common']);
   const { forError, forCode, forField } = useErrorMessages();
+  const toast = useToast();
   const update = useUpdateProfile();
   const upload = useUploadAvatar();
   const remove = useRemoveAvatar();
@@ -61,7 +63,10 @@ function ProfileForm({ user }: { user: SessionUser }) {
   const onSubmit = (values: UpdateProfileInput) =>
     update.mutate(values, {
       // The saved (trimmed) name becomes the new baseline, so Save and Cancel go quiet.
-      onSuccess: () => form.reset(values),
+      onSuccess: () => {
+        form.reset(values);
+        toast.success(t('account.profile.saved'));
+      },
       onError: (error) => {
         // A field error is shown under the field; only unplaced errors keep the banner.
         if (applyServerFieldErrors(error, form.setError, serverFields, forField)) update.reset();
@@ -85,7 +90,7 @@ function ProfileForm({ user }: { user: SessionUser }) {
       return;
     }
     setFileError(null);
-    upload.mutate(file);
+    upload.mutate(file, { onSuccess: () => toast.success(t('account.profile.photoUpdated')) });
   };
 
   const photoBusy = upload.isPending || remove.isPending;
@@ -146,7 +151,9 @@ function ProfileForm({ user }: { user: SessionUser }) {
                     onClick={() => {
                       setFileError(null);
                       upload.reset();
-                      remove.mutate();
+                      remove.mutate(undefined, {
+                        onSuccess: () => toast.success(t('account.profile.photoRemoved')),
+                      });
                     }}
                   >
                     {t('account.profile.removePhoto')}
@@ -189,11 +196,6 @@ function ProfileForm({ user }: { user: SessionUser }) {
           </div>
 
           <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
-            {update.isSuccess && !form.formState.isDirty && (
-              <span role="status" className="mr-auto text-small text-success">
-                {t('account.profile.saved')}
-              </span>
-            )}
             <Button
               type="button"
               disabled={!form.formState.isDirty || update.isPending}
