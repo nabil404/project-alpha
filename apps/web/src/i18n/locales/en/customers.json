@@ -1,0 +1,129 @@
+{
+  "contact": {
+    "area": "Area",
+    "deliveryAddress": "Delivery address",
+    "dialog": {
+      "areaHint": "The neighbourhood or city, for finding customers by area.",
+      "description": "Your own record. Orders already placed keep the details they were placed with.",
+      "title": "Edit contact"
+    },
+    "edit": "Edit",
+    "messenger": "Messenger",
+    "notAdded": "Not added",
+    "phone": "Phone",
+    "saved": "Contact saved.",
+    "title": "Contact"
+  },
+  "conversation": {
+    "botPaused": "The assistant is paused in this chat.",
+    "meta": "{{sender}} · {{at}}",
+    "none": "No conversation yet.",
+    "open": "Open in Conversations",
+    "title": "Latest conversation"
+  },
+  "detail": {
+    "backToCustomers": "Back to customers",
+    "breadcrumb": "Breadcrumb",
+    "figures": {
+      "average": "Average order",
+      "orders": "Orders",
+      "spent": "Total spent"
+    },
+    "openChat": "Open chat",
+    "since": "Customer since {{date}}",
+    "sinceInArea": "{{since}} · {{area}}"
+  },
+  "list": {
+    "card": {
+      "lastOrder": "Last order: {{when}}",
+      "noOrders": "No orders",
+      "orders_one": "{{count}} order",
+      "orders_other": "{{count}} orders"
+    },
+    "clearFilters": "Clear search and filters",
+    "columns": {
+      "area": "Area",
+      "customer": "Customer",
+      "lastOrder": "Last order",
+      "orders": "Orders",
+      "status": "Status",
+      "totalSpent": "Total spent ({{symbol}})"
+    },
+    "description": "Everyone who has messaged or ordered from your shop.",
+    "empty": "No customers yet. Everyone who messages your Page shows up here.",
+    "emptyFiltered": "No customers match.",
+    "filters": {
+      "all": "All",
+      "inactive": "Inactive",
+      "label": "Show",
+      "needs_you": "Needs you",
+      "new": "New",
+      "repeat": "Repeat"
+    },
+    "label": "Customers",
+    "noOrdersYet": "No orders yet",
+    "pagination": {
+      "perPageLabel": "Customers per page",
+      "showing_one": "Showing {{from}}–{{to}} of {{total}} customer",
+      "showing_other": "Showing {{from}}–{{to}} of {{total}} customers"
+    },
+    "searchLabel": "Search customers",
+    "searchPlaceholder": "Search by name, phone or area",
+    "sort": {
+      "by": "Sort by {{column}}",
+      "reverse": "Sorted by {{column}}. Click to reverse"
+    },
+    "title": "Customers"
+  },
+  "notes": {
+    "byline": "{{author}} · {{date}}",
+    "empty": "No notes yet.",
+    "formerMember": "Former team member",
+    "label": "Add a note",
+    "placeholder": "Add a note only your team can see",
+    "save": "Save note",
+    "title": "Notes"
+  },
+  "orders": {
+    "columns": {
+      "items": "Items",
+      "order": "Order",
+      "placed": "Placed",
+      "status": "Status",
+      "total": "Total"
+    },
+    "count_one": "{{formatted}} order",
+    "count_other": "{{formatted}} orders",
+    "empty": "No orders yet.",
+    "item": "{{product}} × {{quantity}}",
+    "itemWithVariant": "{{product}}, {{variant}} × {{quantity}}",
+    "perPageLabel": "Orders per page",
+    "showing_one": "Showing {{from}}–{{to}} of {{total}} order",
+    "showing_other": "Showing {{from}}–{{to}} of {{total}} orders",
+    "title": "Orders"
+  },
+  "summary": {
+    "average": {
+      "allTime": "Across all orders",
+      "change": "{{change}} vs the {{days}} days before",
+      "label": "Average order value"
+    },
+    "needsYou": {
+      "label": "Need a reply",
+      "link": "In Conversations"
+    },
+    "none": "—",
+    "repeat": {
+      "detail_one": "{{repeat}} of {{buyers}} buyer ordered {{min}}+ times",
+      "detail_other": "{{repeat}} of {{buyers}} buyers ordered {{min}}+ times",
+      "label": "Repeat customers",
+      "noOrders": "No orders yet"
+    },
+    "total": {
+      "label": "Total customers",
+      "new_one": "+{{formatted}} in the last {{days}} days",
+      "new_other": "+{{formatted}} in the last {{days}} days",
+      "noneNew": "None new in the last {{days}} days"
+    }
+  }
+}

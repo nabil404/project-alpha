@@ -22,6 +22,8 @@ import { Route as AppCatalogIndexRouteImport } from './routes/_app/catalog/index
 import { Route as AppCatalogCategoriesRouteImport } from './routes/_app/catalog/categories'
 import { Route as AppConversationsIndexRouteImport } from './routes/_app/conversations/index'
 import { Route as AppConversationsConversationIdRouteImport } from './routes/_app/conversations/$conversationId'
+import { Route as AppCustomersIndexRouteImport } from './routes/_app/customers/index'
+import { Route as AppCustomersCustomerIdRouteImport } from './routes/_app/customers/$customerId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings/account'
 import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
@@ -92,6 +94,16 @@ const AppConversationsConversationIdRoute =
     path: '/$conversationId',
     getParentRoute: () => AppConversationsRoute,
   } as any)
+const AppCustomersIndexRoute = AppCustomersIndexRouteImport.update({
+  id: '/customers/',
+  path: '/customers/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCustomersCustomerIdRoute = AppCustomersCustomerIdRouteImport.update({
+  id: '/customers/$customerId',
+  path: '/customers/$customerId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -129,10 +141,12 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof AuthSignUpRoute
   '/catalog/categories': typeof AppCatalogCategoriesRoute
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
+  '/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
   '/catalog/': typeof AppCatalogIndexRoute
   '/conversations/': typeof AppConversationsIndexRoute
+  '/customers/': typeof AppCustomersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
@@ -145,10 +159,12 @@ export interface FileRoutesByTo {
   '/sign-up': typeof AuthSignUpRoute
   '/catalog/categories': typeof AppCatalogCategoriesRoute
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
+  '/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
   '/catalog': typeof AppCatalogIndexRoute
   '/conversations': typeof AppConversationsIndexRoute
+  '/customers': typeof AppCustomersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
@@ -166,10 +182,12 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/catalog/categories': typeof AppCatalogCategoriesRoute
   '/_app/conversations/$conversationId': typeof AppConversationsConversationIdRoute
+  '/_app/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/_app/settings/account': typeof AppSettingsAccountRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
   '/_app/catalog/': typeof AppCatalogIndexRoute
   '/_app/conversations/': typeof AppConversationsIndexRoute
+  '/_app/customers/': typeof AppCustomersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/_app/catalog/products/new': typeof AppCatalogProductsNewRoute
@@ -186,10 +204,12 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/catalog/categories'
     | '/conversations/$conversationId'
+    | '/customers/$customerId'
     | '/settings/account'
     | '/settings/messenger'
     | '/catalog/'
     | '/conversations/'
+    | '/customers/'
     | '/settings/'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
@@ -202,10 +222,12 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/catalog/categories'
     | '/conversations/$conversationId'
+    | '/customers/$customerId'
     | '/settings/account'
     | '/settings/messenger'
     | '/catalog'
     | '/conversations'
+    | '/customers'
     | '/settings'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
@@ -222,10 +244,12 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/catalog/categories'
     | '/_app/conversations/$conversationId'
+    | '/_app/customers/$customerId'
     | '/_app/settings/account'
     | '/_app/settings/messenger'
     | '/_app/catalog/'
     | '/_app/conversations/'
+    | '/_app/customers/'
     | '/_app/settings/'
     | '/_app/catalog/products/$productId'
     | '/_app/catalog/products/new'
@@ -329,6 +353,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppConversationsConversationIdRouteImport
       parentRoute: typeof AppConversationsRoute
     }
+    '/_app/customers/': {
+      id: '/_app/customers/'
+      path: '/customers'
+      fullPath: '/customers/'
+      preLoaderRoute: typeof AppCustomersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/customers/$customerId': {
+      id: '/_app/customers/$customerId'
+      path: '/customers/$customerId'
+      fullPath: '/customers/$customerId'
+      preLoaderRoute: typeof AppCustomersCustomerIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/'
@@ -401,7 +439,9 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
   AppCatalogCategoriesRoute: typeof AppCatalogCategoriesRoute
+  AppCustomersCustomerIdRoute: typeof AppCustomersCustomerIdRoute
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
+  AppCustomersIndexRoute: typeof AppCustomersIndexRoute
   AppCatalogProductsProductIdRoute: typeof AppCatalogProductsProductIdRoute
   AppCatalogProductsNewRoute: typeof AppCatalogProductsNewRoute
 }
@@ -411,7 +451,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
   AppCatalogCategoriesRoute: AppCatalogCategoriesRoute,
+  AppCustomersCustomerIdRoute: AppCustomersCustomerIdRoute,
   AppCatalogIndexRoute: AppCatalogIndexRoute,
+  AppCustomersIndexRoute: AppCustomersIndexRoute,
   AppCatalogProductsProductIdRoute: AppCatalogProductsProductIdRoute,
   AppCatalogProductsNewRoute: AppCatalogProductsNewRoute,
 }

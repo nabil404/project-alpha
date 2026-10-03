@@ -1,6 +1,5 @@
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { PRODUCT_LIST_PAGE_SIZES } from '@app/shared';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,12 +18,14 @@ function pageItems(page: number, totalPages: number): (number | 'gap')[] {
 }
 
 /**
- * The page size, what's showing, and the page buttons, under a catalog table.
- * `summary` and `perPageLabel` name what the table lists.
+ * The page size, what's showing, and the page buttons, under a paged table.
+ * `summary` and `perPageLabel` name what the table lists; `pageSizes` are the
+ * sizes its route accepts.
  */
 export function PaginationBar({
   page,
   limit,
+  pageSizes,
   totalPages,
   summary,
   perPageLabel,
@@ -33,18 +34,19 @@ export function PaginationBar({
 }: {
   page: number;
   limit: number;
+  pageSizes: readonly number[];
   totalPages: number;
   summary: string;
   perPageLabel: string;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
 }) {
-  const { t } = useTranslation('catalog');
+  const { t } = useTranslation();
 
   return (
     <div className="flex flex-wrap items-center gap-4 border-t border-border px-4 py-3 sm:px-6">
       <label className="flex items-center gap-2 text-small text-ink-muted">
-        {t('list.pagination.perPageBefore')}
+        {t('pagination.perPageBefore')}
         <span className="relative flex items-center">
           <select
             aria-label={perPageLabel}
@@ -52,7 +54,7 @@ export function PaginationBar({
             onChange={(event) => onLimitChange(Number(event.target.value))}
             className="h-8 cursor-pointer appearance-none rounded-sm border border-border-strong bg-surface pr-7 pl-2.5 text-small text-ink tabular-nums hover:bg-surface-hover"
           >
-            {PRODUCT_LIST_PAGE_SIZES.map((size) => (
+            {pageSizes.map((size) => (
               <option key={size} value={size}>
                 {size}
               </option>
@@ -64,10 +66,10 @@ export function PaginationBar({
             className="pointer-events-none absolute right-1.5 size-4 text-ink-muted"
           />
         </span>
-        {t('list.pagination.perPageAfter')}
+        {t('pagination.perPageAfter')}
       </label>
       <span className="grow text-small text-ink-muted">{summary}</span>
-      <nav aria-label={t('list.pagination.label')} className="flex items-center gap-1">
+      <nav aria-label={t('pagination.label')} className="flex items-center gap-1">
         <Button
           size="sm"
           disabled={page <= 1}
@@ -75,7 +77,7 @@ export function PaginationBar({
           className="px-2"
         >
           <ChevronLeft aria-hidden strokeWidth={1.5} />
-          {t('list.pagination.previous')}
+          {t('pagination.previous')}
         </Button>
         {pageItems(page, totalPages).map((item, index) =>
           item === 'gap' ? (
@@ -92,7 +94,7 @@ export function PaginationBar({
               size="sm"
               variant={item === page ? 'primary' : 'ghost'}
               aria-current={item === page ? 'page' : undefined}
-              aria-label={t('list.pagination.page', { page: item })}
+              aria-label={t('pagination.page', { page: item })}
               onClick={() => onPageChange(item)}
               className={cn('min-w-8 px-2 tabular-nums')}
             >
@@ -106,7 +108,7 @@ export function PaginationBar({
           onClick={() => onPageChange(page + 1)}
           className="px-2"
         >
-          {t('list.pagination.next')}
+          {t('pagination.next')}
           <ChevronRight aria-hidden strokeWidth={1.5} />
         </Button>
       </nav>

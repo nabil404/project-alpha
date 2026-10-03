@@ -176,6 +176,10 @@ new enum member fails the build instead of rendering unstyled.
 | Conversation `abandoned`                           | neutral                      |
 | Product `active` (Published)                       | success                      |
 | Product `draft`, `archived`                        | neutral                      |
+| Customer `repeat`                                  | accent                       |
+| Customer `new`                                     | success                      |
+| Customer `needs_you`                               | warning                      |
+| Customer `inactive`                                | neutral                      |
 
 Keep `accent` for the one status that needs the seller: the teal accent sits
 near `success` in hue, so an accent badge must never be the only thing that

@@ -2,6 +2,7 @@ import auth from './locales/en/auth.json';
 import catalog from './locales/en/catalog.json';
 import common from './locales/en/common.json';
 import conversations from './locales/en/conversations.json';
+import customers from './locales/en/customers.json';
 import errors from './locales/en/errors.json';
 import orders from './locales/en/orders.json';
 import settings from './locales/en/settings.json';
@@ -13,6 +14,7 @@ export const namespaces = [
   'orders',
   'catalog',
   'conversations',
+  'customers',
   'settings',
   'errors',
 ] as const;
@@ -21,7 +23,7 @@ export const defaultNS = 'common';
 
 /** Adding a locale: add `locales/<lng>/*.json`, one entry here, one in `supportedLanguages`. */
 export const resources = {
-  en: { common, auth, orders, catalog, conversations, settings, errors },
+  en: { common, auth, orders, catalog, conversations, customers, settings, errors },
 } as const;
 
 export const supportedLanguages = ['en'] as const;
