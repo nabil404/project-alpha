@@ -175,7 +175,7 @@ CREATE POLICY "order_merchant_isolation" ON "order" AS PERMISSIVE FOR ALL TO pub
 ALTER TABLE "order" FORCE ROW LEVEL SECURITY;
 ```
 
-> ⚠️ **RLS protects the catalog tables today** (`0004_catalog_force_rls`). The
+> ⚠️ **RLS protects every business table today.** The
 > application-level `merchant_id` predicate remains the tenant boundary, and RLS
 > is the backstop for a query that forgets it, never a licence to omit it.
 
@@ -229,11 +229,11 @@ await withMerchant(db, merchantId, (tx) => ordersRepo.listForMerchant(tx, { merc
 
 **The webhook bootstrap path — settled.** `app_page_merchant(text)` resolves a
 Page id to its merchant before any context exists. It is `SECURITY DEFINER`,
-owned by the `NOLOGIN` role `app_page_resolver`: migration `0009` creates the
-role and grants it `SELECT (page_id, merchant_id)` on `facebook_page`, the
+owned by the `NOLOGIN` role `app_page_resolver`, which holds only
+`SELECT (page_id, merchant_id)` on `facebook_page`; the
 `facebook_page_resolver_read` policy in `schema/pages.ts` lets it read those
-rows, and `0011` creates the function, revokes `EXECUTE` from `PUBLIC`, grants
-it to `app_runtime`, then hands ownership to the resolver. What the function can
+rows. `EXECUTE` is revoked from `PUBLIC` and granted to `app_runtime`, and the
+resolver owns the function. What the function can
 read therefore does not rely on bypassing row-level security. The migrating
 role does still need to be a superuser or hold `SET` membership in
 `app_page_resolver`, because `ALTER FUNCTION … OWNER TO` requires it. Call it
