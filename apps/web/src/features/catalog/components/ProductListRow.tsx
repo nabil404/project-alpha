@@ -8,7 +8,6 @@ import { stockLevelOf, type Product, type ProductListItem, type StockLevel } fro
 import { Button } from '@/components/ui/button';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { statusToneDotClasses, stockLevelTones } from '@/i18n/status-tones';
-import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -50,10 +49,10 @@ export function ProductListRow({
 
   const price =
     item.priceMin === item.priceMax
-      ? formatAmount(item.priceMin, SHOP_CURRENCY)
+      ? formatAmount(item.priceMin)
       : t('list.priceRange', {
-          min: formatAmount(item.priceMin, SHOP_CURRENCY),
-          max: formatAmount(item.priceMax, SHOP_CURRENCY),
+          min: formatAmount(item.priceMin),
+          max: formatAmount(item.priceMax),
         });
   const notes =
     single || item.stock === 0
@@ -214,7 +213,7 @@ function VariantRows({
               <td className={columns.variants.cell} />
               <td className={columns.options.cell} />
               <td className={cn(variantCell, 'text-right text-body tabular-nums')}>
-                {formatAmount(variant.price, SHOP_CURRENCY)}
+                {formatAmount(variant.price)}
               </td>
               <td className={cn(variantCell, 'text-right')}>
                 <StockFigure stock={variant.stock} level={stockLevelOf(variant.stock)} />

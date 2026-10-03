@@ -20,7 +20,6 @@ import { Input } from '@/components/ui/input';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { statusToneDotClasses, stockLevelTones } from '@/i18n/status-tones';
-import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -198,7 +197,7 @@ export function ProductList({
                     {t('list.columns.options')}
                   </th>
                   <th scope="col" className="border-t border-border px-4 py-3 text-right">
-                    {t('list.columns.price', { symbol: currencySymbol(SHOP_CURRENCY) })}
+                    {t('list.columns.price', { symbol: currencySymbol() })}
                   </th>
                   <th scope="col" className="border-t border-border px-4 py-3 text-right">
                     {t('list.columns.stock')}

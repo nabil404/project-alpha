@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { useConversationEvents } from '@/features/conversations';
+import { ShopRegionProvider } from '@/features/settings';
 import { cn } from '@/lib/utils';
 
 import { NAV_ITEMS } from './nav-items';
@@ -15,7 +16,8 @@ import { SidebarContent } from './SidebarContent';
  * The signed-in dashboard: a fixed sidebar from `lg` up; below it, a top bar
  * whose menu button opens the same sidebar as a drawer. The conversation
  * event stream lives here, not on the conversations page, so the sidebar's
- * unread count stays live on every page.
+ * unread count stays live on every page, and so does the shop's region, so
+ * every page's money and dates follow Settings > General.
  */
 export function AppShell() {
   useConversationEvents();
@@ -24,15 +26,17 @@ export function AppShell() {
   });
 
   return (
-    <div className="min-h-dvh bg-bg text-ink lg:flex">
-      <aside className="sticky top-0 hidden h-dvh w-62 shrink-0 overflow-y-auto border-r border-border bg-surface px-4 py-6 lg:block">
-        <SidebarContent />
-      </aside>
-      <MobileTopBar />
-      <main className={cn('min-w-0 grow', !fullBleed && 'px-4 py-6 sm:px-8 sm:py-8')}>
-        <Outlet />
-      </main>
-    </div>
+    <ShopRegionProvider>
+      <div className="min-h-dvh bg-bg text-ink lg:flex">
+        <aside className="sticky top-0 hidden h-dvh w-62 shrink-0 overflow-y-auto border-r border-border bg-surface px-4 py-6 lg:block">
+          <SidebarContent />
+        </aside>
+        <MobileTopBar />
+        <main className={cn('min-w-0 grow', !fullBleed && 'px-4 py-6 sm:px-8 sm:py-8')}>
+          <Outlet />
+        </main>
+      </div>
+    </ShopRegionProvider>
   );
 }
 

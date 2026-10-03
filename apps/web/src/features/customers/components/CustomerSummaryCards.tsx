@@ -4,7 +4,6 @@ import { TrendingDown, TrendingUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CUSTOMER_STATS_WINDOW_DAYS, REPEAT_MIN_ORDERS, type CustomerSummary } from '@app/shared';
 
-import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -75,7 +74,7 @@ export function CustomerSummaryCards({ summary }: { summary: CustomerSummary | u
       />
       <StatCard
         label={t('summary.average.label')}
-        value={allTime === null ? t('summary.none') : formatMoney(allTime, SHOP_CURRENCY)}
+        value={allTime === null ? t('summary.none') : formatMoney(allTime)}
         detail={
           change === null ? (
             t('summary.average.allTime')

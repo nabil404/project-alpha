@@ -80,6 +80,7 @@ function threadItems(messages: Message[], local: LocalMessage[]): ThreadItem[] {
 export function MessageList({ conversationId }: { conversationId: string }) {
   const { t } = useTranslation('conversations');
   const { forError } = useErrorMessages();
+  const { isSameDay } = useFormatters();
   const messagesQuery = useMessages(conversationId);
   const local = useLocalMessages(conversationId);
   const stored =
@@ -143,7 +144,7 @@ export function MessageList({ conversationId }: { conversationId: string }) {
         ) : (
           messages.map((message, index) => (
             <Fragment key={message.key}>
-              {!sameDay(messages[index - 1]?.sentAt, message.sentAt) && (
+              {!sameDay(isSameDay, messages[index - 1]?.sentAt, message.sentAt) && (
                 <DaySeparator at={message.sentAt} />
               )}
               <MessageBubble conversationId={conversationId} message={message} />
@@ -155,14 +156,19 @@ export function MessageList({ conversationId }: { conversationId: string }) {
   );
 }
 
-function sameDay(a: string | undefined, b: string): boolean {
-  return a !== undefined && new Date(a).toDateString() === new Date(b).toDateString();
+/** Days are the shop's, so a separator falls at the shop's midnight. */
+function sameDay(
+  isSameDay: (a: string, b: string) => boolean,
+  a: string | undefined,
+  b: string,
+): boolean {
+  return a !== undefined && isSameDay(a, b);
 }
 
 function DaySeparator({ at }: { at: string }) {
   const { t } = useTranslation('conversations');
-  const { formatDate } = useFormatters();
-  const today = new Date().toDateString() === new Date(at).toDateString();
+  const { formatDate, isSameDay } = useFormatters();
+  const today = isSameDay(at);
 
   return (
     <div className="self-center text-small text-ink-muted">

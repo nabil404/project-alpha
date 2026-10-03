@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CustomerAvatar, useCustomerName } from '@/features/conversations';
 import { useErrorMessages } from '@/i18n/error-keys';
-import { SHOP_CURRENCY } from '@/lib/currency';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -189,7 +188,7 @@ export function CustomerList({
                       </SortableHeader>
                       <SortableHeader sort="total_spent" query={query} onSort={onSort}>
                         {t('list.columns.totalSpent', {
-                          symbol: currencySymbol(SHOP_CURRENCY),
+                          symbol: currencySymbol(),
                         })}
                       </SortableHeader>
                       <SortableHeader sort="last_order" query={query} onSort={onSort} align="left">
@@ -311,7 +310,7 @@ function CustomerRow({ customer }: { customer: CustomerListItem }) {
         {formatNumber(customer.orderCount)}
       </td>
       <td className="px-4 py-3 text-right text-body tabular-nums">
-        {formatAmount(customer.totalSpent, SHOP_CURRENCY)}
+        {formatAmount(customer.totalSpent)}
       </td>
       <td className="px-4 py-3 text-small whitespace-nowrap text-ink-muted">
         {lastOrderLabel(customer.lastOrderAt)}
@@ -346,7 +345,7 @@ function CustomerCards({ customers }: { customers: CustomerListItem[] }) {
                   {customerName(customer.name)}
                 </span>
                 <span className="text-body font-medium whitespace-nowrap tabular-nums">
-                  {formatMoney(customer.totalSpent, SHOP_CURRENCY)}
+                  {formatMoney(customer.totalSpent)}
                 </span>
               </span>
               <span className="flex justify-between gap-2 text-small text-ink-muted">
