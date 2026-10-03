@@ -26,6 +26,14 @@ delivery address.
   later needs no migration. Every business table carries `merchant_id`, which
   references `organization(id)` and never `user(id)`, and all queries are scoped
   by it.
+- **Merchant settings** — one row per shop, written on its first save: country,
+  currency, time zone, date format, contact phone (E.164) and pickup address.
+  The shop's name and logo stay on the organization. A shop with no row reads
+  as the default region (Bangladesh). The currency is what every price and
+  order is in: it can change only until the shop's first order, and a change
+  keeps each price's number (rescaling minor units when the decimals differ),
+  never converting it. The dashboard language belongs to each person
+  (`user.locale`), not the shop; unset, it follows the shop's country.
 - **Page** — connected Facebook Page, encrypted token, bot on/off.
 - **Product / Option / Variant** — product: name, aliases (shown to sellers
   as Tags), description, images, a cover image, delivery charge, status
@@ -70,9 +78,10 @@ delivery address.
 - **Message** — sender (`customer`, `assistant`, `seller`), content, status
   (`sending`, `sent`, `failed`), timestamps, Meta message ID (none while a
   reply is `sending`).
-- **Order / OrderItem** — items, totals, delivery charge, status, notes, linked
-  conversation. The tables exist so the Customers pages can read order
+- **Order / OrderItem** — items, totals, currency (the shop's at the time),
+  delivery charge, status, notes, linked conversation. The tables exist so the Customers pages can read order
   history; their shape is provisional until the orders work creates orders.
 
-Money is stored as integer minor units (e.g. paisa/cents), never floats or
-`numeric`.
+Money is stored as integer minor units of the shop's currency (e.g.
+paisa/cents; the currency's ISO 4217 exponent decides how many), never floats
+or `numeric`.

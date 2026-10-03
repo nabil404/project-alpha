@@ -127,6 +127,20 @@
       "when": 1791056258088,
       "tag": "0017_customers_orders_force_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791061093574,
+      "tag": "0018_settings_general",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791061096651,
+      "tag": "0019_settings_general_force_rls",
+      "breakpoints": true
     }
   ]
 }

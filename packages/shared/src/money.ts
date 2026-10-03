@@ -4,6 +4,22 @@
  */
 export type MinorUnits = number;
 
+/**
+ * The currency's ISO 4217 exponent: 2 for BDT and USD, 0 for JPY, 3 for KWD.
+ * Read from Intl, which carries ISO's table, so no list here can go stale.
+ */
+export function currencyDecimals(currency: string): number {
+  return (
+    new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions()
+      .maximumFractionDigits ?? 2
+  );
+}
+
+/** How many minor units make one major unit: 100 paisa to the taka, 1 yen to the yen. */
+export function minorUnitsPerMajor(currency: string): number {
+  return 10 ** currencyDecimals(currency);
+}
+
 export function toMinorUnits(major: number, unitsPerMajor = 100): MinorUnits {
   return Math.round(major * unitsPerMajor);
 }
@@ -17,7 +33,7 @@ export function formatMinorUnits(
   amount: MinorUnits,
   currency: string,
   locale = 'en-US',
-  unitsPerMajor = 100,
+  unitsPerMajor = minorUnitsPerMajor(currency),
 ): string {
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(
     amount / unitsPerMajor,
@@ -32,7 +48,7 @@ export function formatMinorUnitsAmount(
   amount: MinorUnits,
   currency: string,
   locale = 'en-US',
-  unitsPerMajor = 100,
+  unitsPerMajor = minorUnitsPerMajor(currency),
 ): string {
   const { minimumFractionDigits, maximumFractionDigits } = new Intl.NumberFormat(locale, {
     style: 'currency',

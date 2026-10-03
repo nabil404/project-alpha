@@ -1,10 +1,12 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Put,
   Req,
   UploadedFile,
@@ -24,9 +26,13 @@ import type { UserSession } from '@thallesp/nestjs-better-auth';
 import type { Request } from 'express';
 import {
   accountAvatarSchema,
+  accountPreferencesSchema,
   deviceSessionSchema,
+  updateAccountPreferencesSchema,
   type AccountAvatar,
+  type AccountPreferences,
   type DeviceSession,
+  type UpdateAccountPreferences,
 } from '@app/shared';
 import { z } from 'zod';
 import { CodedValidationException } from '../../common/errors/coded-exceptions';
@@ -34,6 +40,7 @@ import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
 import { AvatarUploadInterceptor } from './avatar/avatar-upload.interceptor';
 import { AvatarService } from './avatar/avatar.service';
+import { UserPreferencesRepository } from './preferences/user-preferences.repository';
 import { DeviceSessionsService } from './sessions/device-sessions.service';
 
 interface SignedInRequest extends Request {
@@ -56,7 +63,7 @@ function signedIn(request: SignedInRequest): { userId: string; sessionId: string
 }
 
 /**
- * The signed-in seller's own account: their photo and their devices. No
+ * The signed-in seller's own account: their photo, language and devices. No
  * TenantGuard - this belongs to the user, not the shop - and every id comes
  * from the session, never the request.
  */
@@ -66,7 +73,30 @@ export class AccountController {
   constructor(
     private readonly avatars: AvatarService,
     private readonly devices: DeviceSessionsService,
+    private readonly preferences: UserPreferencesRepository,
   ) {}
+
+  @Patch('preferences')
+  @ApiOperation({
+    summary: "Set the signed-in person's dashboard language",
+    description:
+      "Theirs alone, not the shop's. `null` follows the shop's country. The session's `user.locale` carries the current value.",
+  })
+  @ApiBody({
+    schema: z.toJSONSchema(updateAccountPreferencesSchema, {
+      target: 'openapi-3.0',
+      io: 'input',
+    }) as SchemaObject,
+  })
+  @ApiOkResponse({ schema: schemaOf(accountPreferencesSchema) })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  async updatePreferences(
+    @Req() request: SignedInRequest,
+    @Body(new ZodValidationPipe(updateAccountPreferencesSchema)) body: UpdateAccountPreferences,
+  ): Promise<AccountPreferences> {
+    await this.preferences.setLocale(signedIn(request).userId, body.locale);
+    return { locale: body.locale };
+  }
 
   @Put('avatar')
   @HttpCode(HttpStatus.OK)

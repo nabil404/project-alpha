@@ -16,6 +16,7 @@ import { MessengerModule } from './modules/messenger/messenger.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { AccountModule } from './modules/account/account.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { CryptoService } from './common/crypto.service';
 import { serializeRequest } from './common/request-log';
 
@@ -69,6 +70,7 @@ import { serializeRequest } from './common/request-log';
     ConversationsModule,
     CustomersModule,
     AccountModule,
+    SettingsModule,
   ],
   providers: [
     CryptoService,
