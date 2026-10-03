@@ -246,9 +246,9 @@ The CLI entry point, [`auth.cli.ts`](../../../apps/api/src/modules/auth/auth.cli
 builds the same config against `drizzle.mock()`, so generating the schema needs
 no database or credentials.
 
-These tables are granted to the restricted `app_runtime` role in
-[`0001_rls_runtime_role.sql`](../../../apps/api/db/migrations/0001_rls_runtime_role.sql),
-but they **must never get an RLS policy**. They carry no `merchant_id`, and the
+These tables are granted to the restricted `app_runtime` role (see
+[Database](../../architecture/database.md#roles)), but they **must never get an
+RLS policy**. They carry no `merchant_id`, and the
 session lookup happens before any merchant context exists, so a policy would
 lock out sign-in itself.
 

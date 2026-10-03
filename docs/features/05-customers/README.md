@@ -86,14 +86,16 @@ Money is integer minor units; timestamps are ISO strings.
 
 ## Data model
 
-Migrations `0016_customers_orders` and `0017_customers_orders_force_rls`;
-schema in
+Schema in
 [`customers.ts`](../../../apps/api/src/modules/database/schema/customers.ts)
 and [`orders.ts`](../../../apps/api/src/modules/database/schema/orders.ts).
 Every table has RLS enabled and forced with a `*_merchant_isolation` policy,
 and composite `(merchant_id, id)` foreign keys.
 
-- `customer` gains `phone`, `delivery_address`, `area` (all nullable).
+- `customer`: `psid`, `name` and `picture_url` (from Facebook, see
+  [Conversations](../04-conversations/README.md#data-model)), and the
+  seller's `phone`, `delivery_address` and `area`, all nullable.
+  `UNIQUE (merchant_id, psid)`.
 - `customer_note`: `customer_id` (cascades with the customer), `author_id` →
   `user.id` `ON DELETE SET NULL`, `body`. Indexed on
   `(merchant_id, customer_id, created_at DESC, id)`.
