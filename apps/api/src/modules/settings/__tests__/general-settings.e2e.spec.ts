@@ -51,7 +51,7 @@ describeDb('Settings > General over HTTP', () => {
   const server = () => app.getHttpServer();
 
   /** Signs up and follows the verification link, leaving the agent signed in. */
-  const verifiedSeller = async (shopName = "Nadia's Kitchen") => {
+  const verifiedSeller = async (shopName = "Nadia's Kitchen", phone = '+880 1712-345678') => {
     const address = `seller-${randomUUID()}@${EMAIL_DOMAIN}`;
     await request(server())
       .post('/api/v1/auth/sign-up/email')
@@ -61,7 +61,7 @@ describeDb('Settings > General over HTTP', () => {
         password: PASSWORD,
         name: 'Nadia Rahman',
         shopName,
-        phone: '+880 1712-345678',
+        phone,
         callbackURL: '/',
       })
       .expect(200);
@@ -152,7 +152,7 @@ describeDb('Settings > General over HTTP', () => {
   });
 
   describe('/settings/general', () => {
-    it('reads a new shop as its sign-up name and the default region', async () => {
+    it("starts a new shop in its sign-up name and the sign-up phone's region", async () => {
       const { agent } = await verifiedSeller("Rahim's Kitchen");
 
       const response = await agent.get('/api/v1/settings/general').expect(200);
@@ -167,6 +167,22 @@ describeDb('Settings > General over HTTP', () => {
         timeZone: 'Asia/Dhaka',
         dateFormat: 'd MMM yyyy',
         currencyLocked: false,
+      });
+    });
+
+    it('starts a shop signed up with a US number in US dollars and New York time', async () => {
+      const { agent } = await verifiedSeller('Brooklyn Threads', '+1 212 555 0123');
+
+      const response = await agent.get('/api/v1/settings/general').expect(200);
+
+      expect(response.body).toMatchObject({
+        name: 'Brooklyn Threads',
+        // The seller's own number is not published as the shop's.
+        contactPhone: null,
+        country: 'US',
+        currency: 'USD',
+        timeZone: 'America/New_York',
+        dateFormat: 'MMM d, yyyy',
       });
     });
 

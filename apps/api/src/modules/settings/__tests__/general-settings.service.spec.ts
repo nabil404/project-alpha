@@ -15,6 +15,7 @@ import { seedOrder } from '../../database/__tests__/order-seeds';
 import * as schema from '../../database/schema/index';
 import { GeneralSettingsService } from '../general-settings.service';
 import { MerchantSettingsRepository } from '../merchant-settings.repository';
+import { seedRegionFromPhone } from '../region-from-phone';
 import { ShopProfileRepository } from '../shop-profile.repository';
 
 describe('merchant_settings date_format column', () => {
@@ -188,5 +189,41 @@ describeDb('GeneralSettingsService', () => {
           .where(eq(schema.merchantSettings.merchantId, t.merchantA)),
       ),
     ).resolves.toEqual({ code: '23514', constraint: 'merchant_settings_contact_phone_ck' });
+  });
+  describe('seedRegionFromPhone', () => {
+    it("sets the region from the number's country", async () => {
+      await expect(seedRegionFromPhone(runtime.db, t.merchantA, '+442071838750')).resolves.toBe(
+        'GB',
+      );
+      await expect(service.get(t.merchantA)).resolves.toMatchObject({
+        country: 'GB',
+        currency: 'GBP',
+        timeZone: 'Europe/London',
+        contactPhone: null,
+      });
+    });
+
+    it('never overwrites settings the shop already has', async () => {
+      await service.update(t.merchantA, { country: 'IN', currency: 'INR' });
+
+      await seedRegionFromPhone(runtime.db, t.merchantA, '+12125550123');
+
+      await expect(service.get(t.merchantA)).resolves.toMatchObject({
+        country: 'IN',
+        currency: 'INR',
+      });
+    });
+
+    it.each([
+      ['no number', null],
+      ['a number it cannot place', '01712-345678'],
+    ])('leaves the default region for %s', async (_, phone) => {
+      await expect(seedRegionFromPhone(runtime.db, t.merchantA, phone)).resolves.toBeNull();
+      const rows = await t.db
+        .select()
+        .from(schema.merchantSettings)
+        .where(eq(schema.merchantSettings.merchantId, t.merchantA));
+      expect(rows).toHaveLength(0);
+    });
   });
 });

@@ -30,8 +30,14 @@ Everything regional is a code - ISO 3166 country, ISO 4217 currency, IANA zone
 
 ## Rules
 
-- **Defaults.** A shop has no `merchant_settings` row until its first PATCH
-  and reads as `regionDefaults(DEFAULT_COUNTRY)` (Bangladesh) until then.
+- **Defaults.** An email sign-up starts the shop in the region of the
+  seller's phone (`seedRegionFromPhone`, from the sign-up hook): a +1 212
+  number opens in USD, America/New_York and month-first dates. It never
+  overwrites an existing row, never fills in the contact phone (the seller's
+  number isn't necessarily the one customers should see), and a failure only
+  logs; sign-up still succeeds. A shop with no row - a social sign-up, or
+  one from before this - reads as `regionDefaults(DEFAULT_COUNTRY)`
+  (Bangladesh) until its first PATCH.
   Picking a country changes nothing on the server by itself: the dashboard
   fills in `regionDefaults(country)` - currency, the capital's (or the main)
   time zone, a date format in the country's day/month order, the calling code -
