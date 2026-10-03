@@ -164,7 +164,7 @@ into another shop.
 
 - `customer`: `psid`, `name` (null until Facebook shares one),
   `profile_fetched_at`. `UNIQUE (merchant_id, psid)`; trigram index on `name`.
-  Phone and address land with the orders work.
+  Contact details and notes: [05 · Customers](../05-customers/README.md).
 - `conversation`: `facebook_page_id` (text, deliberately not a foreign key),
   `customer_id`, `state` (default `browsing`), `collected_slots` (jsonb),
   `bot_paused`, `last_message_at`, `last_message_preview`,
