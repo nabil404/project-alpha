@@ -64,15 +64,6 @@ export function VariantsCard({ product }: { product?: Product }) {
     setPanel((open) => (open?.kind === 'edit' ? null : open));
   };
 
-  // With one option a variant is its value, so the value goes with it; with
-  // more, only that combination goes and its values stay for the others.
-  const removeVariant = (index: number) => {
-    if (!single) return remove(index);
-    const value = variants[index]!.optionValues[0]!;
-    const valueIndex = single.values.findIndex((v) => sameText(v.value, value));
-    apply(removeValue(state, 0, valueIndex));
-  };
-
   const onPanelSubmit = (option: OptionDraft) => {
     if (panel?.kind === 'edit') apply(updateOption(state, panel.index, option));
     else apply(addOption(state, option));
@@ -300,7 +291,7 @@ export function VariantsCard({ product }: { product?: Product }) {
                       aria-label={t('variants.removeVariant', { variant: label })}
                       title={t('variants.remove')}
                       disabled={fields.length === 1}
-                      onClick={() => removeVariant(index)}
+                      onClick={() => remove(index)}
                     >
                       <Trash2 aria-hidden strokeWidth={1.5} />
                     </Button>
@@ -312,7 +303,7 @@ export function VariantsCard({ product }: { product?: Product }) {
         </table>
       </div>
 
-      {options.length > 1 && (
+      {options.length > 0 && (
         <AddCombination state={state} onAdd={(combos) => apply(addCombinations(state, combos))} />
       )}
       <VariantsRootError />
@@ -498,6 +489,7 @@ function AddCombination({
   );
   const exists = hasCombination(state, combo);
   const missing = missingCombinations(state);
+  const optionName = state.options[0]!.name.toLowerCase();
 
   return (
     <div className="flex flex-col gap-2 border-t border-border px-6 py-4">
@@ -542,9 +534,13 @@ function AddCombination({
         )}
       </div>
       <p className="text-small text-ink-muted">
-        {missing.length > 0
-          ? t('variants.missing', { list: missing.map((c) => c.join(' / ')).join(', ') })
-          : t('variants.noneMissing')}
+        {state.options.length === 1
+          ? missing.length > 0
+            ? t('variants.missingOne', { option: optionName, list: missing.join(', ') })
+            : t('variants.noneMissingOne', { option: optionName })
+          : missing.length > 0
+            ? t('variants.missing', { list: missing.map((c) => c.join(' / ')).join(', ') })
+            : t('variants.noneMissing')}
       </p>
     </div>
   );
