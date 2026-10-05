@@ -25,10 +25,12 @@ import { useToast } from '@/lib/toast';
 import { variantDisplayName } from '../format';
 import { useReplaceOrderItems } from '../queries';
 import { ItemsEditor, type ItemsFormValues, type LineInfo } from './ItemsEditor';
+import { useAreaLabel } from './AreaField';
 
 /** The lines, as a table from `sm` up and a stack below it, then the totals. */
 export function OrderItemsCard({ order }: { order: OrderDetail }) {
   const { t } = useTranslation('orders');
+  const areaLabel = useAreaLabel();
   const { formatAmount, formatMoney, currencySymbol, formatNumber } = useFormatters();
   const money = (amount: number) => formatMoney(amount, order.currency);
 
@@ -104,8 +106,8 @@ export function OrderItemsCard({ order }: { order: OrderDetail }) {
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">
-            {order.delivery.area
-              ? t('totals.deliveryInArea', { area: order.delivery.area })
+            {areaLabel(order.delivery)
+              ? t('totals.deliveryInArea', { area: areaLabel(order.delivery) })
               : t('totals.delivery')}
           </dt>
           <dd className="tabular-nums">{money(order.deliveryFee)}</dd>

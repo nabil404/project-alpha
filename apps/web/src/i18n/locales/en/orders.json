@@ -90,18 +90,25 @@
   "delivery": {
     "address": "Address",
     "area": "Area",
+    "areaOption": "{{area}} · {{charge}}",
     "dialog": {
+      "areaHint": "Where it's going, such as Dhaka.",
       "description": "For this order only. The customer's details on file stay as they are.",
-      "title": "Edit delivery",
-      "areaHint": "Where it's going, such as Dhaka."
+      "noAreas": "Set up delivery areas in Settings to fill in charges for you.",
+      "title": "Edit delivery"
     },
     "edit": "Edit",
+    "elsewhere": "Everywhere else",
+    "elsewhereOption": "Everywhere else · {{charge}}",
+    "estimate": "Estimated {{time}} after shipping",
     "fee": "Charge",
+    "freeApplied": "Free delivery: the order is over your threshold.",
     "name": "Name",
     "noArea": "No area",
     "phone": "Phone",
     "saveTracking": "Save",
     "saved": "Delivery details saved",
+    "time": "Delivery time",
     "title": "Delivery",
     "tracking": "Tracking number",
     "trackingLater": "Add when you ship",

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { useForm, type Resolver, type UseFormReturn } from 'react-hook-form';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { useForm, useWatch, type Resolver, type UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import {
   createOrderSchema,
@@ -49,6 +49,7 @@ import { useShopRegion } from '@/lib/shop-region';
 import { useToast } from '@/lib/toast';
 
 import { useCreateOrder, useCustomerSearch, useOrderCustomer } from '../queries';
+import { AreaSelect, useDeliveryRates, useQuotedFee, type AreaPick } from './AreaField';
 import { ItemsEditor, type EditableLine, type ItemsFormValues, type LineInfo } from './ItemsEditor';
 
 /**
@@ -217,6 +218,7 @@ interface NewOrderFormValues {
   phone: string;
   deliveryAddress: string;
   deliveryArea: string;
+  deliveryChargeId: string | null;
   deliveryFee: number;
   paymentMethod: PaymentMethod;
   note: string;
@@ -229,6 +231,7 @@ const serverFields = [
   'phone',
   'deliveryAddress',
   'deliveryArea',
+  'deliveryChargeId',
   'deliveryFee',
   'note',
 ] as const;
@@ -267,11 +270,29 @@ function NewOrderForm({
       phone: customer.phone ?? '',
       deliveryAddress: customer.deliveryAddress ?? '',
       deliveryArea: '',
+      deliveryChargeId: null,
       deliveryFee: 0,
       paymentMethod: 'cash_on_delivery',
       note: '',
     },
   });
+
+  const rates = useDeliveryRates();
+  const [items, area, chargeId, fee] = useWatch({
+    control: form.control,
+    name: ['items', 'deliveryArea', 'deliveryChargeId', 'deliveryFee'],
+  });
+  const { freeApplied, requote } = useQuotedFee({
+    chargeId,
+    items,
+    fee,
+    setFee: (next) => form.setValue('deliveryFee', next, { shouldDirty: true }),
+  });
+  const onPickArea = (pick: AreaPick) => {
+    form.setValue('deliveryChargeId', pick.chargeId, { shouldDirty: true });
+    form.setValue('deliveryArea', pick.area, { shouldDirty: true });
+    requote(pick.chargeId);
+  };
 
   const onSubmit = (values: NewOrderInput) => {
     onBusyChange(true);
@@ -352,19 +373,48 @@ function NewOrderForm({
             )}
           />
           <div className="grid gap-4 sm:grid-cols-3">
-            <FormField
-              control={form.control}
-              name="deliveryArea"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('delivery.area')}</FormLabel>
-                  <FormControl>
-                    <Input maxLength={ORDER_AREA_MAX_LENGTH} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {rates.length > 0 ? (
+              <FormField
+                control={form.control}
+                name="deliveryChargeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('delivery.area')}</FormLabel>
+                    <FormControl>
+                      <AreaSelect
+                        name={field.name}
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        rates={rates}
+                        chargeId={field.value}
+                        area={area}
+                        onPick={onPickArea}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="deliveryArea"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('delivery.area')}</FormLabel>
+                    <FormControl>
+                      <Input maxLength={ORDER_AREA_MAX_LENGTH} {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      <Link to="/settings/delivery" className="text-link">
+                        {t('delivery.dialog.noAreas')}
+                      </Link>
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="deliveryFee"
@@ -378,6 +428,9 @@ function NewOrderForm({
                       onBlur={field.onBlur}
                     />
                   </FormControl>
+                  {freeApplied && field.value === 0 && (
+                    <FormDescription>{t('delivery.freeApplied')}</FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
