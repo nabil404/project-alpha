@@ -17,8 +17,7 @@
  * declares a pgPolicy against app_current_merchant() - see with-merchant.ts.
  * `pnpm --filter api db:verify-rls` fails the build if one is missing.
  *
- * Every section has its file. The orders tables are provisional: the orders
- * work owns their shape.
+ * Every section has its file.
  */
 
 export * from './auth';

@@ -20,6 +20,7 @@ export const orderStatusTones = {
   packed: 'neutral',
   shipped: 'neutral',
   delivered: 'success',
+  returned: 'warning',
   cancelled: 'danger',
 } as const satisfies Record<OrderStatus, StatusTone>;
 

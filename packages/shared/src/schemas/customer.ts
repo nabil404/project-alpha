@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { phoneSchema } from './auth';
 import { conversationStateSchema, messageSenderSchema } from './conversation';
+import {
+  pageNumber,
+  pagePaginationSchema,
+  pageSizeOf,
+  searchTerm,
+  sortDirectionSchema,
+} from './list-query';
 import { orderStatusSchema } from './order';
 
 /**
@@ -9,7 +16,7 @@ import { orderStatusSchema } from './order';
  * - `inactive`: no message and no order for INACTIVE_AFTER_DAYS.
  * - `repeat`: REPEAT_MIN_ORDERS or more orders.
  * - `new`: everyone else.
- * Cancelled orders never count.
+ * Cancelled and returned orders never count.
  */
 export const customerStatuses = ['needs_you', 'inactive', 'repeat', 'new'] as const;
 export const customerStatusSchema = z.enum(customerStatuses);
@@ -29,19 +36,7 @@ export const customerSorts = ['last_order', 'orders', 'total_spent'] as const;
 export const customerSortSchema = z.enum(customerSorts);
 export type CustomerSort = z.infer<typeof customerSortSchema>;
 
-export const sortDirections = ['asc', 'desc'] as const;
-export const sortDirectionSchema = z.enum(sortDirections);
-export type SortDirection = z.infer<typeof sortDirectionSchema>;
-
 export const customerPageSizes = [10, 25, 50, 100] as const;
-
-/** An empty `q=` in the URL means no search, not a failed one. */
-const searchTerm = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-  z.string().trim().max(100).optional(),
-);
-
-const pageNumber = z.coerce.number().int().min(1).max(10_000).default(1);
 
 /**
  * GET /customers. `q` matches name, phone or area. Customers with no orders
@@ -53,13 +48,7 @@ export const listCustomersQuerySchema = z.object({
   sort: customerSortSchema.default('last_order'),
   direction: sortDirectionSchema.default('desc'),
   page: pageNumber,
-  pageSize: z.coerce
-    .number()
-    .int()
-    .refine((value) => (customerPageSizes as readonly number[]).includes(value), {
-      params: { code: 'INVALID_VALUE' },
-    })
-    .default(10),
+  pageSize: pageSizeOf(customerPageSizes),
 });
 export type ListCustomersQuery = z.infer<typeof listCustomersQuerySchema>;
 
@@ -70,15 +59,7 @@ export const listCustomerOrdersQuerySchema = z.object({
 });
 export type ListCustomerOrdersQuery = z.infer<typeof listCustomerOrdersQuerySchema>;
 
-export const pagePaginationSchema = z.object({
-  page: z.number().int().positive(),
-  pageSize: z.number().int().positive(),
-  total: z.number().int().nonnegative(),
-  totalPages: z.number().int().nonnegative(),
-});
-export type PagePagination = z.infer<typeof pagePaginationSchema>;
-
-/** Order figures; money in minor units. Cancelled orders are left out. */
+/** Order figures; money in minor units. Cancelled and returned orders are left out. */
 export const customerOrderStatsSchema = z.object({
   orderCount: z.number().int().nonnegative(),
   totalSpent: z.number().int().nonnegative(),

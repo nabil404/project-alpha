@@ -78,6 +78,7 @@
       "delivered": "Delivered",
       "new": "New",
       "packed": "Packed",
+      "returned": "Returned",
       "shipped": "Shipped"
     },
     "product": {
