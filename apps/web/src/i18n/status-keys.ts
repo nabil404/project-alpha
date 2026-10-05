@@ -26,6 +26,7 @@ export const orderStatusKeys = {
   packed: 'status.order.packed',
   shipped: 'status.order.shipped',
   delivered: 'status.order.delivered',
+  returned: 'status.order.returned',
   cancelled: 'status.order.cancelled',
 } as const satisfies Record<OrderStatus, ParseKeys<'common'>>;
 

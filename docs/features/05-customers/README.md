@@ -10,11 +10,9 @@ This page describes what is built.
 
 **Status (Oct 2026):** built end to end: list, summary, detail, contact edits,
 a customer's orders, and notes, in the API and at `/customers` and
-`/customers/:id` in the dashboard. The `order` and `order_item` tables exist
-only so these pages can read order history. They are **provisional**:
-nothing creates orders yet, and the orders work owns their shape and may
-change it. Not built yet: export and the items under
-[Follow-ups](#follow-ups).
+`/customers/:id` in the dashboard. The order tables these pages read belong
+to [Orders](../07-orders/README.md). Not built yet: export and the items
+under [Follow-ups](#follow-ups).
 
 ## Routes (`/api/v1/customers`, session + TenantGuard)
 
@@ -63,7 +61,7 @@ Money is integer minor units; timestamps are ISO strings.
   4. `new`: everyone else, including customers with no orders.
 - **Last activity** is the latest of first contact, any conversation's
   `last_message_at`, and the last order.
-- **Cancelled orders never count**: not in `orderCount`, `totalSpent`,
+- **Cancelled and returned orders never count**: not in `orderCount`, `totalSpent`,
   `lastOrderAt`, the status, or average order value. The customer's order list
   still shows them.
 - **Windows are rolling,** not calendar months: "this month" is the last 30
@@ -100,17 +98,8 @@ and composite `(merchant_id, id)` foreign keys.
 - `customer_note`: `customer_id` (cascades with the customer), `author_id` →
   `user.id` `ON DELETE SET NULL`, `body`. Indexed on
   `(merchant_id, customer_id, created_at DESC, id)`.
-- `order` (provisional): `number` (`UNIQUE (merchant_id, number)`, > 0),
-  `customer_id`, `conversation_id` (nullable), `status` (the shared order
-  statuses, default `new`), `subtotal`, `delivery_charge`, `total`
-  (`total = subtotal + delivery_charge`), the delivery snapshot
-  `customer_name`, `phone`, `delivery_address`, `notes`, `placed_at`
-  (millisecond precision). Indexed on `(merchant_id, customer_id, placed_at DESC, id)`
-  and `(merchant_id, placed_at DESC, id)`.
-- `order_item` (provisional): `order_id` (cascades), `product_id` and
-  `variant_id` (plain references, no foreign key: products are hard-deleted),
-  snapshots `product_name` and `variant_name`, `quantity` > 0,
-  `unit_price` ≥ 0, `position` (`UNIQUE (merchant_id, order_id, position)`).
+- `order` and `order_item`: see [Orders](../07-orders/README.md#data-model).
+  These pages read them through `(merchant_id, customer_id, placed_at DESC, id)`.
 
 ## Web
 

@@ -79,6 +79,13 @@ export const errorCodes = [
   // Customers
   'CUSTOMER_NOT_FOUND',
 
+  // Orders
+  'ORDER_NOT_FOUND',
+  'ORDER_STALE',
+  'ORDER_INVALID_TRANSITION',
+  'ORDER_NOT_EDITABLE',
+  'ORDER_INSUFFICIENT_STOCK',
+
   // Catalog
   'PRODUCT_NOT_FOUND',
   'VARIANT_NOT_FOUND',

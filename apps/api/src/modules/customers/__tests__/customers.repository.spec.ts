@@ -93,6 +93,12 @@ describeDb('customer repositories (app_runtime, two merchants)', () => {
       lastMessageAt: hoursAgo(6),
       state: 'handed_off',
     });
+    // A returned order counts no more than a cancelled one: still "no orders".
+    await seedOrder(t.db, a, sabbir.id, {
+      placedAt: hoursAgo(8),
+      status: 'returned',
+      items: [{ unitPrice: 777700 }],
+    });
 
     // Inactive: two orders, but nothing for more than 60 days.
     const shakil = await seedCustomer(t.db, a, {
@@ -185,7 +191,7 @@ describeDb('customer repositories (app_runtime, two merchants)', () => {
     expect(listed.slice(0, 4)).toEqual([ids.shakil, ids.rakib, ids.tanvir, ids.nusrat]);
   });
 
-  it('derives order figures and status, leaving cancelled orders out', async () => {
+  it('derives order figures and status, leaving cancelled and returned orders out', async () => {
     const byId = new Map((await listA()).rows.map((row) => [row.customer.id, row]));
     expect(byId.get(ids.nusrat)).toMatchObject({
       orderCount: 3,
