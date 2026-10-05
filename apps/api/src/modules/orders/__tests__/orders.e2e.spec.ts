@@ -1,0 +1,447 @@
+import {
+  Global,
+  Module,
+  type ExecutionContext,
+  type INestApplication,
+  type LoggerService,
+} from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
+import {
+  orderDetailSchema,
+  orderEventSchema,
+  orderListResponseSchema,
+  orderSummarySchema,
+  type OrderDetail,
+} from '@app/shared';
+import request from 'supertest';
+import { AuthModule } from '../../auth/auth.module';
+import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
+import { TenantGuard } from '../../../common/tenant.guard';
+import { AppConfig } from '../../config/app.config';
+import { DATABASE } from '../../database/database.module';
+import * as schema from '../../database/schema/index';
+import {
+  describeDb,
+  openCatalogTestDb,
+  openRuntimeDb,
+  seedProduct,
+  seedVariant,
+  type CatalogTestDb,
+} from '../../database/__tests__/catalog-test-db';
+import { seedConversation, seedCustomer } from '../../database/__tests__/conversation-seeds';
+import { seedOrder } from '../../database/__tests__/order-seeds';
+import { MailService } from '../../mail/mail.service';
+import { ProductsModule } from '../../products/products.module';
+import { OrdersModule } from '../orders.module';
+
+const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
+
+/**
+ * Over real HTTP with AuthModule mounted, as the customer routes' spec does.
+ * The app connects as app_runtime, so RLS applies; the tenant guard is stubbed
+ * to a switchable merchant and the signed-in seller.
+ */
+describeDb('order routes over HTTP', () => {
+  let app: INestApplication;
+  let t: CatalogTestDb;
+  let runtime: ReturnType<typeof openRuntimeDb>;
+  let merchantId: string;
+  const seller = { id: randomUUID(), name: 'Rahim Uddin' };
+  const server = () => app.getHttpServer();
+
+  let nusratId: string;
+  let productId: string;
+  let kurtiM: string;
+  let kurtiL: string;
+  let draftedId: string;
+  let otherOrderId: string;
+
+  const stockOf = async (variantId: string) => {
+    const [row] = await t.db
+      .select({ stock: schema.productVariant.stock })
+      .from(schema.productVariant)
+      .where(eq(schema.productVariant.id, variantId));
+    return row?.stock;
+  };
+  const revisionOf = async (id: string) => {
+    const [row] = await t.db
+      .select({ revision: schema.product.revision })
+      .from(schema.product)
+      .where(eq(schema.product.id, id));
+    return row?.revision;
+  };
+  const get = async (id: string): Promise<OrderDetail> =>
+    orderDetailSchema.parse((await request(server()).get(`/api/v1/orders/${id}`).expect(200)).body);
+  const create = (body: Record<string, unknown>, key?: string) => {
+    const req = request(server()).post('/api/v1/orders');
+    if (key) req.set('Idempotency-Key', key);
+    return req.send({ customerId: nusratId, deliveryCharge: 6000, ...body });
+  };
+  /** The status alongside the body, so a failure shows the error envelope. */
+  const ok = (res: request.Response) => {
+    expect({ status: res.status, body: res.body }).toMatchObject({ status: 200 });
+    return res;
+  };
+  const move = async (id: string, status: string, extra: Record<string, unknown> = {}) =>
+    request(server())
+      .post(`/api/v1/orders/${id}/status`)
+      .send({ status, version: (await get(id)).version, ...extra });
+
+  beforeAll(async () => {
+    t = await openCatalogTestDb();
+    runtime = openRuntimeDb();
+    const env: Record<string, string> = {
+      NODE_ENV: 'test',
+      APP_URL: 'http://localhost:5173',
+      BETTER_AUTH_SECRET: 'x'.repeat(32),
+    };
+
+    @Global()
+    @Module({
+      providers: [
+        { provide: DATABASE, useValue: runtime.db },
+        { provide: AppConfig, useValue: { get: (key: string) => env[key] } },
+      ],
+      exports: [DATABASE, AppConfig],
+    })
+    class TestInfrastructureModule {}
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [TestInfrastructureModule, AuthModule, OrdersModule, ProductsModule],
+    })
+      .overrideProvider(MailService)
+      .useValue({ dispatch: () => {} })
+      .overrideGuard(TenantGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          const req = context.switchToHttp().getRequest<Record<string, unknown>>();
+          req.merchantId = merchantId;
+          req.session = { user: seller, session: {} };
+          return true;
+        },
+      })
+      .compile();
+
+    app = moduleRef.createNestApplication({
+      ...NEST_APP_OPTIONS,
+      bufferLogs: false,
+      logger: false,
+    });
+    configureApp(app, silentLogger);
+    await app.init();
+
+    await t.db.insert(schema.user).values({ ...seller, email: `${seller.id}@example.com` });
+    const a = t.merchantA;
+    const nusrat = await seedCustomer(t.db, a, {
+      name: 'Nusrat Jahan',
+      phone: '01712-345678',
+      deliveryAddress: 'House 12, Road 4, Mirpur 10, Dhaka',
+    });
+    nusratId = nusrat.id;
+    const product = await seedProduct(t.db, a, { name: 'Blue kurti', status: 'active' });
+    productId = product.id;
+    kurtiM = (await seedVariant(t.db, a, product.id, { name: 'M', price: 160000, stock: 3 })).id;
+    kurtiL = (await seedVariant(t.db, a, product.id, { name: 'L', price: 170000, stock: 1 })).id;
+
+    // An earlier, delivered order: history for the detail's customer figures.
+    await seedOrder(t.db, a, nusrat.id, {
+      status: 'delivered',
+      placedAt: new Date('2026-09-01T10:00:00Z'),
+      items: [{ unitPrice: 548000 }],
+    });
+    // Drafted by the assistant from a chat.
+    const conversation = await seedConversation(t.db, a, { customerId: nusrat.id });
+    const drafted = await seedOrder(t.db, a, nusrat.id, {
+      conversationId: conversation.id,
+      placedAt: new Date('2026-10-04T10:05:00Z'),
+      deliveryCharge: 6000,
+      items: [{ productName: 'Blue kurti', variantName: 'M', quantity: 2, unitPrice: 160000 }],
+    });
+    await t.db
+      .update(schema.orderItem)
+      .set({ productId: product.id, variantId: kurtiM, sku: 'KUR-BLU-M' })
+      .where(eq(schema.orderItem.orderId, drafted.id));
+    draftedId = drafted.id;
+
+    const other = await seedCustomer(t.db, t.merchantB, { name: 'Nusrat Jahan' });
+    otherOrderId = (await seedOrder(t.db, t.merchantB, other.id)).id;
+  });
+
+  beforeEach(() => {
+    merchantId = t.merchantA;
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    await runtime?.close();
+    await t.close();
+    await t.db
+      .delete(schema.user)
+      .where(eq(schema.user.id, seller.id))
+      .catch(() => {});
+  });
+
+  it('gets an order with its lines, delivery snapshot and the customer’s history', async () => {
+    const order = await get(draftedId);
+    expect(order).toMatchObject({
+      status: 'new',
+      source: 'assistant',
+      nextStatuses: ['confirmed', 'cancelled'],
+      paymentStatus: 'unpaid',
+      subtotal: 320000,
+      deliveryCharge: 6000,
+      total: 326000,
+      delivery: { name: 'Nusrat Jahan', phone: '01712-345678' },
+      customer: { id: nusratId, earlierOrderCount: 1, spentBefore: 548000 },
+    });
+    expect(order.items).toEqual([
+      expect.objectContaining({
+        variantId: kurtiM,
+        sku: 'KUR-BLU-M',
+        quantity: 2,
+        lineTotal: 320000,
+      }),
+    ]);
+  });
+
+  it("answers 404 ORDER_NOT_FOUND for another merchant's order, on every route", async () => {
+    const base = `/api/v1/orders/${otherOrderId}`;
+    for (const res of [
+      await request(server()).get(base),
+      await request(server()).get(`${base}/activity`),
+      await request(server()).post(`${base}/status`).send({ status: 'confirmed', version: '0' }),
+      await request(server())
+        .put(`${base}/items`)
+        .send({ items: [{ variantId: kurtiM, quantity: 1 }], version: '0' }),
+      await request(server()).patch(base).send({ note: 'Hijacked', version: '0' }),
+    ]) {
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatchObject({ code: 'ORDER_NOT_FOUND' });
+    }
+    const [row] = await t.db
+      .select({ status: schema.order.status, notes: schema.order.notes })
+      .from(schema.order)
+      .where(eq(schema.order.id, otherOrderId));
+    expect(row).toEqual({ status: 'new', notes: null });
+  });
+
+  it('confirms: takes the stock, bumps the product, and records who did it', async () => {
+    const revision = await revisionOf(productId);
+    const res = await move(draftedId, 'confirmed').then(ok);
+    expect(orderDetailSchema.parse(res.body)).toMatchObject({
+      status: 'confirmed',
+      nextStatuses: ['packed', 'cancelled'],
+    });
+    expect(await stockOf(kurtiM)).toBe(1);
+    expect(await revisionOf(productId)).toBe((revision ?? 0) + 1);
+
+    const activity = await request(server())
+      .get(`/api/v1/orders/${draftedId}/activity`)
+      .expect(200);
+    expect(activity.body.map((event: unknown) => orderEventSchema.parse(event))).toEqual([
+      expect.objectContaining({
+        data: { type: 'status_changed', from: 'new', to: 'confirmed' },
+        actor: seller,
+      }),
+    ]);
+  });
+
+  it('refuses a change made from an older read, and a move the lifecycle does not allow', async () => {
+    const stale = await request(server())
+      .post(`/api/v1/orders/${draftedId}/status`)
+      .send({ status: 'packed', version: '0' })
+      .expect(409);
+    expect(stale.body.error.code).toBe('ORDER_STALE');
+    const skip = await move(draftedId, 'delivered');
+    expect(skip.status).toBe(409);
+    expect(skip.body.error).toMatchObject({
+      code: 'ORDER_INVALID_TRANSITION',
+      params: { from: 'confirmed', to: 'delivered' },
+    });
+  });
+
+  it('edits a confirmed order’s items, moving only the stock difference', async () => {
+    const { version } = await get(draftedId);
+    const res = await request(server())
+      .put(`/api/v1/orders/${draftedId}/items`)
+      .send({
+        version,
+        items: [
+          { variantId: kurtiM, quantity: 1 },
+          { variantId: kurtiL, quantity: 1 },
+        ],
+      })
+      .expect(200);
+    const order = orderDetailSchema.parse(res.body);
+    expect(order.items.map((item) => [item.variantName, item.quantity, item.unitPrice])).toEqual([
+      ['M', 1, 160000],
+      ['L', 1, 170000],
+    ]);
+    expect(order).toMatchObject({ subtotal: 330000, total: 336000 });
+    expect(await stockOf(kurtiM)).toBe(2);
+    expect(await stockOf(kurtiL)).toBe(0);
+  });
+
+  it('refuses taking more than is in stock, and changes nothing', async () => {
+    const { version } = await get(draftedId);
+    const res = await request(server())
+      .put(`/api/v1/orders/${draftedId}/items`)
+      .send({ version, items: [{ variantId: kurtiM, quantity: 9 }] })
+      .expect(409);
+    expect(res.body.error).toMatchObject({
+      code: 'ORDER_INSUFFICIENT_STOCK',
+      params: { variantId: kurtiM, name: 'Blue kurti, M', available: 2 },
+    });
+    expect(await stockOf(kurtiM)).toBe(2);
+    expect(await stockOf(kurtiL)).toBe(0);
+    expect((await get(draftedId)).version).toBe(version);
+  });
+
+  it('edits delivery, payment and tracking, then refuses delivery edits once shipped', async () => {
+    const { version } = await get(draftedId);
+    const res = await request(server())
+      .patch(`/api/v1/orders/${draftedId}`)
+      .send({
+        version,
+        deliveryAddress: 'House 14, Road 4, Mirpur 10, Dhaka',
+        deliveryCharge: 12000,
+        paymentStatus: 'paid',
+        note: 'Call before delivery',
+      })
+      .expect(200);
+    expect(orderDetailSchema.parse(res.body)).toMatchObject({
+      total: 342000,
+      paymentStatus: 'paid',
+      note: 'Call before delivery',
+      delivery: { address: 'House 14, Road 4, Mirpur 10, Dhaka' },
+    });
+    const [customer] = await t.db
+      .select({ address: schema.customer.deliveryAddress })
+      .from(schema.customer)
+      .where(eq(schema.customer.id, nusratId));
+    expect(customer?.address).toBe('House 12, Road 4, Mirpur 10, Dhaka');
+
+    await move(draftedId, 'packed').then(ok);
+    await move(draftedId, 'shipped').then(ok);
+    const shipped = await get(draftedId);
+    const refused = await request(server())
+      .patch(`/api/v1/orders/${draftedId}`)
+      .send({ version: shipped.version, phone: '01812-000000' })
+      .expect(409);
+    expect(refused.body.error.code).toBe('ORDER_NOT_EDITABLE');
+    await request(server())
+      .patch(`/api/v1/orders/${draftedId}`)
+      .send({ version: shipped.version, trackingNumber: 'PTH-123' })
+      .expect(200);
+  });
+
+  it('gives the stock back when a shipped order is cancelled', async () => {
+    const res = await move(draftedId, 'cancelled', { note: 'Customer refused' }).then(ok);
+    expect(orderDetailSchema.parse(res.body).nextStatuses).toEqual([]);
+    expect(await stockOf(kurtiM)).toBe(3);
+    expect(await stockOf(kurtiL)).toBe(1);
+  });
+
+  it('adds an order by hand from the customer’s details on file, once per idempotency key', async () => {
+    const key = randomUUID();
+    const body = {
+      items: [{ variantId: kurtiL, quantity: 1 }],
+      deliveryZone: 'Local',
+      paymentMethod: 'bank_transfer',
+    };
+    const first = orderDetailSchema.parse((await create(body, key).expect(201)).body);
+    expect(first).toMatchObject({
+      source: 'seller',
+      status: 'new',
+      paymentMethod: 'bank_transfer',
+      currency: 'BDT',
+      conversationId: null,
+      total: 176000,
+      delivery: {
+        name: 'Nusrat Jahan',
+        address: 'House 12, Road 4, Mirpur 10, Dhaka',
+        zone: 'Local',
+      },
+    });
+    const replay = orderDetailSchema.parse((await create(body, key).expect(201)).body);
+    expect(replay.id).toBe(first.id);
+    const second = orderDetailSchema.parse((await create(body).expect(201)).body);
+    expect(second.number).toBe(first.number + 1);
+    // Drafted, not confirmed: no stock moves yet.
+    expect(await stockOf(kurtiL)).toBe(1);
+  });
+
+  it('refuses a hand-made order with no address to deliver to, or an archived variant', async () => {
+    const bare = await seedCustomer(t.db, t.merchantA, { name: 'Tanvir Ahmed' });
+    const res = await request(server())
+      .post('/api/v1/orders')
+      .send({ customerId: bare.id, deliveryCharge: 0, items: [{ variantId: kurtiM, quantity: 1 }] })
+      .expect(400);
+    expect(Object.keys(res.body.error.fields)).toEqual(['phone', 'deliveryAddress']);
+
+    const archived = await seedVariant(t.db, t.merchantA, productId, {
+      name: 'XL',
+      archivedAt: new Date(),
+    });
+    const gone = await create({ items: [{ variantId: archived.id, quantity: 1 }] }).expect(404);
+    expect(gone.body.error.code).toBe('VARIANT_NOT_FOUND');
+    const duplicate = await create({
+      items: [
+        { variantId: kurtiM, quantity: 1 },
+        { variantId: kurtiM, quantity: 2 },
+      ],
+    }).expect(400);
+    expect(duplicate.body.error.fields['items.1.variantId'][0].code).toBe('DUPLICATE');
+  });
+
+  it('lists with search, status and dates, and the tabs count under the same filters', async () => {
+    const all = orderListResponseSchema.parse(
+      (await request(server()).get('/api/v1/orders').expect(200)).body,
+    );
+    expect(all.data.length).toBe(all.pagination.total);
+    expect(all.data.every((row) => row.customer.id === nusratId)).toBe(true);
+
+    const drafted = (await get(draftedId)).number;
+    const byNumber = orderListResponseSchema.parse(
+      (
+        await request(server())
+          .get('/api/v1/orders')
+          .query({ q: `ORD-2026-${String(drafted).padStart(5, '0')}` })
+          .expect(200)
+      ).body,
+    );
+    expect(byNumber.data.map((row) => row.id)).toEqual([draftedId]);
+    expect(byNumber.data[0]).toMatchObject({ status: 'cancelled', itemCount: 2 });
+
+    const inOctober = { from: '2026-10-01T00:00:00+06:00', to: '2026-10-05T00:00:00+06:00' };
+    const cancelled = orderListResponseSchema.parse(
+      (
+        await request(server())
+          .get('/api/v1/orders')
+          .query({ status: 'cancelled', ...inOctober })
+          .expect(200)
+      ).body,
+    );
+    expect(cancelled.data.map((row) => row.id)).toEqual([draftedId]);
+
+    const summary = orderSummarySchema.parse(
+      (await request(server()).get('/api/v1/orders/summary').query({ q: '01712' }).expect(200))
+        .body,
+    );
+    expect(summary.counts).toMatchObject({ all: all.pagination.total, cancelled: 1, delivered: 1 });
+    expect(summary.awaitingConfirmation).toBe(2);
+    expect(summary.placedInWindow.byAssistant).toBeLessThan(summary.placedInWindow.all);
+
+    await request(server())
+      .get('/api/v1/orders')
+      .query({ from: inOctober.to, to: inOctober.from })
+      .expect(400);
+  });
+
+  it('refuses to delete a product that was ordered', async () => {
+    const res = await request(server()).delete(`/api/v1/products/${productId}`).expect(409);
+    expect(res.body.error.code).toBe('PRODUCT_IN_USE');
+  });
+});

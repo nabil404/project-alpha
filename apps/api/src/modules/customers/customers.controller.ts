@@ -60,7 +60,7 @@ export class CustomersController {
   @ApiOperation({
     summary: 'List customers',
     description:
-      'Everyone who has messaged the shop, with their order figures and status. `q` matches name, phone (digits alone match a formatted number) or area. Customers with no orders sort last in either direction. Cancelled orders never count.',
+      'Everyone who has messaged the shop, with their order figures and status. `q` matches name, phone (digits alone match a formatted number) or area. Customers with no orders sort last in either direction. Cancelled and returned orders never count.',
   })
   @ApiQuery({ name: 'filter', required: false, enum: [...customerFilters] })
   @ApiQuery({ name: 'q', required: false, schema: { type: 'string', maxLength: 100 } })

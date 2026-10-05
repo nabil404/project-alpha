@@ -1,5 +1,11 @@
 import { eq } from 'drizzle-orm';
-import { orderStatuses } from '@app/shared';
+import {
+  orderEventTypes,
+  orderSources,
+  orderStatuses,
+  paymentMethods,
+  paymentStatuses,
+} from '@app/shared';
 import { withMerchant } from '../with-merchant';
 import * as schema from '../schema/index';
 import {
@@ -7,6 +13,8 @@ import {
   openCatalogTestDb,
   openRuntimeDb,
   pgErrorOf,
+  seedProduct,
+  seedVariant,
   type CatalogTestDb,
 } from './catalog-test-db';
 import { seedConversation, seedCustomer } from './conversation-seeds';
@@ -15,6 +23,10 @@ import { seedOrder } from './order-seeds';
 describe('order enum columns', () => {
   it('match the shared enums', () => {
     expect(schema.order.status.enumValues).toEqual([...orderStatuses]);
+    expect(schema.order.source.enumValues).toEqual([...orderSources]);
+    expect(schema.order.paymentStatus.enumValues).toEqual([...paymentStatuses]);
+    expect(schema.order.paymentMethod.enumValues).toEqual([...paymentMethods]);
+    expect(schema.orderEvent.type.enumValues).toEqual([...orderEventTypes]);
   });
 });
 
@@ -68,6 +80,31 @@ describeDb('order and customer note schema constraints', () => {
     ).resolves.toEqual({ code: '23514', constraint: 'order_amounts_ck' });
   });
 
+  it("rejects a line on another merchant's variant, and an event whose type disagrees with its data", async () => {
+    const customerOfA = await seedCustomer(t.db, t.merchantA);
+    const productOfB = await seedProduct(t.db, t.merchantB);
+    const variantOfB = await seedVariant(t.db, t.merchantB, productOfB.id);
+    const orderOfA = await seedOrder(t.db, t.merchantA, customerOfA.id);
+    await expect(
+      pgErrorOf(
+        t.db
+          .update(schema.orderItem)
+          .set({ variantId: variantOfB.id })
+          .where(eq(schema.orderItem.orderId, orderOfA.id)),
+      ),
+    ).resolves.toEqual({ code: '23503', constraint: 'order_item_variant_fk' });
+    await expect(
+      pgErrorOf(
+        t.db.insert(schema.orderEvent).values({
+          merchantId: t.merchantA,
+          orderId: orderOfA.id,
+          type: 'created',
+          data: { type: 'status_changed', from: 'new', to: 'confirmed' },
+        }),
+      ),
+    ).resolves.toEqual({ code: '23514', constraint: 'order_event_data_type_ck' });
+  });
+
   it("rejects a note on another merchant's customer", async () => {
     const customerOfA = await seedCustomer(t.db, t.merchantA);
     await expect(
@@ -89,6 +126,13 @@ describeDb('order and customer note schema constraints', () => {
     await t.db
       .insert(schema.customerNote)
       .values({ merchantId: t.merchantB, customerId: customerOfB.id, body: 'B only' });
+    const orderOfB = await seedOrder(t.db, t.merchantB, customerOfB.id);
+    await t.db.insert(schema.orderEvent).values({
+      merchantId: t.merchantB,
+      orderId: orderOfB.id,
+      type: 'created',
+      data: { type: 'created', source: 'seller' },
+    });
 
     const seen = await withMerchant(runtime.db, t.merchantA, async (tx) => ({
       orders: await tx.select({ merchantId: schema.order.merchantId }).from(schema.order),
@@ -98,11 +142,13 @@ describeDb('order and customer note schema constraints', () => {
       notes: await tx
         .select({ merchantId: schema.customerNote.merchantId })
         .from(schema.customerNote),
+      events: await tx.select({ merchantId: schema.orderEvent.merchantId }).from(schema.orderEvent),
     }));
     expect(new Set(seen.orders.map((row) => row.merchantId))).toEqual(new Set([t.merchantA]));
     expect(new Set(seen.items.map((row) => row.merchantId))).toEqual(new Set([t.merchantA]));
     expect(seen.items.map((row) => row.orderId)).toContain(orderOfA.id);
     expect(seen.notes).toEqual([]);
+    expect(seen.events).toEqual([]);
 
     // Without merchant context, nothing at all.
     await expect(runtime.db.select().from(schema.order)).resolves.toEqual([]);

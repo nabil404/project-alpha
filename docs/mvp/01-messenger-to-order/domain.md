@@ -10,7 +10,9 @@ delivery address.
 
 ## Order statuses
 
-`New → Confirmed → Packed → Shipped → Delivered`, or `Cancelled`.
+`New → Confirmed → Packed → Shipped → Delivered → Returned`, or `Cancelled`
+from anything before Delivered. The dashboard shows New as "Drafted": the
+customer has confirmed in Messenger and the seller confirms it again.
 
 ## Data model
 
@@ -56,7 +58,8 @@ delivery address.
   to them bumps the product's revision, so a save from an outdated page is
   refused. Order confirmation and cancellation, which change stock, must bump
   it too. The AI sees only active products and their live variants. Stock is
-  decremented when an order is confirmed and restored if it is cancelled.
+  decremented when an order is confirmed and restored if it is cancelled or
+  returned.
 - **Category** — a seller's flat list, no nesting; names unique per seller.
   A product can sit in several categories. Deleting one is a soft delete and
   removes it from its products.
@@ -68,7 +71,8 @@ delivery address.
   active in the last 30 days, and the dashboard falls back to initials. The
   Customers page shows one status per customer, the first that applies: needs
   you (a conversation is handed off), inactive (no message or order for 60
-  days), repeat (two or more orders), new. Cancelled orders never count.
+  days), repeat (two or more orders), new. Cancelled and returned orders never
+  count.
 - **Customer note** — free text the seller's team keeps on a customer, with
   its author; the customer never sees it.
 - **Conversation** — customer, Page, state, collected slots, bot paused flag.
@@ -79,9 +83,16 @@ delivery address.
 - **Message** — sender (`customer`, `assistant`, `seller`), content, status
   (`sending`, `sent`, `failed`), timestamps, Meta message ID (none while a
   reply is `sending`).
-- **Order / OrderItem** — items, totals, currency (the shop's at the time),
-  delivery charge, status, notes, linked conversation. The tables exist so the Customers pages can read order
-  history; their shape is provisional until the orders work creates orders.
+- **Order / OrderItem / OrderEvent** — items (snapshots of name, variant, SKU
+  and price, linked to their variant), totals, currency (the shop's at the
+  time), delivery details and charge, status, payment status and method (the
+  seller's record; the MVP takes no payments), tracking number, an internal
+  note, source (`assistant` or `seller`), linked conversation, and an activity
+  log of who changed what. The assistant drafts orders from a confirmed
+  conversation; the seller can also add one by hand for a customer who has
+  messaged the Page. Stock is held while an order is confirmed, packed,
+  shipped or delivered, and given back when it is cancelled or returned.
+  Cancelled and returned orders never count as revenue or a customer's spend.
 
 Money is stored as integer minor units of the shop's currency (e.g.
 paisa/cents; the currency's ISO 4217 exponent decides how many), never floats
