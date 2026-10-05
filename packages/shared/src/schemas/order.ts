@@ -106,8 +106,9 @@ const rangeInOrder = (range: { from?: string; to?: string }) =>
 const rangeIssue = { path: ['to'], params: { code: 'INVALID_VALUE' } };
 
 /**
- * GET /orders. `q` matches the order number, the customer's name or phone
- * (digits alone match a formatted number).
+ * GET /orders. `q` matches the order reference, whole or in part, or a bare
+ * order number in any year, or the customer's name or phone (digits alone
+ * match a formatted number).
  */
 export const listOrdersQuerySchema = z
   .object({
@@ -133,8 +134,12 @@ const money = z.number().int().nonnegative();
 
 export const orderListItemSchema = z.object({
   id: z.string().uuid(),
-  /** The shop's own order number. */
+  /** ORD-2026-00481: the order's identifier, shown to the seller and sent to the customer. */
+  reference: z.string().min(1),
+  /** The shop's own order number within `year`, counted from 1 each year. */
   number: z.number().int().positive(),
+  /** The calendar year it was placed, in the shop's time zone. */
+  year: z.number().int().positive(),
   source: orderSourceSchema,
   status: orderStatusSchema,
   paymentStatus: paymentStatusSchema,
@@ -204,7 +209,12 @@ export type OrderLine = z.infer<typeof orderLineSchema>;
 
 export const orderDetailSchema = z.object({
   id: z.string().uuid(),
+  /** ORD-2026-00481: the order's identifier, shown to the seller and sent to the customer. */
+  reference: z.string().min(1),
+  /** The shop's own order number within `year`, counted from 1 each year. */
   number: z.number().int().positive(),
+  /** The calendar year it was placed, in the shop's time zone. */
+  year: z.number().int().positive(),
   /** Opaque. Send it back with a change; a change from an older read is refused with ORDER_STALE. */
   version: z.string().min(1),
   source: orderSourceSchema,

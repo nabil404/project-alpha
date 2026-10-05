@@ -10,7 +10,7 @@ import { useErrorMessages } from '@/i18n/error-keys';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-import { OrderStatusBadge, orderReference, useLinesLabel } from '@/features/orders';
+import { OrderStatusBadge, useLinesLabel } from '@/features/orders';
 
 import { useCustomerOrders } from '../queries';
 
@@ -80,7 +80,7 @@ export function CustomerOrdersCard({ customerId }: { customerId: string }) {
                     params={{ orderId: order.id }}
                     className="font-mono text-code text-link underline-offset-4 hover:underline"
                   >
-                    {orderReference(order)}
+                    {order.reference}
                   </Link>
                   <OrderStatusBadge status={order.status} />
                 </span>
@@ -126,7 +126,7 @@ export function CustomerOrdersCard({ customerId }: { customerId: string }) {
                         params={{ orderId: order.id }}
                         className="font-mono text-code text-link underline-offset-4 hover:underline"
                       >
-                        {orderReference(order)}
+                        {order.reference}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-body">{itemsLabel(order.items)}</td>
