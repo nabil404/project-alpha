@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { one } from '../database/rows';
 import { deliveryCharge } from '../database/schema/index';
@@ -47,6 +47,22 @@ export class DeliveryChargesRepository {
       .select()
       .from(deliveryCharge)
       .where(and(eq(deliveryCharge.merchantId, merchantId), inArray(deliveryCharge.id, ids)));
+  }
+
+  /**
+   * Each name as the unique index compares it: Postgres `lower()`, which folds
+   * some letters differently from JavaScript ("İzmir" and "izmir" agree here).
+   */
+  async foldNames(executor: Executor, names: string[]): Promise<string[]> {
+    if (names.length === 0) return [];
+    const list = sql.join(
+      names.map((name) => sql`${name}`),
+      sql`, `,
+    );
+    const { rows } = await executor.execute<{ folded: string }>(
+      sql`select lower(name) as folded from unnest(array[${list}]::text[]) with ordinality as t(name, i) order by i`,
+    );
+    return rows.map((row) => row.folded);
   }
 
   async insert(

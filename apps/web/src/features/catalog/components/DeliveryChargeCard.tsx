@@ -56,6 +56,12 @@ export function DeliveryChargeCard({ className }: { className: string }) {
 
   const rates = settings.data ? shopRates(settings.data, t('delivery.elsewhere')) : [];
   const own = new Map(charges.field.value.map((row) => [row.deliveryChargeId, row.charge]));
+  // The field's error is per array index, which follows `deliveryCharges`, not the table rows.
+  const rowErrors = (charges.fieldState.error ?? []) as unknown as ({
+    charge?: { message?: string };
+  } | null)[];
+  const errorFor = (id: string) =>
+    rowErrors[charges.field.value.findIndex((row) => row.deliveryChargeId === id)]?.charge?.message;
   const setOwn = (id: string, charge: number | null) => {
     const rest = charges.field.value.filter((row) => row.deliveryChargeId !== id);
     const next: ProductDeliveryCharge[] =
@@ -96,7 +102,13 @@ export function DeliveryChargeCard({ className }: { className: string }) {
               name={custom.field.name}
               className="mt-1 size-4 cursor-pointer accent-accent"
               checked={!custom.field.value}
-              onChange={() => custom.field.onChange(false)}
+              onChange={() => {
+                custom.field.onChange(false);
+                // A half-typed amount can't block a save it isn't part of.
+                charges.field.onChange(
+                  charges.field.value.filter((row) => Number.isFinite(row.charge)),
+                );
+              }}
             />
             <span className="flex min-w-0 flex-col">
               <span className="text-body font-medium">{t('delivery.shop')}</span>
@@ -125,21 +137,29 @@ export function DeliveryChargeCard({ className }: { className: string }) {
             <>
               <ul className="flex flex-col gap-2">
                 {rates.map((rate) => (
-                  <li key={rate.id} className="flex items-center gap-3">
-                    <span className="flex min-w-0 grow flex-col">
-                      <span className="truncate text-body font-medium">{rate.label}</span>
-                      <span className="text-small text-ink-muted">
-                        {t('delivery.shopCharge', { amount: formatMoney(rate.charge) })}
+                  <li key={rate.id} className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                      <span className="flex min-w-0 grow flex-col">
+                        <span className="truncate text-body font-medium">{rate.label}</span>
+                        <span className="text-small text-ink-muted">
+                          {t('delivery.shopCharge', { amount: formatMoney(rate.charge) })}
+                        </span>
                       </span>
-                    </span>
-                    <MoneyInput
-                      nullable
-                      className="w-28 shrink-0"
-                      aria-label={t('delivery.chargeFor', { area: rate.label })}
-                      value={own.get(rate.id) ?? null}
-                      onChange={(charge) => setOwn(rate.id, charge)}
-                      onBlur={charges.field.onBlur}
-                    />
+                      <MoneyInput
+                        nullable
+                        className="w-28 shrink-0"
+                        aria-label={t('delivery.chargeFor', { area: rate.label })}
+                        value={own.get(rate.id) ?? null}
+                        onChange={(charge) => setOwn(rate.id, charge)}
+                        onBlur={charges.field.onBlur}
+                        aria-invalid={errorFor(rate.id) ? true : undefined}
+                      />
+                    </div>
+                    {errorFor(rate.id) && (
+                      <p role="alert" className="text-small text-danger">
+                        {errorFor(rate.id)}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

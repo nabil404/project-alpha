@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { SaveDeliverySettings } from '@app/shared';
 import {
@@ -123,6 +124,23 @@ describeDb('DeliverySettingsService', () => {
       [a!.id, 'Gazipur'],
       [b!.id, 'Dhaka'],
     ]);
+  });
+
+  it('flags names the database folds together, as a field error, not a 500', async () => {
+    // JavaScript lowercases "İzmir" to "i̇zmir"; Postgres lower() gives "izmir".
+    const error = await service
+      .save(
+        t.merchantA,
+        doc([
+          { areaName: 'izmir', charge: 1, deliveryTime: null },
+          { areaName: 'İzmir', charge: 2, deliveryTime: null },
+        ]),
+      )
+      .catch((e: unknown) => e);
+    expect((error as HttpException).getResponse()).toMatchObject({
+      code: 'VALIDATION_FAILED',
+      fields: { 'deliveryCharges.1.areaName': [{ code: 'DUPLICATE' }] },
+    });
   });
 
   it("refuses another merchant's id and leaves their row alone", async () => {

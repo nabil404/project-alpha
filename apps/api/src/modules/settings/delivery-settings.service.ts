@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { DeliverySettings, SaveDeliverySettings } from '@app/shared';
+import { CodedValidationException } from '../../common/errors/index';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { DATABASE, type Database } from '../database/database.module';
 import { withMerchant } from '../database/with-merchant';
@@ -33,6 +34,21 @@ export class DeliverySettingsService {
       const named = new Set(current.filter((row) => !row.isFallback).map((row) => row.id));
       for (const row of input.deliveryCharges) {
         if (row.id && !named.has(row.id)) throw deliveryChargeNotFound(row.id);
+      }
+
+      // The shared schema catches most repeats; this catches the names only
+      // the database's own case folding makes equal, before the index does.
+      const folded = await this.charges.foldNames(
+        tx,
+        input.deliveryCharges.map((row) => row.areaName),
+      );
+      const repeat = folded.findIndex((name, index) => folded.indexOf(name) !== index);
+      if (repeat !== -1) {
+        throw new CodedValidationException({
+          [`deliveryCharges.${repeat}.areaName`]: [
+            { code: 'DUPLICATE', message: 'Another area has this name', params: {} },
+          ],
+        });
       }
 
       const kept = input.deliveryCharges.flatMap((row) => (row.id ? [row.id] : []));
