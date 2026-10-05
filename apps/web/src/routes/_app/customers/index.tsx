@@ -37,7 +37,8 @@ function toSearch(input: Record<string, unknown>): CustomersSearch {
   const show = parsed(shape.filter.safeParse(input.show));
   return {
     show: show === 'all' ? undefined : show,
-    q: parsed(shape.q.safeParse(input.q)),
+    // A hand-typed `?q=481` arrives as a number: the router parses search values as JSON.
+    q: parsed(shape.q.safeParse(typeof input.q === 'number' ? String(input.q) : input.q)),
     sort: absentAt(parsed(shape.sort.safeParse(input.sort)), DEFAULTS.sort),
     direction: absentAt(parsed(shape.direction.safeParse(input.direction)), DEFAULTS.direction),
     page: absentAt(parsed(shape.page.safeParse(input.page)), DEFAULTS.page),
