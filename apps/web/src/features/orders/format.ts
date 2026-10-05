@@ -2,14 +2,6 @@ import { useTranslation } from 'react-i18next';
 
 import { useFormatters } from '@/lib/format';
 
-/**
- * ORD-2026-00481: the shop's order number, zero-padded, after the year it was
- * placed. An identifier, not a quantity, so it is never locale-grouped.
- */
-export function orderReference({ number, placedAt }: { number: number; placedAt: string }) {
-  return `ORD-${new Date(placedAt).getFullYear()}-${String(number).padStart(5, '0')}`;
-}
-
 interface LineLabelParts {
   productName: string;
   variantName: string | null;

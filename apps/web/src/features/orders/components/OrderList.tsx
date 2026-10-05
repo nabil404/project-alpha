@@ -22,7 +22,7 @@ import { useShopRegion } from '@/lib/shop-region';
 import { cn } from '@/lib/utils';
 
 import { rangeInstants, type OrderRangeChoice } from '../date-range';
-import { orderReference, useLineLabel, usePlacedLabel } from '../format';
+import { useLineLabel, usePlacedLabel } from '../format';
 import { useOrderList, useOrderSummary } from '../queries';
 import { CreateOrderDialog } from './CreateOrderDialog';
 import { DateRangeFilter } from './DateRangeFilter';
@@ -375,7 +375,7 @@ function OrderRow({ order }: { order: OrderListItem }) {
           params={{ orderId: order.id }}
           className="flex flex-col font-mono text-code text-ink hover:text-link"
         >
-          {orderReference(order)}
+          {order.reference}
           <span className="font-sans text-small text-ink-muted">{orderSource(order.source)}</span>
         </Link>
       </td>
@@ -428,7 +428,7 @@ function OrderCards({ orders }: { orders: OrderListItem[] }) {
             className="flex flex-col gap-1 px-4 py-3 text-ink hover:bg-surface-hover"
           >
             <span className="flex items-center justify-between gap-2">
-              <span className="font-mono text-code text-ink-muted">{orderReference(order)}</span>
+              <span className="font-mono text-code text-ink-muted">{order.reference}</span>
               <OrderStatusBadge status={order.status} />
             </span>
             <span className="flex items-baseline justify-between gap-2">

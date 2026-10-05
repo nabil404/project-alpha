@@ -14,7 +14,9 @@ export const orderVersion = (row: Pick<OrderRow, 'revision'>) => String(row.revi
 export function toOrderListItem({ order, firstItem, itemCount }: OrderListRow): OrderListItem {
   return {
     id: order.id,
+    reference: order.reference,
     number: order.number,
+    year: order.year,
     source: order.source,
     status: order.status,
     paymentStatus: order.paymentStatus,
@@ -38,7 +40,9 @@ export interface OrderDetailParts {
 export function toOrderDetail({ order, items, customer, history }: OrderDetailParts): OrderDetail {
   return {
     id: order.id,
+    reference: order.reference,
     number: order.number,
+    year: order.year,
     version: orderVersion(order),
     source: order.source,
     status: order.status,

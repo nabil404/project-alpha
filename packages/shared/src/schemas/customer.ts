@@ -134,8 +134,12 @@ export type CustomerDetail = z.infer<typeof customerDetailSchema>;
 
 export const customerOrderSchema = z.object({
   id: z.string().uuid(),
-  /** The shop's own order number. */
+  /** ORD-2026-00481: the order's identifier, shown to the seller and sent to the customer. */
+  reference: z.string().min(1),
+  /** The shop's own order number within `year`, counted from 1 each year. */
   number: z.number().int().positive(),
+  /** The calendar year it was placed, in the shop's time zone. */
+  year: z.number().int().positive(),
   status: orderStatusSchema,
   /** Minor units, delivery included. */
   total: z.number().int().nonnegative(),

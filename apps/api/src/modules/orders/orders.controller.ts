@@ -90,7 +90,7 @@ export class OrdersController {
   @ApiOperation({
     summary: 'List orders',
     description:
-      '`q` matches the order number ("481", "#481" or "ORD-2026-00481"), the customer’s name or phone (digits alone match a formatted number). `from` and `to` bound when the order was placed.',
+      '`q` matches the order reference, whole or in part ("ORD-2026-00481", "2026-004"), a bare order number in any year ("481", "#481"), the customer’s name or phone (digits alone match a formatted number). `from` and `to` bound when the order was placed.',
   })
   @ApiQuery({ name: 'status', required: false, enum: [...orderFilters] })
   @ApiQuery({ name: 'q', required: false, schema: { type: 'string', maxLength: 100 } })

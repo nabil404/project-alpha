@@ -35,10 +35,12 @@ the `version` the page read; a change from an older read is
 Shapes are the Zod schemas in
 [`packages/shared/src/schemas/order.ts`](../../../packages/shared/src/schemas/order.ts).
 Money is integer minor units of the order's `currency`; timestamps are ISO
-strings. `number` is the shop's sequence as an integer; the web formats it
-(`ORD-2026-00481`).
+strings. `reference` (`ORD-2026-00481`) is assigned by the API when the order
+is placed and shown as is: `year` is the calendar year it was placed in the
+shop's time zone, `number` counts the shop's orders from 1 within that year,
+zero-padded to five digits and widening past them (`ORD-2026-100000`).
 
-- `OrderListItem`: number, source, status, payment, the customer's id with the
+- `OrderListItem`: reference, number, year, source, status, payment, the customer's id with the
   name and phone the order was placed with, the first line and `itemCount`
   ("Blue kurti, M × 2 +1 more"), total, currency, `placedAt`.
 - `OrderSummary`: `counts` per tab under the same `q`, `from` and `to` as the
@@ -91,14 +93,16 @@ earlierOrderCount, spentBefore }` ("Repeat customer · 2 earlier orders"),
 - **Dates:** `from` is inclusive and `to` exclusive. The page turns "Today" or
   "This month" into instants in the shop's time zone, so the API never
   guesses one; `from` must be before `to`.
-- **Search** matches the order number (`481`, `#481` or `ORD-2026-00481`), and
-  the name and phone as on Customers.
+- **Search** matches the reference whole or in part, case-insensitively
+  (`ORD-2026-00481`, unpadded `ORD-2026-481`, `ORD-2026`, `2026-004`); a bare
+  number (`481`, `#481`) matches that number exactly, in any year; and the
+  name and phone as on Customers.
 - **Orders added by hand** are for a customer who has messaged the Page. They
   start as `new` with `source = seller`, so stock moves on confirmation as
   for the assistant's. Name, phone and address default to the customer's
   details on file; if one is missing it must be sent (`REQUIRED` on that
   field). The currency is the shop's. Creation takes the shop's settings row
-  lock, which serializes the number sequence, the idempotency check and the
+  lock, which serializes the yearly number sequence, the idempotency check and the
   currency lock. With an `Idempotency-Key`, a repeat returns the first order.
 - **A product that was ordered cannot be deleted** (`409 PRODUCT_IN_USE`):
   order lines keep foreign keys to their product and variant. The seller
@@ -107,11 +111,14 @@ earlierOrderCount, spentBefore }` ("Repeat customer · 2 earlier orders"),
 ## Data model
 
 Schema in [`orders.ts`](../../../apps/api/src/modules/database/schema/orders.ts),
-migrations `0020_orders` and `0021_orders_force_rls`. Every table has RLS
+migrations `0020_orders` and `0021_orders_force_rls`; `0022`–`0025` moved
+the number to a yearly sequence, renumbering existing orders within their
+year by `placed_at`. Every table has RLS
 enabled and forced with a `*_merchant_isolation` policy, and composite
 `(merchant_id, id)` foreign keys.
 
-- `order`: `number` (`UNIQUE (merchant_id, number)`), `customer_id`,
+- `order`: `year`, `number` (`UNIQUE (merchant_id, year, number)`),
+  `reference` (`UNIQUE (merchant_id, reference)`), `customer_id`,
   `conversation_id` (nullable), `source`, `status`, `payment_status`,
   `payment_method`, `subtotal`, `delivery_charge`, `total`
   (`total = subtotal + delivery_charge`), `currency`, the delivery snapshot

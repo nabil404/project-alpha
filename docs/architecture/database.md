@@ -155,31 +155,31 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 
 ## Check constraints
 
-| Constraint                           | Table                  | Rule                                                                                                               |
-| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `product_status_ck`                  | `product`              | `status` in `draft`, `active`, `archived`.                                                                         |
-| `product_delivery_charge_ck`         | `product`              | `delivery_charge >= 0` (minor units).                                                                              |
-| `product_revision_ck`                | `product`              | `revision >= 0`. `revision` is bumped by every write to the product's document and is its `version` on the wire.   |
-| `product_variant_price_ck`           | `product_variant`      | `price >= 0` (minor units).                                                                                        |
-| `product_variant_stock_ck`           | `product_variant`      | `stock >= 0`.                                                                                                      |
-| `product_variant_default_unnamed_ck` | `product_variant`      | `is_default` exactly when `name` is null — the default variant is the unnamed one.                                 |
-| `product_option_position_ck`         | `product_option`       | `position >= 0`.                                                                                                   |
-| `product_option_value_position_ck`   | `product_option_value` | `position >= 0`.                                                                                                   |
-| `conversation_state_ck`              | `conversation`         | `state` in `browsing`, `collecting_details`, `awaiting_confirmation`, `confirmed`, `handed_off`, `abandoned`.      |
-| `conversation_last_sender_ck`        | `conversation`         | `last_message_sender` in `customer`, `assistant`, `seller`.                                                        |
-| `message_sender_ck`                  | `message`              | `sender` in `customer`, `assistant`, `seller`.                                                                     |
-| `message_status_ck`                  | `message`              | `status` in `sending`, `sent`, `failed`.                                                                           |
-| `order_status_ck`                    | `order`                | `status` in `new`, `confirmed`, `packed`, `shipped`, `delivered`, `returned`, `cancelled`.                         |
-| `order_source_ck`                    | `order`                | `source` in `assistant`, `seller`.                                                                                 |
-| `order_payment_status_ck`            | `order`                | `payment_status` in `unpaid`, `paid`, `refunded`.                                                                  |
-| `order_payment_method_ck`            | `order`                | `payment_method` in `cash_on_delivery`, `bank_transfer`, `mobile_wallet`.                                          |
-| `order_revision_ck`                  | `order`                | `revision >= 0`. Bumped by every write to the order; its `version` on the wire, as for products.                   |
-| `order_number_ck`                    | `order`                | `number > 0`. `UNIQUE (merchant_id, number)`: each shop has its own sequence.                                      |
-| `order_amounts_ck`                   | `order`                | `subtotal >= 0`, `delivery_charge >= 0`, `total = subtotal + delivery_charge` (minor units).                       |
-| `order_item_quantity_ck`             | `order_item`           | `quantity > 0`.                                                                                                    |
-| `order_item_unit_price_ck`           | `order_item`           | `unit_price >= 0` (minor units).                                                                                   |
-| `order_event_type_ck`                | `order_event`          | `type` in `created`, `status_changed`, `items_changed`, `delivery_changed`, `payment_changed`, `tracking_changed`. |
-| `order_event_data_type_ck`           | `order_event`          | `data ->> 'type' = type`: the jsonb payload's discriminator matches the column (parsed with Zod on read).          |
+| Constraint                           | Table                  | Rule                                                                                                                       |
+| ------------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `product_status_ck`                  | `product`              | `status` in `draft`, `active`, `archived`.                                                                                 |
+| `product_delivery_charge_ck`         | `product`              | `delivery_charge >= 0` (minor units).                                                                                      |
+| `product_revision_ck`                | `product`              | `revision >= 0`. `revision` is bumped by every write to the product's document and is its `version` on the wire.           |
+| `product_variant_price_ck`           | `product_variant`      | `price >= 0` (minor units).                                                                                                |
+| `product_variant_stock_ck`           | `product_variant`      | `stock >= 0`.                                                                                                              |
+| `product_variant_default_unnamed_ck` | `product_variant`      | `is_default` exactly when `name` is null — the default variant is the unnamed one.                                         |
+| `product_option_position_ck`         | `product_option`       | `position >= 0`.                                                                                                           |
+| `product_option_value_position_ck`   | `product_option_value` | `position >= 0`.                                                                                                           |
+| `conversation_state_ck`              | `conversation`         | `state` in `browsing`, `collecting_details`, `awaiting_confirmation`, `confirmed`, `handed_off`, `abandoned`.              |
+| `conversation_last_sender_ck`        | `conversation`         | `last_message_sender` in `customer`, `assistant`, `seller`.                                                                |
+| `message_sender_ck`                  | `message`              | `sender` in `customer`, `assistant`, `seller`.                                                                             |
+| `message_status_ck`                  | `message`              | `status` in `sending`, `sent`, `failed`.                                                                                   |
+| `order_status_ck`                    | `order`                | `status` in `new`, `confirmed`, `packed`, `shipped`, `delivered`, `returned`, `cancelled`.                                 |
+| `order_source_ck`                    | `order`                | `source` in `assistant`, `seller`.                                                                                         |
+| `order_payment_status_ck`            | `order`                | `payment_status` in `unpaid`, `paid`, `refunded`.                                                                          |
+| `order_payment_method_ck`            | `order`                | `payment_method` in `cash_on_delivery`, `bank_transfer`, `mobile_wallet`.                                                  |
+| `order_revision_ck`                  | `order`                | `revision >= 0`. Bumped by every write to the order; its `version` on the wire, as for products.                           |
+| `order_number_ck`                    | `order`                | `number > 0`. `UNIQUE (merchant_id, year, number)`: each shop numbers from 1 each year; `UNIQUE (merchant_id, reference)`. |
+| `order_amounts_ck`                   | `order`                | `subtotal >= 0`, `delivery_charge >= 0`, `total = subtotal + delivery_charge` (minor units).                               |
+| `order_item_quantity_ck`             | `order_item`           | `quantity > 0`.                                                                                                            |
+| `order_item_unit_price_ck`           | `order_item`           | `unit_price >= 0` (minor units).                                                                                           |
+| `order_event_type_ck`                | `order_event`          | `type` in `created`, `status_changed`, `items_changed`, `delivery_changed`, `payment_changed`, `tracking_changed`.         |
+| `order_event_data_type_ck`           | `order_event`          | `data ->> 'type' = type`: the jsonb payload's discriminator matches the column (parsed with Zod on read).                  |
 
 ## Partial and special indexes
 

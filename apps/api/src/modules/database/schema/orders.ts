@@ -45,12 +45,15 @@ const ORDER_EVENT_TYPES = [
   'tracking_changed',
 ] as const;
 
-export const ORDER_NUMBER_UQ = 'order_merchant_number_uq';
+export const ORDER_NUMBER_UQ = 'order_merchant_year_number_uq';
+export const ORDER_REFERENCE_UQ = 'order_merchant_reference_uq';
 export const ORDER_IDEMPOTENCY_UQ = 'order_merchant_idempotency_key_uq';
 
 /**
- * `number` is the shop's own sequence, shown to the seller and sent to the
- * customer. The delivery fields are a snapshot taken when the order is placed,
+ * `number` counts the shop's orders from 1 within `year`, the calendar year
+ * the order was placed in the shop's time zone; `reference` (ORD-2026-00481)
+ * is the two together, stored when the order is placed, shown to the seller
+ * and sent to the customer. The delivery fields are a snapshot taken when the order is placed,
  * so editing the customer later never rewrites an order. Totals are minor
  * units of `currency`, copied from the shop's settings when the order is placed.
  */
@@ -60,6 +63,8 @@ export const order = pgTable(
     id: id(),
     merchantId: merchantId(),
     number: integer('number').notNull(),
+    year: integer('year').notNull(),
+    reference: text('reference').notNull(),
     customerId: text('customer_id').notNull(),
     /** The conversation it was confirmed in; null for an order the seller added. */
     conversationId: text('conversation_id'),
@@ -95,7 +100,8 @@ export const order = pgTable(
   },
   (t) => [
     unique('order_merchant_id_uq').on(t.merchantId, t.id),
-    unique(ORDER_NUMBER_UQ).on(t.merchantId, t.number),
+    unique(ORDER_NUMBER_UQ).on(t.merchantId, t.year, t.number),
+    unique(ORDER_REFERENCE_UQ).on(t.merchantId, t.reference),
     unique(ORDER_IDEMPOTENCY_UQ).on(t.merchantId, t.idempotencyKey),
     foreignKey({
       name: 'order_customer_fk',
