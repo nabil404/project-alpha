@@ -17,7 +17,6 @@ export interface NewProductValues {
   description: string | null;
   status: ProductStatus;
   aliases: string[];
-  deliveryCharge: number;
 }
 
 export interface NewVariantValues {

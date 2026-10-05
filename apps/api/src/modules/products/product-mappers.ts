@@ -88,7 +88,8 @@ export function toProduct(row: ProductRow, parts: ProductParts): Product {
         .filter((value) => value.optionId === option.id)
         .map((value) => ({ id: value.id, value: value.value })),
     })),
-    deliveryCharge: row.deliveryCharge,
+    // wire renamed in Task 6
+    deliveryCharge: 0,
     variants: parts.variants
       .map((variant) => ({ variant, valueIds: valueIdsOf(variant.id) }))
       .sort((a, b) => byValuePositions(a.valueIds, b.valueIds))

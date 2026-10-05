@@ -157,7 +157,7 @@ describeDb('order routes over HTTP', () => {
     const drafted = await seedOrder(t.db, a, nusrat.id, {
       conversationId: conversation.id,
       placedAt: new Date('2026-10-04T10:05:00Z'),
-      deliveryCharge: 6000,
+      deliveryFee: 6000,
       items: [{ productName: 'Blue kurti', variantName: 'M', quantity: 2, unitPrice: 160000 }],
     });
     await t.db

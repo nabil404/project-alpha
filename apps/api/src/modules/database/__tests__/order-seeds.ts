@@ -21,7 +21,7 @@ export async function seedOrder(
   customerId: string,
   {
     items = [{}],
-    deliveryCharge = 0,
+    deliveryFee = 0,
     ...overrides
   }: Partial<typeof schema.order.$inferInsert> & { items?: SeedItem[] } = {},
 ) {
@@ -43,8 +43,8 @@ export async function seedOrder(
       number,
       year,
       subtotal,
-      deliveryCharge,
-      total: subtotal + deliveryCharge,
+      deliveryFee,
+      total: subtotal + deliveryFee,
       currency: 'BDT',
       customerName: 'Nusrat Jahan',
       phone: '01712-345678',

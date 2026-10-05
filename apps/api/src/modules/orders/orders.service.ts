@@ -156,13 +156,13 @@ export class OrdersService {
         status: 'new',
         paymentMethod: input.paymentMethod,
         subtotal,
-        deliveryCharge: input.deliveryCharge,
+        deliveryFee: input.deliveryCharge,
         total: subtotal + input.deliveryCharge,
         currency: settings.currency,
         customerName,
         phone,
         deliveryAddress,
-        deliveryZone: input.deliveryZone ?? null,
+        deliveryArea: input.deliveryZone ?? null,
         notes: input.note ?? null,
         idempotencyKey: idempotencyKey ?? null,
         placedAt,
@@ -229,7 +229,7 @@ export class OrdersService {
       const subtotal = subtotalOf(lines);
       const updated = await this.orders.update(tx, scope, id, {
         subtotal,
-        total: subtotal + row.deliveryCharge,
+        total: subtotal + row.deliveryFee,
       });
       await this.events.insert(tx, scope, id, actor.id, [
         { type: 'items_changed', totalBefore: row.total, totalAfter: updated.total },

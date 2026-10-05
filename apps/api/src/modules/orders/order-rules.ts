@@ -141,9 +141,10 @@ export function planOrderPatch(row: OrderRow, input: Omit<UpdateOrder, 'version'
   set('customerName', input.customerName, 'name');
   set('phone', input.phone, 'phone');
   set('deliveryAddress', input.deliveryAddress, 'address');
-  set('deliveryZone', input.deliveryZone, 'zone');
-  set('deliveryCharge', input.deliveryCharge, 'charge');
-  if (changes.deliveryCharge !== undefined) changes.total = row.subtotal + changes.deliveryCharge;
+  // wire renamed in Task 7
+  set('deliveryArea', input.deliveryZone, 'zone');
+  set('deliveryFee', input.deliveryCharge, 'charge');
+  if (changes.deliveryFee !== undefined) changes.total = row.subtotal + changes.deliveryFee;
   if (delivery.length > 0) events.push({ type: 'delivery_changed', fields: delivery });
 
   set('paymentStatus', input.paymentStatus);

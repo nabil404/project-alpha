@@ -69,7 +69,6 @@ export class ProductsService {
         description: doc.description,
         status: doc.status,
         aliases: doc.aliases,
-        deliveryCharge: doc.deliveryCharge,
       });
       await this.writer.apply(tx, scope, row.id, planProductDocument(EMPTY_PRODUCT_STATE, doc));
       await this.linkCategories(tx, scope, row.id, doc.categoryIds);
@@ -172,7 +171,6 @@ export class ProductsService {
         description: doc.description,
         status: doc.status,
         aliases: doc.aliases,
-        deliveryCharge: doc.deliveryCharge,
         coverImageId: plan.coverImageId ?? null,
       });
       await this.writer.apply(tx, scope, id, plan);
