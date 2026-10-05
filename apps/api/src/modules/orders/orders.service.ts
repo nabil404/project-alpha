@@ -33,6 +33,7 @@ import {
   orderStale,
 } from './order-errors';
 import { OrderEventsRepository } from './order-events.repository';
+import { orderReference, orderYear } from './order-reference';
 import { orderVersion, toOrderDetail, toOrderEvent, toOrderListItem } from './order-mappers';
 import {
   buildLines,
@@ -146,8 +147,9 @@ export class OrdersService {
       );
       const lines = buildLines(input.items, [], variants);
       const subtotal = subtotalOf(lines);
+      const placedAt = new Date();
       const row = await this.orders.insert(tx, scope, {
-        number: await this.orders.nextNumber(tx, scope),
+        ...(await this.numberFor(tx, scope, placedAt, settings.timeZone)),
         customerId: customer.id,
         conversationId: null,
         source: 'seller',
@@ -163,7 +165,7 @@ export class OrdersService {
         deliveryZone: input.deliveryZone ?? null,
         notes: input.note ?? null,
         idempotencyKey: idempotencyKey ?? null,
-        placedAt: new Date(),
+        placedAt,
       });
       await this.orders.replaceItems(tx, scope, row.id, lines);
       await this.events.insert(tx, scope, row.id, actor.id, [
@@ -287,6 +289,22 @@ export class OrdersService {
         available: variant?.stock ?? 0,
       });
     }
+  }
+
+  /**
+   * The year, number and reference for an order placed at `placedAt`. Every
+   * path that creates an order takes the shop's settings row lock first and
+   * then calls this, so two orders never share a number.
+   */
+  private async numberFor(
+    tx: Executor,
+    scope: TenantScope,
+    placedAt: Date,
+    timeZone: string,
+  ): Promise<{ year: number; number: number; reference: string }> {
+    const year = orderYear(placedAt, timeZone);
+    const number = await this.orders.nextNumber(tx, scope, year);
+    return { year, number, reference: orderReference(year, number) };
   }
 
   private async detail(tx: Executor, scope: TenantScope, row: OrderRow): Promise<OrderDetail> {

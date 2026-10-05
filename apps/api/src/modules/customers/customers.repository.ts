@@ -77,7 +77,7 @@ export interface CustomerSummaryRow {
 }
 
 export interface CustomerOrderRow {
-  order: Pick<OrderRow, 'id' | 'number' | 'status' | 'total' | 'placedAt'>;
+  order: Pick<OrderRow, 'id' | 'reference' | 'number' | 'year' | 'status' | 'total' | 'placedAt'>;
   items: Pick<OrderItemRow, 'productName' | 'variantName' | 'quantity'>[];
 }
 
@@ -311,7 +311,9 @@ export class CustomersRepository {
     const orders = await executor
       .select({
         id: order.id,
+        reference: order.reference,
         number: order.number,
+        year: order.year,
         status: order.status,
         total: order.total,
         placedAt: order.placedAt,

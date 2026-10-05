@@ -38,8 +38,10 @@ const daysBefore = (now: Date, days: number) => new Date(now.getTime() - days * 
 /** Orders that never count towards revenue or a customer's spend. */
 const NOT_SOLD: OrderStatus[] = ['cancelled', 'returned'];
 
-/** "481", "#481" or "ORD-2026-00481": the order number on its own. */
-const ORDER_NUMBER_PATTERN = /^#?(?:ORD-?\d{4}-?)?0*(\d{1,9})$/i;
+/** "481" or "#481": that number in any year. */
+const BARE_NUMBER_PATTERN = /^#?0*(\d{1,9})$/;
+/** "ORD-2026-00481", also unpadded or without dashes: that year's number. */
+const REFERENCE_PATTERN = /^#?ORD-?(\d{4})-?0*(\d{1,9})$/i;
 
 export interface OrderSearch {
   q?: string;
@@ -118,10 +120,17 @@ export class OrdersRepository {
     if (to) conditions.push(lt(order.placedAt, new Date(to)));
     if (q) {
       const digits = q.replace(/\D/g, '');
-      const number = ORDER_NUMBER_PATTERN.exec(q)?.[1];
+      const bare = BARE_NUMBER_PATTERN.exec(q)?.[1];
+      const reference = REFERENCE_PATTERN.exec(q);
       conditions.push(
         or(
-          number ? eq(order.number, Number(number)) : undefined,
+          bare ? eq(order.number, Number(bare)) : undefined,
+          reference
+            ? and(eq(order.year, Number(reference[1])), eq(order.number, Number(reference[2])))
+            : undefined,
+          // Part of a reference ("ORD-2026", "2026-004"). Digits alone match
+          // the number exactly instead, or "481" would find 01481 too.
+          bare ? undefined : ilike(order.reference, likePattern(q)),
           ilike(order.customerName, likePattern(q)),
           ilike(order.phone, likePattern(q)),
           // "01712345678" finds "01712-345678": compare digits only.
@@ -334,14 +343,16 @@ export class OrdersRepository {
   }
 
   /**
-   * The shop's next order number. Only race-free while the caller holds the
-   * shop's settings row lock, which every order creation takes first.
+   * The shop's next order number in `year`; the first order of a year is 1.
+   * Only race-free while the caller holds the shop's settings row lock, which
+   * every order creation takes first. Reads the end of the
+   * (merchant_id, year, number) unique index, however many orders there are.
    */
-  async nextNumber(executor: Executor, { merchantId }: TenantScope): Promise<number> {
+  async nextNumber(executor: Executor, { merchantId }: TenantScope, year: number): Promise<number> {
     const [row] = await executor
       .select({ last: sql<number>`coalesce(max(${order.number}), 0)`.mapWith(Number) })
       .from(order)
-      .where(eq(order.merchantId, merchantId));
+      .where(and(eq(order.merchantId, merchantId), eq(order.year, year)));
     return (row?.last ?? 0) + 1;
   }
 

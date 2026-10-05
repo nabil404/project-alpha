@@ -34,6 +34,7 @@ import { seedConversation, seedCustomer } from '../../database/__tests__/convers
 import { seedOrder } from '../../database/__tests__/order-seeds';
 import { MailService } from '../../mail/mail.service';
 import { ProductsModule } from '../../products/products.module';
+import { orderYear } from '../order-reference';
 import { OrdersModule } from '../orders.module';
 
 const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
@@ -166,7 +167,8 @@ describeDb('order routes over HTTP', () => {
     draftedId = drafted.id;
 
     const other = await seedCustomer(t.db, t.merchantB, { name: 'Nusrat Jahan' });
-    otherOrderId = (await seedOrder(t.db, t.merchantB, other.id)).id;
+    // From a long-gone year, so this year's numbering in the other shop starts empty.
+    otherOrderId = (await seedOrder(t.db, t.merchantB, other.id, { year: 2000 })).id;
   });
 
   beforeEach(() => {
@@ -368,9 +370,43 @@ describeDb('order routes over HTTP', () => {
     const replay = orderDetailSchema.parse((await create(body, key).expect(201)).body);
     expect(replay.id).toBe(first.id);
     const second = orderDetailSchema.parse((await create(body).expect(201)).body);
-    expect(second.number).toBe(first.number + 1);
+    expect(second).toMatchObject({ year: first.year, number: first.number + 1 });
+    expect(second.reference).toBe(`ORD-${second.year}-${String(second.number).padStart(5, '0')}`);
     // Drafted, not confirmed: no stock moves yet.
     expect(await stockOf(kurtiL)).toBe(1);
+  });
+
+  it('numbers each year from 1 in the shop’s time zone, whatever other years and shops hold', async () => {
+    merchantId = t.merchantB;
+    const year = orderYear(new Date(), 'Asia/Dhaka');
+    const rumana = await seedCustomer(t.db, t.merchantB, {
+      name: 'Rumana Akter',
+      phone: '01811-223344',
+      deliveryAddress: 'Flat 3B, Road 7, Dhanmondi, Dhaka',
+    });
+    await seedOrder(t.db, t.merchantB, rumana.id, { year: year - 1, number: 900 });
+    const scarf = await seedProduct(t.db, t.merchantB, { name: 'Silk scarf', status: 'active' });
+    const variant = await seedVariant(t.db, t.merchantB, scarf.id, { price: 90000, stock: 5 });
+    const place = async () =>
+      orderDetailSchema.parse(
+        (
+          await request(server())
+            .post('/api/v1/orders')
+            .send({
+              customerId: rumana.id,
+              deliveryCharge: 0,
+              items: [{ variantId: variant.id, quantity: 1 }],
+            })
+            .expect(201)
+        ).body,
+      );
+
+    const first = await place();
+    expect(first).toMatchObject({ year, number: 1, reference: `ORD-${year}-00001` });
+    expect(await place()).toMatchObject({ year, number: 2, reference: `ORD-${year}-00002` });
+    // At once: the settings row lock hands each its own next number.
+    const together = await Promise.all([place(), place(), place(), place()]);
+    expect(together.map((order) => order.number).sort((x, y) => x - y)).toEqual([3, 4, 5, 6]);
   });
 
   it('refuses a hand-made order with no address to deliver to, or an archived variant', async () => {
@@ -403,17 +439,16 @@ describeDb('order routes over HTTP', () => {
     expect(all.data.length).toBe(all.pagination.total);
     expect(all.data.every((row) => row.customer.id === nusratId)).toBe(true);
 
-    const drafted = (await get(draftedId)).number;
-    const byNumber = orderListResponseSchema.parse(
+    const byReference = orderListResponseSchema.parse(
       (
         await request(server())
           .get('/api/v1/orders')
-          .query({ q: `ORD-2026-${String(drafted).padStart(5, '0')}` })
+          .query({ q: (await get(draftedId)).reference })
           .expect(200)
       ).body,
     );
-    expect(byNumber.data.map((row) => row.id)).toEqual([draftedId]);
-    expect(byNumber.data[0]).toMatchObject({ status: 'cancelled', itemCount: 2 });
+    expect(byReference.data.map((row) => row.id)).toEqual([draftedId]);
+    expect(byReference.data[0]).toMatchObject({ status: 'cancelled', itemCount: 2 });
 
     const inOctober = { from: '2026-10-01T00:00:00+06:00', to: '2026-10-05T00:00:00+06:00' };
     const cancelled = orderListResponseSchema.parse(
@@ -438,6 +473,31 @@ describeDb('order routes over HTTP', () => {
       .get('/api/v1/orders')
       .query({ from: inOctober.to, to: inOctober.from })
       .expect(400);
+  });
+
+  it('finds an order by its reference, whole, unpadded or in part, or by its bare number in any year', async () => {
+    const drafted = await get(draftedId);
+    const in2024 = await seedOrder(t.db, t.merchantA, nusratId, { year: 2024, number: 7777 });
+    const in2025 = await seedOrder(t.db, t.merchantA, nusratId, { year: 2025, number: 7777 });
+    // Another shop's order with a reference this shop does not have.
+    await seedOrder(t.db, t.merchantB, (await seedCustomer(t.db, t.merchantB)).id, {
+      year: 2026,
+      number: 4242,
+    });
+    const search = async (q: string) =>
+      orderListResponseSchema
+        .parse((await request(server()).get('/api/v1/orders').query({ q }).expect(200)).body)
+        .data.map((row) => row.id)
+        .sort();
+
+    expect(await search(drafted.reference.toLowerCase())).toEqual([draftedId]);
+    expect(await search('ORD-2025-7777')).toEqual([in2025.id]);
+    expect(await search('ORD-2025')).toEqual([in2025.id]);
+    expect(await search('2024-07')).toEqual([in2024.id]);
+    expect(await search('#7777')).toEqual([in2024.id, in2025.id].sort());
+    // Digits alone match the number exactly, not part of it.
+    expect(await search('777')).toEqual([]);
+    expect(await search('ORD-2026-04242')).toEqual([]);
   });
 
   it('refuses to delete a product that was ordered', async () => {

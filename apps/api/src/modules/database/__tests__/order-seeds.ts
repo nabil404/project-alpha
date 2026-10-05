@@ -1,4 +1,5 @@
 import type { Database } from '../database.module';
+import { orderReference } from '../../orders/order-reference';
 import * as schema from '../schema/index';
 
 let nextNumber = 1;
@@ -32,12 +33,15 @@ export async function seedOrder(
     position,
   }));
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+  const number = overrides.number ?? nextNumber++;
+  const year = overrides.year ?? 2026;
   const [row] = await db
     .insert(schema.order)
     .values({
       merchantId,
       customerId,
-      number: nextNumber++,
+      number,
+      year,
       subtotal,
       deliveryCharge,
       total: subtotal + deliveryCharge,
@@ -47,6 +51,7 @@ export async function seedOrder(
       deliveryAddress: 'House 12, Road 4, Mirpur 10, Dhaka',
       placedAt: new Date(),
       ...overrides,
+      reference: overrides.reference ?? orderReference(year, number),
     })
     .returning();
   if (!row) throw new Error('seedOrder returned no row');

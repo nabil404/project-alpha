@@ -61,16 +61,27 @@ describeDb('order and customer note schema constraints', () => {
     ).resolves.toEqual({ code: '23503', constraint: 'order_conversation_fk' });
   });
 
-  it('numbers orders once per merchant, and the same number in two shops', async () => {
+  it('numbers orders once per merchant and year, and the same number in two shops', async () => {
     const customerOfA = await seedCustomer(t.db, t.merchantA);
     const customerOfB = await seedCustomer(t.db, t.merchantB);
-    await seedOrder(t.db, t.merchantA, customerOfA.id, { number: 9001 });
+    await seedOrder(t.db, t.merchantA, customerOfA.id, { year: 2026, number: 9001 });
     await expect(
-      pgErrorOf(seedOrder(t.db, t.merchantA, customerOfA.id, { number: 9001 })),
+      pgErrorOf(seedOrder(t.db, t.merchantA, customerOfA.id, { year: 2026, number: 9001 })),
     ).resolves.toEqual({ code: '23505', constraint: schema.ORDER_NUMBER_UQ });
     await expect(
-      seedOrder(t.db, t.merchantB, customerOfB.id, { number: 9001 }),
-    ).resolves.toBeTruthy();
+      seedOrder(t.db, t.merchantA, customerOfA.id, { year: 2027, number: 9001 }),
+    ).resolves.toMatchObject({ reference: 'ORD-2027-09001' });
+    await expect(
+      seedOrder(t.db, t.merchantB, customerOfB.id, { year: 2026, number: 9001 }),
+    ).resolves.toMatchObject({ reference: 'ORD-2026-09001' });
+  });
+
+  it('keeps a reference once per merchant', async () => {
+    const customer = await seedCustomer(t.db, t.merchantA);
+    await seedOrder(t.db, t.merchantA, customer.id, { reference: 'ORD-1999-00001' });
+    await expect(
+      pgErrorOf(seedOrder(t.db, t.merchantA, customer.id, { reference: 'ORD-1999-00001' })),
+    ).resolves.toEqual({ code: '23505', constraint: schema.ORDER_REFERENCE_UQ });
   });
 
   it('refuses a total that is not subtotal plus delivery', async () => {

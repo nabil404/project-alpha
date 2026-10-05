@@ -6,7 +6,6 @@ import type { OrderDetail } from '@app/shared';
 import { useCustomerName } from '@/features/conversations';
 import { useFormatters } from '@/lib/format';
 
-import { orderReference } from '../format';
 import { DeliveryCard } from './DeliveryCard';
 import { OrderActions } from './OrderActions';
 import { OrderActivityCard } from './OrderActivityCard';
@@ -27,7 +26,6 @@ export function OrderDetailView({ order }: { order: OrderDetail }) {
   const { t } = useTranslation('orders');
   const { formatDate } = useFormatters();
   const customerName = useCustomerName();
-  const reference = orderReference(order);
   const placed = formatDate(order.placedAt, 'dateTime');
 
   return (
@@ -43,7 +41,7 @@ export function OrderDetailView({ order }: { order: OrderDetail }) {
             <ChevronRight strokeWidth={1.5} className="size-3.5" />
           </li>
           <li aria-current="page" className="min-w-0 font-mono font-medium text-ink">
-            {reference}
+            {order.reference}
           </li>
         </ol>
       </nav>
@@ -51,7 +49,7 @@ export function OrderDetailView({ order }: { order: OrderDetail }) {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="font-mono text-display break-all">{reference}</h1>
+            <h1 className="font-mono text-display break-all">{order.reference}</h1>
             <OrderStatusBadge status={order.status} />
           </div>
           <p className="text-small text-ink-muted">
