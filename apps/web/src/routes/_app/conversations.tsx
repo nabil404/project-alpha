@@ -21,7 +21,11 @@ const searchSchema = listConversationsQuerySchema.pick({ filter: true, q: true }
 export const Route = createFileRoute('/_app/conversations')({
   staticData: { fullBleed: true },
   validateSearch: (search: Record<string, unknown>): ConversationsSearch => {
-    const parsed = searchSchema.safeParse(search);
+    // A hand-typed `?q=481` arrives as a number: the router parses search values as JSON.
+    const parsed = searchSchema.safeParse({
+      ...search,
+      q: typeof search.q === 'number' ? String(search.q) : search.q,
+    });
     if (!parsed.success) return {};
     const { filter, q } = parsed.data;
     return { filter: filter === 'all' ? undefined : filter, q };
