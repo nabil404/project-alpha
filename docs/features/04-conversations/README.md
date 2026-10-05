@@ -5,12 +5,40 @@ MVP's [scope](../../mvp/01-messenger-to-order/scope.md) ("conversation viewer",
 "human handoff, and bot auto-pause when the seller replies manually"). This
 page describes what is built.
 
-**Status (Sep 2026):** inbound messages and seller echoes are stored by the
+**Status (Oct 2026):** inbound messages and seller echoes are stored by the
 worker; the API lists, searches, counts and shows conversations, marks them
-read, takes over and hands back, sends seller replies, and streams changes
-over SSE. Not built yet: assistant replies (AI work), the drafted-order panel
-and order history (orders work), and the web route (the sidebar item exists,
-disabled).
+read, takes over and hands back, sends seller replies, deletes failed ones,
+and streams changes over SSE. The dashboard has the inbox at
+`/conversations` and `/conversations/:id`. Not built yet: assistant replies
+(AI work), and the drafted-order panel and order history in the thread. See
+[Follow-ups](#follow-ups).
+
+## Webhook
+
+[`messenger.controller.ts`](../../../apps/api/src/modules/messenger/messenger.controller.ts),
+at `/api/v1/webhooks/messenger`, `@AllowAnonymous()`: Meta carries no session,
+so the verify token and the signature are its authentication.
+
+- **`GET`** is Meta's subscription handshake: `hub.mode=subscribe` and
+  `hub.verify_token` equal to `META_VERIFY_TOKEN` echo `hub.challenge` as
+  plain text; anything else is `401 WEBHOOK_VERIFICATION_FAILED`. It stays
+  under the global throttle.
+- **`POST`** checks `X-Hub-Signature-256` (`sha256=<hex>`, HMAC of the raw
+  body keyed with `META_APP_SECRET`, compared in constant time) before any
+  work: no raw body is `400 WEBHOOK_MISSING_RAW_BODY`, a bad signature
+  `401 WEBHOOK_INVALID_SIGNATURE`, a body that isn't a JSON object
+  `400 WEBHOOK_MALFORMED_PAYLOAD`. It then queues one job per text message
+  (`jobId = mid`) and answers `200 EVENT_RECEIVED` at once. `@SkipThrottle()`:
+  Meta delivers every Page's events from a few addresses, so a per-IP limit
+  would throttle all shops together.
+- The raw body survives because the auth module keeps `rawBody: true` on its
+  body parser ([Auth](../01-auth/README.md#http-surface)).
+
+| Variable             | Notes                                                                                        |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| `META_VERIFY_TOKEN`  | Required; the token typed into the Meta app's webhook setup                                  |
+| `META_APP_SECRET`    | Required; the signature key ([Page connection](../03-facebook-page/README.md#configuration)) |
+| `WORKER_CONCURRENCY` | Defaults to 5; not yet applied to the inbound processor (see Follow-ups)                     |
 
 ## Flow
 
@@ -41,31 +69,40 @@ SPA    refetches over REST
 - **Failures.** An unknown job name or a malformed payload fails once
   (`UnrecoverableError`; the log names field paths, never values). Anything
   else retries with the queue defaults: 5 attempts, exponential from 1 s.
-- **Customer name.** `GET /{psid}?fields=name` with the connected Page's token,
-  outside any transaction, when the customer is new, or has no name and was
-  last tried 24 h or more ago (`needsProfile`). A known name is never
-  refreshed; a Graph failure stores the message with `name = null`.
+- **Customer profile.** `GET /{psid}?fields=name,profile_pic` with the
+  connected Page's token, outside any transaction (`needsProfile`): when the
+  customer is new; 24 h after the last try while the name or picture is still
+  missing; and every 3 days once both are known, because Facebook's picture
+  link expires. A read keeps any name or picture it didn't return; a Graph
+  failure stores the message anyway.
+- **Daily profile refresh.** `ProfileRefreshProcessor`, in the worker only,
+  runs at 04:00 UTC (an hour after the image sweep) through the BullMQ job
+  scheduler, upserted on every boot. Per shop it re-reads up to 200 customers
+  active in the last 30 days whose profile is due, each Graph call outside any
+  transaction, and stops a shop's run after 5 failures in a row (its Page
+  token is likely revoked). The dashboard falls back to initials.
 
 ## Routes (`/api/v1/conversations`, session + TenantGuard)
 
 A non-UUID `:id` is `400 VALIDATION_FAILED`; an unknown id, or another shop's,
 is `404 CONVERSATION_NOT_FOUND` (never 403).
 
-| Route                | Request                                                                                                    | Response                                                                                                                                                                |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /`              | `filter` (`all` default, `needs_you`, `drafted`, `unread`), `q` ≤ 100, `cursor`, `limit` 1–50 (default 25) | `{ data: ConversationListItem[], pagination: { nextCursor } }`, newest activity first                                                                                   |
-| `GET /counts`        | —                                                                                                          | `{ all, needsYou, drafted, unread }`, ignoring `q`                                                                                                                      |
-| `GET /events`        | —                                                                                                          | SSE, below                                                                                                                                                              |
-| `GET /:id`           | —                                                                                                          | `ConversationDetail`                                                                                                                                                    |
-| `GET /:id/messages`  | `before`, `limit` 1–100 (default 50)                                                                       | `{ data: Message[], pagination: { prevCursor } }`: the newest page, oldest first; pass `prevCursor` as `before` for the page before it, null at the start of the thread |
-| `PUT /:id/read`      | —                                                                                                          | 204. Reads up to the customer's last message; idempotent, and publishes only when something was unread                                                                  |
-| `PATCH /:id`         | `{ botPaused }`, strict (any other key is 400)                                                             | 200 `ConversationDetail`. `true` takes over and never changes `state`; `false` hands back, below                                                                        |
-| `POST /:id/messages` | `{ text }`, trimmed, 1–2000                                                                                | 201 `Message` (`sender: seller`, `status: sent`); errors below                                                                                                          |
+| Route                             | Request                                                                                                    | Response                                                                                                                                                                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /`                           | `filter` (`all` default, `needs_you`, `drafted`, `unread`), `q` ≤ 100, `cursor`, `limit` 1–50 (default 25) | `{ data: ConversationListItem[], pagination: { nextCursor } }`, newest activity first                                                                                                                                      |
+| `GET /counts`                     | —                                                                                                          | `{ all, needsYou, drafted, unread }`, ignoring `q`                                                                                                                                                                         |
+| `GET /events`                     | —                                                                                                          | SSE, below                                                                                                                                                                                                                 |
+| `GET /:id`                        | —                                                                                                          | `ConversationDetail`                                                                                                                                                                                                       |
+| `GET /:id/messages`               | `before`, `limit` 1–100 (default 50)                                                                       | `{ data: Message[], pagination: { prevCursor } }`: the newest page, oldest first; pass `prevCursor` as `before` for the page before it, null at the start of the thread                                                    |
+| `PUT /:id/read`                   | —                                                                                                          | 204. Reads up to the customer's last message; idempotent, and publishes only when something was unread                                                                                                                     |
+| `PATCH /:id`                      | `{ botPaused }`, strict (any other key is 400)                                                             | 200 `ConversationDetail`. `true` takes over and never changes `state`; `false` hands back, below                                                                                                                           |
+| `POST /:id/messages`              | `{ text }`, trimmed, 1–2000                                                                                | 201 `Message` (`sender: seller`, `status: sent`); errors below                                                                                                                                                             |
+| `DELETE /:id/messages/:messageId` | —                                                                                                          | 204. Only a seller reply with `status: failed`, which never reached the customer; any other is `409 MESSAGE_NOT_DELETABLE`, an unknown one `404 MESSAGE_NOT_FOUND`. The list preview falls back to the newest message left |
 
 Shapes are the Zod schemas in
 [`packages/shared/src/schemas/conversation.ts`](../../../packages/shared/src/schemas/conversation.ts):
 
-- `ConversationListItem`: `{ id, customer: { id, name | null }, state, botPaused, unread, lastMessage: { preview, sender, at }, lastInboundAt | null }`.
+- `ConversationListItem`: `{ id, customer: { id, name | null, pictureUrl | null }, state, botPaused, unread, lastMessage: { preview, sender, at }, lastInboundAt | null }`.
   `preview` is the last message on one line, at most 140 graphemes with a
   trailing `…`.
 - `ConversationDetail`: the same without `lastMessage`, plus
@@ -98,7 +135,8 @@ still arrives unread.
 `sending`, move `last_*` and set `bot_paused`, commit; `POST /me/messages`
 (`messaging_type: RESPONSE`); mark it `sent` with its Meta id, or `failed`, and
 publish. A failed reply stays in the thread and as the list preview, and the
-assistant stays paused; the seller retypes to retry.
+assistant stays paused; the seller retries it (a new send of the same text)
+or removes it (`DELETE /:id/messages/:messageId`).
 
 ## SSE (`GET /events`)
 
@@ -162,8 +200,9 @@ All three tables have RLS enabled and forced with a `*_merchant_isolation`
 policy, and composite `(merchant_id, id)` foreign keys, so a row cannot point
 into another shop.
 
-- `customer`: `psid`, `name` (null until Facebook shares one),
-  `profile_fetched_at`. `UNIQUE (merchant_id, psid)`; trigram index on `name`.
+- `customer`: `psid`, `name` and `picture_url` (null until Facebook shares
+  them), `profile_fetched_at`. `UNIQUE (merchant_id, psid)`; trigram index on
+  `name`.
   Contact details and notes: [05 · Customers](../05-customers/README.md).
 - `conversation`: `facebook_page_id` (text, deliberately not a foreign key),
   `customer_id`, `state` (default `browsing`), `collected_slots` (jsonb),
@@ -184,28 +223,46 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 `facebook_page_resolver_read`). The migrating role must be a superuser or hold
 `SET` membership in `app_page_resolver`. Call it through `resolvePageMerchant()`.
 
+## Web
+
+- **`/conversations`** lists the threads with the filter tabs, their counts
+  and search; **`/conversations/:id`** opens one beside the list: who it is
+  with, who is answering (Take over / Hand back), the messages, and the reply
+  box. Nothing polls: one `EventSource` on `GET /events` invalidates whatever a
+  change touches, and the sidebar's badge stays live on every page.
+- **Eager replies.** Enter sends and the box clears at once; the reply shows
+  in the thread from a local copy until the API answers, and a chat's replies
+  go out one at a time, in order. A failed one shows Retry and Remove under
+  it. The box is closed outside the 24-hour window, which the API enforces
+  anyway.
+- **Days** split at the shop's midnight, in its time zone
+  ([Settings – General](../06-settings-general/README.md#dashboard)).
+- Code: `apps/web/src/features/conversations/`, routes under
+  `apps/web/src/routes/_app/conversations/`.
+
 ## Follow-ups
 
 - Queue the assistant's turn from `InboundMessageIngest` (AI work), honouring
   the conversation's `bot_paused` and the Page's `bot_enabled`.
-- Drafted-order panel and customer order history; settle the design's seller
-  "Confirm order" against the rule that only the customer confirms.
+- The drafted-order panel and the customer's order history beside the thread.
+  The seller's own "Confirm" is settled: it is the second confirmation of an
+  order the customer already confirmed ([Orders](../07-orders/README.md#rules)).
 - Per-shop auto-resume after a takeover (Never / 1 h / 24 h) in Settings ›
-  Assistant, once the settings API exists.
-- The Conversations web route, using the SSE contract above.
+  Assistant. The settings API now exists ([06](../06-settings-general/README.md));
+  this needs its own settings and the job that resumes.
 - `HUMAN_AGENT` tag after App Review, if pilots ask for it.
 - `WORKER_CONCURRENCY` is not yet applied to the inbound processor (BullMQ's
   default of 1 is used).
 - The Caddyfile change (`@compressible not path …`) has not been run through
   `caddy validate`; validate before deploying.
 - A reply can stay `sending` if the process dies mid-send or the final write
-  fails; the web client should treat a `sending` message older than about 30 s
-  as failed, and a sweep can mark them later.
+  fails. The web shows a stored `sending` row in place of its local copy, but
+  nothing yet turns an abandoned one into `failed`; a sweep should.
 - A send that times out may still have been delivered; it is recorded as
   failed (its echo carries our app id and is skipped), so retyping it can send
   it twice.
-- A failed reply still pauses the assistant and becomes the list preview;
-  decide whether a failure should undo the pause.
+- A failed reply still pauses the assistant; decide whether a failure should
+  undo the pause.
 - If an echo of our own reply arrives without our `app_id` before the reply is
   marked `sent`, the ingest stores it first and `markSent` hits
   `UNIQUE (merchant_id, meta_message_id)`: a 500 and a doubled message.
