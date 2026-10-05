@@ -102,6 +102,9 @@ export const errorCodes = [
   'PRODUCT_STALE',
   'PRODUCT_IN_USE',
 
+  // Settings > Delivery charges
+  'DELIVERY_CHARGE_NOT_FOUND',
+
   // Field-level, derived from Zod issues
   'REQUIRED',
   'INVALID_TYPE',

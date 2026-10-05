@@ -21,6 +21,7 @@
     "CONVERSATION_NOT_FOUND": "That conversation no longer exists. Refresh the page.",
     "CURRENCY_LOCKED": "Your shop has taken orders in its current currency, so it can't be changed.",
     "CUSTOMER_NOT_FOUND": "That customer no longer exists. Refresh the page.",
+    "DELIVERY_CHARGE_NOT_FOUND": "That delivery area was removed. Reload to see your current areas.",
     "FACEBOOK_AUTH_CANCELLED": "You cancelled on Facebook, so no Page was connected.",
     "FACEBOOK_AUTH_EXPIRED": "The connection took too long. Start again.",
     "FACEBOOK_AUTH_FAILED": "Facebook didn't confirm the connection. Try again.",
