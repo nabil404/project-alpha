@@ -12,6 +12,8 @@ coverage/
 *.log
 .pnpm-store/
 .vite/
+# TanStack Router plugin scratch files, written while the dev server runs
+.tanstack/
 apps/web/dist/
 apps/api/dist/
 apps/api/load/results/
