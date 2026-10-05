@@ -4,7 +4,11 @@ Turns Facebook/Messenger customer conversations into confirmed orders for
 sellers on Facebook Pages. What each MVP builds and why — scope, rules and
 domain model — lives in [`docs/mvp/`](docs/mvp/README.md); those docs are the
 source of truth. The stack and its principles live in
-[`docs/architecture/tech-stack.md`](docs/architecture/tech-stack.md).
+[`docs/architecture/tech-stack.md`](docs/architecture/tech-stack.md). How each
+built feature works (routes, rules, data, tests, what is left) lives in
+[`docs/features/`](docs/features/README.md); update a feature's page in the
+same change as its code, and grep the other pages for "Not yet built" and
+follow-up entries the change completes.
 
 Per-app conventions live in `.claude/skills/`: **`backend-engineer`** (`apps/api`
 — Drizzle, queue, webhooks, LLM), **`frontend-engineer`** (`apps/web` —
@@ -44,7 +48,8 @@ _None yet._
 | `infra/cloudformation/deploy.sh <target>`                          | Create or update a CloudFormation stack. `<target>` is `bootstrap` (shared by dev and stage, first), `bootstrap-prod` (prod's own copy, before prod), or an environment - `dev`, `stage`, `prod` - read from `environments/<env>.params`. Needs AWS CLI v2 and `AWS_REGION`; see [`docs/architecture/deployment.md`](docs/architecture/deployment.md). |
 
 **Schema loop:** edit `apps/api/src/modules/database/schema/` → `db:generate` → review
-the SQL by hand → `db:migrate` → `db:verify-rls`.
+the SQL by hand → `db:migrate` → `db:verify-rls`. Migrations land in
+`apps/api/db/migrations/` (`NNNN_name.sql`, snapshots in `meta/`).
 
 | Local URL (dev only)             | What                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -117,5 +122,9 @@ apps/api/.env -f docker/compose.local.yml …`, wrapped as `pnpm dev:up` /
   never import i18next; the locale crosses that boundary as a BCP-47 string.
 - Tests live in a colocated `__tests__/` directory, never as a sibling file.
   This applies to both apps.
+- A route's error codes and statuses are its `@ApiCodedError(...)` decorators;
+  feature docs' error tables must match them.
+- `docs/superpowers/` is gitignored (local specs and plans); never link to it
+  from committed docs.
 - Project instructions live in `AGENTS.md` only. Do not create `CLAUDE.md` or
   `CLAUDE.local.md`; either one stops Claude Code from loading this file.

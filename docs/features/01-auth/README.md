@@ -5,11 +5,14 @@ Scope comes from the MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
 [data model](../../mvp/01-messenger-to-order/domain.md#data-model); this page
 describes how it is built.
 
-**Status (Sep 2026):** the API side is implemented and covered by an HTTP-level
-e2e spec. The SPA has sign-in (`/sign-in`), sign-up (`/sign-up`), forgot
-password (`/forgot-password`) and reset password (`/reset-password`). Not built
-yet: the explicit Facebook linking UI in account settings, and the Facebook
-Page connection flow (see [Not yet built](#not-yet-built)).
+**Status (Oct 2026):** the API side is implemented and covered by an HTTP-level
+e2e spec. The SPA has sign-in (`/sign-in`, with Google and Facebook), sign-up
+(`/sign-up`), forgot password (`/forgot-password`) and reset password
+(`/reset-password`). Linking and unlinking Google or Facebook, changing the
+password and signing devices out live in
+[Settings – Account](../08-settings-account/README.md); connecting a Facebook
+Page is [03 · Connect Facebook Page](../03-facebook-page/README.md). What is
+left is under [Not yet built](#not-yet-built).
 
 ## At a glance
 
@@ -52,8 +55,18 @@ still boots, and the email/password flows keep working.
 - **Facebook never links automatically.** Facebook does not guarantee a
   verified email, so matching on it would let someone take over an account by
   registering the victim's address on Facebook. A Facebook identity joins an
-  existing account only when the seller links it explicitly from account
-  settings.
+  existing account only when the seller links it explicitly from
+  [Settings – Account](../08-settings-account/README.md#sign-in-methods).
+  Signing in with a Facebook account whose email already has an account
+  redirects with `?error=AUTH_ACCOUNT_NOT_LINKED`.
+
+Better Auth's OAuth callback reports failure by redirecting with
+`?error=<snake_case>`. `toOAuthErrorLocation` in
+[`auth-errors.ts`](../../../apps/api/src/modules/auth/auth-errors.ts) rewrites
+it to an `ErrorCode` and drops `error_description`: `AUTH_ACCOUNT_NOT_LINKED`,
+`AUTH_SOCIAL_CANCELLED` (the seller said no), `AUTH_SOCIAL_EMAIL_MISMATCH` and
+`AUTH_SOCIAL_ACCOUNT_TAKEN` (when linking), and `AUTH_SOCIAL_FAILED` for
+anything else.
 
 ## Email and password flows
 
@@ -125,10 +138,10 @@ Every business table's `merchant_id` references `organization(id)`, never
 they make would be rejected. Two Better Auth database hooks in `auth.config.ts`
 make sure that can't happen:
 
-| Hook                    | Calls                                           | Effect                                                                                                                                                                                                                                                                               |
-| ----------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `user.create.after`     | `ensureOrganizationForUser(db, user, shopName)` | Creates the seller's organization (name = the sign-up's `shopName`, or the seller's name for a social sign-up; slug = its id) and a `member` row with role `owner`. Runs only on user **creation**, so a Google sign-in that links to an existing account reuses that seller's shop. |
-| `session.create.before` | `ensureOrganizationForUserId(db, userId)`       | Puts `activeOrganizationId` on every new session. The plugin marks that field `input: false`, so a client can't set it. It has to be resolved here, or it stays null.                                                                                                                |
+| Hook                    | Calls                                                                                              | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user.create.after`     | `ensureOrganizationForUser(db, user, shopName)`, then `seedRegionFromPhone(db, merchantId, phone)` | Creates the seller's organization (name = the sign-up's `shopName`, or the seller's name for a social sign-up; slug = its id) and a `member` row with role `owner`. Runs only on user **creation**, so a Google sign-in that links to an existing account reuses that seller's shop. Then writes the shop's `merchant_settings` row in the region of the sign-up phone ([Settings – General](../06-settings-general/README.md#rules)); a failure there only logs, and sign-up still succeeds. |
+| `session.create.before` | `ensureOrganizationForUserId(db, userId)`                                                          | Puts `activeOrganizationId` on every new session. The plugin marks that field `input: false`, so a client can't set it. It has to be resolved here, or it stays null.                                                                                                                                                                                                                                                                                                                         |
 
 Both functions live in
 [`database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts)
@@ -187,16 +200,21 @@ origin, which is why the session cookie needs no CORS setup.
 
 Endpoints the flows above use:
 
-| Method | Path                                  | Used for                                    |
-| ------ | ------------------------------------- | ------------------------------------------- |
-| POST   | `/api/v1/auth/sign-up/email`          | Email sign-up                               |
-| GET    | `/api/v1/auth/verify-email?token=…`   | The emailed verification link               |
-| POST   | `/api/v1/auth/sign-in/email`          | Email sign-in                               |
-| POST   | `/api/v1/auth/sign-in/social`         | Start Google / Facebook sign-in             |
-| POST   | `/api/v1/auth/sign-out`               | Sign out                                    |
-| POST   | `/api/v1/auth/request-password-reset` | Forgot password                             |
-| POST   | `/api/v1/auth/reset-password`         | Set the new password with the emailed token |
-| GET    | `/api/v1/auth/get-session`            | Current `{ session, user }`                 |
+| Method | Path                                   | Used for                                    |
+| ------ | -------------------------------------- | ------------------------------------------- |
+| POST   | `/api/v1/auth/sign-up/email`           | Email sign-up                               |
+| GET    | `/api/v1/auth/verify-email?token=…`    | The emailed verification link               |
+| POST   | `/api/v1/auth/sign-in/email`           | Email sign-in                               |
+| POST   | `/api/v1/auth/sign-in/social`          | Start Google / Facebook sign-in             |
+| POST   | `/api/v1/auth/sign-out`                | Sign out                                    |
+| POST   | `/api/v1/auth/request-password-reset`  | Forgot password                             |
+| POST   | `/api/v1/auth/reset-password`          | Set the new password with the emailed token |
+| GET    | `/api/v1/auth/get-session`             | Current `{ session, user }`                 |
+| POST   | `/api/v1/auth/send-verification-email` | Resend the verification link                |
+
+Settings – Account also uses `/update-user`, `/change-password`,
+`/list-accounts`, `/link-social` and `/unlink-account`; see
+[08 · Settings – Account](../08-settings-account/README.md).
 
 The full list, merged with our own controllers, is in Swagger at
 http://localhost:5173/api/docs (development only). Open it **through the Vite
@@ -226,7 +244,10 @@ Redirects (302) pass through untouched.
 | `INVALID_TOKEN`, `TOKEN_EXPIRED`           | `AUTH_INVALID_TOKEN`                                                                                                                |
 | `PASSWORD_TOO_SHORT` / `PASSWORD_TOO_LONG` | `VALIDATION_FAILED`, field `password` (or `newPassword` on `/reset-password`, `/change-password`), code `MIN_LENGTH` / `MAX_LENGTH` |
 | `INVALID_EMAIL`                            | `VALIDATION_FAILED`, field `email`, code `INVALID_FORMAT`                                                                           |
-| `VALIDATION_ERROR`                         | `VALIDATION_FAILED`, fields parsed back out of the message (`[body.email] …`)                                                       |
+| `INVALID_PASSWORD` (`/change-password`)    | `AUTH_WRONG_PASSWORD`                                                                                                               |
+| `FAILED_TO_UNLINK_LAST_ACCOUNT`            | `AUTH_LAST_SIGN_IN_METHOD`                                                                                                          |
+| `SESSION_NOT_FRESH`                        | `AUTH_SESSION_NOT_FRESH` (unlinking needs a session under a day old)                                                                |
+| `VALIDATION_ERROR`                         | `VALIDATION_FAILED`, fields parsed back out of the message (`[body.email] …`), each with code `INVALID_INPUT`                       |
 | any other 401                              | `AUTH_UNAUTHENTICATED`                                                                                                              |
 | anything else                              | `HTTP_<status>`, the same fallback the global filter uses                                                                           |
 
@@ -237,7 +258,11 @@ Adding a new auth `ErrorCode` touches three files:
 ## Data
 
 Better Auth owns seven tables: `user`, `session`, `account`, `verification`
-(core), and `organization`, `member`, `invitation` (Organization plugin). Their
+(core), and `organization`, `member`, `invitation` (Organization plugin).
+`user` carries two `additionalFields` of ours: `phone` (E.164, null for a
+social sign-up) and `locale` (the dashboard language, set only through
+`PATCH /api/v1/account/preferences`; Better Auth's `/update-user` refuses it).
+`user.image` is the profile photo and `organization.logo` the shop logo. Their
 Drizzle schema is generated into
 [`database/schema/auth.ts`](../../../apps/api/src/modules/database/schema/auth.ts) by:
 
@@ -312,14 +337,13 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- auth
 - **Email verified screen.** A successful verification link lands on `/`
   with no confirmation; a failed one (`/?error=…`) lands on sign-in with an
   error banner.
-- **Terms and privacy pages.** Sign-up requires agreeing to them, but
-  `apps/web/src/features/auth/legal.ts` points at placeholder paths, and the
-  agreement is not recorded server-side.
-- **Shop name and phone for social sign-ups**, which arrive without either.
-- **Account settings:** explicit Facebook linking, and change password (the
-  error mapping already handles `/change-password`).
-- **Page connection:** the separate step that requests Page permissions and
-  stores the encrypted Page token. It gets its own feature doc.
+- **Terms and privacy pages.** Sign-up requires agreeing to them, and
+  `apps/web/src/features/auth/legal.ts` links `/terms` and `/privacy`, which
+  Caddy routes to `/legal/*.html`; those files don't exist yet. The agreement
+  is not recorded server-side.
+- **Shop name and phone for social sign-ups**, which arrive without either:
+  the shop is named after the seller and reads as the default region
+  (Bangladesh) until its first save in Settings – General.
 - **Organization switcher:** deferred. The data model already supports several
   organizations per seller.
 
