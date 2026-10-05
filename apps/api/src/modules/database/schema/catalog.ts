@@ -15,7 +15,7 @@ import {
 import { createdAt, id, merchantId, merchantIsolation, updatedAt } from './columns';
 
 /**
- * The catalog: products, their options and variants, a category tree, and
+ * The catalog: products, their options and variants, a flat category list, and
  * product↔category links. Every child points at its parent through a composite
  * (merchant_id, id) foreign key, so no row can reference another merchant's
  * row - RLS filters reads but does not validate the ids a row points at.
