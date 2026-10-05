@@ -172,6 +172,8 @@ new enum member fails the build instead of rendering unstyled.
 | Order `confirmed`, `packed`, `shipped`             | neutral                      |
 | Order `delivered`, stock `in_stock`                | success                      |
 | Order `cancelled`, stock `out_of_stock`            | danger                       |
+| Order `returned`, payment `refunded`               | warning                      |
+| Payment `unpaid` / `paid`                          | neutral / success            |
 | Conversation `awaiting_confirmation`, `handed_off` | warning                      |
 | Conversation `abandoned`                           | neutral                      |
 | Product `active` (Published)                       | success                      |

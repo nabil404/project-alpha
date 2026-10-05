@@ -1,6 +1,282 @@
 {
+  "actions": {
+    "cancelled": {
+      "confirm": "Cancel order",
+      "description": "The customer's order won't go ahead. You can't undo this.",
+      "descriptionStock": "The customer's order won't go ahead, and its items go back into stock. You can't undo this.",
+      "done": "Order cancelled",
+      "label": "Cancel order",
+      "title": "Cancel this order?"
+    },
+    "confirmed": {
+      "done": "Order confirmed. Its items are taken from stock.",
+      "label": "Confirm order"
+    },
+    "delivered": {
+      "done": "Marked as delivered",
+      "label": "Mark as delivered"
+    },
+    "keep": "Keep order",
+    "packed": {
+      "done": "Marked as packed",
+      "label": "Mark as packed"
+    },
+    "reason": "Reason (optional)",
+    "reasonPlaceholder": "Kept on the order's activity",
+    "returned": {
+      "confirm": "Mark as returned",
+      "description": "The order came back to you. You can't undo this.",
+      "descriptionStock": "The order came back to you, and its items go back into stock. You can't undo this.",
+      "done": "Marked as returned",
+      "label": "Mark as returned",
+      "title": "Mark this order as returned?"
+    },
+    "shipped": {
+      "done": "Marked as shipped",
+      "label": "Mark as shipped"
+    }
+  },
+  "activity": {
+    "createdByAssistant": "The assistant drafted this order from the Messenger chat",
+    "createdBySeller": "{{who}} added this order",
+    "deliveryChanged": "{{who}} changed the delivery details",
+    "fields": {
+      "address": "Address",
+      "charge": "Delivery charge",
+      "name": "Name",
+      "phone": "Phone",
+      "zone": "Zone"
+    },
+    "itemsChanged": "{{who}} changed the items",
+    "paymentMethodChanged": "{{who}} changed the payment method",
+    "paymentStatusChanged": "{{who}} marked the payment as {{status}}",
+    "placed": "Placed {{at}}",
+    "someone": "A former team member",
+    "statusChanged": "{{who}} moved the order to {{status}}",
+    "title": "Activity",
+    "totalChanged": "Total {{before}} → {{after}}",
+    "trackingRemoved": "{{who}} removed the tracking number",
+    "trackingSet": "{{who}} added the tracking number"
+  },
+  "conversation": {
+    "open": "Open chat",
+    "title": "Conversation",
+    "unavailable": "The chat's messages aren't available."
+  },
+  "create": {
+    "changeCustomer": "Change",
+    "customerSearchFailed": "Customers couldn't be loaded. Try again.",
+    "customerSearchLabel": "Search customers",
+    "customerSearchPlaceholder": "Name or phone",
+    "deliveryTitle": "Delivery and payment",
+    "description": "For a customer who has messaged your Page. The order starts as drafted, ready for you to confirm.",
+    "detailsHint": "Filled in from the customer's details. Changing them here changes this order only.",
+    "done": "Order added",
+    "itemsTitle": "Items",
+    "noContact": "No phone or area yet",
+    "noCustomers": "No customers match.",
+    "open": "Create order",
+    "submit": "Add order",
+    "title": "Add an order"
+  },
+  "customer": {
+    "earlierOrders_one": "Repeat customer · {{formatted}} earlier order",
+    "earlierOrders_other": "Repeat customer · {{formatted}} earlier orders",
+    "firstOrder": "First order",
+    "spentBefore": "{{amount}} spent before",
+    "title": "Customer",
+    "viewProfile": "View profile"
+  },
+  "delivery": {
+    "address": "Address",
+    "charge": "Delivery charge",
+    "dialog": {
+      "description": "For this order only. The customer's details on file stay as they are.",
+      "title": "Edit delivery",
+      "zoneHint": "The area the charge is for, such as Local."
+    },
+    "edit": "Edit",
+    "name": "Name",
+    "noZone": "No zone",
+    "phone": "Phone",
+    "saveTracking": "Save",
+    "saved": "Delivery details saved",
+    "title": "Delivery",
+    "tracking": "Tracking number",
+    "trackingLater": "Add when you ship",
+    "trackingSaved": "Tracking number saved",
+    "zone": "Zone"
+  },
+  "detail": {
+    "backToOrders": "Back to orders",
+    "breadcrumb": "Breadcrumb",
+    "checkBeforeConfirming": "Check the items, address and total, then confirm the order for {{name}}. Confirming takes the items from stock.",
+    "fromAssistant": "Drafted by the assistant from a Messenger chat · {{placed}}",
+    "fromSeller": "Added by you · {{placed}}"
+  },
+  "items": {
+    "add": "Add a product",
+    "alreadyAdded": "Already added",
+    "closePicker": "Close product search",
+    "columns": {
+      "price": "Price ({{symbol}})",
+      "product": "Product",
+      "quantity": "Qty",
+      "total": "Total ({{symbol}})"
+    },
+    "dialog": {
+      "description": "Change quantities and prices, or add and remove products.",
+      "descriptionConfirmed": "This order is confirmed, so stock changes with your edit: added items are taken from stock, removed ones go back.",
+      "title": "Edit items"
+    },
+    "edit": "Edit items",
+    "lineTotal": "Line total {{total}}",
+    "noProducts": "No products match.",
+    "none": "No items yet. Add a product.",
+    "optionDetail": "{{price}} · {{stock}} in stock",
+    "price": "Price",
+    "priceTimesQuantity": "{{price}} × {{quantity}}",
+    "quantity": "Qty",
+    "remove": "Remove {{item}}",
+    "saved": "Items saved",
+    "searchFailed": "Products couldn't be loaded. Try again.",
+    "searchLabel": "Search products",
+    "searchPlaceholder": "Product name, tag or SKU",
+    "subtotal": "Subtotal",
+    "times": "× {{quantity}}",
+    "title": "Items",
+    "unknownVariant": "Product",
+    "variantCount_one": "{{count}} variant",
+    "variantCount_other": "{{count}} variants"
+  },
+  "line": {
+    "plain": "{{product}} × {{quantity}}",
+    "withVariant": "{{product}}, {{variant}} × {{quantity}}"
+  },
   "list": {
-    "empty": "No orders yet.",
+    "awaiting_one": "{{formatted}} order is waiting for you to check and confirm it.",
+    "awaiting_other": "{{formatted}} orders are waiting for you to check and confirm them.",
+    "clearFilters": "Clear search and filters",
+    "columns": {
+      "action": "Action",
+      "customer": "Customer",
+      "date": "Date",
+      "items": "Items",
+      "order": "Order",
+      "payment": "Payment",
+      "status": "Status",
+      "total": "Total ({{symbol}})"
+    },
+    "description": "Orders the assistant drafted from chats and ones you added yourself.",
+    "empty": "No orders yet. Orders the assistant drafts from chats show up here.",
+    "emptyFiltered": "No orders match.",
+    "filters": {
+      "all": "All",
+      "label": "Status"
+    },
+    "label": "Orders",
+    "moreItems_one": "+{{count}} more",
+    "moreItems_other": "+{{count}} more",
+    "pagination": {
+      "perPageLabel": "Orders per page",
+      "showing_one": "Showing {{from}}–{{to}} of {{total}} order",
+      "showing_other": "Showing {{from}}–{{to}} of {{total}} orders"
+    },
+    "range": {
+      "30d": "Last 30 days",
+      "7d": "Last 7 days",
+      "all": "All time",
+      "custom": "Custom range",
+      "from": "From",
+      "label": "Date range",
+      "month": "This month",
+      "to": "To",
+      "today": "Today"
+    },
+    "review": "Review",
+    "searchLabel": "Search orders",
+    "searchPlaceholder": "Order ID, customer or phone",
+    "showDrafted": "Show drafted",
+    "sort": {
+      "by": "Sort by {{column}}",
+      "reverse": "Reverse the order of {{column}}"
+    },
     "title": "Orders"
+  },
+  "nav": {
+    "awaiting": "orders waiting for you"
+  },
+  "note": {
+    "discard": "Discard",
+    "hint": "Only your team sees this.",
+    "placeholder": "Add a note about this order",
+    "save": "Save note",
+    "saved": "Note saved",
+    "title": "Internal note"
+  },
+  "payment": {
+    "dialog": {
+      "description": "Record how and whether the customer paid. Social Glider doesn't take payments itself.",
+      "title": "Edit payment"
+    },
+    "edit": "Edit",
+    "hint": {
+      "paid": "The customer paid {{total}}.",
+      "refunded": "You refunded the customer.",
+      "unpaid": {
+        "bank_transfer": "Waiting for a bank transfer of {{total}}.",
+        "cash_on_delivery": "The customer pays {{total}} when the order arrives.",
+        "mobile_wallet": "Waiting for a mobile wallet payment of {{total}}."
+      }
+    },
+    "markPaid": "Mark as paid",
+    "markedPaid": "Marked as paid",
+    "method": "Payment method",
+    "saved": "Payment saved",
+    "status": "Payment status",
+    "title": "Payment"
+  },
+  "placed": {
+    "today": "Today, {{time}}",
+    "yesterday": "Yesterday, {{time}}"
+  },
+  "progress": {
+    "cancelled": "This order was cancelled.",
+    "label": "Order progress",
+    "returned": "This order was returned.",
+    "steps": {
+      "confirmed": "You confirm",
+      "delivered": "Customer receives",
+      "new": "Check the order",
+      "packed": "Pack the items",
+      "shipped": "Hand to courier"
+    }
+  },
+  "summary": {
+    "assistant": {
+      "detail": "Of orders in the last {{days}} days",
+      "label": "Drafted by the assistant",
+      "noOrders": "No orders in the last {{days}} days"
+    },
+    "awaiting": {
+      "detail": "Drafted, waiting for you",
+      "label": "Need your confirmation"
+    },
+    "none": "—",
+    "revenue": {
+      "change": "{{change}} vs the {{days}} days before",
+      "label": "Revenue, last {{days}} days",
+      "noPrevious": "Nothing to compare with the {{days}} days before"
+    },
+    "toShip": {
+      "detail": "{{confirmed}} confirmed · {{packed}} packed",
+      "label": "To pack and ship"
+    }
+  },
+  "totals": {
+    "delivery": "Delivery",
+    "deliveryInZone": "Delivery · {{zone}}",
+    "subtotal": "Subtotal",
+    "total": "Total"
   }
 }
