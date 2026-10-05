@@ -80,6 +80,7 @@ row from a non-superuser owner, and such a backfill would silently do nothing.
 | `customer_note`                                                                      | yes           | yes         | yes        | `customer_note_merchant_isolation`                                |
 | `order`                                                                              | yes           | yes         | yes        | `order_merchant_isolation`                                        |
 | `order_item`                                                                         | yes           | yes         | yes        | `order_item_merchant_isolation`                                   |
+| `order_event`                                                                        | yes           | yes         | yes        | `order_event_merchant_isolation`                                  |
 | `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation` | no            | no          | no         | none — Better Auth tables, deliberately unprotected by RLS        |
 
 ## Policies
@@ -108,6 +109,7 @@ merchant. With no context set, both evaluate to `NULL` and nothing matches.
 | `customer_note_merchant_isolation`                | `customer_note`                | `ALL`    | `public`            | same                                   | same                                   | Confines the team's customer notes to the current merchant.                                                                                     |
 | `order_merchant_isolation`                        | `order`                        | `ALL`    | `public`            | same                                   | same                                   | Confines orders and their delivery details to the current merchant.                                                                             |
 | `order_item_merchant_isolation`                   | `order_item`                   | `ALL`    | `public`            | same                                   | same                                   | Confines order items to the current merchant.                                                                                                   |
+| `order_event_merchant_isolation`                  | `order_event`                  | `ALL`    | `public`            | same                                   | same                                   | Confines an order's activity log to the current merchant.                                                                                       |
 
 ## Triggers
 
@@ -146,29 +148,38 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `customer_note_customer_fk`               | `customer_note` → `customer`                                                                                                   | `CASCADE`                   | Deleting a customer removes their notes. `author_id` → `user.id` is a plain key, `SET NULL`: a deleted user leaves notes without an author.                                       |
 | `order_customer_fk`                       | `order` → `customer`                                                                                                           | `NO ACTION`                 | An order's customer belongs to the same merchant; a customer with orders cannot be deleted.                                                                                       |
 | `order_conversation_fk`                   | `order (merchant_id, conversation_id)` → `conversation`                                                                        | `NO ACTION`                 | The conversation an order was confirmed in belongs to the same merchant. Nullable; a null skips the check.                                                                        |
-| `order_item_order_fk`                     | `order_item` → `order`                                                                                                         | `CASCADE`                   | Deleting an order removes its items. `product_id` and `variant_id` have no key: items keep name and price snapshots, and products are hard-deleted.                               |
+| `order_item_order_fk`                     | `order_item` → `order`                                                                                                         | `CASCADE`                   | Deleting an order removes its items.                                                                                                                                              |
+| `order_item_product_fk`                   | `order_item (merchant_id, product_id)` → `product`                                                                             | `NO ACTION`                 | A product that was ordered cannot be deleted (the API answers `PRODUCT_IN_USE`; the seller archives it). Items still keep name, SKU and price snapshots. Nullable for old lines.  |
+| `order_item_variant_fk`                   | `order_item (merchant_id, variant_id)` → `product_variant`                                                                     | `NO ACTION`                 | The line's variant belongs to the same merchant. Variants are only archived, never deleted, so the key never blocks a catalog edit. Nullable for old lines.                       |
+| `order_event_order_fk`                    | `order_event` → `order`                                                                                                        | `CASCADE`                   | Deleting an order removes its activity. `actor_id` → `user.id` is a plain key, `SET NULL`: a deleted user leaves events without an actor.                                         |
 
 ## Check constraints
 
-| Constraint                           | Table                  | Rule                                                                                                             |
-| ------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `product_status_ck`                  | `product`              | `status` in `draft`, `active`, `archived`.                                                                       |
-| `product_delivery_charge_ck`         | `product`              | `delivery_charge >= 0` (minor units).                                                                            |
-| `product_revision_ck`                | `product`              | `revision >= 0`. `revision` is bumped by every write to the product's document and is its `version` on the wire. |
-| `product_variant_price_ck`           | `product_variant`      | `price >= 0` (minor units).                                                                                      |
-| `product_variant_stock_ck`           | `product_variant`      | `stock >= 0`.                                                                                                    |
-| `product_variant_default_unnamed_ck` | `product_variant`      | `is_default` exactly when `name` is null — the default variant is the unnamed one.                               |
-| `product_option_position_ck`         | `product_option`       | `position >= 0`.                                                                                                 |
-| `product_option_value_position_ck`   | `product_option_value` | `position >= 0`.                                                                                                 |
-| `conversation_state_ck`              | `conversation`         | `state` in `browsing`, `collecting_details`, `awaiting_confirmation`, `confirmed`, `handed_off`, `abandoned`.    |
-| `conversation_last_sender_ck`        | `conversation`         | `last_message_sender` in `customer`, `assistant`, `seller`.                                                      |
-| `message_sender_ck`                  | `message`              | `sender` in `customer`, `assistant`, `seller`.                                                                   |
-| `message_status_ck`                  | `message`              | `status` in `sending`, `sent`, `failed`.                                                                         |
-| `order_status_ck`                    | `order`                | `status` in `new`, `confirmed`, `packed`, `shipped`, `delivered`, `cancelled`.                                   |
-| `order_number_ck`                    | `order`                | `number > 0`. `UNIQUE (merchant_id, number)`: each shop has its own sequence.                                    |
-| `order_amounts_ck`                   | `order`                | `subtotal >= 0`, `delivery_charge >= 0`, `total = subtotal + delivery_charge` (minor units).                     |
-| `order_item_quantity_ck`             | `order_item`           | `quantity > 0`.                                                                                                  |
-| `order_item_unit_price_ck`           | `order_item`           | `unit_price >= 0` (minor units).                                                                                 |
+| Constraint                           | Table                  | Rule                                                                                                               |
+| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `product_status_ck`                  | `product`              | `status` in `draft`, `active`, `archived`.                                                                         |
+| `product_delivery_charge_ck`         | `product`              | `delivery_charge >= 0` (minor units).                                                                              |
+| `product_revision_ck`                | `product`              | `revision >= 0`. `revision` is bumped by every write to the product's document and is its `version` on the wire.   |
+| `product_variant_price_ck`           | `product_variant`      | `price >= 0` (minor units).                                                                                        |
+| `product_variant_stock_ck`           | `product_variant`      | `stock >= 0`.                                                                                                      |
+| `product_variant_default_unnamed_ck` | `product_variant`      | `is_default` exactly when `name` is null — the default variant is the unnamed one.                                 |
+| `product_option_position_ck`         | `product_option`       | `position >= 0`.                                                                                                   |
+| `product_option_value_position_ck`   | `product_option_value` | `position >= 0`.                                                                                                   |
+| `conversation_state_ck`              | `conversation`         | `state` in `browsing`, `collecting_details`, `awaiting_confirmation`, `confirmed`, `handed_off`, `abandoned`.      |
+| `conversation_last_sender_ck`        | `conversation`         | `last_message_sender` in `customer`, `assistant`, `seller`.                                                        |
+| `message_sender_ck`                  | `message`              | `sender` in `customer`, `assistant`, `seller`.                                                                     |
+| `message_status_ck`                  | `message`              | `status` in `sending`, `sent`, `failed`.                                                                           |
+| `order_status_ck`                    | `order`                | `status` in `new`, `confirmed`, `packed`, `shipped`, `delivered`, `returned`, `cancelled`.                         |
+| `order_source_ck`                    | `order`                | `source` in `assistant`, `seller`.                                                                                 |
+| `order_payment_status_ck`            | `order`                | `payment_status` in `unpaid`, `paid`, `refunded`.                                                                  |
+| `order_payment_method_ck`            | `order`                | `payment_method` in `cash_on_delivery`, `bank_transfer`, `mobile_wallet`.                                          |
+| `order_revision_ck`                  | `order`                | `revision >= 0`. Bumped by every write to the order; its `version` on the wire, as for products.                   |
+| `order_number_ck`                    | `order`                | `number > 0`. `UNIQUE (merchant_id, number)`: each shop has its own sequence.                                      |
+| `order_amounts_ck`                   | `order`                | `subtotal >= 0`, `delivery_charge >= 0`, `total = subtotal + delivery_charge` (minor units).                       |
+| `order_item_quantity_ck`             | `order_item`           | `quantity > 0`.                                                                                                    |
+| `order_item_unit_price_ck`           | `order_item`           | `unit_price >= 0` (minor units).                                                                                   |
+| `order_event_type_ck`                | `order_event`          | `type` in `created`, `status_changed`, `items_changed`, `delivery_changed`, `payment_changed`, `tracking_changed`. |
+| `order_event_data_type_ck`           | `order_event`          | `data ->> 'type' = type`: the jsonb payload's discriminator matches the column (parsed with Zod on read).          |
 
 ## Partial and special indexes
 
@@ -187,6 +198,7 @@ swaps two names would trip a non-deferrable index halfway through.
 | `category_merchant_name_live_uidx`       | `category`        | unique `(merchant_id, lower(name))` where `deleted_at is null`   | Category names are case-insensitively unique among live categories. |
 | `product_variant_merchant_sku_live_uidx` | `product_variant` | unique `(merchant_id, sku)` where `archived_at is null`          | SKUs are unique per merchant among live variants.                   |
 | `product_variant_default_live_uidx`      | `product_variant` | unique `(product_id)` where `is_default and archived_at is null` | At most one live default variant per product.                       |
+| `order_merchant_idempotency_key_uq`      | `order`           | unique `(merchant_id, idempotency_key)` (nulls distinct)         | A replayed `Idempotency-Key` returns the order it first created.    |
 | `conversation_needs_you_idx`             | `conversation`    | `(merchant_id)` where `state = 'handed_off'`                     | Serves the "needs you" inbox filter.                                |
 | `conversation_drafted_idx`               | `conversation`    | `(merchant_id)` where `state = 'awaiting_confirmation'`          | Serves the drafted-order inbox filter.                              |
 | `customer_name_trgm_idx`                 | `customer`        | GIN `(name gin_trgm_ops)`                                        | Substring search on customer names.                                 |
