@@ -65,6 +65,26 @@
   "breadcrumb": {
     "label": "Breadcrumb"
   },
+  "delivery": {
+    "add": "Add area",
+    "area": "Area name",
+    "areas": "Delivery areas",
+    "charge": "Charge ({{symbol}})",
+    "chargeFor": "Charge for {{area}}",
+    "description": "Add the areas you deliver to, what each one costs and how long it takes. The charge is added to every drafted order.",
+    "elsewhere": "Everywhere else",
+    "elsewhereHint": "When the address matches no area",
+    "elsewhereLabel": "everywhere else",
+    "freeOver": "Free delivery over",
+    "freeOverHint": "Leave empty to always charge delivery.",
+    "hint": "Write area names the way customers do, like a city or neighbourhood. The assistant matches the delivery address to an area and tells the customer the charge and delivery time.",
+    "remove": "Remove {{area}}",
+    "saved": "Delivery charges saved.",
+    "time": "Delivery time",
+    "timeFor": "Delivery time for {{area}}",
+    "timePlaceholder": "e.g. 2–3 days",
+    "title": "Delivery charges"
+  },
   "general": {
     "noMatch": "No matches.",
     "profile": {
@@ -160,7 +180,7 @@
   "nav": {
     "account": "Account",
     "assistant": "Order assistant",
-    "delivery": "Delivery and payment",
+    "delivery": "Delivery charges",
     "general": "General",
     "label": "Settings sections",
     "messenger": "Messenger",
