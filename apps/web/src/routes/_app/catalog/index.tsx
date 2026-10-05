@@ -33,7 +33,8 @@ function toSearch(input: Record<string, unknown>): CatalogSearch {
   const limit = parsed(shape.limit.safeParse(input.limit));
   return {
     show: show === 'all' ? undefined : show,
-    q: parsed(shape.q.safeParse(input.q)),
+    // A hand-typed `?q=481` arrives as a number: the router parses search values as JSON.
+    q: parsed(shape.q.safeParse(typeof input.q === 'number' ? String(input.q) : input.q)),
     categoryId: parsed(shape.categoryId.safeParse(input.categoryId)),
     page: page === DEFAULTS.page ? undefined : page,
     limit: limit === DEFAULTS.limit ? undefined : limit,
