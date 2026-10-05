@@ -59,6 +59,25 @@
     "done": "{{name}} deleted.",
     "title": "Delete {{name}}?"
   },
+  "delivery": {
+    "area": "Area",
+    "charge": "Charge ({{symbol}})",
+    "chargeFor": "Charge for {{area}}",
+    "custom": "Custom charge for this product",
+    "customHint": "Set a different charge per area, for heavy or bulky items. Leave one empty to use the shop charge.",
+    "description": "The assistant adds this to the order based on the customer's address.",
+    "editAreas": "Edit delivery areas",
+    "elsewhere": "Everywhere else",
+    "more_one": "{{count}} more area",
+    "more_other": "{{count}} more areas",
+    "noAreas": "Add your delivery areas in Settings first.",
+    "separator": " · ",
+    "shop": "Use shop charges",
+    "shopCharge": "Shop charge {{amount}}",
+    "summaryItem": "{{area}} {{charge}}",
+    "timesHint": "Delivery times stay the same as your shop settings.",
+    "title": "Delivery charge"
+  },
   "editor": {
     "actions": {
       "delete": "Delete",

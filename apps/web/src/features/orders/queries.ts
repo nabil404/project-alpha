@@ -10,6 +10,8 @@ import type {
   CreateOrder,
   CustomerDetail,
   CustomerListResponse,
+  DeliveryQuote,
+  DeliveryQuoteRequest,
   ListOrdersQuery,
   OrderDetail,
   OrderEvent,
@@ -146,6 +148,17 @@ export function useUpdateOrder(id: string) {
   return useOrderMutation(id, (input: UpdateOrder) =>
     apiFetch<OrderDetail>(orderPath(id), { method: 'PATCH', body: JSON.stringify(input) }),
   );
+}
+
+/** What delivering these items to an area costs. Writes nothing; the forms prefill their fee with it. */
+export function useDeliveryQuote() {
+  return useMutation({
+    mutationFn: (input: DeliveryQuoteRequest) =>
+      apiFetch<DeliveryQuote>('/orders/delivery-quote', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  });
 }
 
 /**

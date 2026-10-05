@@ -45,6 +45,7 @@ import { catalogKeys, productQueryOptions, useCreateProduct, useSaveProduct } fr
 import { CategoryPicker } from './CategoryPicker';
 import { CommaListInput } from './CommaListInput';
 import { DeleteProductButton } from './DeleteProductButton';
+import { DeliveryChargeCard } from './DeliveryChargeCard';
 import { PhotosCard } from './PhotosCard';
 import { ProductStatusBadge } from './ProductStatusBadge';
 import { VariantsCard } from './VariantsCard';
@@ -263,6 +264,7 @@ export function ProductEditor({ product }: { product?: Product }) {
               <StatusCard />
               <OrganisationCard />
               <StockSummaryCard />
+              <DeliveryChargeCard className={card} />
             </div>
           </div>
         </form>

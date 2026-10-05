@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useForm, useWatch, type Resolver } from 'react-hook-form';
+import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Banknote, MapPin, Navigation, Phone, User } from 'lucide-react';
+import { Banknote, Clock, MapPin, Navigation, Phone, User } from 'lucide-react';
 import {
   ORDER_ADDRESS_MAX_LENGTH,
   ORDER_NAME_MAX_LENGTH,
@@ -43,6 +44,13 @@ import { useFormatters } from '@/lib/format';
 import { useToast } from '@/lib/toast';
 
 import { useUpdateOrder } from '../queries';
+import {
+  AreaSelect,
+  useAreaLabel,
+  useDeliveryRates,
+  useQuotedFee,
+  type AreaPick,
+} from './AreaField';
 
 /** The tracking number means something once the parcel is ready to go. */
 const TRACKING_FROM = new Set<OrderDetail['status']>([
@@ -60,6 +68,7 @@ const TRACKING_FROM = new Set<OrderDetail['status']>([
 export function DeliveryCard({ order }: { order: OrderDetail }) {
   const { t } = useTranslation('orders');
   const { formatMoney } = useFormatters();
+  const areaLabel = useAreaLabel();
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4 shadow-card sm:p-6">
@@ -73,13 +82,20 @@ export function DeliveryCard({ order }: { order: OrderDetail }) {
       <DetailLine
         icon={<Navigation />}
         label={t('delivery.area')}
-        value={order.delivery.area ?? t('delivery.noArea')}
+        value={areaLabel(order.delivery) ?? t('delivery.noArea')}
       />
       <DetailLine
         icon={<Banknote />}
         label={t('delivery.fee')}
         value={formatMoney(order.deliveryFee, order.currency)}
       />
+      {order.delivery.time && (
+        <DetailLine
+          icon={<Clock />}
+          label={t('delivery.time')}
+          value={t('delivery.estimate', { time: order.delivery.time })}
+        />
+      )}
       <TrackingField order={order} />
     </section>
   );
@@ -154,6 +170,7 @@ const deliveryFormSchema = updateOrderSchema
     phone: true,
     deliveryAddress: true,
     deliveryArea: true,
+    deliveryChargeId: true,
     deliveryFee: true,
   })
   .required({ customerName: true, phone: true, deliveryAddress: true, deliveryFee: true });
@@ -164,6 +181,7 @@ interface DeliveryFormValues {
   phone: string;
   deliveryAddress: string;
   deliveryArea: string;
+  deliveryChargeId: string | null;
   deliveryFee: number;
 }
 type DeliveryChanges = Omit<typeof updateOrderSchema._output, 'version'>;
@@ -173,6 +191,7 @@ const serverFields = [
   'phone',
   'deliveryAddress',
   'deliveryArea',
+  'deliveryChargeId',
   'deliveryFee',
 ] as const;
 
@@ -181,6 +200,7 @@ const toFormValues = (order: OrderDetail): DeliveryFormValues => ({
   phone: order.delivery.phone,
   deliveryAddress: order.delivery.address,
   deliveryArea: order.delivery.area ?? '',
+  deliveryChargeId: order.delivery.chargeId,
   deliveryFee: order.deliveryFee,
 });
 
@@ -201,6 +221,28 @@ function EditDeliveryDialog({ order }: { order: OrderDetail }) {
     >,
     defaultValues: toFormValues(order),
   });
+
+  const rates = useDeliveryRates();
+  const [area, chargeId, fee] = useWatch({
+    control: form.control,
+    name: ['deliveryArea', 'deliveryChargeId', 'deliveryFee'],
+  });
+  const lines = order.items.flatMap((line) =>
+    line.variantId
+      ? [{ variantId: line.variantId, quantity: line.quantity, unitPrice: line.unitPrice }]
+      : [],
+  );
+  const { freeApplied, requote } = useQuotedFee({
+    chargeId,
+    items: lines,
+    fee,
+    setFee: (next) => form.setValue('deliveryFee', next, { shouldDirty: true }),
+  });
+  const onPickArea = (pick: AreaPick) => {
+    form.setValue('deliveryChargeId', pick.chargeId, { shouldDirty: true });
+    form.setValue('deliveryArea', pick.area, { shouldDirty: true });
+    requote(pick.chargeId);
+  };
 
   const onOpenChange = (next: boolean) => {
     if (!next && update.isPending) return;
@@ -280,20 +322,48 @@ function EditDeliveryDialog({ order }: { order: OrderDetail }) {
                 )}
               />
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="deliveryArea"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('delivery.area')}</FormLabel>
-                      <FormControl>
-                        <Input maxLength={ORDER_AREA_MAX_LENGTH} {...field} />
-                      </FormControl>
-                      <FormDescription>{t('delivery.dialog.areaHint')}</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {rates.length > 0 ? (
+                  <FormField
+                    control={form.control}
+                    name="deliveryChargeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('delivery.area')}</FormLabel>
+                        <FormControl>
+                          <AreaSelect
+                            name={field.name}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            rates={rates}
+                            chargeId={field.value}
+                            area={area}
+                            onPick={onPickArea}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="deliveryArea"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('delivery.area')}</FormLabel>
+                        <FormControl>
+                          <Input maxLength={ORDER_AREA_MAX_LENGTH} {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          <Link to="/settings/delivery" className="text-link">
+                            {t('delivery.dialog.noAreas')}
+                          </Link>
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="deliveryFee"
@@ -307,6 +377,9 @@ function EditDeliveryDialog({ order }: { order: OrderDetail }) {
                           onBlur={field.onBlur}
                         />
                       </FormControl>
+                      {freeApplied && field.value === 0 && (
+                        <FormDescription>{t('delivery.freeApplied')}</FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
