@@ -1,4 +1,4 @@
-import type { CreateProduct, Product, ProductStatus } from '@app/shared';
+import type { CreateProduct, Product, ProductDeliveryCharge, ProductStatus } from '@app/shared';
 
 /**
  * The edit page's form: the product document the API saves, with every
@@ -30,8 +30,9 @@ export interface ProductFormValues {
   description: string;
   status: ProductStatus;
   aliases: string[];
-  /** Not on the page yet; carried so a save keeps it. */
-  deliveryCharge: number;
+  /** False: the shop's delivery charges. True: `deliveryCharges`, the shop's where it sets none. */
+  customDelivery: boolean;
+  deliveryCharges: ProductDeliveryCharge[];
   categoryIds: string[];
   /**
    * The default photo, chosen in All photos. Not part of the create schema, so
@@ -47,7 +48,8 @@ export const emptyProduct: ProductFormValues = {
   description: '',
   status: 'draft',
   aliases: [],
-  deliveryCharge: 0,
+  customDelivery: false,
+  deliveryCharges: [],
   categoryIds: [],
   coverImageId: null,
   options: [],
@@ -64,7 +66,8 @@ export function toFormValues(product: Product): ProductFormValues {
     description: product.description ?? '',
     status: product.status,
     aliases: product.aliases,
-    deliveryCharge: product.deliveryCharge,
+    customDelivery: product.customDelivery,
+    deliveryCharges: product.deliveryCharges,
     categoryIds: product.categoryIds,
     coverImageId: product.coverImageId,
     options: product.options.map((option) => ({

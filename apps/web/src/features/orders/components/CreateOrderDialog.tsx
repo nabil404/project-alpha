@@ -7,7 +7,7 @@ import {
   ORDER_ADDRESS_MAX_LENGTH,
   ORDER_NAME_MAX_LENGTH,
   ORDER_NOTE_MAX_LENGTH,
-  ORDER_ZONE_MAX_LENGTH,
+  ORDER_AREA_MAX_LENGTH,
   paymentMethods,
   type CreateOrder,
   type CustomerDetail,
@@ -216,8 +216,8 @@ interface NewOrderFormValues {
   customerName: string;
   phone: string;
   deliveryAddress: string;
-  deliveryZone: string;
-  deliveryCharge: number;
+  deliveryArea: string;
+  deliveryFee: number;
   paymentMethod: PaymentMethod;
   note: string;
 }
@@ -228,8 +228,8 @@ const serverFields = [
   'customerName',
   'phone',
   'deliveryAddress',
-  'deliveryZone',
-  'deliveryCharge',
+  'deliveryArea',
+  'deliveryFee',
   'note',
 ] as const;
 
@@ -266,8 +266,8 @@ function NewOrderForm({
       customerName: customer.name ?? '',
       phone: customer.phone ?? '',
       deliveryAddress: customer.deliveryAddress ?? '',
-      deliveryZone: '',
-      deliveryCharge: 0,
+      deliveryArea: '',
+      deliveryFee: 0,
       paymentMethod: 'cash_on_delivery',
       note: '',
     },
@@ -354,12 +354,12 @@ function NewOrderForm({
           <div className="grid gap-4 sm:grid-cols-3">
             <FormField
               control={form.control}
-              name="deliveryZone"
+              name="deliveryArea"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('delivery.zone')}</FormLabel>
+                  <FormLabel>{t('delivery.area')}</FormLabel>
                   <FormControl>
-                    <Input maxLength={ORDER_ZONE_MAX_LENGTH} {...field} />
+                    <Input maxLength={ORDER_AREA_MAX_LENGTH} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -367,10 +367,10 @@ function NewOrderForm({
             />
             <FormField
               control={form.control}
-              name="deliveryCharge"
+              name="deliveryFee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('delivery.charge')}</FormLabel>
+                  <FormLabel>{t('delivery.fee')}</FormLabel>
                   <FormControl>
                     <MoneyInput
                       value={field.value}

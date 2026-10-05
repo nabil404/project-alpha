@@ -94,6 +94,9 @@ export type OrderChanges = Partial<
     | 'phone'
     | 'deliveryAddress'
     | 'deliveryArea'
+    | 'deliveryChargeId'
+    | 'deliveryEverywhereElse'
+    | 'deliveryTime'
     | 'trackingNumber'
     | 'notes'
   >

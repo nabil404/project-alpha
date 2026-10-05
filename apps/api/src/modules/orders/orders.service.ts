@@ -23,6 +23,8 @@ import { withMerchant } from '../database/with-merchant';
 import { customerNotFound } from '../customers/customer-errors';
 import { pagePagination } from '../customers/customer-mappers';
 import { defaultMerchantSettings } from '../settings/general-settings.service';
+import { DeliveryChargesRepository } from '../settings/delivery-charges.repository';
+import { deliveryChargeNotFound } from '../settings/delivery-errors';
 import { MerchantSettingsRepository } from '../settings/merchant-settings.repository';
 import { OrderCatalogRepository } from './order-catalog.repository';
 import {
@@ -41,6 +43,7 @@ import {
   stockChanges,
   subtotalOf,
   variantLabel,
+  type LinkedDelivery,
   type StockChange,
 } from './order-rules';
 import { OrdersRepository } from './orders.repository';
@@ -60,6 +63,7 @@ export class OrdersService {
     private readonly events: OrderEventsRepository,
     private readonly catalog: OrderCatalogRepository,
     private readonly settings: MerchantSettingsRepository,
+    private readonly deliveryCharges: DeliveryChargesRepository,
   ) {}
 
   list(scope: TenantScope, query: ListOrdersQuery): Promise<OrderListResponse> {
@@ -156,13 +160,15 @@ export class OrdersService {
         status: 'new',
         paymentMethod: input.paymentMethod,
         subtotal,
-        deliveryFee: input.deliveryCharge,
-        total: subtotal + input.deliveryCharge,
+        deliveryFee: input.deliveryFee,
+        total: subtotal + input.deliveryFee,
         currency: settings.currency,
         customerName,
         phone,
         deliveryAddress,
-        deliveryArea: input.deliveryZone ?? null,
+        ...(input.deliveryChargeId !== undefined
+          ? await this.deliveryColumns(tx, scope, input.deliveryChargeId, input.deliveryArea)
+          : { deliveryArea: input.deliveryArea ?? null }),
         notes: input.note ?? null,
         idempotencyKey: idempotencyKey ?? null,
         placedAt,
@@ -248,7 +254,11 @@ export class OrdersService {
     const { version, ...fields } = input;
     return withMerchant(this.db, scope.merchantId, async (tx) => {
       const row = await this.lockForChange(tx, scope, id, version);
-      const { changes, events, touchesDelivery } = planOrderPatch(row, fields);
+      const linked =
+        fields.deliveryChargeId !== undefined && fields.deliveryChargeId !== row.deliveryChargeId
+          ? await this.deliveryColumns(tx, scope, fields.deliveryChargeId, fields.deliveryArea)
+          : undefined;
+      const { changes, events, touchesDelivery } = planOrderPatch(row, fields, linked);
       if (touchesDelivery && !orderDeliveryEditable(row.status)) throw orderNotEditable(row.status);
       // Nothing differs: no new version, so the page's copy stays current.
       if (Object.keys(changes).length === 0) return this.detail(tx, scope, row);
@@ -256,6 +266,35 @@ export class OrdersService {
       await this.events.insert(tx, scope, id, actor.id, events);
       return this.detail(tx, scope, updated);
     });
+  }
+
+  /**
+   * What an order takes from the delivery charge it is priced by: the area's
+   * name (unless one is given), whether it is everywhere else, and its
+   * estimate. `null` unlinks and clears them, keeping a given name.
+   */
+  private async deliveryColumns(
+    tx: Executor,
+    scope: TenantScope,
+    chargeId: string | null,
+    area: string | null | undefined,
+  ): Promise<LinkedDelivery> {
+    if (chargeId === null) {
+      return {
+        deliveryChargeId: null,
+        deliveryArea: area ?? null,
+        deliveryEverywhereElse: false,
+        deliveryTime: null,
+      };
+    }
+    const row = await this.deliveryCharges.find(tx, scope, chargeId);
+    if (!row) throw deliveryChargeNotFound(chargeId);
+    return {
+      deliveryChargeId: row.id,
+      deliveryArea: area !== undefined ? area : row.areaName,
+      deliveryEverywhereElse: row.isFallback,
+      deliveryTime: row.deliveryTime,
+    };
   }
 
   /** The order, locked until the transaction ends, provided the caller read its current version. */

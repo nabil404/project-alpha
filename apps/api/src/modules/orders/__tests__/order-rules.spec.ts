@@ -158,6 +158,9 @@ describe('planOrderPatch', () => {
     phone: '01712-345678',
     deliveryAddress: 'House 12, Road 4, Mirpur 10',
     deliveryArea: 'Local',
+    deliveryChargeId: null,
+    deliveryEverywhereElse: false,
+    deliveryTime: null,
     paymentStatus: 'unpaid',
     paymentMethod: 'cash_on_delivery',
     trackingNumber: null,
@@ -168,17 +171,37 @@ describe('planOrderPatch', () => {
     expect(
       planOrderPatch(row, {
         customerName: 'Nusrat Jahan',
-        deliveryCharge: 6000,
+        deliveryFee: 6000,
         trackingNumber: null,
       }),
     ).toEqual({ changes: {}, events: [], touchesDelivery: false });
   });
 
   it('recomputes the total with the delivery charge and lists the delivery fields changed', () => {
-    const plan = planOrderPatch(row, { deliveryCharge: 12000, deliveryZone: null });
+    const plan = planOrderPatch(row, { deliveryFee: 12000, deliveryArea: null });
     expect(plan.changes).toEqual({ deliveryFee: 12000, total: 332000, deliveryArea: null });
-    expect(plan.events).toEqual([{ type: 'delivery_changed', fields: ['zone', 'charge'] }]);
+    expect(plan.events).toEqual([{ type: 'delivery_changed', fields: ['area', 'fee'] }]);
     expect(plan.touchesDelivery).toBe(true);
+  });
+
+  it('records a moved area once, whether its name, its link or both changed', () => {
+    const chargeId = '6f1c2b8e-4a1d-4c6e-9d2f-0b7a3e5c1d24';
+    const plan = planOrderPatch(
+      row,
+      { deliveryArea: 'Gazipur' },
+      {
+        deliveryChargeId: chargeId,
+        deliveryArea: 'Gazipur',
+        deliveryEverywhereElse: false,
+        deliveryTime: '2–3 days',
+      },
+    );
+    expect(plan.changes).toEqual({
+      deliveryChargeId: chargeId,
+      deliveryArea: 'Gazipur',
+      deliveryTime: '2–3 days',
+    });
+    expect(plan.events).toEqual([{ type: 'delivery_changed', fields: ['area'] }]);
   });
 
   it('records payment and tracking without touching delivery, and the note without an event', () => {
