@@ -22,16 +22,17 @@ is `404 ORDER_NOT_FOUND` (never 403), on every `:id` route. Every change takes
 the `version` the page read; a change from an older read is
 `409 ORDER_STALE`, as the product edit page's is.
 
-| Route               | Request                                                                                                                                                                                      | Response                                    |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `GET /`             | `status` (`all` default, or an order status), `q` ≤ 100, `from`, `to` (instants), `sort` (`placed_at` default, `total`), `direction` (`desc` default), `page`, `pageSize` 10/25/50/100       | `{ data: OrderListItem[], pagination }`     |
-| `GET /summary`      | `q`, `from`, `to`                                                                                                                                                                            | `OrderSummary`                              |
-| `POST /`            | `CreateOrder`, optional `Idempotency-Key` header                                                                                                                                             | 201 `OrderDetail`                           |
-| `GET /:id`          | —                                                                                                                                                                                            | `OrderDetail`                               |
-| `GET /:id/activity` | —                                                                                                                                                                                            | `OrderEvent[]`, newest first, not paginated |
-| `POST /:id/status`  | `{ status, note?, version }`; `note` is the reason kept on the activity (why it was cancelled), not the order's internal note                                                                | 200 `OrderDetail`                           |
-| `PUT /:id/items`    | `{ items: [{ variantId, quantity, unitPrice? }], version }`                                                                                                                                  | 200 `OrderDetail`                           |
-| `PATCH /:id`        | `{ customerName?, phone?, deliveryAddress?, deliveryZone?, deliveryCharge?, paymentStatus?, paymentMethod?, trackingNumber?, note?, version }`; `note` is the internal note (column `notes`) | 200 `OrderDetail`                           |
+| Route                  | Request                                                                                                                                                                                                      | Response                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `GET /`                | `status` (`all` default, or an order status), `q` ≤ 100, `from`, `to` (instants), `sort` (`placed_at` default, `total`), `direction` (`desc` default), `page`, `pageSize` 10/25/50/100                       | `{ data: OrderListItem[], pagination }`      |
+| `GET /summary`         | `q`, `from`, `to`                                                                                                                                                                                            | `OrderSummary`                               |
+| `POST /`               | `CreateOrder`, optional `Idempotency-Key` header                                                                                                                                                             | 201 `OrderDetail`                            |
+| `GET /:id`             | —                                                                                                                                                                                                            | `OrderDetail`                                |
+| `GET /:id/activity`    | —                                                                                                                                                                                                            | `OrderEvent[]`, newest first, not paginated  |
+| `POST /:id/status`     | `{ status, note?, version }`; `note` is the reason kept on the activity (why it was cancelled), not the order's internal note                                                                                | 200 `OrderDetail`                            |
+| `PUT /:id/items`       | `{ items: [{ variantId, quantity, unitPrice? }], version }`                                                                                                                                                  | 200 `OrderDetail`                            |
+| `PATCH /:id`           | `{ customerName?, phone?, deliveryAddress?, deliveryArea?, deliveryChargeId?, deliveryFee?, paymentStatus?, paymentMethod?, trackingNumber?, note?, version }`; `note` is the internal note (column `notes`) | 200 `OrderDetail`                            |
+| `POST /delivery-quote` | `{ deliveryChargeId, items: [{ variantId, quantity, unitPrice? }] }`; writes nothing                                                                                                                         | 200 `{ fee, subtotal, freeDeliveryApplied }` |
 
 Shapes are the Zod schemas in
 [`packages/shared/src/schemas/order.ts`](../../../packages/shared/src/schemas/order.ts).
@@ -51,14 +52,15 @@ zero-padded to five digits and widening past them (`ORD-2026-100000`).
   and `placedInWindow` (`all`, `byAssistant`) for "Drafted by the assistant
   71%".
 - `OrderDetail`: the order with `version`, `nextStatuses` (the buttons to
-  show), lines with SKU and `lineTotal`, `delivery { name, phone, address,
-zone }`, `trackingNumber`, `note`, `customer { id, name, pictureUrl,
+  show), lines with SKU and `lineTotal`, `deliveryFee`, `delivery { name,
+phone, address, area, chargeId, everywhereElse, time }`, `trackingNumber`, `note`, `customer { id, name, pictureUrl,
 earlierOrderCount, spentBefore }` ("Repeat customer · 2 earlier orders"),
   and `conversationId` for "Open chat" (null for an order the seller added).
 - `OrderEvent`: `{ id, data, actor: { id, name } | null, createdAt }`, where
   `data` is one of `created`, `status_changed` (with the seller's note),
   `items_changed` (totals before and after), `delivery_changed` (which of
-  `name`, `phone`, `address`, `zone`, `charge`), `payment_changed` (status
+  `name`, `phone`, `address`, `area`, `fee`; events stored before the rename
+  said `zone` and `charge` and read as these), `payment_changed` (status
   and/or method, from and to) and `tracking_changed`. Editing the internal note
   records no event. `actor` is null for the assistant.
 
@@ -83,15 +85,27 @@ earlierOrderCount, spentBefore }` ("Repeat customer · 2 earlier orders"),
   name, SKU and price, even if since archived; a new one must be live and is
   priced from the catalog. `unitPrice` overrides either. A variant may appear
   once (`DUPLICATE`); 1–50 lines.
-- **Delivery details** (name, phone, address, zone, charge) change until the
+- **Delivery details** (name, phone, address, area, fee) change until the
   order ships; payment, tracking number and the note at any time. They are the
   order's own snapshot: the customer's record never changes. A field sent back
   unchanged is no change, and a PATCH that changes nothing keeps the version.
-- **Delivery charge** is the seller's, not derived from the catalog: required
-  on `POST /` (the dialog starts it at 0), changeable until the order ships,
-  and kept when items change. `total = subtotal + delivery_charge`, enforced by
-  a check. Orders don't read `product.delivery_charge` yet; how the assistant
-  prices delivery is for the AI work.
+- **Delivery area.** `deliveryChargeId` links one of the shop's
+  [delivery charges](../09-settings-delivery/README.md) (an area, or
+  everywhere else) and copies onto the order its area name (unless
+  `deliveryArea` is sent), whether it is everywhere else, and its delivery
+  time, shown as "Estimated 1–2 days after shipping". `null` unlinks and
+  clears all three. Removing the area in Settings keeps the copies and clears
+  only the link. Another shop's id → `404 DELIVERY_CHARGE_NOT_FOUND`. A
+  typed `deliveryArea` with no link still works, for orders from before.
+- **Delivery fee** is stored as sent and never recomputed: required on
+  `POST /`, changeable until the order ships, and kept when items change.
+  `total = subtotal + delivery_fee`, enforced by a check. The dashboard fills
+  it in from `POST /delivery-quote`: each product's own charge for the area,
+  or the shop's where it sets none; the highest of those, not the sum; and
+  nothing once the subtotal reaches the shop's free-delivery threshold
+  (`deliveryFeeFor` in `@app/shared`, the rule the assistant will quote
+  with). The quote prices items as sent, else at the catalog price, archived
+  variants included.
 - **Payment** is the seller's record only (`unpaid`, `paid`, `refunded`;
   `cash_on_delivery`, `bank_transfer`, `mobile_wallet`); the MVP takes no
   payments.
@@ -131,9 +145,12 @@ enabled and forced with a `*_merchant_isolation` policy, and composite
 - `order`: `year`, `number` (`UNIQUE (merchant_id, year, number)`),
   `reference` (`UNIQUE (merchant_id, reference)`), `customer_id`,
   `conversation_id` (nullable), `source`, `status`, `payment_status`,
-  `payment_method`, `subtotal`, `delivery_charge`, `total`
-  (`total = subtotal + delivery_charge`), `currency`, the delivery snapshot
-  (`customer_name`, `phone`, `delivery_address`, `delivery_zone`),
+  `payment_method`, `subtotal`, `delivery_fee`, `total`
+  (`total = subtotal + delivery_fee`), `currency`, the delivery snapshot
+  (`customer_name`, `phone`, `delivery_address`, `delivery_area`,
+  `delivery_everywhere_else`, `delivery_time`), `delivery_charge_id` (→
+  `delivery_charge`, `ON DELETE SET NULL (delivery_charge_id)`, migration
+  `0027`),
   `tracking_number`, `notes` (internal), `revision`, `idempotency_key`
   (`UNIQUE (merchant_id, idempotency_key)`), `placed_at`. Indexed on
   `(merchant_id, placed_at DESC, id)`, `(merchant_id, status, placed_at DESC, id)`
@@ -151,16 +168,17 @@ enabled and forced with a `*_merchant_isolation` policy, and composite
 From [`order-errors.ts`](../../../apps/api/src/modules/orders/order-errors.ts),
 plus the shared ones each route lists in Swagger.
 
-| Code                       | Status | Params                           | When                                                                                 |
-| -------------------------- | ------ | -------------------------------- | ------------------------------------------------------------------------------------ |
-| `ORDER_NOT_FOUND`          | 404    | `{ id }`                         | No such order for this merchant                                                      |
-| `ORDER_STALE`              | 409    | `{ id }`                         | The `version` sent isn't the order's current one                                     |
-| `ORDER_INVALID_TRANSITION` | 409    | `{ from, to }`                   | A status move the lifecycle doesn't allow                                            |
-| `ORDER_NOT_EDITABLE`       | 409    | `{ status }`                     | Items outside `new`/`confirmed`; delivery details outside `new`/`confirmed`/`packed` |
-| `ORDER_INSUFFICIENT_STOCK` | 409    | `{ variantId, name, available }` | Taking more of a variant than it has                                                 |
-| `CUSTOMER_NOT_FOUND`       | 404    | `{ id }`                         | `POST /` for a customer who isn't the shop's                                         |
-| `VARIANT_NOT_FOUND`        | 404    | `{ id }`                         | A new line's variant is unknown or archived                                          |
-| `PRODUCT_IN_USE`           | 409    | `{ id }`                         | Deleting a product an order line references (catalog route)                          |
+| Code                        | Status | Params                           | When                                                                                 |
+| --------------------------- | ------ | -------------------------------- | ------------------------------------------------------------------------------------ |
+| `ORDER_NOT_FOUND`           | 404    | `{ id }`                         | No such order for this merchant                                                      |
+| `ORDER_STALE`               | 409    | `{ id }`                         | The `version` sent isn't the order's current one                                     |
+| `ORDER_INVALID_TRANSITION`  | 409    | `{ from, to }`                   | A status move the lifecycle doesn't allow                                            |
+| `ORDER_NOT_EDITABLE`        | 409    | `{ status }`                     | Items outside `new`/`confirmed`; delivery details outside `new`/`confirmed`/`packed` |
+| `ORDER_INSUFFICIENT_STOCK`  | 409    | `{ variantId, name, available }` | Taking more of a variant than it has                                                 |
+| `CUSTOMER_NOT_FOUND`        | 404    | `{ id }`                         | `POST /` for a customer who isn't the shop's                                         |
+| `VARIANT_NOT_FOUND`         | 404    | `{ id }`                         | A new line's variant is unknown or archived                                          |
+| `DELIVERY_CHARGE_NOT_FOUND` | 404    | `{ id }`                         | `POST /`, `PATCH /:id` or the quote names an area that isn't the shop's              |
+| `PRODUCT_IN_USE`            | 409    | `{ id }`                         | Deleting a product an order line references (catalog route)                          |
 
 Field codes under `400 VALIDATION_FAILED`: `REQUIRED` (a hand-made order
 missing a name, phone or address the customer's record can't fill),
@@ -178,15 +196,18 @@ missing a name, phone or address the customer's record can't fill),
   date, and cards below it. The view lives in the URL (`status`, `q`,
   `range`, `from`, `to`, `sort`, `direction`, `page`, `pageSize`). "Create
   order" opens a dialog: pick a customer, add items, then delivery and
-  payment, prefilled from the customer's details; it sends an
+  payment, prefilled from the customer's details; picking an area fills in
+  the fee from the quote, and changing the items re-quotes it unless the
+  seller typed their own; it sends an
   `Idempotency-Key` made once per dialog and opens the new order.
 - **`/orders/:id`**: the next step as the primary button (Confirm, Mark as
   packed, shipped, delivered), with Cancel and Mark as returned behind a
   confirmation that takes an optional reason. The buttons come from
   `canTransitionOrder`. Then the progress stepper, the items (an Edit items
   dialog while new or confirmed, with a product and variant picker), payment
-  (Mark as paid, or an Edit dialog), the activity, the customer, delivery (an
-  Edit dialog until shipped; the tracking number from packed), the chat's
+  (Mark as paid, or an Edit dialog), the activity, the customer, delivery
+  (area, charge and the estimate; an Edit dialog until shipped, where picking
+  an area re-quotes the fee; the tracking number from packed), the chat's
   last three messages with a link to it, and the internal note.
 - Every change sends the order's `version`. A `409` refetches the order, so
   the seller sees what changed; a success replaces the order with the answer
@@ -202,12 +223,13 @@ snapshots, the PATCH plan), `order-reference.ts` (year and reference),
 variant and product locks). The lifecycle (`canTransitionOrder`,
 `orderHoldsStock`) is in `@app/shared`, so the web shows the same buttons.
 
-| Spec                                                                                                                 | Covers                                                                                                      |
-| -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [`orders/__tests__/order-rules.spec.ts`](../../../apps/api/src/modules/orders/__tests__/order-rules.spec.ts)         | Stock differences, lock order, line snapshots, the PATCH plan                                               |
-| [`orders/__tests__/order-reference.spec.ts`](../../../apps/api/src/modules/orders/__tests__/order-reference.spec.ts) | The year in the shop's zone; padding and widening                                                           |
-| [`orders/__tests__/orders.e2e.spec.ts`](../../../apps/api/src/modules/orders/__tests__/orders.e2e.spec.ts)           | Every route over HTTP: stock, staleness, transitions, hand-made orders, numbering, search, `PRODUCT_IN_USE` |
-| [`database/__tests__/orders-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/orders-schema.spec.ts) | Keys, checks, yearly numbering, RLS for two merchants                                                       |
+| Spec                                                                                                                               | Covers                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [`orders/__tests__/order-rules.spec.ts`](../../../apps/api/src/modules/orders/__tests__/order-rules.spec.ts)                       | Stock differences, lock order, line snapshots, the PATCH plan                                               |
+| [`orders/__tests__/delivery-quote.service.spec.ts`](../../../apps/api/src/modules/orders/__tests__/delivery-quote.service.spec.ts) | The fee: highest not sum, shop charge where a product sets none, the threshold, another shop's area         |
+| [`orders/__tests__/order-reference.spec.ts`](../../../apps/api/src/modules/orders/__tests__/order-reference.spec.ts)               | The year in the shop's zone; padding and widening                                                           |
+| [`orders/__tests__/orders.e2e.spec.ts`](../../../apps/api/src/modules/orders/__tests__/orders.e2e.spec.ts)                         | Every route over HTTP: stock, staleness, transitions, hand-made orders, numbering, search, `PRODUCT_IN_USE` |
+| [`database/__tests__/orders-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/orders-schema.spec.ts)               | Keys, checks, yearly numbering, RLS for two merchants                                                       |
 
 Web: `apps/web/src/features/orders/`, routes under
 `apps/web/src/routes/_app/orders/`.
@@ -220,6 +242,5 @@ Web: `apps/web/src/features/orders/`, routes under
 - The assistant writing `source = assistant` orders from a confirmed
   conversation, idempotent per confirmation.
 - CSV export of the filtered list.
-- Delivery zones as a shop setting; until then `delivery_zone` is free text.
 - Email the seller about a new order (scope's notifications); nothing sends it
   yet.

@@ -18,19 +18,19 @@ with orders; see [Orders](../07-orders/README.md#rules).
 
 ## At a glance
 
-| Concern          | Decision                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tables           | `product`, `product_option`, `product_option_value`, `product_variant`, `product_variant_option_value`, `product_image`, `category`, `product_category` |
-| Tenant integrity | Composite foreign keys on `(merchant_id, id)` so no row can point at another merchant's row; RLS forced on all eight                                    |
-| Lifecycle        | Product `status` (`draft` / `active` / `archived`); variants archived (`archived_at`); categories soft-deleted                                          |
-| Sellable         | The AI sees only `active` products, their options, live variants and live categories                                                                    |
-| Money            | Integer minor units (`price`, `delivery_charge`), never floats                                                                                          |
-| Options          | Up to 3 per product (Size, Sleeve), each with up to 30 ordered values; a variant is one value per option                                                |
-| Variants         | 1–100 live per product; a product without options has exactly one, unnamed, the default                                                                 |
-| Concurrency      | `product.revision`, `version` on the wire; a save from an older read is `409 PRODUCT_STALE`                                                             |
-| SKU              | Required, unique per merchant among live variants, case-insensitive; generated when left blank                                                          |
-| Categories       | A flat list, no nesting; a product can sit in several                                                                                                   |
-| Images           | Up to 8 per product, 10 MB per upload, re-encoded by `sharp`, stored in R2 through the S3 API; the cover is chosen, not the first in order              |
+| Concern          | Decision                                                                                                                                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tables           | `product`, `product_option`, `product_option_value`, `product_variant`, `product_variant_option_value`, `product_image`, `category`, `product_category` (and `product_delivery_charge`, see [Settings – Delivery charges](../09-settings-delivery/README.md)) |
+| Tenant integrity | Composite foreign keys on `(merchant_id, id)` so no row can point at another merchant's row; RLS forced on all eight                                                                                                                                          |
+| Lifecycle        | Product `status` (`draft` / `active` / `archived`); variants archived (`archived_at`); categories soft-deleted                                                                                                                                                |
+| Sellable         | The AI sees only `active` products, their options, live variants and live categories                                                                                                                                                                          |
+| Money            | Integer minor units (`price`, a product's own delivery charges), never floats                                                                                                                                                                                 |
+| Options          | Up to 3 per product (Size, Sleeve), each with up to 30 ordered values; a variant is one value per option                                                                                                                                                      |
+| Variants         | 1–100 live per product; a product without options has exactly one, unnamed, the default                                                                                                                                                                       |
+| Concurrency      | `product.revision`, `version` on the wire; a save from an older read is `409 PRODUCT_STALE`                                                                                                                                                                   |
+| SKU              | Required, unique per merchant among live variants, case-insensitive; generated when left blank                                                                                                                                                                |
+| Categories       | A flat list, no nesting; a product can sit in several                                                                                                                                                                                                         |
+| Images           | Up to 8 per product, 10 MB per upload, re-encoded by `sharp`, stored in R2 through the S3 API; the cover is chosen, not the first in order                                                                                                                    |
 
 ## Data model
 
@@ -46,7 +46,7 @@ at. The composite keys do that, so a bug that writes another merchant's
 
 | Table                          | Key columns                                                                                             | Constraints worth knowing                                                                                                                                                                                                      |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `product`                      | `name`, `description`, `aliases text[]`, `status`, `delivery_charge`, `cover_image_id`, `revision`      | `status` check; `delivery_charge >= 0`; `revision >= 0`                                                                                                                                                                        |
+| `product`                      | `name`, `description`, `aliases text[]`, `status`, `custom_delivery`, `cover_image_id`, `revision`      | `status` check; `revision >= 0`                                                                                                                                                                                                |
 | `product_option`               | `product_id`, `name`, `position`                                                                        | FK to product `ON DELETE CASCADE`; `position` dense `0..n-1` (the order customers are asked in), not unique. Name uniqueness within a product is the service's, under the product row lock                                     |
 | `product_option_value`         | `option_id`, `value`, `position`                                                                        | FK to option `ON DELETE CASCADE`; `UNIQUE (merchant_id, option_id, id)`, the target of the link table's key                                                                                                                    |
 | `product_variant`              | `product_id`, `name` (null = default), `sku`, `price`, `stock`, `is_default`, `image_id`, `archived_at` | FK to product `ON DELETE CASCADE`; `price`, `stock >= 0`; `is_default = (name IS NULL)`; partial unique `(merchant_id, sku) WHERE archived_at IS NULL`; partial unique `(product_id) WHERE is_default AND archived_at IS NULL` |
@@ -123,6 +123,15 @@ Creation (`POST /products`) takes the same document without a `version`.
   unnamed and `is_default`. Otherwise a variant's name is the seller's, or else
   its values joined (`M / Short`), written on every save and kept on archived
   variants so order lines still read.
+- **Delivery charge.** `customDelivery: false` (the default) prices delivery
+  at the shop's charges ([Settings – Delivery charges](../09-settings-delivery/README.md)).
+  `true` uses `deliveryCharges`, `[{ deliveryChargeId, charge }]`: the
+  product's own charge per shop area, everywhere else included, stored in
+  `product_delivery_charge`. An area it leaves out costs the shop charge.
+  Every save replaces them, and saving with `customDelivery: false` drops
+  them. An id that isn't one of the shop's areas → `DELIVERY_CHARGE_NOT_FOUND`;
+  one listed twice → `DUPLICATE` at `deliveryCharges.<i>.deliveryChargeId`.
+  Removing an area in Settings removes every product's charge for it.
 - **Version.** Every write to the product's fields, options or variants bumps
   `revision`, sent as an opaque `version`. A save whose `version` isn't the
   current one → `409 PRODUCT_STALE`, so of two saves from one read the second
@@ -309,18 +318,19 @@ The product routes are in
 [`products.controller.ts`](../../../apps/api/src/modules/products/products.controller.ts),
 behind the session and `TenantGuard`, so the merchant always comes from the
 session. Every product answer is `productSchema`: the product with `options`,
-live `variants`, `categoryIds`, `images`, `coverImageId` and `version`.
+live `variants`, `categoryIds`, `images`, `coverImageId`, `customDelivery`,
+`deliveryCharges` and `version`.
 
-| Method | Path                                       | Body                  | Success               | Errors                                                                                                                                                        |
-| ------ | ------------------------------------------ | --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/v1/products`                         | `createProductSchema` | 201, the product      | 400 `VALIDATION_FAILED`, 404 `CATEGORY_NOT_FOUND`, 409 `SKU_TAKEN`                                                                                            |
-| GET    | `/api/v1/products`                         | query, below          | 200, a page           | 400 `VALIDATION_FAILED`                                                                                                                                       |
-| GET    | `/api/v1/products/counts`                  | —                     | 200, count per filter | —                                                                                                                                                             |
-| GET    | `/api/v1/products/:id`                     | —                     | 200, the product      | 404 `PRODUCT_NOT_FOUND`                                                                                                                                       |
-| PUT    | `/api/v1/products/:id`                     | `saveProductSchema`   | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `PRODUCT_OPTION_NOT_FOUND` / `VARIANT_NOT_FOUND` / `CATEGORY_NOT_FOUND`, 409 `PRODUCT_STALE` / `SKU_TAKEN` |
-| PATCH  | `/api/v1/products/:id`                     | `updateProductSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `CATEGORY_NOT_FOUND`                                                                                       |
-| PATCH  | `/api/v1/products/:id/variants/:variantId` | `updateVariantSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `VARIANT_NOT_FOUND` / `PRODUCT_IMAGE_NOT_FOUND`, 409 `SKU_TAKEN`                                           |
-| DELETE | `/api/v1/products/:id`                     | —                     | 204                   | 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_IN_USE`                                                                                                                 |
+| Method | Path                                       | Body                  | Success               | Errors                                                                                                                                                                                      |
+| ------ | ------------------------------------------ | --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/v1/products`                         | `createProductSchema` | 201, the product      | 400 `VALIDATION_FAILED`, 404 `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `SKU_TAKEN`                                                                                            |
+| GET    | `/api/v1/products`                         | query, below          | 200, a page           | 400 `VALIDATION_FAILED`                                                                                                                                                                     |
+| GET    | `/api/v1/products/counts`                  | —                     | 200, count per filter | —                                                                                                                                                                                           |
+| GET    | `/api/v1/products/:id`                     | —                     | 200, the product      | 404 `PRODUCT_NOT_FOUND`                                                                                                                                                                     |
+| PUT    | `/api/v1/products/:id`                     | `saveProductSchema`   | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `PRODUCT_OPTION_NOT_FOUND` / `VARIANT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `PRODUCT_STALE` / `SKU_TAKEN` |
+| PATCH  | `/api/v1/products/:id`                     | `updateProductSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`                                                                                       |
+| PATCH  | `/api/v1/products/:id/variants/:variantId` | `updateVariantSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `VARIANT_NOT_FOUND` / `PRODUCT_IMAGE_NOT_FOUND`, 409 `SKU_TAKEN`                                                                         |
+| DELETE | `/api/v1/products/:id`                     | —                     | 204                   | 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_IN_USE`                                                                                                                                               |
 
 A non-UUID `:id` is `400 VALIDATION_FAILED` on every route.
 
@@ -382,6 +392,7 @@ the categories service, the upload interceptor, and
 | `PRODUCT_STALE`                  | 409    | `{ id }`         | A save's `version` isn't the product's current one           |
 | `PRODUCT_IN_USE`                 | 409    | `{ id }`         | Deleting a product an order line references                  |
 | `SKU_TAKEN`                      | 409    | `{ sku }`        | Typed SKU already used by a live variant                     |
+| `DELIVERY_CHARGE_NOT_FOUND`      | 404    | `{ id }`         | A product's own charge names an area the shop doesn't have   |
 | `PRODUCT_IMAGE_TOO_LARGE`        | 413    | `{ maxBytes }`   | Upload over 10 MB                                            |
 | `PRODUCT_IMAGE_UNSUPPORTED_TYPE` | 415    | —                | Not JPEG, PNG or WebP                                        |
 | `PRODUCT_IMAGE_INVALID`          | 400    | —                | Undecodable, over 40 MP, or not exactly one file in `file`   |
@@ -496,7 +507,9 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
 - **`/catalog`**: the products list (see [Products list](#products-list)).
 - **`/catalog/products/new`** and **`/catalog/products/$productId`**: basic
   details, the option editor and variant table, the variant image picker,
-  status, categories and aliases (shown as Tags), and the photo dialogs (Add
+  status, categories and aliases (shown as Tags), the Delivery charge card
+  (shop charges, or a custom charge per area with the shop charge beside it),
+  and the photo dialogs (Add
   photos with per-file progress, All photos with delete and the default
   choice, and a full-screen viewer). The default photo (the cover) is saved
   with the page; uploads and deletes happen at once. A save sends the
@@ -510,10 +523,9 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
 - **Dashboard extras.** Reordering photos; the Categories page's insights
   panel (what customers ask for, categories they ask for that don't exist,
   and the needs-attention list); and fields the design shows that the API
-  doesn't hold yet: a choice between the product's own delivery charge and a
-  shop default, the assistant notes, a per-seller low-stock threshold and
-  sales figures. Orders don't read `product.delivery_charge` yet; an order's
-  charge is the seller's (see [Orders](../07-orders/README.md#rules)).
+  doesn't hold yet: the assistant notes, a per-seller low-stock threshold and
+  sales figures. The design's product-level "Free delivery" option was left
+  out on purpose; the only free delivery is the shop's threshold.
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
 - **AI prompt wiring.** `findSellableCatalog` returns what the prompt needs,
