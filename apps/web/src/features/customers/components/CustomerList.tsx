@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from '@tanstack/react-router';
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   customerFilters,
@@ -14,8 +14,8 @@ import {
 
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { PaginationBar } from '@/components/PaginationBar';
+import { SearchInput } from '@/components/SearchInput';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { CustomerAvatar, useCustomerName } from '@/features/conversations';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useFormatters } from '@/lib/format';
@@ -25,8 +25,6 @@ import { useLastOrderLabel } from '../format';
 import { useCustomerList, useCustomerSummary } from '../queries';
 import { CustomerStatusBadge } from './CustomerStatusBadge';
 import { CustomerSummaryCards } from './CustomerSummaryCards';
-
-const SEARCH_DEBOUNCE_MS = 300;
 
 const countKeys = {
   all: 'all',
@@ -106,7 +104,12 @@ export function CustomerList({
           className="overflow-hidden rounded-lg border border-border bg-surface shadow-card"
         >
           <div className="flex flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
-            <SearchInput value={query.q} onChange={(q) => onChange({ q })} />
+            <SearchInput
+              value={query.q}
+              onChange={(q) => onChange({ q })}
+              label={t('list.searchLabel')}
+              placeholder={t('list.searchPlaceholder')}
+            />
             <div
               role="group"
               aria-label={t('list.filters.label')}
@@ -367,47 +370,6 @@ function CustomerCards({ customers }: { customers: CustomerListItem[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-/** Typing updates the box at once and the URL (and so the query) once the seller pauses. */
-function SearchInput({
-  value,
-  onChange,
-}: {
-  value: string | undefined;
-  onChange: (q: string | undefined) => void;
-}) {
-  const { t } = useTranslation('customers');
-  const [draft, setDraft] = useState(value ?? '');
-
-  // Back/forward changes the URL under the box.
-  useEffect(() => setDraft(value ?? ''), [value]);
-
-  useEffect(() => {
-    const next = draft.trim() || undefined;
-    if (next === value) return;
-    const timer = setTimeout(() => onChange(next), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [draft, value, onChange]);
-
-  return (
-    <div className="relative flex w-full items-center sm:w-80">
-      <Search
-        aria-hidden
-        className="pointer-events-none absolute left-3 size-4 text-ink-muted"
-        strokeWidth={1.5}
-      />
-      <Input
-        type="search"
-        aria-label={t('list.searchLabel')}
-        placeholder={t('list.searchPlaceholder')}
-        maxLength={100}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        className="pl-9"
-      />
-    </div>
   );
 }
 

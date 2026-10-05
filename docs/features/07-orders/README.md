@@ -9,8 +9,8 @@ activity. Scope comes from the MVP's
 are the Orders and Order detail artboards in the design canvas. This page
 describes what is built.
 
-**Status (Oct 2026):** the API is built. Not built yet: the dashboard pages,
-CSV export, the order summary sent to the customer in Messenger on
+**Status (Oct 2026):** built end to end, in the API and at `/orders` and
+`/orders/:id` in the dashboard. Not built yet: CSV export, the order summary sent to the customer in Messenger on
 confirmation, and the assistant's own order creation (the conversation flow
 will write `source = assistant` orders). See [Follow-ups](#follow-ups).
 
@@ -128,9 +128,35 @@ enabled and forced with a `*_merchant_isolation` policy, and composite
   `orderEventDataSchema` on read; a check keeps `data->>'type' = type`),
   `actor_id` → `user.id` `ON DELETE SET NULL`, `created_at`.
 
+## Web
+
+- **`/`** redirects to `/orders` until the Overview page exists. The nav's
+  Orders item counts the drafted orders waiting for the seller.
+- **`/orders`**: the four cards (ignoring the filters), a banner while drafted
+  orders wait, search, a date filter (all time, today, last 7 or 30 days, this
+  month, or a custom range of the shop's calendar days, turned into instants
+  in the shop's time zone), the status tabs with counts under the same search
+  and dates, and a page of orders: a table from `md` up, sortable by total and
+  date, and cards below it. The view lives in the URL (`status`, `q`,
+  `range`, `from`, `to`, `sort`, `direction`, `page`, `pageSize`). "Create
+  order" opens a dialog: pick a customer, add items, then delivery and
+  payment, prefilled from the customer's details; it sends an
+  `Idempotency-Key` made once per dialog and opens the new order.
+- **`/orders/:id`**: the next step as the primary button (Confirm, Mark as
+  packed, shipped, delivered), with Cancel and Mark as returned behind a
+  confirmation that takes an optional reason. The buttons come from
+  `canTransitionOrder`. Then the progress stepper, the items (an Edit items
+  dialog while new or confirmed, with a product and variant picker), payment
+  (Mark as paid, or an Edit dialog), the activity, the customer, delivery (an
+  Edit dialog until shipped; the tracking number from packed), the chat's
+  last three messages with a link to it, and the internal note.
+- Every change sends the order's `version`. A `409` refetches the order, so
+  the seller sees what changed; a success replaces the order with the answer
+  and refreshes the lists, the activity, the catalog (stock) and Customers.
+- The customer page's orders link to `/orders/:id`.
+
 ## Follow-ups
 
-- The dashboard pages at `/orders` and `/orders/:id`.
 - The order summary in Messenger when the seller confirms ("When you confirm,
   Nusrat gets an order summary"): sent after the transaction commits, through
   the conversations send path, never inside it.

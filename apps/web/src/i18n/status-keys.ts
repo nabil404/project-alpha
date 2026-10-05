@@ -6,7 +6,10 @@ import type {
   CustomerStatus,
   MessageSender,
   MessageStatus,
+  OrderSource,
   OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
   ProductStatus,
   StockLevel,
   StockStatus,
@@ -29,6 +32,23 @@ export const orderStatusKeys = {
   returned: 'status.order.returned',
   cancelled: 'status.order.cancelled',
 } as const satisfies Record<OrderStatus, ParseKeys<'common'>>;
+
+export const paymentStatusKeys = {
+  unpaid: 'status.payment.unpaid',
+  paid: 'status.payment.paid',
+  refunded: 'status.payment.refunded',
+} as const satisfies Record<PaymentStatus, ParseKeys<'common'>>;
+
+export const paymentMethodKeys = {
+  cash_on_delivery: 'status.paymentMethod.cash_on_delivery',
+  bank_transfer: 'status.paymentMethod.bank_transfer',
+  mobile_wallet: 'status.paymentMethod.mobile_wallet',
+} as const satisfies Record<PaymentMethod, ParseKeys<'common'>>;
+
+export const orderSourceKeys = {
+  assistant: 'status.orderSource.assistant',
+  seller: 'status.orderSource.seller',
+} as const satisfies Record<OrderSource, ParseKeys<'common'>>;
 
 export const conversationStateKeys = {
   browsing: 'status.conversation.browsing',
@@ -92,6 +112,9 @@ export function useStatusLabels() {
 
   return {
     orderStatus: (status: OrderStatus): string => t(orderStatusKeys[status]),
+    paymentStatus: (status: PaymentStatus): string => t(paymentStatusKeys[status]),
+    paymentMethod: (method: PaymentMethod): string => t(paymentMethodKeys[method]),
+    orderSource: (source: OrderSource): string => t(orderSourceKeys[source]),
     conversationState: (state: ConversationState): string => t(conversationStateKeys[state]),
     stockStatus: (status: StockStatus): string => t(stockStatusKeys[status]),
     stockLevel: (level: StockLevel): string => t(stockLevelKeys[level]),

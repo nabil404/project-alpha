@@ -96,8 +96,6 @@
     "count_one": "{{formatted}} order",
     "count_other": "{{formatted}} orders",
     "empty": "No orders yet.",
-    "item": "{{product}} × {{quantity}}",
-    "itemWithVariant": "{{product}}, {{variant}} × {{quantity}}",
     "perPageLabel": "Orders per page",
     "showing_one": "Showing {{from}}–{{to}} of {{total}} order",
     "showing_other": "Showing {{from}}–{{to}} of {{total}} orders",
