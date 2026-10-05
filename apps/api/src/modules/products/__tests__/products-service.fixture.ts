@@ -6,6 +6,8 @@ import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-
 import { ProductImageRepository } from '../images/product-image.repository';
 import { ProductOptionsRepository } from '../options/product-options.repository';
 import { ProductWriter } from '../options/product-writer';
+import { DeliveryChargesRepository } from '../../settings/delivery-charges.repository';
+import { ProductDeliveryRepository } from '../product-delivery.repository';
 import { ProductsRepository } from '../products.repository';
 import { ProductsService } from '../products.service';
 
@@ -24,6 +26,8 @@ export function productsService(
     options,
     new ProductWriter(products, options),
     storage,
+    new DeliveryChargesRepository(),
+    new ProductDeliveryRepository(),
   );
 }
 
@@ -38,7 +42,8 @@ export function documentOf(product: Product): SaveProduct {
     description: product.description,
     status: product.status,
     aliases: product.aliases,
-    deliveryCharge: product.deliveryCharge,
+    customDelivery: product.customDelivery,
+    deliveryCharges: product.deliveryCharges,
     categoryIds: product.categoryIds,
     coverImageId: product.coverImageId,
     options: product.options.map((o) => ({

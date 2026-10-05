@@ -225,7 +225,7 @@ export const orderDetailSchema = z.object({
   paymentMethod: paymentMethodSchema,
   currency: z.string().length(3),
   subtotal: money,
-  deliveryCharge: money,
+  deliveryFee: money,
   total: money,
   items: z.array(orderLineSchema),
   /** The delivery details the order was placed with; editing the customer never changes them. */
@@ -233,7 +233,14 @@ export const orderDetailSchema = z.object({
     name: z.string(),
     phone: z.string(),
     address: z.string(),
-    zone: z.string().nullable(),
+    /** The area's name when it was delivered there; null for everywhere else or none. Kept when the area goes. */
+    area: z.string().nullable(),
+    /** The Settings delivery charge it was priced by; null once that area is removed, or for none. */
+    chargeId: z.string().uuid().nullable(),
+    /** Priced at the shop's everywhere-else charge. */
+    everywhereElse: z.boolean(),
+    /** The estimate when priced, e.g. "1–2 days" after shipping. */
+    time: z.string().nullable(),
   }),
   trackingNumber: z.string().nullable(),
   /** The seller's own note; the customer never sees it. */
@@ -258,7 +265,7 @@ export const ORDER_MAX_ITEMS = 50;
 export const ORDER_NOTE_MAX_LENGTH = 2000;
 export const ORDER_NAME_MAX_LENGTH = 200;
 export const ORDER_ADDRESS_MAX_LENGTH = 500;
-export const ORDER_ZONE_MAX_LENGTH = 100;
+export const ORDER_AREA_MAX_LENGTH = 100;
 export const ORDER_TRACKING_MAX_LENGTH = 100;
 
 /** A blank field clears the value. */
@@ -302,7 +309,8 @@ const itemList = z
 
 const nameInput = z.string().trim().min(1).max(ORDER_NAME_MAX_LENGTH);
 const addressInput = z.string().trim().min(1).max(ORDER_ADDRESS_MAX_LENGTH);
-const zoneInput = clearable(z.string().trim().max(ORDER_ZONE_MAX_LENGTH));
+const areaInput = clearable(z.string().trim().max(ORDER_AREA_MAX_LENGTH));
+const chargeIdInput = z.string().uuid().nullable();
 const noteInput = clearable(z.string().trim().max(ORDER_NOTE_MAX_LENGTH));
 const versionInput = z.string().min(1);
 
@@ -315,8 +323,9 @@ export const createOrderSchema = z
   .object({
     customerId: z.string().uuid(),
     items: itemList,
-    deliveryCharge: money,
-    deliveryZone: zoneInput.optional(),
+    deliveryFee: money,
+    deliveryArea: areaInput.optional(),
+    deliveryChargeId: chargeIdInput.optional(),
     customerName: nameInput.optional(),
     phone: phoneSchema.optional(),
     deliveryAddress: addressInput.optional(),
@@ -346,14 +355,19 @@ export type ReplaceOrderItems = z.infer<typeof replaceOrderItemsSchema>;
 /**
  * PATCH /orders/:id. Omit a field to leave it. The delivery fields change only
  * until the order ships; payment, tracking and the note at any time.
+ * `deliveryChargeId` links a Settings delivery charge (an area or everywhere
+ * else) and snapshots its name, everywhere-else flag and estimate; a sent
+ * `deliveryArea` overrides the name, and `null` unlinks and clears them. The
+ * fee is never recomputed.
  */
 export const updateOrderSchema = z
   .object({
     customerName: nameInput.optional(),
     phone: phoneSchema.optional(),
     deliveryAddress: addressInput.optional(),
-    deliveryZone: zoneInput.optional(),
-    deliveryCharge: money.optional(),
+    deliveryArea: areaInput.optional(),
+    deliveryChargeId: chargeIdInput.optional(),
+    deliveryFee: money.optional(),
     paymentStatus: paymentStatusSchema.optional(),
     paymentMethod: paymentMethodSchema.optional(),
     trackingNumber: clearable(z.string().trim().max(ORDER_TRACKING_MAX_LENGTH)).optional(),
@@ -363,8 +377,16 @@ export const updateOrderSchema = z
   .strict();
 export type UpdateOrder = z.infer<typeof updateOrderSchema>;
 
-export const orderDeliveryFields = ['name', 'phone', 'address', 'zone', 'charge'] as const;
-export const orderDeliveryFieldSchema = z.enum(orderDeliveryFields);
+export const orderDeliveryFields = ['name', 'phone', 'address', 'area', 'fee'] as const;
+/** Events stored before the rename say `zone` and `charge`; they read as `area` and `fee`. */
+const renamedDeliveryFields: Record<string, (typeof orderDeliveryFields)[number]> = {
+  zone: 'area',
+  charge: 'fee',
+};
+export const orderDeliveryFieldSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? (renamedDeliveryFields[value] ?? value) : value),
+  z.enum(orderDeliveryFields),
+);
 export type OrderDeliveryField = z.infer<typeof orderDeliveryFieldSchema>;
 
 /** What happened, with the facts the timeline shows; stored as jsonb and parsed on read. */

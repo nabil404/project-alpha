@@ -70,7 +70,7 @@ export class ProductsController {
   @ApiBody({ schema: json(createProductSchema, 'input') })
   @ApiCreatedResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
-  @ApiCodedError(404, ['CATEGORY_NOT_FOUND'])
+  @ApiCodedError(404, ['CATEGORY_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
   @ApiCodedError(409, ['SKU_TAKEN'])
   create(
     @Req() request: TenantRequest,
@@ -142,6 +142,7 @@ export class ProductsController {
     'PRODUCT_OPTION_NOT_FOUND',
     'VARIANT_NOT_FOUND',
     'CATEGORY_NOT_FOUND',
+    'DELIVERY_CHARGE_NOT_FOUND',
   ])
   @ApiCodedError(409, ['PRODUCT_STALE', 'SKU_TAKEN'])
   save(
@@ -161,7 +162,7 @@ export class ProductsController {
   @ApiBody({ schema: json(updateProductSchema, 'input') })
   @ApiOkResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
-  @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND'])
+  @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
   update(
     @Req() request: TenantRequest,
     @Param('id', uuidParam) id: string,

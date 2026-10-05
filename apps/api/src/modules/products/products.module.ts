@@ -6,6 +6,8 @@ import { ProductImagesController } from './images/product-images.controller';
 import { ProductImagesService } from './images/product-images.service';
 import { ProductOptionsRepository } from './options/product-options.repository';
 import { ProductWriter } from './options/product-writer';
+import { DeliveryChargesRepository } from '../settings/delivery-charges.repository';
+import { ProductDeliveryRepository } from './product-delivery.repository';
 import { ProductsController } from './products.controller';
 import { ProductsRepository } from './products.repository';
 import { ProductsService } from './products.service';
@@ -25,6 +27,9 @@ import { ProductsService } from './products.service';
     ProductImagesService,
     ProductOptionsRepository,
     ProductWriter,
+    ProductDeliveryRepository,
+    // Stateless; read here to check a product's own charges name the shop's areas.
+    DeliveryChargesRepository,
   ],
   exports: [ProductsService, ProductImagesService, ProductImageRepository],
 })
