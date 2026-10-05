@@ -2,6 +2,7 @@ import type {
   ConversationState,
   CustomerStatus,
   OrderStatus,
+  PaymentStatus,
   ProductStatus,
   StockLevel,
   StockStatus,
@@ -23,6 +24,12 @@ export const orderStatusTones = {
   returned: 'warning',
   cancelled: 'danger',
 } as const satisfies Record<OrderStatus, StatusTone>;
+
+export const paymentStatusTones = {
+  unpaid: 'neutral',
+  paid: 'success',
+  refunded: 'warning',
+} as const satisfies Record<PaymentStatus, StatusTone>;
 
 export const customerStatusTones = {
   needs_you: 'warning',

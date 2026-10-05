@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { UnreadBadge } from '@/features/conversations';
+import { AwaitingOrdersBadge } from '@/features/orders';
 
 export interface NavItem {
   id: string;
@@ -27,7 +28,13 @@ export interface NavItem {
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'overview', label: 'nav.overview', icon: LayoutDashboard },
-  { id: 'orders', label: 'nav.orders', icon: ShoppingBag, to: '/', exact: true },
+  {
+    id: 'orders',
+    label: 'nav.orders',
+    icon: ShoppingBag,
+    to: '/orders',
+    badge: AwaitingOrdersBadge,
+  },
   {
     id: 'conversations',
     label: 'nav.conversations',

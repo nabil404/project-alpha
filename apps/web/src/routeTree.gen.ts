@@ -24,6 +24,8 @@ import { Route as AppConversationsIndexRouteImport } from './routes/_app/convers
 import { Route as AppConversationsConversationIdRouteImport } from './routes/_app/conversations/$conversationId'
 import { Route as AppCustomersIndexRouteImport } from './routes/_app/customers/index'
 import { Route as AppCustomersCustomerIdRouteImport } from './routes/_app/customers/$customerId'
+import { Route as AppOrdersIndexRouteImport } from './routes/_app/orders/index'
+import { Route as AppOrdersOrderIdRouteImport } from './routes/_app/orders/$orderId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings/account'
 import { Route as AppSettingsGeneralRouteImport } from './routes/_app/settings/general'
@@ -105,6 +107,16 @@ const AppCustomersCustomerIdRoute = AppCustomersCustomerIdRouteImport.update({
   path: '/customers/$customerId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrdersIndexRoute = AppOrdersIndexRouteImport.update({
+  id: '/orders/',
+  path: '/orders/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrdersOrderIdRoute = AppOrdersOrderIdRouteImport.update({
+  id: '/orders/$orderId',
+  path: '/orders/$orderId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -148,12 +160,14 @@ export interface FileRoutesByFullPath {
   '/catalog/categories': typeof AppCatalogCategoriesRoute
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/customers/$customerId': typeof AppCustomersCustomerIdRoute
+  '/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
   '/catalog/': typeof AppCatalogIndexRoute
   '/conversations/': typeof AppConversationsIndexRoute
   '/customers/': typeof AppCustomersIndexRoute
+  '/orders/': typeof AppOrdersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
@@ -167,12 +181,14 @@ export interface FileRoutesByTo {
   '/catalog/categories': typeof AppCatalogCategoriesRoute
   '/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/customers/$customerId': typeof AppCustomersCustomerIdRoute
+  '/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
   '/catalog': typeof AppCatalogIndexRoute
   '/conversations': typeof AppConversationsIndexRoute
   '/customers': typeof AppCustomersIndexRoute
+  '/orders': typeof AppOrdersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
@@ -191,12 +207,14 @@ export interface FileRoutesById {
   '/_app/catalog/categories': typeof AppCatalogCategoriesRoute
   '/_app/conversations/$conversationId': typeof AppConversationsConversationIdRoute
   '/_app/customers/$customerId': typeof AppCustomersCustomerIdRoute
+  '/_app/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/_app/settings/account': typeof AppSettingsAccountRoute
   '/_app/settings/general': typeof AppSettingsGeneralRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
   '/_app/catalog/': typeof AppCatalogIndexRoute
   '/_app/conversations/': typeof AppConversationsIndexRoute
   '/_app/customers/': typeof AppCustomersIndexRoute
+  '/_app/orders/': typeof AppOrdersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/_app/catalog/products/new': typeof AppCatalogProductsNewRoute
@@ -214,12 +232,14 @@ export interface FileRouteTypes {
     | '/catalog/categories'
     | '/conversations/$conversationId'
     | '/customers/$customerId'
+    | '/orders/$orderId'
     | '/settings/account'
     | '/settings/general'
     | '/settings/messenger'
     | '/catalog/'
     | '/conversations/'
     | '/customers/'
+    | '/orders/'
     | '/settings/'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
@@ -233,12 +253,14 @@ export interface FileRouteTypes {
     | '/catalog/categories'
     | '/conversations/$conversationId'
     | '/customers/$customerId'
+    | '/orders/$orderId'
     | '/settings/account'
     | '/settings/general'
     | '/settings/messenger'
     | '/catalog'
     | '/conversations'
     | '/customers'
+    | '/orders'
     | '/settings'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
@@ -256,12 +278,14 @@ export interface FileRouteTypes {
     | '/_app/catalog/categories'
     | '/_app/conversations/$conversationId'
     | '/_app/customers/$customerId'
+    | '/_app/orders/$orderId'
     | '/_app/settings/account'
     | '/_app/settings/general'
     | '/_app/settings/messenger'
     | '/_app/catalog/'
     | '/_app/conversations/'
     | '/_app/customers/'
+    | '/_app/orders/'
     | '/_app/settings/'
     | '/_app/catalog/products/$productId'
     | '/_app/catalog/products/new'
@@ -379,6 +403,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomersCustomerIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/orders/': {
+      id: '/_app/orders/'
+      path: '/orders'
+      fullPath: '/orders/'
+      preLoaderRoute: typeof AppOrdersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/orders/$orderId': {
+      id: '/_app/orders/$orderId'
+      path: '/orders/$orderId'
+      fullPath: '/orders/$orderId'
+      preLoaderRoute: typeof AppOrdersOrderIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/'
@@ -461,8 +499,10 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppCatalogCategoriesRoute: typeof AppCatalogCategoriesRoute
   AppCustomersCustomerIdRoute: typeof AppCustomersCustomerIdRoute
+  AppOrdersOrderIdRoute: typeof AppOrdersOrderIdRoute
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
   AppCustomersIndexRoute: typeof AppCustomersIndexRoute
+  AppOrdersIndexRoute: typeof AppOrdersIndexRoute
   AppCatalogProductsProductIdRoute: typeof AppCatalogProductsProductIdRoute
   AppCatalogProductsNewRoute: typeof AppCatalogProductsNewRoute
 }
@@ -473,8 +513,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppCatalogCategoriesRoute: AppCatalogCategoriesRoute,
   AppCustomersCustomerIdRoute: AppCustomersCustomerIdRoute,
+  AppOrdersOrderIdRoute: AppOrdersOrderIdRoute,
   AppCatalogIndexRoute: AppCatalogIndexRoute,
   AppCustomersIndexRoute: AppCustomersIndexRoute,
+  AppOrdersIndexRoute: AppOrdersIndexRoute,
   AppCatalogProductsProductIdRoute: AppCatalogProductsProductIdRoute,
   AppCatalogProductsNewRoute: AppCatalogProductsNewRoute,
 }

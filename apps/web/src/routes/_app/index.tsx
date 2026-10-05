@@ -1,12 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { useTranslation } from 'react-i18next';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
+/** Orders is the dashboard's home until the Overview page exists. */
 export const Route = createFileRoute('/_app/')({
-  component: OrdersPage,
+  beforeLoad: () => {
+    throw redirect({ to: '/orders', replace: true });
+  },
 });
-
-function OrdersPage() {
-  const { t } = useTranslation('orders');
-
-  return <h1 className="text-display">{t('list.title')}</h1>;
-}

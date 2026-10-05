@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import type { CustomerOrder } from '@app/shared';
 
 import { useFormatters } from '@/lib/format';
 
@@ -22,27 +21,4 @@ export function useLastOrderLabel() {
         : formatDate(lastOrderAt, 'dayMonth');
     return label.charAt(0).toLocaleUpperCase() + label.slice(1);
   };
-}
-
-/**
- * ORD-2026-00481: the shop's order number, zero-padded, after the year it was
- * placed. An identifier, not a quantity, so it is never locale-grouped.
- */
-export function orderReference({ number, placedAt }: Pick<CustomerOrder, 'number' | 'placedAt'>) {
-  return `ORD-${new Date(placedAt).getFullYear()}-${String(number).padStart(5, '0')}`;
-}
-
-/** "Blue kurti, M × 2, Dupatta × 1". */
-export function useOrderItemsLabel() {
-  const { t } = useTranslation('customers');
-  const { formatList } = useFormatters();
-
-  return (items: CustomerOrder['items']): string =>
-    formatList(
-      items.map(({ productName, variantName, quantity }) =>
-        variantName
-          ? t('orders.itemWithVariant', { product: productName, variant: variantName, quantity })
-          : t('orders.item', { product: productName, quantity }),
-      ),
-    );
 }

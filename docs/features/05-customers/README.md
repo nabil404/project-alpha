@@ -117,7 +117,7 @@ and composite `(merchant_id, id)` foreign keys.
   to `needs_you`.
 - **`/customers/:id`**: the badge and "Customer since", Open chat (the latest
   conversation), the three figures, the orders (paged, `ORD-<year placed>-<number
-padded to 5>`, not links until orders have a page), the latest conversation,
+padded to 5>`, each linking to its order), the latest conversation,
   the contact card with an Edit dialog (the shared `updateCustomerSchema`; a
   blank field clears), and the notes with a box to add one.
 - **Badges.** Repeat is accent, New success, Needs you warning, Inactive
