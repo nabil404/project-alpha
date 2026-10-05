@@ -28,6 +28,7 @@ import { Route as AppOrdersIndexRouteImport } from './routes/_app/orders/index'
 import { Route as AppOrdersOrderIdRouteImport } from './routes/_app/orders/$orderId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings/account'
+import { Route as AppSettingsDeliveryRouteImport } from './routes/_app/settings/delivery'
 import { Route as AppSettingsGeneralRouteImport } from './routes/_app/settings/general'
 import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
 import { Route as AppCatalogProductsProductIdRouteImport } from './routes/_app/catalog/products/$productId'
@@ -127,6 +128,11 @@ const AppSettingsAccountRoute = AppSettingsAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsDeliveryRoute = AppSettingsDeliveryRouteImport.update({
+  id: '/delivery',
+  path: '/delivery',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsGeneralRoute = AppSettingsGeneralRouteImport.update({
   id: '/general',
   path: '/general',
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
+  '/settings/delivery': typeof AppSettingsDeliveryRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
   '/catalog/': typeof AppCatalogIndexRoute
@@ -183,6 +190,7 @@ export interface FileRoutesByTo {
   '/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
+  '/settings/delivery': typeof AppSettingsDeliveryRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
   '/catalog': typeof AppCatalogIndexRoute
@@ -209,6 +217,7 @@ export interface FileRoutesById {
   '/_app/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/_app/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/_app/settings/account': typeof AppSettingsAccountRoute
+  '/_app/settings/delivery': typeof AppSettingsDeliveryRoute
   '/_app/settings/general': typeof AppSettingsGeneralRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
   '/_app/catalog/': typeof AppCatalogIndexRoute
@@ -234,6 +243,7 @@ export interface FileRouteTypes {
     | '/customers/$customerId'
     | '/orders/$orderId'
     | '/settings/account'
+    | '/settings/delivery'
     | '/settings/general'
     | '/settings/messenger'
     | '/catalog/'
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/customers/$customerId'
     | '/orders/$orderId'
     | '/settings/account'
+    | '/settings/delivery'
     | '/settings/general'
     | '/settings/messenger'
     | '/catalog'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/_app/customers/$customerId'
     | '/_app/orders/$orderId'
     | '/_app/settings/account'
+    | '/_app/settings/delivery'
     | '/_app/settings/general'
     | '/_app/settings/messenger'
     | '/_app/catalog/'
@@ -431,6 +443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsAccountRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/delivery': {
+      id: '/_app/settings/delivery'
+      path: '/delivery'
+      fullPath: '/settings/delivery'
+      preLoaderRoute: typeof AppSettingsDeliveryRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/general': {
       id: '/_app/settings/general'
       path: '/general'
@@ -477,6 +496,7 @@ const AppConversationsRouteWithChildren =
 
 interface AppSettingsRouteChildren {
   AppSettingsAccountRoute: typeof AppSettingsAccountRoute
+  AppSettingsDeliveryRoute: typeof AppSettingsDeliveryRoute
   AppSettingsGeneralRoute: typeof AppSettingsGeneralRoute
   AppSettingsMessengerRoute: typeof AppSettingsMessengerRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
@@ -484,6 +504,7 @@ interface AppSettingsRouteChildren {
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsAccountRoute: AppSettingsAccountRoute,
+  AppSettingsDeliveryRoute: AppSettingsDeliveryRoute,
   AppSettingsGeneralRoute: AppSettingsGeneralRoute,
   AppSettingsMessengerRoute: AppSettingsMessengerRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
