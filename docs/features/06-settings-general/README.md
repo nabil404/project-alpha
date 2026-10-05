@@ -52,8 +52,9 @@ zone), and the dashboard localizes names with `Intl.DisplayNames`.
   `+` and country code; the form's calling code picker supplies it.
 - **Currency** can change until the shop's first order, of any status, and is
   fixed after (`currencyLocked`). A change keeps each price's number: when the
-  two currencies have different decimals, every variant price and delivery
-  charge is rescaled (৳1,600.50 → ¥1,601) and each product's revision bumped.
+  two currencies have different decimals, every variant price, delivery
+  charge ([Delivery charges](../09-settings-delivery/README.md)) and the
+  free-delivery threshold is rescaled (৳1,600.50 → ¥1,601) and each product's revision bumped.
   Nothing is converted at an exchange rate. The settings row is locked for the
   save, and order creation takes the same row's lock before it snapshots the
   currency onto `order.currency`
