@@ -79,8 +79,7 @@ export class MerchantSettingsRepository {
   }
 
   /**
-   * Multiplies every catalog amount - variant prices and product delivery
-   * charges, archived ones too - by `factor`, rounding half away from zero, so
+   * Multiplies every catalog amount - variant prices, archived ones too - by `factor`, rounding half away from zero, so
    * a price keeps its number when the currency's decimals change (৳1,600.00
    * stays 1,600 as ¥1,600). Bumps each product's revision, as every write to
    * its variants must.
@@ -90,7 +89,7 @@ export class MerchantSettingsRepository {
     { merchantId }: TenantScope,
     factor: string,
   ): Promise<void> {
-    const scaled = (column: typeof productVariant.price | typeof product.deliveryCharge) =>
+    const scaled = (column: typeof productVariant.price) =>
       sql`round(${column}::numeric * ${factor}::numeric)::integer`;
     await executor
       .update(productVariant)
@@ -98,10 +97,7 @@ export class MerchantSettingsRepository {
       .where(eq(productVariant.merchantId, merchantId));
     await executor
       .update(product)
-      .set({
-        deliveryCharge: scaled(product.deliveryCharge),
-        revision: sql`${product.revision} + 1`,
-      })
+      .set({ revision: sql`${product.revision} + 1` })
       .where(eq(product.merchantId, merchantId));
   }
 }

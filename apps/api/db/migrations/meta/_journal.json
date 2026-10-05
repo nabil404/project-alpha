@@ -183,6 +183,20 @@
       "when": 1791229029035,
       "tag": "0025_order_reference_required",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791238207217,
+      "tag": "0026_settings_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791238218591,
+      "tag": "0027_delivery_charge_force_rls",
+      "breakpoints": true
     }
   ]
 }

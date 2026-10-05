@@ -41,7 +41,12 @@ export const product = pgTable(
     status: text('status', { enum: ['draft', 'active', 'archived'] })
       .notNull()
       .default('draft'),
-    deliveryCharge: integer('delivery_charge').notNull().default(0),
+    /**
+     * False: delivery costs the shop's charges (Settings > Delivery charges).
+     * True: its own per area, in product_delivery_charge, the shop's where it
+     * sets none.
+     */
+    customDelivery: boolean('custom_delivery').notNull().default(false),
     /**
      * The default photo: sent when a customer hasn't picked a variant, and for
      * variants without their own. Null exactly when the product has no images.
@@ -62,7 +67,6 @@ export const product = pgTable(
   (t) => [
     unique('product_merchant_id_uq').on(t.merchantId, t.id),
     check('product_status_ck', sql`${t.status} in ('draft', 'active', 'archived')`),
-    check('product_delivery_charge_ck', sql`${t.deliveryCharge} >= 0`),
     check('product_revision_ck', sql`${t.revision} >= 0`),
     index('product_merchant_status_idx').on(t.merchantId, t.status),
     index('product_merchant_created_idx').on(t.merchantId, t.createdAt),

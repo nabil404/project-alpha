@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -75,15 +76,25 @@ export const order = pgTable(
       .notNull()
       .default('cash_on_delivery'),
     subtotal: integer('subtotal').notNull(),
-    deliveryCharge: integer('delivery_charge').notNull().default(0),
+    deliveryFee: integer('delivery_fee').notNull().default(0),
     total: integer('total').notNull(),
     /** ISO 4217: the shop's currency when the order was placed. */
     currency: text('currency').notNull(),
     customerName: text('customer_name').notNull(),
     phone: text('phone').notNull(),
     deliveryAddress: text('delivery_address').notNull(),
-    /** The delivery zone's name as it was when charged; zones themselves are not modelled yet. */
-    deliveryZone: text('delivery_zone'),
+    /** The area's name when it was delivered there; null for everywhere else or none. Kept when the area goes. */
+    deliveryArea: text('delivery_area'),
+    /**
+     * The Settings delivery charge it was priced by. Its foreign key is
+     * migration 0027's, not declared here: drizzle-kit cannot express ON
+     * DELETE SET NULL for one column of a composite key.
+     */
+    deliveryChargeId: text('delivery_charge_id'),
+    /** Priced at the shop's everywhere-else row. */
+    deliveryEverywhereElse: boolean('delivery_everywhere_else').notNull().default(false),
+    /** The estimate when priced, e.g. "1–2 days" after shipping. */
+    deliveryTime: text('delivery_time'),
     trackingNumber: text('tracking_number'),
     /** The seller's internal note; the customer never sees it. */
     notes: text('notes'),
@@ -122,10 +133,11 @@ export const order = pgTable(
     check('order_currency_ck', sql`${t.currency} ~ '^[A-Z]{3}$'`),
     check(
       'order_amounts_ck',
-      sql`${t.subtotal} >= 0 and ${t.deliveryCharge} >= 0 and ${t.total} = ${t.subtotal} + ${t.deliveryCharge}`,
+      sql`${t.subtotal} >= 0 and ${t.deliveryFee} >= 0 and ${t.total} = ${t.subtotal} + ${t.deliveryFee}`,
     ),
     index('order_customer_placed_idx').on(t.merchantId, t.customerId, t.placedAt.desc(), t.id),
     index('order_merchant_placed_idx').on(t.merchantId, t.placedAt.desc(), t.id),
+    index('order_delivery_charge_idx').on(t.merchantId, t.deliveryChargeId),
     index('order_merchant_status_placed_idx').on(t.merchantId, t.status, t.placedAt.desc(), t.id),
     merchantIsolation('order_merchant_isolation', t.merchantId),
   ],

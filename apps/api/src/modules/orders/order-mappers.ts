@@ -51,7 +51,8 @@ export function toOrderDetail({ order, items, customer, history }: OrderDetailPa
     paymentMethod: order.paymentMethod,
     currency: order.currency,
     subtotal: order.subtotal,
-    deliveryCharge: order.deliveryCharge,
+    // wire renamed in Task 7
+    deliveryCharge: order.deliveryFee,
     total: order.total,
     items: items.map((item) => ({
       id: item.id,
@@ -68,7 +69,8 @@ export function toOrderDetail({ order, items, customer, history }: OrderDetailPa
       name: order.customerName,
       phone: order.phone,
       address: order.deliveryAddress,
-      zone: order.deliveryZone,
+      // wire renamed in Task 7
+      zone: order.deliveryArea,
     },
     trackingNumber: order.trackingNumber,
     note: order.notes,

@@ -160,7 +160,6 @@ describeDb('ProductsService — products and category links', () => {
         name: 'Silk Panjabi',
         status: 'active',
         aliases: ['silk'],
-        deliveryCharge: 8000,
         categoryIds: [second.id],
       });
 
@@ -168,7 +167,6 @@ describeDb('ProductsService — products and category links', () => {
         name: 'Silk Panjabi',
         status: 'active',
         aliases: ['silk'],
-        deliveryCharge: 8000,
         categoryIds: [second.id],
       });
     });

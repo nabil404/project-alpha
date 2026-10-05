@@ -120,9 +120,9 @@ describeDb('GeneralSettingsService', () => {
   });
 
   it('keeps every price its number when the decimals change', async () => {
-    const product = await seedProduct(t.db, t.merchantA, { deliveryCharge: 6000 });
+    const product = await seedProduct(t.db, t.merchantA);
     const variant = await seedVariant(t.db, t.merchantA, product.id, { price: 160050 });
-    const productOfB = await seedProduct(t.db, t.merchantB, { deliveryCharge: 6000 });
+    const productOfB = await seedProduct(t.db, t.merchantB);
     const variantOfB = await seedVariant(t.db, t.merchantB, productOfB.id, { price: 160050 });
 
     await service.update(t.merchantA, { currency: 'JPY' });
@@ -135,9 +135,9 @@ describeDb('GeneralSettingsService', () => {
       .select()
       .from(schema.product)
       .where(eq(schema.product.id, product.id));
-    // ৳1,600.50 -> ¥1,601 and ৳60.00 -> ¥60; the revision moves so open editors refuse a stale save.
+    // ৳1,600.50 -> ¥1,601; the revision moves so open editors refuse a stale save.
     expect(variantRow?.price).toBe(1601);
-    expect(productRow).toMatchObject({ deliveryCharge: 60, revision: product.revision + 1 });
+    expect(productRow).toMatchObject({ revision: product.revision + 1 });
 
     const [untouched] = await t.db
       .select()

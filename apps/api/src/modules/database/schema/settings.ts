@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, pgTable, text } from 'drizzle-orm/pg-core';
+import { check, integer, pgTable, text } from 'drizzle-orm/pg-core';
 import { createdAt, merchantId, merchantIsolation, oneOf, updatedAt } from './columns';
 
 /** A literal copy of @app/shared's DATE_FORMATS (drizzle-kit loads this file on its own); the schema spec keeps them equal. */
@@ -33,6 +33,8 @@ export const merchantSettings = pgTable(
     /** E.164. */
     contactPhone: text('contact_phone'),
     pickupAddress: text('pickup_address'),
+    /** Minor units; orders with a subtotal at or over it ship free. Null always charges. */
+    freeDeliveryOver: integer('free_delivery_over'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -41,6 +43,7 @@ export const merchantSettings = pgTable(
     check('merchant_settings_currency_ck', sql`${t.currency} ~ '^[A-Z]{3}$'`),
     check('merchant_settings_date_format_ck', oneOf(t.dateFormat, DATE_FORMATS)),
     check('merchant_settings_contact_phone_ck', sql`${t.contactPhone} ~ '^\\+[1-9][0-9]{6,14}$'`),
+    check('merchant_settings_free_delivery_over_ck', sql`${t.freeDeliveryOver} >= 0`),
     merchantIsolation('merchant_settings_merchant_isolation', t.merchantId),
   ],
 );

@@ -151,12 +151,12 @@ describe('buildLines', () => {
 describe('planOrderPatch', () => {
   const row = {
     subtotal: 320000,
-    deliveryCharge: 6000,
+    deliveryFee: 6000,
     total: 326000,
     customerName: 'Nusrat Jahan',
     phone: '01712-345678',
     deliveryAddress: 'House 12, Road 4, Mirpur 10',
-    deliveryZone: 'Local',
+    deliveryArea: 'Local',
     paymentStatus: 'unpaid',
     paymentMethod: 'cash_on_delivery',
     trackingNumber: null,
@@ -175,7 +175,7 @@ describe('planOrderPatch', () => {
 
   it('recomputes the total with the delivery charge and lists the delivery fields changed', () => {
     const plan = planOrderPatch(row, { deliveryCharge: 12000, deliveryZone: null });
-    expect(plan.changes).toEqual({ deliveryCharge: 12000, total: 332000, deliveryZone: null });
+    expect(plan.changes).toEqual({ deliveryFee: 12000, total: 332000, deliveryArea: null });
     expect(plan.events).toEqual([{ type: 'delivery_changed', fields: ['zone', 'charge'] }]);
     expect(plan.touchesDelivery).toBe(true);
   });
