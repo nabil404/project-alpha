@@ -26,6 +26,7 @@ export function defaultMerchantSettings(): MerchantSettingsValues {
     dateFormat,
     contactPhone: null,
     pickupAddress: null,
+    freeDeliveryOver: null,
   };
 }
 
