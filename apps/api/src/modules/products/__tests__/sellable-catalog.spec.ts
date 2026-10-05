@@ -37,7 +37,6 @@ describeDb('ProductsService.findSellableCatalog', () => {
         createProductSchema.parse({
           name,
           status,
-          deliveryCharge: 0,
           categoryIds: [kept.id, removed.id],
           options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
           variants: [
@@ -55,7 +54,6 @@ describeDb('ProductsService.findSellableCatalog', () => {
       createProductSchema.parse({
         name: 'Other seller',
         status: 'active',
-        deliveryCharge: 0,
         variants: [{ price: 1, stock: 1 }],
       }),
     );

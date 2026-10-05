@@ -1,4 +1,5 @@
 import { HttpException } from '@nestjs/common';
+import { orderEventDataSchema } from '@app/shared';
 import type { OrderItemRow, OrderRow } from '../../database/schema/index';
 import type { OrderableVariant } from '../order-catalog.repository';
 import { buildLines, planOrderPatch, stockChanges, subtotalOf } from '../order-rules';
@@ -196,5 +197,13 @@ describe('planOrderPatch', () => {
       { type: 'tracking_changed', trackingNumber: 'PTH-123' },
     ]);
     expect(plan.touchesDelivery).toBe(false);
+  });
+});
+
+describe('orderEventDataSchema', () => {
+  it('reads delivery changes stored before the area and fee rename', () => {
+    expect(
+      orderEventDataSchema.parse({ type: 'delivery_changed', fields: ['zone', 'charge'] }),
+    ).toEqual({ type: 'delivery_changed', fields: ['area', 'fee'] });
   });
 });

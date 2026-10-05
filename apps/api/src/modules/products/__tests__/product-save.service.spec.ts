@@ -1,4 +1,5 @@
 import { createProductSchema, type Product, type SaveProduct } from '@app/shared';
+import * as schema from '../../database/schema/index';
 import type { ProductsService } from '../products.service';
 import {
   describeDb,
@@ -21,7 +22,6 @@ describeDb('ProductsService — save', () => {
       merchantId,
       createProductSchema.parse({
         name: 'Mug',
-        deliveryCharge: 0,
         variants: [{ price: 50000, stock: 4 }],
       }),
     );
@@ -31,7 +31,6 @@ describeDb('ProductsService — save', () => {
       createProductSchema.parse({
         name: 'Kurti',
         status,
-        deliveryCharge: 0,
         options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
         variants: [
           { optionValues: ['M'], sku: sku('m'), price: 160000, stock: 9 },
@@ -52,6 +51,102 @@ describeDb('ProductsService — save', () => {
 
   afterAll(async () => {
     await t.close();
+  });
+
+  describe('delivery charges', () => {
+    const area = async (merchantId: string, areaName: string | null, position: number) => {
+      const [row] = await t.db
+        .insert(schema.deliveryCharge)
+        .values({
+          merchantId,
+          areaName: `${areaName ?? ''}${areaName ? `-${++n}` : ''}` || null,
+          isFallback: areaName === null,
+          charge: 6000,
+          position,
+        })
+        .returning();
+      if (!row) throw new Error('no delivery_charge row');
+      return row;
+    };
+
+    it('keeps its own charges in the order the shop lists its areas', async () => {
+      const product = await plain();
+      const elsewhere = await area(t.merchantA, null, 0);
+      const dhaka = await area(t.merchantA, 'Dhaka', 0);
+
+      const saved = await save(product, (doc) => {
+        doc.customDelivery = true;
+        doc.deliveryCharges = [
+          { deliveryChargeId: elsewhere.id, charge: 15000 },
+          { deliveryChargeId: dhaka.id, charge: 8000 },
+        ];
+      });
+
+      expect(saved.customDelivery).toBe(true);
+      expect(saved.deliveryCharges).toEqual([
+        { deliveryChargeId: dhaka.id, charge: 8000 },
+        { deliveryChargeId: elsewhere.id, charge: 15000 },
+      ]);
+      expect(saved.version).not.toBe(product.version);
+    });
+
+    it('drops its own charges when it goes back to the shop charges', async () => {
+      const product = await plain();
+      const dhaka = await area(t.merchantA, 'Dhaka', 1);
+      const custom = await save(product, (doc) => {
+        doc.customDelivery = true;
+        doc.deliveryCharges = [{ deliveryChargeId: dhaka.id, charge: 8000 }];
+      });
+
+      const shop = await save(custom, (doc) => {
+        doc.customDelivery = false;
+      });
+
+      expect(shop).toMatchObject({ customDelivery: false, deliveryCharges: [] });
+    });
+
+    it('stores no charges sent with the shop charges chosen', async () => {
+      const product = await plain();
+      const dhaka = await area(t.merchantA, 'Dhaka', 2);
+
+      const saved = await save(product, (doc) => {
+        doc.customDelivery = false;
+        doc.deliveryCharges = [{ deliveryChargeId: dhaka.id, charge: 8000 }];
+      });
+
+      expect(saved.deliveryCharges).toEqual([]);
+    });
+
+    it("refuses another merchant's area and writes nothing", async () => {
+      const product = await plain();
+      const theirs = await area(t.merchantB, 'Dhaka', 0);
+
+      await expectCoded(
+        save(product, (doc) => {
+          doc.customDelivery = true;
+          doc.deliveryCharges = [{ deliveryChargeId: theirs.id, charge: 8000 }];
+        }),
+        'DELIVERY_CHARGE_NOT_FOUND',
+      );
+      await expect(service.get(t.merchantA, product.id)).resolves.toMatchObject({
+        customDelivery: false,
+        version: product.version,
+      });
+    });
+
+    it('sets its own charges when created', async () => {
+      const dhaka = await area(t.merchantA, 'Dhaka', 3);
+      const created = await service.create(
+        t.merchantA,
+        createProductSchema.parse({
+          name: 'Heavy rug',
+          customDelivery: true,
+          deliveryCharges: [{ deliveryChargeId: dhaka.id, charge: 20000 }],
+          variants: [{ price: 500000 }],
+        }),
+      );
+      expect(created.deliveryCharges).toEqual([{ deliveryChargeId: dhaka.id, charge: 20000 }]);
+    });
   });
 
   it('saves an unchanged document, changing nothing but the version', async () => {
@@ -135,7 +230,6 @@ describeDb('ProductsService — save', () => {
         t.merchantA,
         createProductSchema.parse({
           name: 'Reuse',
-          deliveryCharge: 0,
           variants: [{ sku: large.sku, price: 1 }],
         }),
       ),

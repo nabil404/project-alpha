@@ -22,7 +22,6 @@ describeDb('ProductsService — images', () => {
       merchantId,
       createProductSchema.parse({
         name: 'Shirt',
-        deliveryCharge: 0,
         options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
         variants: [
           { optionValues: ['M'], price: 90000, stock: 1 },

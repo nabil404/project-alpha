@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   Global,
   Module,
@@ -20,6 +21,7 @@ import {
   seedCategory,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
+import * as schema from '../../database/schema/index';
 import { MailService } from '../../mail/mail.service';
 import { ObjectStorage } from '../../storage/object-storage';
 import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
@@ -41,7 +43,6 @@ describeDb('product routes over HTTP', () => {
 
   const newProduct = {
     name: 'Blue kurti',
-    deliveryCharge: 6000,
     options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
     variants: [
       { optionValues: ['M'], price: 160000, stock: 9 },
@@ -120,6 +121,45 @@ describeDb('product routes over HTTP', () => {
     await request(server()).delete(`/api/v1/products/${created.body.id}`).expect(204);
   });
 
+  it("sets a product's own delivery charge per area, and refuses an unknown area", async () => {
+    const [dhaka] = await t.db
+      .insert(schema.deliveryCharge)
+      .values({ merchantId, areaName: `Dhaka ${randomUUID()}`, charge: 6000, position: 0 })
+      .returning();
+    const created = await request(server()).post('/api/v1/products').send(newProduct).expect(201);
+    const product = productSchema.parse(created.body);
+    const document = {
+      version: product.version,
+      name: product.name,
+      options: product.options,
+      variants: product.variants.map((v) => ({
+        id: v.id,
+        optionValues: [v.name],
+        price: v.price,
+        stock: v.stock,
+      })),
+    };
+
+    const saved = await request(server())
+      .put(`/api/v1/products/${product.id}`)
+      .send({
+        ...document,
+        customDelivery: true,
+        deliveryCharges: [{ deliveryChargeId: dhaka!.id, charge: 9000 }],
+      })
+      .expect(200);
+    expect(productSchema.parse(saved.body)).toMatchObject({
+      customDelivery: true,
+      deliveryCharges: [{ deliveryChargeId: dhaka!.id, charge: 9000 }],
+    });
+
+    const unknown = await request(server())
+      .patch(`/api/v1/products/${product.id}`)
+      .send({ deliveryCharges: [{ deliveryChargeId: randomUUID(), charge: 1 }] })
+      .expect(404);
+    expect(unknown.body.error.code).toBe('DELIVERY_CHARGE_NOT_FOUND');
+  });
+
   it('refuses a page size the list does not offer, and an unknown filter', async () => {
     const tooBig = await request(server()).get('/api/v1/products').query({ limit: 7 }).expect(400);
     expect(tooBig.body.error.code).toBe('VALIDATION_FAILED');
@@ -138,7 +178,7 @@ describeDb('product routes over HTTP', () => {
       .send({
         version: product.version,
         name: product.name,
-        deliveryCharge: product.deliveryCharge,
+        customDelivery: product.customDelivery,
         options: [
           { id: product.options[0]!.id, name: 'Size', values: product.options[0]!.values },
           { name: 'Sleeve', values: [{ value: 'Short' }, { value: 'Long' }] },

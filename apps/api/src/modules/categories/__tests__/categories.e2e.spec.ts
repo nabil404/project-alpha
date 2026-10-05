@@ -177,7 +177,6 @@ describeDb('category routes over HTTP', () => {
       .post('/api/v1/products')
       .send({
         name: 'Blue kurti',
-        deliveryCharge: 6000,
         categoryIds: [kept.id, dropped.id],
         variants: [{ optionValues: [], price: 160000, stock: 9 }],
       })

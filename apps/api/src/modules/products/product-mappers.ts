@@ -1,6 +1,7 @@
 import {
   stockLevelOf,
   type Product,
+  type ProductDeliveryCharge,
   type ProductImage,
   type ProductListItem,
   type StockLevel,
@@ -54,6 +55,8 @@ export interface ProductParts {
   links: VariantOptionValueRow[];
   categoryIds: string[];
   images: ProductImage[];
+  /** Its own delivery charges, in the shop's area order. */
+  deliveryCharges: ProductDeliveryCharge[];
 }
 
 /** Variants sort by their values' positions, option by option, as the edit table and the assistant list them. */
@@ -88,8 +91,8 @@ export function toProduct(row: ProductRow, parts: ProductParts): Product {
         .filter((value) => value.optionId === option.id)
         .map((value) => ({ id: value.id, value: value.value })),
     })),
-    // wire renamed in Task 6
-    deliveryCharge: 0,
+    customDelivery: row.customDelivery,
+    deliveryCharges: row.customDelivery ? parts.deliveryCharges : [],
     variants: parts.variants
       .map((variant) => ({ variant, valueIds: valueIdsOf(variant.id) }))
       .sort((a, b) => byValuePositions(a.valueIds, b.valueIds))

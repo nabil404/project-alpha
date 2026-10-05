@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DELIVERY_AREAS_MAX } from './delivery';
 
 export const stockStatusSchema = z.enum(['in_stock', 'out_of_stock']);
 export type StockStatus = z.infer<typeof stockStatusSchema>;
@@ -99,6 +100,14 @@ export const variantSchema = z.object({
 });
 export type Variant = z.infer<typeof variantSchema>;
 
+/** A product's own charge for one Settings > Delivery charges row (an area or everywhere else). */
+export const productDeliveryChargeSchema = z.object({
+  deliveryChargeId: z.string().uuid(),
+  /** Minor units. */
+  charge: z.number().int().nonnegative(),
+});
+export type ProductDeliveryCharge = z.infer<typeof productDeliveryChargeSchema>;
+
 export const productSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
@@ -110,8 +119,10 @@ export const productSchema = z.object({
   /** The default photo; null exactly when there are no images. */
   coverImageId: z.string().uuid().nullable().default(null),
   options: z.array(productOptionSchema).default([]),
-  /** Minor units. */
-  deliveryCharge: z.number().int().nonnegative(),
+  /** False: delivery costs the shop's charges. True: `deliveryCharges`, the shop's where it sets none. */
+  customDelivery: z.boolean(),
+  /** Empty unless `customDelivery`; in the order the shop lists its areas. */
+  deliveryCharges: z.array(productDeliveryChargeSchema),
   variants: z.array(variantSchema),
   /** Opaque. Send it back with a save; a save from an older read is refused with PRODUCT_STALE. */
   version: z.string().min(1),
@@ -123,6 +134,26 @@ const descriptionSchema = z.string().trim().max(5000).nullable();
 /** Blank or omitted: the API generates one. */
 const skuInputSchema = z.string().trim().max(64).optional();
 const moneySchema = z.number().int().nonnegative();
+
+/** A product's own delivery charges, one per area at most. */
+const productDeliveryChargeList = z
+  .array(z.object({ deliveryChargeId: z.string().uuid(), charge: moneySchema }).strict())
+  .max(DELIVERY_AREAS_MAX + 1)
+  .superRefine((rows, ctx) => {
+    const seen = new Set<string>();
+    rows.forEach((row, index) => {
+      if (seen.has(row.deliveryChargeId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [index, 'deliveryChargeId'],
+          message: 'Area listed twice',
+          params: { code: 'DUPLICATE' },
+        });
+      }
+      seen.add(row.deliveryChargeId);
+    });
+  });
+
 const stockSchema = z.number().int().nonnegative();
 
 /** `categoryIds`, when present, replaces the product's links. */
@@ -131,7 +162,8 @@ export const updateProductSchema = z.object({
   description: descriptionSchema.optional(),
   status: productStatusSchema.optional(),
   aliases: z.array(z.string().trim().min(1)).optional(),
-  deliveryCharge: moneySchema.optional(),
+  customDelivery: z.boolean().optional(),
+  deliveryCharges: productDeliveryChargeList.optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
 });
 export type UpdateProduct = z.infer<typeof updateProductSchema>;
@@ -306,7 +338,9 @@ const productDocumentShape = {
   description: descriptionSchema.default(null),
   status: productStatusSchema.default('draft'),
   aliases: z.array(z.string().trim().min(1)).default([]),
-  deliveryCharge: moneySchema,
+  customDelivery: z.boolean().default(false),
+  /** Kept only while `customDelivery`; an area left out costs the shop charge. */
+  deliveryCharges: productDeliveryChargeList.default([]),
   categoryIds: z.array(z.string().uuid()).default([]),
   options: z.array(productOptionInputSchema).max(PRODUCT_OPTION_MAX_COUNT).default([]),
   variants: z.array(productVariantInputSchema).min(1).max(PRODUCT_VARIANT_MAX_COUNT),
@@ -342,7 +376,6 @@ export const productCsvRowSchema = z.object({
   price: z.string().min(1),
   /** A count, not a status. */
   stock: z.string().optional(),
-  delivery_charge: z.string().optional(),
 });
 
 /**
