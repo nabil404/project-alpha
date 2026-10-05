@@ -25,6 +25,8 @@ import {
 } from '@nestjs/swagger';
 import {
   createOrderSchema,
+  deliveryQuoteRequestSchema,
+  deliveryQuoteSchema,
   listOrdersQuerySchema,
   orderDetailSchema,
   orderEventSchema,
@@ -39,6 +41,8 @@ import {
   updateOrderSchema,
   updateOrderStatusSchema,
   type CreateOrder,
+  type DeliveryQuote,
+  type DeliveryQuoteRequest,
   type ListOrdersQuery,
   type OrderDetail,
   type OrderEvent,
@@ -54,6 +58,7 @@ import { parseOrThrow } from '../../common/parse-or-throw';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { DeliveryQuoteService } from './delivery-quote.service';
 import { OrdersService, type OrderActor } from './orders.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
@@ -84,7 +89,10 @@ function actor(request: TenantRequest): OrderActor {
 @UseGuards(TenantGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly quotes: DeliveryQuoteService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -138,13 +146,13 @@ export class OrdersController {
   @ApiOperation({
     summary: 'Add an order by hand',
     description:
-      'For a customer who has messaged the Page. It starts as `new`; stock moves when it is confirmed. Name, phone and address default to the customer’s details on file. Send an `Idempotency-Key` to make a retry safe: a repeat returns the order the first request created.',
+      'For a customer who has messaged the Page. It starts as `new`; stock moves when it is confirmed. Name, phone and address default to the customer’s details on file. `deliveryChargeId` links a Settings delivery charge and copies its area name, everywhere-else flag and estimate onto the order; `deliveryFee` is stored as sent (quote it with POST /orders/delivery-quote). Send an `Idempotency-Key` to make a retry safe: a repeat returns the order the first request created.',
   })
   @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Up to 200 characters.' })
   @ApiBody({ schema: openApi(createOrderSchema, 'input') })
   @ApiCreatedResponse({ description: 'The order.', schema: openApi(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
-  @ApiCodedError(404, ['CUSTOMER_NOT_FOUND', 'VARIANT_NOT_FOUND'])
+  @ApiCodedError(404, ['CUSTOMER_NOT_FOUND', 'VARIANT_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
   create(
     @Req() request: TenantRequest,
     @Headers('idempotency-key') header: string | undefined,
@@ -152,6 +160,24 @@ export class OrdersController {
   ): Promise<OrderDetail> {
     const key = parseOrThrow(idempotencyHeader, { 'Idempotency-Key': header })['Idempotency-Key'];
     return this.orders.create(tenantScope(request), actor(request), body, key);
+  }
+
+  @Post('delivery-quote')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Quote the delivery fee for items to an area',
+    description:
+      "Each product costs its own charge for the area if it sets one, else the shop's; the fee is the highest, not the sum, and nothing once the subtotal reaches the shop's free-delivery threshold. Prices are the ones sent, else the catalog's. Writes nothing.",
+  })
+  @ApiBody({ schema: openApi(deliveryQuoteRequestSchema, 'input') })
+  @ApiOkResponse({ description: 'The fee.', schema: openApi(deliveryQuoteSchema) })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  @ApiCodedError(404, ['DELIVERY_CHARGE_NOT_FOUND', 'VARIANT_NOT_FOUND'])
+  deliveryQuote(
+    @Req() request: TenantRequest,
+    @Body(new ZodValidationPipe(deliveryQuoteRequestSchema)) body: DeliveryQuoteRequest,
+  ): Promise<DeliveryQuote> {
+    return this.quotes.quote(tenantScope(request), body);
   }
 
   @Get(':id')
@@ -221,12 +247,12 @@ export class OrdersController {
   @ApiOperation({
     summary: 'Edit an order',
     description:
-      'Delivery details (name, phone, address, zone, charge) until the order ships; payment, tracking number and the internal note at any time. Omit a field to leave it; a blank zone, tracking number or note clears it. The customer’s own details never change.',
+      'Delivery details (name, phone, address, area, fee) until the order ships; payment, tracking number and the internal note at any time. Omit a field to leave it; a blank area, tracking number or note clears it. `deliveryChargeId` links a Settings delivery charge and copies its area name (unless `deliveryArea` is sent), everywhere-else flag and estimate; `null` unlinks and clears them. The fee is never recomputed. The customer’s own details never change.',
   })
   @ApiBody({ schema: openApi(updateOrderSchema, 'input') })
   @ApiOkResponse({ description: 'The updated order.', schema: openApi(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
-  @ApiCodedError(404, ['ORDER_NOT_FOUND'])
+  @ApiCodedError(404, ['ORDER_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
   @ApiCodedError(409, ['ORDER_STALE', 'ORDER_NOT_EDITABLE'])
   update(
     @Req() request: TenantRequest,

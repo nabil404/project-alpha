@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ProductDeliveryRepository } from '../products/product-delivery.repository';
+import { DeliveryChargesRepository } from '../settings/delivery-charges.repository';
 import { MerchantSettingsRepository } from '../settings/merchant-settings.repository';
+import { DeliveryQuoteService } from './delivery-quote.service';
 import { OrderCatalogRepository } from './order-catalog.repository';
 import { OrderEventsRepository } from './order-events.repository';
 import { OrdersController } from './orders.controller';
@@ -19,7 +22,11 @@ import { OrdersService } from './orders.service';
     OrderCatalogRepository,
     // Stateless; read here for the shop's currency and its row lock.
     MerchantSettingsRepository,
+    // Stateless; read here to price delivery by area and products.
+    DeliveryChargesRepository,
+    ProductDeliveryRepository,
     OrdersService,
+    DeliveryQuoteService,
   ],
 })
 export class OrdersModule {}

@@ -9,6 +9,7 @@ import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import {
+  deliveryQuoteSchema,
   orderDetailSchema,
   orderEventSchema,
   orderListResponseSchema,
@@ -78,7 +79,7 @@ describeDb('order routes over HTTP', () => {
   const create = (body: Record<string, unknown>, key?: string) => {
     const req = request(server()).post('/api/v1/orders');
     if (key) req.set('Idempotency-Key', key);
-    return req.send({ customerId: nusratId, deliveryCharge: 6000, ...body });
+    return req.send({ customerId: nusratId, deliveryFee: 6000, ...body });
   };
   /** The status alongside the body, so a failure shows the error envelope. */
   const ok = (res: request.Response) => {
@@ -193,7 +194,7 @@ describeDb('order routes over HTTP', () => {
       nextStatuses: ['confirmed', 'cancelled'],
       paymentStatus: 'unpaid',
       subtotal: 320000,
-      deliveryCharge: 6000,
+      deliveryFee: 6000,
       total: 326000,
       delivery: { name: 'Nusrat Jahan', phone: '01712-345678' },
       customer: { id: nusratId, earlierOrderCount: 1, spentBefore: 548000 },
@@ -308,7 +309,7 @@ describeDb('order routes over HTTP', () => {
       .send({
         version,
         deliveryAddress: 'House 14, Road 4, Mirpur 10, Dhaka',
-        deliveryCharge: 12000,
+        deliveryFee: 12000,
         paymentStatus: 'paid',
         note: 'Call before delivery',
       })
@@ -350,7 +351,7 @@ describeDb('order routes over HTTP', () => {
     const key = randomUUID();
     const body = {
       items: [{ variantId: kurtiL, quantity: 1 }],
-      deliveryZone: 'Local',
+      deliveryArea: 'Local',
       paymentMethod: 'bank_transfer',
     };
     const first = orderDetailSchema.parse((await create(body, key).expect(201)).body);
@@ -364,7 +365,7 @@ describeDb('order routes over HTTP', () => {
       delivery: {
         name: 'Nusrat Jahan',
         address: 'House 12, Road 4, Mirpur 10, Dhaka',
-        zone: 'Local',
+        area: 'Local',
       },
     });
     const replay = orderDetailSchema.parse((await create(body, key).expect(201)).body);
@@ -394,7 +395,7 @@ describeDb('order routes over HTTP', () => {
             .post('/api/v1/orders')
             .send({
               customerId: rumana.id,
-              deliveryCharge: 0,
+              deliveryFee: 0,
               items: [{ variantId: variant.id, quantity: 1 }],
             })
             .expect(201)
@@ -413,7 +414,7 @@ describeDb('order routes over HTTP', () => {
     const bare = await seedCustomer(t.db, t.merchantA, { name: 'Tanvir Ahmed' });
     const res = await request(server())
       .post('/api/v1/orders')
-      .send({ customerId: bare.id, deliveryCharge: 0, items: [{ variantId: kurtiM, quantity: 1 }] })
+      .send({ customerId: bare.id, deliveryFee: 0, items: [{ variantId: kurtiM, quantity: 1 }] })
       .expect(400);
     expect(Object.keys(res.body.error.fields)).toEqual(['phone', 'deliveryAddress']);
 
@@ -503,5 +504,116 @@ describeDb('order routes over HTTP', () => {
   it('refuses to delete a product that was ordered', async () => {
     const res = await request(server()).delete(`/api/v1/products/${productId}`).expect(409);
     expect(res.body.error.code).toBe('PRODUCT_IN_USE');
+  });
+  describe('delivery areas', () => {
+    const seedArea = async (
+      values: Partial<typeof schema.deliveryCharge.$inferInsert>,
+      merchant = merchantId,
+    ) => {
+      const [row] = await t.db
+        .insert(schema.deliveryCharge)
+        .values({ merchantId: merchant, areaName: null, charge: 0, position: 0, ...values })
+        .returning();
+      if (!row) throw new Error('no delivery_charge row');
+      return row;
+    };
+    const items = () => [{ variantId: kurtiM, quantity: 1 }];
+    let dhakaId: string;
+    let gazipurId: string;
+    let elsewhereId: string;
+
+    beforeAll(async () => {
+      dhakaId = (await seedArea({ areaName: 'Dhaka', charge: 6000, deliveryTime: '1–2 days' })).id;
+      gazipurId = (await seedArea({ areaName: 'Gazipur', charge: 8000, position: 1 })).id;
+      elsewhereId = (await seedArea({ isFallback: true, charge: 12000, deliveryTime: '3–5 days' }))
+        .id;
+    });
+
+    it('links an area and keeps its name and estimate', async () => {
+      const res = await create({ items: items(), deliveryChargeId: dhakaId }).expect(201);
+      expect(orderDetailSchema.parse(res.body)).toMatchObject({
+        deliveryFee: 6000,
+        delivery: { area: 'Dhaka', chargeId: dhakaId, everywhereElse: false, time: '1–2 days' },
+      });
+    });
+
+    it('marks an order priced at everywhere else', async () => {
+      const res = await create({
+        items: items(),
+        deliveryChargeId: elsewhereId,
+        deliveryFee: 12000,
+      }).expect(201);
+      expect(orderDetailSchema.parse(res.body).delivery).toMatchObject({
+        area: null,
+        chargeId: elsewhereId,
+        everywhereElse: true,
+        time: '3–5 days',
+      });
+    });
+
+    it('moves the area with PATCH, then unlinks it', async () => {
+      const order = orderDetailSchema.parse(
+        (await create({ items: items(), deliveryChargeId: dhakaId }).expect(201)).body,
+      );
+      const moved = await request(server())
+        .patch(`/api/v1/orders/${order.id}`)
+        .send({ version: order.version, deliveryChargeId: gazipurId, deliveryFee: 8000 })
+        .expect(200);
+      expect(orderDetailSchema.parse(moved.body)).toMatchObject({
+        deliveryFee: 8000,
+        delivery: { area: 'Gazipur', chargeId: gazipurId, time: null },
+      });
+
+      const cleared = await request(server())
+        .patch(`/api/v1/orders/${order.id}`)
+        .send({ version: moved.body.version, deliveryChargeId: null })
+        .expect(200);
+      expect(orderDetailSchema.parse(cleared.body).delivery).toMatchObject({
+        area: null,
+        chargeId: null,
+        everywhereElse: false,
+        time: null,
+      });
+    });
+
+    it('keeps an order readable after its area is removed', async () => {
+      const savar = await seedArea({
+        areaName: 'Savar',
+        charge: 9000,
+        deliveryTime: '2 days',
+        position: 2,
+      });
+      const order = orderDetailSchema.parse(
+        (await create({ items: items(), deliveryChargeId: savar.id }).expect(201)).body,
+      );
+      await t.db.delete(schema.deliveryCharge).where(eq(schema.deliveryCharge.id, savar.id));
+      expect((await get(order.id)).delivery).toMatchObject({
+        area: 'Savar',
+        chargeId: null,
+        time: '2 days',
+      });
+    });
+
+    it("refuses another shop's area", async () => {
+      const theirs = await seedArea({ areaName: 'Dhaka', charge: 1 }, t.merchantB);
+      const res = await create({ items: items(), deliveryChargeId: theirs.id }).expect(404);
+      expect(res.body.error.code).toBe('DELIVERY_CHARGE_NOT_FOUND');
+    });
+
+    it('quotes the fee for items to an area, and validates the request', async () => {
+      const quoted = await request(server())
+        .post('/api/v1/orders/delivery-quote')
+        .send({ deliveryChargeId: gazipurId, items: items() })
+        .expect(200);
+      expect(deliveryQuoteSchema.parse(quoted.body)).toMatchObject({
+        fee: 8000,
+        freeDeliveryApplied: false,
+      });
+
+      await request(server())
+        .post('/api/v1/orders/delivery-quote')
+        .send({ deliveryChargeId: 'nope', items: items() })
+        .expect(400);
+    });
   });
 });

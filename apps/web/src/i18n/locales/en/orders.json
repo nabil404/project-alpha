@@ -42,10 +42,10 @@
     "deliveryChanged": "{{who}} changed the delivery details",
     "fields": {
       "address": "Address",
-      "charge": "Delivery charge",
+      "area": "Area",
+      "fee": "Delivery charge",
       "name": "Name",
-      "phone": "Phone",
-      "zone": "Zone"
+      "phone": "Phone"
     },
     "itemsChanged": "{{who}} changed the items",
     "paymentMethodChanged": "{{who}} changed the payment method",
@@ -89,23 +89,23 @@
   },
   "delivery": {
     "address": "Address",
-    "charge": "Delivery charge",
+    "area": "Area",
     "dialog": {
       "description": "For this order only. The customer's details on file stay as they are.",
       "title": "Edit delivery",
-      "zoneHint": "The area the charge is for, such as Local."
+      "areaHint": "Where it's going, such as Dhaka."
     },
     "edit": "Edit",
+    "fee": "Charge",
     "name": "Name",
-    "noZone": "No zone",
+    "noArea": "No area",
     "phone": "Phone",
     "saveTracking": "Save",
     "saved": "Delivery details saved",
     "title": "Delivery",
     "tracking": "Tracking number",
     "trackingLater": "Add when you ship",
-    "trackingSaved": "Tracking number saved",
-    "zone": "Zone"
+    "trackingSaved": "Tracking number saved"
   },
   "detail": {
     "backToOrders": "Back to orders",
@@ -275,7 +275,7 @@
   },
   "totals": {
     "delivery": "Delivery",
-    "deliveryInZone": "Delivery · {{zone}}",
+    "deliveryInArea": "Delivery · {{area}}",
     "subtotal": "Subtotal",
     "total": "Total"
   }

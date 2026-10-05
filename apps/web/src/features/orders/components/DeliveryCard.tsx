@@ -6,7 +6,7 @@ import {
   ORDER_ADDRESS_MAX_LENGTH,
   ORDER_NAME_MAX_LENGTH,
   ORDER_TRACKING_MAX_LENGTH,
-  ORDER_ZONE_MAX_LENGTH,
+  ORDER_AREA_MAX_LENGTH,
   orderDeliveryEditable,
   updateOrderSchema,
   type OrderDetail,
@@ -72,13 +72,13 @@ export function DeliveryCard({ order }: { order: OrderDetail }) {
       <DetailLine icon={<MapPin />} label={t('delivery.address')} value={order.delivery.address} />
       <DetailLine
         icon={<Navigation />}
-        label={t('delivery.zone')}
-        value={order.delivery.zone ?? t('delivery.noZone')}
+        label={t('delivery.area')}
+        value={order.delivery.area ?? t('delivery.noArea')}
       />
       <DetailLine
         icon={<Banknote />}
-        label={t('delivery.charge')}
-        value={formatMoney(order.deliveryCharge, order.currency)}
+        label={t('delivery.fee')}
+        value={formatMoney(order.deliveryFee, order.currency)}
       />
       <TrackingField order={order} />
     </section>
@@ -153,18 +153,18 @@ const deliveryFormSchema = updateOrderSchema
     customerName: true,
     phone: true,
     deliveryAddress: true,
-    deliveryZone: true,
-    deliveryCharge: true,
+    deliveryArea: true,
+    deliveryFee: true,
   })
-  .required({ customerName: true, phone: true, deliveryAddress: true, deliveryCharge: true });
+  .required({ customerName: true, phone: true, deliveryAddress: true, deliveryFee: true });
 
-/** Every text field is a string in the form; the schema turns a blank zone into a clear. */
+/** Every text field is a string in the form; the schema turns a blank area into a clear. */
 interface DeliveryFormValues {
   customerName: string;
   phone: string;
   deliveryAddress: string;
-  deliveryZone: string;
-  deliveryCharge: number;
+  deliveryArea: string;
+  deliveryFee: number;
 }
 type DeliveryChanges = Omit<typeof updateOrderSchema._output, 'version'>;
 
@@ -172,16 +172,16 @@ const serverFields = [
   'customerName',
   'phone',
   'deliveryAddress',
-  'deliveryZone',
-  'deliveryCharge',
+  'deliveryArea',
+  'deliveryFee',
 ] as const;
 
 const toFormValues = (order: OrderDetail): DeliveryFormValues => ({
   customerName: order.delivery.name,
   phone: order.delivery.phone,
   deliveryAddress: order.delivery.address,
-  deliveryZone: order.delivery.zone ?? '',
-  deliveryCharge: order.deliveryCharge,
+  deliveryArea: order.delivery.area ?? '',
+  deliveryFee: order.deliveryFee,
 });
 
 function EditDeliveryDialog({ order }: { order: OrderDetail }) {
@@ -282,24 +282,24 @@ function EditDeliveryDialog({ order }: { order: OrderDetail }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="deliveryZone"
+                  name="deliveryArea"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('delivery.zone')}</FormLabel>
+                      <FormLabel>{t('delivery.area')}</FormLabel>
                       <FormControl>
-                        <Input maxLength={ORDER_ZONE_MAX_LENGTH} {...field} />
+                        <Input maxLength={ORDER_AREA_MAX_LENGTH} {...field} />
                       </FormControl>
-                      <FormDescription>{t('delivery.dialog.zoneHint')}</FormDescription>
+                      <FormDescription>{t('delivery.dialog.areaHint')}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={form.control}
-                  name="deliveryCharge"
+                  name="deliveryFee"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('delivery.charge')}</FormLabel>
+                      <FormLabel>{t('delivery.fee')}</FormLabel>
                       <FormControl>
                         <MoneyInput
                           value={field.value}

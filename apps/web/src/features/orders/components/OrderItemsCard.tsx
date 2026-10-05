@@ -104,11 +104,11 @@ export function OrderItemsCard({ order }: { order: OrderDetail }) {
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">
-            {order.delivery.zone
-              ? t('totals.deliveryInZone', { zone: order.delivery.zone })
+            {order.delivery.area
+              ? t('totals.deliveryInArea', { area: order.delivery.area })
               : t('totals.delivery')}
           </dt>
-          <dd className="tabular-nums">{money(order.deliveryCharge)}</dd>
+          <dd className="tabular-nums">{money(order.deliveryFee)}</dd>
         </div>
         <div className="flex justify-between gap-4 border-t border-border pt-2 text-heading">
           <dt>{t('totals.total')}</dt>

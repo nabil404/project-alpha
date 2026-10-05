@@ -378,16 +378,13 @@ export const updateOrderSchema = z
 export type UpdateOrder = z.infer<typeof updateOrderSchema>;
 
 export const orderDeliveryFields = ['name', 'phone', 'address', 'area', 'fee'] as const;
+export type OrderDeliveryField = (typeof orderDeliveryFields)[number];
 /** Events stored before the rename say `zone` and `charge`; they read as `area` and `fee`. */
-const renamedDeliveryFields: Record<string, (typeof orderDeliveryFields)[number]> = {
-  zone: 'area',
-  charge: 'fee',
-};
-export const orderDeliveryFieldSchema = z.preprocess(
+const renamedDeliveryFields: Record<string, OrderDeliveryField> = { zone: 'area', charge: 'fee' };
+export const orderDeliveryFieldSchema: z.ZodType<OrderDeliveryField> = z.preprocess(
   (value) => (typeof value === 'string' ? (renamedDeliveryFields[value] ?? value) : value),
   z.enum(orderDeliveryFields),
 );
-export type OrderDeliveryField = z.infer<typeof orderDeliveryFieldSchema>;
 
 /** What happened, with the facts the timeline shows; stored as jsonb and parsed on read. */
 export const orderEventDataSchema = z.discriminatedUnion('type', [

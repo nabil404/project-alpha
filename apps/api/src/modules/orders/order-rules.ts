@@ -120,11 +120,22 @@ export interface OrderPatch {
   touchesDelivery: boolean;
 }
 
+/** The columns an order takes from the Settings delivery charge it is priced by. */
+export type LinkedDelivery = Pick<
+  OrderChanges,
+  'deliveryChargeId' | 'deliveryArea' | 'deliveryEverywhereElse' | 'deliveryTime'
+>;
+
 /**
  * The column changes and activity a PATCH makes, comparing against the order
- * as it is so a field sent back unchanged is no change at all.
+ * as it is so a field sent back unchanged is no change at all. `linked` is
+ * what a newly linked delivery charge (or `null`) sets.
  */
-export function planOrderPatch(row: OrderRow, input: Omit<UpdateOrder, 'version'>): OrderPatch {
+export function planOrderPatch(
+  row: OrderRow,
+  input: Omit<UpdateOrder, 'version'>,
+  linked?: LinkedDelivery,
+): OrderPatch {
   const changes: OrderChanges = {};
   const events: OrderEventData[] = [];
 
@@ -141,11 +152,19 @@ export function planOrderPatch(row: OrderRow, input: Omit<UpdateOrder, 'version'
   set('customerName', input.customerName, 'name');
   set('phone', input.phone, 'phone');
   set('deliveryAddress', input.deliveryAddress, 'address');
-  // wire renamed in Task 7
-  set('deliveryArea', input.deliveryZone, 'zone');
-  set('deliveryFee', input.deliveryCharge, 'charge');
+  if (linked) {
+    set('deliveryChargeId', linked.deliveryChargeId, 'area');
+    set('deliveryArea', linked.deliveryArea, 'area');
+    set('deliveryEverywhereElse', linked.deliveryEverywhereElse, 'area');
+    set('deliveryTime', linked.deliveryTime, 'area');
+  } else {
+    set('deliveryArea', input.deliveryArea, 'area');
+  }
+  set('deliveryFee', input.deliveryFee, 'fee');
   if (changes.deliveryFee !== undefined) changes.total = row.subtotal + changes.deliveryFee;
-  if (delivery.length > 0) events.push({ type: 'delivery_changed', fields: delivery });
+  if (delivery.length > 0) {
+    events.push({ type: 'delivery_changed', fields: [...new Set(delivery)] });
+  }
 
   set('paymentStatus', input.paymentStatus);
   set('paymentMethod', input.paymentMethod);
