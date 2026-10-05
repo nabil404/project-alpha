@@ -56,6 +56,12 @@ describeDb('GeneralSettingsService', () => {
       await t.db.delete(schema.orderItem).where(eq(schema.orderItem.merchantId, merchantId));
       await t.db.delete(schema.order).where(eq(schema.order.merchantId, merchantId));
       await t.db
+        .delete(schema.productDeliveryCharge)
+        .where(eq(schema.productDeliveryCharge.merchantId, merchantId));
+      await t.db
+        .delete(schema.deliveryCharge)
+        .where(eq(schema.deliveryCharge.merchantId, merchantId));
+      await t.db
         .delete(schema.merchantSettings)
         .where(eq(schema.merchantSettings.merchantId, merchantId));
     }
@@ -144,6 +150,54 @@ describeDb('GeneralSettingsService', () => {
       .from(schema.productVariant)
       .where(eq(schema.productVariant.id, variantOfB.id));
     expect(untouched?.price).toBe(160050);
+  });
+
+  it('keeps delivery charges, product charges and the threshold their number when the decimals change', async () => {
+    const [dhakaA] = await t.db
+      .insert(schema.deliveryCharge)
+      .values({ merchantId: t.merchantA, areaName: 'Dhaka', charge: 6000, position: 0 })
+      .returning();
+    await t.db
+      .insert(schema.deliveryCharge)
+      .values({ merchantId: t.merchantB, areaName: 'Dhaka', charge: 6000, position: 0 });
+    const product = await seedProduct(t.db, t.merchantA, { customDelivery: true });
+    await t.db.insert(schema.productDeliveryCharge).values({
+      merchantId: t.merchantA,
+      productId: product.id,
+      deliveryChargeId: dhakaA!.id,
+      charge: 9000,
+    });
+    await service.update(t.merchantA, { country: 'BD' });
+    await t.db
+      .update(schema.merchantSettings)
+      .set({ freeDeliveryOver: 100000 })
+      .where(eq(schema.merchantSettings.merchantId, t.merchantA));
+
+    await service.update(t.merchantA, { currency: 'JPY' });
+
+    const charges = await t.db
+      .select({
+        merchantId: schema.deliveryCharge.merchantId,
+        charge: schema.deliveryCharge.charge,
+      })
+      .from(schema.deliveryCharge);
+    const [own] = await t.db
+      .select()
+      .from(schema.productDeliveryCharge)
+      .where(eq(schema.productDeliveryCharge.productId, product.id));
+    const [settingsA] = await t.db
+      .select()
+      .from(schema.merchantSettings)
+      .where(eq(schema.merchantSettings.merchantId, t.merchantA));
+    // ৳60.00 -> ¥60, ৳90.00 -> ¥90, ৳1,000.00 -> ¥1,000; merchant B untouched.
+    expect(charges).toEqual(
+      expect.arrayContaining([
+        { merchantId: t.merchantA, charge: 60 },
+        { merchantId: t.merchantB, charge: 6000 },
+      ]),
+    );
+    expect(own?.charge).toBe(90);
+    expect(settingsA?.freeDeliveryOver).toBe(1000);
   });
 
   it('leaves prices alone between currencies with the same decimals', async () => {
