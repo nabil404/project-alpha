@@ -31,6 +31,7 @@ import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings/a
 import { Route as AppSettingsDeliveryRouteImport } from './routes/_app/settings/delivery'
 import { Route as AppSettingsGeneralRouteImport } from './routes/_app/settings/general'
 import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
+import { Route as AppSettingsNotificationsRouteImport } from './routes/_app/settings/notifications'
 import { Route as AppCatalogProductsProductIdRouteImport } from './routes/_app/catalog/products/$productId'
 import { Route as AppCatalogProductsNewRouteImport } from './routes/_app/catalog/products/new'
 
@@ -143,6 +144,12 @@ const AppSettingsMessengerRoute = AppSettingsMessengerRouteImport.update({
   path: '/messenger',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsNotificationsRoute =
+  AppSettingsNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
 const AppCatalogProductsProductIdRoute =
   AppCatalogProductsProductIdRouteImport.update({
     id: '/catalog/products/$productId',
@@ -171,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/settings/delivery': typeof AppSettingsDeliveryRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/settings/notifications': typeof AppSettingsNotificationsRoute
   '/catalog/': typeof AppCatalogIndexRoute
   '/conversations/': typeof AppConversationsIndexRoute
   '/customers/': typeof AppCustomersIndexRoute
@@ -193,6 +201,7 @@ export interface FileRoutesByTo {
   '/settings/delivery': typeof AppSettingsDeliveryRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
+  '/settings/notifications': typeof AppSettingsNotificationsRoute
   '/catalog': typeof AppCatalogIndexRoute
   '/conversations': typeof AppConversationsIndexRoute
   '/customers': typeof AppCustomersIndexRoute
@@ -220,6 +229,7 @@ export interface FileRoutesById {
   '/_app/settings/delivery': typeof AppSettingsDeliveryRoute
   '/_app/settings/general': typeof AppSettingsGeneralRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
+  '/_app/settings/notifications': typeof AppSettingsNotificationsRoute
   '/_app/catalog/': typeof AppCatalogIndexRoute
   '/_app/conversations/': typeof AppConversationsIndexRoute
   '/_app/customers/': typeof AppCustomersIndexRoute
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/settings/delivery'
     | '/settings/general'
     | '/settings/messenger'
+    | '/settings/notifications'
     | '/catalog/'
     | '/conversations/'
     | '/customers/'
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/settings/delivery'
     | '/settings/general'
     | '/settings/messenger'
+    | '/settings/notifications'
     | '/catalog'
     | '/conversations'
     | '/customers'
@@ -294,6 +306,7 @@ export interface FileRouteTypes {
     | '/_app/settings/delivery'
     | '/_app/settings/general'
     | '/_app/settings/messenger'
+    | '/_app/settings/notifications'
     | '/_app/catalog/'
     | '/_app/conversations/'
     | '/_app/customers/'
@@ -464,6 +477,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsMessengerRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/notifications': {
+      id: '/_app/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof AppSettingsNotificationsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/catalog/products/$productId': {
       id: '/_app/catalog/products/$productId'
       path: '/catalog/products/$productId'
@@ -499,6 +519,7 @@ interface AppSettingsRouteChildren {
   AppSettingsDeliveryRoute: typeof AppSettingsDeliveryRoute
   AppSettingsGeneralRoute: typeof AppSettingsGeneralRoute
   AppSettingsMessengerRoute: typeof AppSettingsMessengerRoute
+  AppSettingsNotificationsRoute: typeof AppSettingsNotificationsRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
@@ -507,6 +528,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsDeliveryRoute: AppSettingsDeliveryRoute,
   AppSettingsGeneralRoute: AppSettingsGeneralRoute,
   AppSettingsMessengerRoute: AppSettingsMessengerRoute,
+  AppSettingsNotificationsRoute: AppSettingsNotificationsRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
 
