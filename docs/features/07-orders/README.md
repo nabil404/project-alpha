@@ -242,5 +242,6 @@ Web: `apps/web/src/features/orders/`, routes under
 - The assistant writing `source = assistant` orders from a confirmed
   conversation, idempotent per confirmation.
 - CSV export of the filtered list.
-- Email the seller about a new order (scope's notifications); nothing sends it
-  yet.
+- Report each assistant order with `NotificationsService.orderDrafted` once
+  it commits, so the seller gets its email
+  ([Settings – Notifications](../10-settings-notifications/README.md#sending)).
