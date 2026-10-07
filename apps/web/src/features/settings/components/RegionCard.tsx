@@ -26,7 +26,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select, fieldProps } from '@/components/ui/select';
 import { sessionQueryOptions } from '@/features/auth';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { dateFnsLocale, useFormatters } from '@/lib/format';
@@ -225,17 +225,17 @@ export function RegionCard({ settings }: { settings: GeneralSettings }) {
                   <FormItem>
                     <FormLabel>{t('general.region.dateFormat')}</FormLabel>
                     <FormControl>
-                      <NativeSelect {...field}>
-                        {DATE_FORMATS.map((dateFormat) => (
-                          <option key={dateFormat} value={dateFormat}>
-                            {formatShopDate(now, {
-                              dateFormat,
-                              timeZone,
-                              locale: dateFnsLocale(locale),
-                            })}
-                          </option>
-                        ))}
-                      </NativeSelect>
+                      <Select
+                        {...fieldProps(field)}
+                        options={DATE_FORMATS.map((dateFormat) => ({
+                          value: dateFormat,
+                          label: formatShopDate(now, {
+                            dateFormat,
+                            timeZone,
+                            locale: dateFnsLocale(locale),
+                          }),
+                        }))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -248,18 +248,21 @@ export function RegionCard({ settings }: { settings: GeneralSettings }) {
                   <FormItem>
                     <FormLabel>{t('general.region.language')}</FormLabel>
                     <FormControl>
-                      <NativeSelect {...field}>
-                        <option value="">
-                          {t('general.region.languageAuto', {
-                            language: nativeLanguageName(defaultDashboardLocale(country)),
-                          })}
-                        </option>
-                        {DASHBOARD_LOCALES.map((language) => (
-                          <option key={language} value={language}>
-                            {nativeLanguageName(language)}
-                          </option>
-                        ))}
-                      </NativeSelect>
+                      <Select
+                        {...fieldProps(field)}
+                        options={[
+                          {
+                            value: '',
+                            label: t('general.region.languageAuto', {
+                              language: nativeLanguageName(defaultDashboardLocale(country)),
+                            }),
+                          },
+                          ...DASHBOARD_LOCALES.map((language) => ({
+                            value: language,
+                            label: nativeLanguageName(language),
+                          })),
+                        ]}
+                      />
                     </FormControl>
                     <FormDescription>{t('general.region.languageHint')}</FormDescription>
                     <FormMessage />

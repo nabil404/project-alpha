@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { ChevronDown, Plus, Search, TriangleAlert } from 'lucide-react';
+import { Plus, Search, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   LOW_STOCK_THRESHOLD,
@@ -17,6 +17,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { PaginationBar } from '@/components/PaginationBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { statusToneDotClasses, stockLevelTones } from '@/i18n/status-tones';
@@ -400,24 +401,15 @@ function CategorySelect({
   const { t } = useTranslation('catalog');
 
   return (
-    <span className="relative flex items-center max-sm:w-full">
-      <select
+    <span className="flex max-sm:w-full">
+      <Select
         aria-label={t('list.categoryLabel')}
         value={value ?? ''}
-        onChange={(event) => onChange(event.target.value || undefined)}
-        className="h-10 w-full cursor-pointer appearance-none rounded-md border border-border-strong bg-surface pr-9 pl-4 text-body text-ink hover:bg-surface-hover"
-      >
-        <option value="">{t('list.allCategories')}</option>
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.name}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        aria-hidden
-        strokeWidth={1.5}
-        className="pointer-events-none absolute right-3 size-4 text-ink-muted"
+        onValueChange={(next) => onChange(next || undefined)}
+        options={[
+          { value: '', label: t('list.allCategories') },
+          ...options.map((option) => ({ value: option.id, label: option.name })),
+        ]}
       />
     </span>
   );

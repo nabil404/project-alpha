@@ -21,7 +21,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { paymentStatusTones, statusToneClasses } from '@/i18n/status-tones';
@@ -142,31 +142,27 @@ function EditPaymentDialog({ order }: { order: OrderDetail }) {
           {update.isError && <ErrorBanner>{forError(update.error)}</ErrorBanner>}
           <div className="flex flex-col gap-2">
             <Label htmlFor="payment-method">{t('payment.method')}</Label>
-            <NativeSelect
+            <Select
               id="payment-method"
               value={method}
-              onChange={(event) => setMethod(event.target.value as PaymentMethod)}
-            >
-              {paymentMethods.map((option) => (
-                <option key={option} value={option}>
-                  {paymentMethod(option)}
-                </option>
-              ))}
-            </NativeSelect>
+              onValueChange={(next) => setMethod(next as PaymentMethod)}
+              options={paymentMethods.map((option) => ({
+                value: option,
+                label: paymentMethod(option),
+              }))}
+            />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="payment-status">{t('payment.status')}</Label>
-            <NativeSelect
+            <Select
               id="payment-status"
               value={status}
-              onChange={(event) => setStatus(event.target.value as PaymentStatus)}
-            >
-              {paymentStatuses.map((option) => (
-                <option key={option} value={option}>
-                  {paymentStatus(option)}
-                </option>
-              ))}
-            </NativeSelect>
+              onValueChange={(next) => setStatus(next as PaymentStatus)}
+              options={paymentStatuses.map((option) => ({
+                value: option,
+                label: paymentStatus(option),
+              }))}
+            />
           </div>
           <DialogFooter>
             <DialogClose asChild>

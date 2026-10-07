@@ -1,7 +1,8 @@
 import type { ParseKeys } from 'i18next';
-import { ChevronDown, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
+import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { Select } from '@/components/ui/select';
 import { THEME_PREFERENCES, useThemePreference, type ThemePreference } from '@/lib/theme';
 
 const themeLabelKeys = {
@@ -25,36 +26,22 @@ export function ThemeSelect() {
   const { preference, setPreference } = useThemePreference();
   const Icon = themeIcons[preference];
 
-  // The native arrow can't be padded, so it is hidden and drawn as an icon.
   // The leading icon shows the current choice, so the control reads as a theme picker.
   return (
-    <span className="relative inline-flex items-center">
-      <Icon
-        aria-hidden
-        strokeWidth={1.5}
-        className="pointer-events-none absolute left-2.5 size-4 text-ink-muted"
-      />
-      <select
-        aria-label={t('theme.label')}
-        value={preference}
-        onChange={(event) => {
-          if (isThemePreference(event.target.value)) {
-            setPreference(event.target.value);
-          }
-        }}
-        className="h-8 cursor-pointer appearance-none rounded-md border border-border-strong bg-surface pr-8 pl-8 text-label text-ink hover:bg-surface-hover"
-      >
-        {THEME_PREFERENCES.map((option) => (
-          <option key={option} value={option}>
-            {t(themeLabelKeys[option])}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        aria-hidden
-        strokeWidth={1.5}
-        className="pointer-events-none absolute right-2.5 size-4 text-ink-muted"
-      />
-    </span>
+    <Select
+      aria-label={t('theme.label')}
+      size="sm"
+      value={preference}
+      onValueChange={(next) => {
+        if (isThemePreference(next)) setPreference(next);
+      }}
+      options={THEME_PREFERENCES.map((option) => ({
+        value: option,
+        label: t(themeLabelKeys[option]),
+      }))}
+      icon={<Icon aria-hidden strokeWidth={1.5} className="size-4 shrink-0 text-ink-muted" />}
+      className="w-auto"
+      contentClassName="min-w-36"
+    />
   );
 }

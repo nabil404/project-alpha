@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 /** The first and last page, the ones either side of the current page, and gaps between. */
@@ -47,25 +48,14 @@ export function PaginationBar({
     <div className="flex flex-wrap items-center gap-4 border-t border-border px-4 py-3 sm:px-6">
       <label className="flex items-center gap-2 text-small text-ink-muted">
         {t('pagination.perPageBefore')}
-        <span className="relative flex items-center">
-          <select
-            aria-label={perPageLabel}
-            value={limit}
-            onChange={(event) => onLimitChange(Number(event.target.value))}
-            className="h-8 cursor-pointer appearance-none rounded-sm border border-border-strong bg-surface pr-7 pl-2.5 text-small text-ink tabular-nums hover:bg-surface-hover"
-          >
-            {pageSizes.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            aria-hidden
-            strokeWidth={1.5}
-            className="pointer-events-none absolute right-1.5 size-4 text-ink-muted"
-          />
-        </span>
+        <Select
+          aria-label={perPageLabel}
+          size="sm"
+          value={String(limit)}
+          onValueChange={(next) => onLimitChange(Number(next))}
+          options={pageSizes.map((size) => ({ value: String(size), label: String(size) }))}
+          className="w-auto min-w-18 tabular-nums"
+        />
         {t('pagination.perPageAfter')}
       </label>
       <span className="grow text-small text-ink-muted">{summary}</span>

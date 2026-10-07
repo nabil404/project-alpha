@@ -8,6 +8,7 @@ import {
   timeZonesOf,
 } from '@app/shared';
 
+import { Flag } from '@/components/Flag';
 import type { ComboboxOption } from '@/components/ui/combobox';
 import { useFormatters } from '@/lib/format';
 
@@ -19,11 +20,6 @@ import { useFormatters } from '@/lib/format';
 
 function displayNames(locale: string, type: Intl.DisplayNamesType): Intl.DisplayNames {
   return new Intl.DisplayNames([locale, 'en'], { type, fallback: 'code' });
-}
-
-/** "🇧🇩" from "BD": regional indicator symbols, which every current OS draws as a flag. */
-export function flagOf(country: string): string {
-  return String.fromCodePoint(...[...country].map((char) => 0x1f1a5 + char.charCodeAt(0)));
 }
 
 export function useCountryName(): (country: string) => string {
@@ -42,7 +38,7 @@ export function useCountryOptions(): ComboboxOption[] {
     return COUNTRY_CODES.map((code) => ({
       value: code,
       label: names.of(code) ?? code,
-      prefix: flagOf(code),
+      prefix: <Flag country={code} />,
       keywords: [code, ...countryAliasesOf(code)],
     })).sort((a, b) => a.label.localeCompare(b.label, locale));
   }, [locale]);
@@ -102,7 +98,7 @@ export function useTimeZoneOptions(country: string): TimeZoneOptions {
   }, [locale, country]);
 }
 
-/** "🇧🇩 +880" per country that has a numbering plan, for the phone field's code picker. */
+/** Flag and "+880" per country that has a numbering plan, for the phone field's code picker. */
 export function useCallingCodeOptions(): ComboboxOption[] {
   const countries = useCountryOptions();
   return useMemo(
