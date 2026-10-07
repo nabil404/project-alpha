@@ -37,7 +37,12 @@ feature page because no code exists yet:
   [Catalog](02-catalog/README.md#not-yet-built) and
   [Orders](07-orders/README.md#follow-ups).
 - **Email notifications** to the seller for new orders and handoffs. Only auth
-  mail is sent today ([Auth](01-auth/README.md#email-and-password-flows)).
+  mail is sent today ([Auth](01-auth/README.md#email-and-password-flows)). The
+  templates are built - `newOrderEmail`, `customerWaitingEmail` and
+  `dailySummaryEmail` in
+  [`modules/mail/templates.ts`](../apps/api/src/modules/mail/templates.ts) -
+  but no job sends them, and there are no notification settings for their
+  "Change them" link to open yet.
 - **Needs Attention queue** on the dashboard. Today "Needs you" exists as a
   conversation filter and a customer status, and drafted orders as an Orders
   tab and banner.

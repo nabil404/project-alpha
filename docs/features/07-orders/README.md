@@ -242,5 +242,7 @@ Web: `apps/web/src/features/orders/`, routes under
 - The assistant writing `source = assistant` orders from a confirmed
   conversation, idempotent per confirmation.
 - CSV export of the filtered list.
-- Email the seller about a new order (scope's notifications); nothing sends it
-  yet.
+- Email the seller about a new order (scope's notifications). The template,
+  `newOrderEmail` in
+  [`modules/mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts),
+  is built; nothing sends it yet.

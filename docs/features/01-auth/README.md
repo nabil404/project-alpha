@@ -77,11 +77,13 @@ the templates in
 [`modules/mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts).
 Each email is plain text plus HTML built with [MJML](https://mjml.io) from the
 shared layout in
-[`modules/mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts). MJML
-compiles every template once, when the module loads, around a link
-placeholder, with strict validation, so a broken template fails startup and the
-specs. Sending a message only swaps the escaped link in, which keeps rendering
-cost the same on every auth path.
+[`modules/mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts), whose
+look and copy follow the email designs on the dashboard's design canvas. MJML
+compiles every template once, when the module loads, with strict validation,
+so a broken template fails startup and the specs. What differs per message (a
+link, a name) is a slot filled with the escaped value at send time, which keeps
+rendering cost the same on every auth path. The existing-account email links to
+both `/sign-in` and `/forgot-password`.
 
 ### Sign-up and verification
 
@@ -365,5 +367,5 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- auth
 - [`apps/api/src/modules/database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts): organization bootstrap
 - [`apps/api/src/modules/database/schema/auth.ts`](../../../apps/api/src/modules/database/schema/auth.ts): generated auth tables
 - [`apps/api/src/modules/mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts): auth emails
-- [`apps/api/src/modules/mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts): MJML layout, compiled at load
+- [`apps/api/src/modules/mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts): MJML layout and blocks, compiled at load
 - [`packages/shared/src/schemas/auth.ts`](../../../packages/shared/src/schemas/auth.ts): password rules
