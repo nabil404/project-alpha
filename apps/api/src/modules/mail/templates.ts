@@ -22,7 +22,8 @@ import {
  * Notification emails take display strings for money and dates, already
  * formatted for the shop (`formatMinorUnits`, `formatShopDate` from
  * `@app/shared`), because the shop's currency, locale and time zone are the
- * caller's to know. Every value is escaped into the HTML.
+ * caller's to know; `notifications/notification-emails.ts` supplies them.
+ * Every value is escaped into the HTML.
  */
 export interface MailContent {
   subject: string;

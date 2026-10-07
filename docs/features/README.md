@@ -5,17 +5,18 @@ what is left. _What_ an MVP builds and _why_ lives in [`docs/mvp/`](../mvp/READM
 which wins on any conflict; these pages describe what the code does. Update a
 feature's page in the same change as its code.
 
-| #   | Feature                                                       | Status (Oct 2026)                                                                   |
-| --- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 01  | [Authentication](01-auth/README.md)                           | Built: email/password, Google, Facebook, organizations, tenant guard                |
-| 02  | [Product catalog](02-catalog/README.md)                       | Built, except CSV import                                                            |
-| 03  | [Connect Facebook Page](03-facebook-page/README.md)           | Built, except the bot on/off toggle                                                 |
-| 04  | [Conversations](04-conversations/README.md)                   | Built: webhook, ingest, inbox, replies, SSE. Assistant replies wait for the AI work |
-| 05  | [Customers](05-customers/README.md)                           | Built, except export                                                                |
-| 06  | [Settings – General](06-settings-general/README.md)           | Built                                                                               |
-| 07  | [Orders](07-orders/README.md)                                 | Built, except CSV export and the Messenger order summary                            |
-| 08  | [Settings – Account](08-settings-account/README.md)           | Built                                                                               |
-| 09  | [Settings – Delivery charges](09-settings-delivery/README.md) | Built; the assistant quoting delivery waits for the AI work                         |
+| #   | Feature                                                         | Status (Oct 2026)                                                                   |
+| --- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 01  | [Authentication](01-auth/README.md)                             | Built: email/password, Google, Facebook, organizations, tenant guard                |
+| 02  | [Product catalog](02-catalog/README.md)                         | Built, except CSV import                                                            |
+| 03  | [Connect Facebook Page](03-facebook-page/README.md)             | Built, except the bot on/off toggle                                                 |
+| 04  | [Conversations](04-conversations/README.md)                     | Built: webhook, ingest, inbox, replies, SSE. Assistant replies wait for the AI work |
+| 05  | [Customers](05-customers/README.md)                             | Built, except export                                                                |
+| 06  | [Settings – General](06-settings-general/README.md)             | Built                                                                               |
+| 07  | [Orders](07-orders/README.md)                                   | Built, except CSV export and the Messenger order summary                            |
+| 08  | [Settings – Account](08-settings-account/README.md)             | Built                                                                               |
+| 09  | [Settings – Delivery charges](09-settings-delivery/README.md)   | Built; the assistant quoting delivery waits for the AI work                         |
+| 10  | [Settings – Notifications](10-settings-notifications/README.md) | Built; the AI work reporting orders and handoffs is not                             |
 
 ## Each page
 
@@ -36,13 +37,10 @@ feature page because no code exists yet:
   [Conversations](04-conversations/README.md#follow-ups),
   [Catalog](02-catalog/README.md#not-yet-built) and
   [Orders](07-orders/README.md#follow-ups).
-- **Email notifications** to the seller for new orders and handoffs. Only auth
-  mail is sent today ([Auth](01-auth/README.md#email-and-password-flows)). The
-  templates are built - `newOrderEmail`, `customerWaitingEmail` and
-  `dailySummaryEmail` in
-  [`modules/mail/templates.ts`](../apps/api/src/modules/mail/templates.ts) -
-  but no job sends them, and there are no notification settings for their
-  "Change them" link to open yet.
+- **Reporting new orders and handoffs** for the seller's emails: the
+  sending is built
+  ([Settings – Notifications](10-settings-notifications/README.md#sending)),
+  and the AI work calls it.
 - **Needs Attention queue** on the dashboard. Today "Needs you" exists as a
   conversation filter and a customer status, and drafted orders as an Orders
   tab and banner.

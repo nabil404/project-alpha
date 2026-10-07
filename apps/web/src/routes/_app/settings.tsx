@@ -35,7 +35,12 @@ const SECTIONS: readonly SettingsSection[] = [
   { id: 'messenger', label: 'nav.messenger', icon: MessageCircle, to: '/settings/messenger' },
   { id: 'assistant', label: 'nav.assistant', icon: Bot },
   { id: 'delivery', label: 'nav.delivery', icon: Truck, to: '/settings/delivery' },
-  { id: 'notifications', label: 'nav.notifications', icon: Bell },
+  {
+    id: 'notifications',
+    label: 'nav.notifications',
+    icon: Bell,
+    to: '/settings/notifications',
+  },
   { id: 'account', label: 'nav.account', icon: CircleUser, to: '/settings/account' },
 ];
 

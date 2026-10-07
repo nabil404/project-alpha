@@ -185,5 +185,22 @@
     "label": "Settings sections",
     "messenger": "Messenger",
     "notifications": "Notifications"
+  },
+  "notifications": {
+    "customerWaiting": {
+      "hint": "An email when a chat is handed to you and nobody has replied in 10 minutes.",
+      "label": "Customer waiting for you"
+    },
+    "dailySummary": {
+      "hint": "An email at 9:00 your shop's time with yesterday's orders and revenue, on days you have orders.",
+      "label": "Daily summary"
+    },
+    "description": "Where we tell you about things that need you.",
+    "newOrder": {
+      "hint": "An email for every order the assistant drafts.",
+      "label": "New order drafted"
+    },
+    "saved": "Notification settings saved.",
+    "title": "Notifications"
   }
 }

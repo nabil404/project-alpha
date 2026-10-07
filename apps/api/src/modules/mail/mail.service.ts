@@ -30,6 +30,14 @@ export class MailService implements Mailer {
     this.from = config.get('MAIL_FROM');
   }
 
+  /**
+   * Sends and waits, throwing on failure, for a queue job that should retry.
+   * Never use it on an auth path: see Mailer.dispatch.
+   */
+  async send(message: MailMessage): Promise<void> {
+    await this.transport.sendMail({ from: this.from, ...message });
+  }
+
   dispatch(message: MailMessage): void {
     this.transport.sendMail({ from: this.from, ...message }).catch((error: unknown) => {
       // The body carries a single-use token, so only the subject and the
