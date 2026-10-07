@@ -63,29 +63,28 @@ backfill) run with no merchant context, so they see these tables' rows only
 because the owner is the cluster's superuser. `FORCE` alone would hide every
 row from a non-superuser owner, and such a backfill would silently do nothing.
 
-| Table                                                                                | `merchant_id`             | RLS enabled | RLS forced | Policies                                                          |
-| ------------------------------------------------------------------------------------ | ------------------------- | ----------- | ---------- | ----------------------------------------------------------------- |
-| `category`                                                                           | yes                       | yes         | yes        | `category_merchant_isolation`                                     |
-| `product`                                                                            | yes                       | yes         | yes        | `product_merchant_isolation`                                      |
-| `product_category`                                                                   | yes                       | yes         | yes        | `product_category_merchant_isolation`                             |
-| `product_variant`                                                                    | yes                       | yes         | yes        | `product_variant_merchant_isolation`                              |
-| `product_image`                                                                      | yes                       | yes         | yes        | `product_image_merchant_isolation`                                |
-| `product_option`                                                                     | yes                       | yes         | yes        | `product_option_merchant_isolation`                               |
-| `product_option_value`                                                               | yes                       | yes         | yes        | `product_option_value_merchant_isolation`                         |
-| `product_variant_option_value`                                                       | yes                       | yes         | yes        | `product_variant_option_value_merchant_isolation`                 |
-| `facebook_page`                                                                      | yes                       | yes         | yes        | `facebook_page_merchant_isolation`, `facebook_page_resolver_read` |
-| `customer`                                                                           | yes                       | yes         | yes        | `customer_merchant_isolation`                                     |
-| `conversation`                                                                       | yes                       | yes         | yes        | `conversation_merchant_isolation`                                 |
-| `message`                                                                            | yes                       | yes         | yes        | `message_merchant_isolation`                                      |
-| `customer_note`                                                                      | yes                       | yes         | yes        | `customer_note_merchant_isolation`                                |
-| `order`                                                                              | yes                       | yes         | yes        | `order_merchant_isolation`                                        |
-| `order_item`                                                                         | yes                       | yes         | yes        | `order_item_merchant_isolation`                                   |
-| `order_event`                                                                        | yes                       | yes         | yes        | `order_event_merchant_isolation`                                  |
-| `delivery_charge_merchant_isolation`                                                 | `delivery_charge`         | `ALL`       | `public`   | same                                                              | same | Confines the shop's delivery areas, their charges and times to the current merchant. |
-| `product_delivery_charge_merchant_isolation`                                         | `product_delivery_charge` | `ALL`       | `public`   | same                                                              | same | Confines products' own delivery charges to the current merchant.                     |
-| `delivery_charge`                                                                    | yes                       | yes         | yes        | `delivery_charge_merchant_isolation`                              |
-| `product_delivery_charge`                                                            | yes                       | yes         | yes        | `product_delivery_charge_merchant_isolation`                      |
-| `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation` | no                        | no          | no         | none — Better Auth tables, deliberately unprotected by RLS        |
+| Table                                                                                | `merchant_id` | RLS enabled | RLS forced | Policies                                                          |
+| ------------------------------------------------------------------------------------ | ------------- | ----------- | ---------- | ----------------------------------------------------------------- |
+| `category`                                                                           | yes           | yes         | yes        | `category_merchant_isolation`                                     |
+| `product`                                                                            | yes           | yes         | yes        | `product_merchant_isolation`                                      |
+| `product_category`                                                                   | yes           | yes         | yes        | `product_category_merchant_isolation`                             |
+| `product_variant`                                                                    | yes           | yes         | yes        | `product_variant_merchant_isolation`                              |
+| `product_image`                                                                      | yes           | yes         | yes        | `product_image_merchant_isolation`                                |
+| `product_option`                                                                     | yes           | yes         | yes        | `product_option_merchant_isolation`                               |
+| `product_option_value`                                                               | yes           | yes         | yes        | `product_option_value_merchant_isolation`                         |
+| `product_variant_option_value`                                                       | yes           | yes         | yes        | `product_variant_option_value_merchant_isolation`                 |
+| `facebook_page`                                                                      | yes           | yes         | yes        | `facebook_page_merchant_isolation`, `facebook_page_resolver_read` |
+| `customer`                                                                           | yes           | yes         | yes        | `customer_merchant_isolation`                                     |
+| `conversation`                                                                       | yes           | yes         | yes        | `conversation_merchant_isolation`                                 |
+| `message`                                                                            | yes           | yes         | yes        | `message_merchant_isolation`                                      |
+| `customer_note`                                                                      | yes           | yes         | yes        | `customer_note_merchant_isolation`                                |
+| `order`                                                                              | yes           | yes         | yes        | `order_merchant_isolation`                                        |
+| `order_item`                                                                         | yes           | yes         | yes        | `order_item_merchant_isolation`                                   |
+| `order_event`                                                                        | yes           | yes         | yes        | `order_event_merchant_isolation`                                  |
+| `delivery_charge`                                                                    | yes           | yes         | yes        | `delivery_charge_merchant_isolation`                              |
+| `product_delivery_charge`                                                            | yes           | yes         | yes        | `product_delivery_charge_merchant_isolation`                      |
+| `notification_preference`                                                            | yes           | yes         | yes        | `notification_preference_merchant_isolation`                      |
+| `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation` | no            | no          | no         | none — Better Auth tables, deliberately unprotected by RLS        |
 
 ## Policies
 
@@ -114,6 +113,9 @@ merchant. With no context set, both evaluate to `NULL` and nothing matches.
 | `order_merchant_isolation`                        | `order`                        | `ALL`    | `public`            | same                                   | same                                   | Confines orders and their delivery details to the current merchant.                                                                             |
 | `order_item_merchant_isolation`                   | `order_item`                   | `ALL`    | `public`            | same                                   | same                                   | Confines order items to the current merchant.                                                                                                   |
 | `order_event_merchant_isolation`                  | `order_event`                  | `ALL`    | `public`            | same                                   | same                                   | Confines an order's activity log to the current merchant.                                                                                       |
+| `delivery_charge_merchant_isolation`              | `delivery_charge`              | `ALL`    | `public`            | same                                   | same                                   | Confines the shop's delivery areas, their charges and times to the current merchant.                                                            |
+| `product_delivery_charge_merchant_isolation`      | `product_delivery_charge`      | `ALL`    | `public`            | same                                   | same                                   | Confines products' own delivery charges to the current merchant.                                                                                |
+| `notification_preference_merchant_isolation`      | `notification_preference`      | `ALL`    | `public`            | same                                   | same                                   | Confines each person's notification switches for a shop to that shop.                                                                           |
 
 ## Triggers
 
