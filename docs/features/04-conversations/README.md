@@ -244,6 +244,10 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 
 - Queue the assistant's turn from `InboundMessageIngest` (AI work), honouring
   the conversation's `bot_paused` and the Page's `bot_enabled`.
+- When the assistant hands a conversation off, call
+  `NotificationsService.handedOff` after that write commits, so the seller is
+  emailed if nobody replies in 10 minutes
+  ([Settings – Notifications](../10-settings-notifications/README.md#sending)).
 - The drafted-order panel and the customer's order history beside the thread.
   The seller's own "Confirm" is settled: it is the second confirmation of an
   order the customer already confirmed ([Orders](../07-orders/README.md#rules)).
