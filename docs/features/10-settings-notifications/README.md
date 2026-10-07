@@ -48,21 +48,25 @@ context. It then queues one `send-email` job per recipient, so a retried
 event never mails anyone twice and a failed send (`MailService.send` throws)
 retries alone. No mail call runs inside a transaction.
 
-| Email                    | Reported by                                                                          | Job id                                      | Sent when the job runs if                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| New order drafted        | `NotificationsService.orderDrafted(merchantId, orderId)`, after the order commits    | `order-drafted-<orderId>`                   | The order exists and its `source` is `assistant`; one the seller added needs no email                                      |
-| Customer waiting for you | `NotificationsService.handedOff(merchantId, conversationId, at)`, delayed 10 minutes | `customer-waiting-<conversationId>-<at ms>` | The chat is still `handed_off` and no `seller` message has been sent since `at`, from here or Facebook's inbox             |
-| Daily summary            | The worker's `daily-summary-scan` scheduler, every 15 minutes (UTC)                  | `daily-summary-<merchantId>-<day>`          | It is 9:00-9:14 in the shop's time zone (the default region's with no settings row), and the shop placed an order that day |
+| Email                    | Reported by                                                                          | Job id                                      | Sent when the job runs if                                                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New order drafted        | `NotificationsService.orderDrafted(merchantId, orderId)`, after the order commits    | `order-drafted-<orderId>`                   | The order exists and its `source` is `assistant`; one the seller added needs no email                                                                                                   |
+| Customer waiting for you | `NotificationsService.handedOff(merchantId, conversationId, at)`, delayed 10 minutes | `customer-waiting-<conversationId>-<at ms>` | The chat is still `handed_off`, its `handed_off_at` is still `at` (not handed back or off again since), and no `seller` message has been sent since `at`, from here or Facebook's inbox |
+| Daily summary            | The worker's `daily-summary-scan` scheduler, every 15 minutes (UTC)                  | `daily-summary-<merchantId>-<day>`          | The scan was scheduled for 9:00-9:14 in the shop's time zone (the default region's with no settings row), and the shop has an order that day that is not cancelled or returned          |
 
 - **Job ids** come from the event, so reporting it twice is a no-op while
-  BullMQ keeps the job (an hour after it completes). Send jobs are
-  `<event job id>-<userId>`. BullMQ refuses `:` in an id.
+  BullMQ keeps the job. Event jobs carry `EVENT_JOB_RETENTION` (kept a week
+  after they complete, by age alone), because the queue's default also caps
+  completed jobs at a count every send shares. Send jobs are
+  `<event job id>-<userId>` and keep the default. BullMQ refuses `:` in an id.
 - **The daily summary** covers yesterday, shop time, with the day's
-  boundaries computed by Postgres in that zone: how many orders were placed,
-  and their total leaving out cancelled and returned ones. Every UTC offset
-  is a multiple of 15 minutes, so each shop hits exactly one scan a day. The
-  scan reads each shop's recipients first, and its time zone only if it has
-  any.
+  boundaries computed by Postgres in that zone: how many orders were placed
+  and their total, cancelled and returned ones left out of both. Every UTC
+  offset is a multiple of 15 minutes, so each shop hits exactly one scan a
+  day. The scan judges the time it was scheduled for (`opts.prevMillis`), not
+  when a worker picked it up, so one that waits behind sends still finds the
+  shops it was for. It reads each shop's time zone first, and its recipients
+  only if it is that shop's 9:00.
 - **Emails** are in English, link to the order, the conversation or the
   orders list on `APP_URL`, and end with a link to these settings. Amounts
   are in the order's or the shop's currency; the summary's date is in the
@@ -73,7 +77,8 @@ retries alone. No mail call runs inside a transaction.
 `/settings/notifications`: one card with a switch per email, in the design's
 order, each with its hint. A switch saves the moment it flips: the cache
 takes the change at once, a success toast confirms it, and a failed save
-puts that switch back and shows an `ErrorBanner` in the card. Only the last
+puts that switch back and shows an `ErrorBanner` in the card, even when a
+later toggle is already in flight; the next toggle clears it. Only the last
 of several quick toggles refetches, so an earlier response cannot flip a
 switch back. The `Switch` primitive (`components/ui/switch.tsx`) is the
 design system's: accent track and `on-accent` thumb when on.
@@ -85,7 +90,10 @@ design system's: accent track and `on-accent` thumb when on.
 `user`, so a deleted person takes their switches with them; the columns have
 no defaults, because the repository writes `NOTIFICATION_DEFAULTS` itself.
 Migrations `0028_settings_notifications` and
-`0029_notification_preference_force_rls`. Details in
+`0029_notification_preference_force_rls`. The customer-waiting email also
+reads `conversation.handed_off_at`
+([Conversations](../04-conversations/README.md#data-model)), added by
+`0030_conversation_handed_off_at`. Details in
 [database.md](../../architecture/database.md).
 
 ## Code and tests
@@ -106,8 +114,8 @@ Web: `apps/web/src/features/settings/components/NotificationsCard.tsx`,
 | [`settings/__tests__/notification-settings.service.spec.ts`](../../../apps/api/src/modules/settings/__tests__/notification-settings.service.spec.ts) | Defaults, partial updates, two members of one shop, one person in two shops, another shop's rows, recipients, RLS               |
 | [`settings/__tests__/notification-settings.e2e.spec.ts`](../../../apps/api/src/modules/settings/__tests__/notification-settings.e2e.spec.ts)         | The routes over HTTP and their errors                                                                                           |
 | [`notifications/__tests__/notification-composer.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notification-composer.spec.ts)       | Each email's conditions against the database: seller orders, replies, state, switches, time zones, day boundaries, another shop |
-| [`notifications/__tests__/notifications.processor.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notifications.processor.spec.ts)   | Routing, the scheduler, send-job ids, a failed send throwing                                                                    |
-| [`notifications/__tests__/notifications.service.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notifications.service.spec.ts)       | Job ids and the 10-minute delay                                                                                                 |
+| [`notifications/__tests__/notifications.processor.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notifications.processor.spec.ts)   | Routing, the scheduler, the scan's scheduled time, send-job ids, a failed send throwing                                         |
+| [`notifications/__tests__/notifications.service.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notifications.service.spec.ts)       | Job ids, their retention and the 10-minute delay                                                                                |
 | [`notifications/__tests__/shop-clock.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/shop-clock.spec.ts)                             | Shop-local time, the 9:00 scan, a 45-minute offset, daylight saving                                                             |
 | [`notifications/__tests__/notification-emails.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notification-emails.spec.ts)           | Links, HTML escaping, wording                                                                                                   |
 
@@ -116,8 +124,9 @@ Web: `apps/web/src/features/settings/components/NotificationsCard.tsx`,
 - **Reporting the two events**, part of the AI work:
   - call `NotificationsService.orderDrafted` after the transaction that
     writes a `source = assistant` order commits;
-  - call `NotificationsService.handedOff` after the transaction that moves a
-    conversation into `handed_off` commits, with the moment it did.
+  - set `conversation.handed_off_at` in the write that moves a conversation
+    into `handed_off`, and call `NotificationsService.handedOff` with that
+    same moment after it commits.
 - **Emails in the reader's language**, once the dashboard speaks more than
   English.
 - **The daily summary** is outside MVP 01's scope; it is built because the

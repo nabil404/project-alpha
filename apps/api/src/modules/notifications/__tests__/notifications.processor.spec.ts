@@ -5,6 +5,7 @@ import {
   CUSTOMER_WAITING_JOB,
   DAILY_SUMMARY_JOB,
   DAILY_SUMMARY_SCAN_JOB,
+  EVENT_JOB_RETENTION,
   ORDER_DRAFTED_JOB,
   SEND_EMAIL_JOB,
 } from '../../queue/queue.constants';
@@ -31,7 +32,8 @@ describe('NotificationsProcessor', () => {
     composer as unknown as NotificationComposer,
     { send } as unknown as MailService,
   );
-  const job = (name: string, id: string, data: unknown) => ({ name, id, data }) as Job;
+  const job = (name: string, id: string, data: unknown, opts: Job['opts'] = {}) =>
+    ({ name, id, data, opts, timestamp: Date.parse('2026-10-07T03:00:00Z') }) as Job;
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -86,14 +88,27 @@ describe('NotificationsProcessor', () => {
       {
         name: DAILY_SUMMARY_JOB,
         data: { merchantId: 'm1', day: '2026-10-06' },
-        opts: { jobId: 'daily-summary-m1-2026-10-06' },
+        opts: { ...EVENT_JOB_RETENTION, jobId: 'daily-summary-m1-2026-10-06' },
       },
       {
         name: DAILY_SUMMARY_JOB,
         data: { merchantId: 'm2', day: '2026-10-06' },
-        opts: { jobId: 'daily-summary-m2-2026-10-06' },
+        opts: { ...EVENT_JOB_RETENTION, jobId: 'daily-summary-m2-2026-10-06' },
       },
     ]);
+  });
+
+  it('scans for the moment the scheduler meant, however late the worker runs it', async () => {
+    composer.dailySummariesDue.mockResolvedValue([]);
+    const scheduled = Date.parse('2026-10-07T03:00:00Z');
+
+    // Picked up at 03:20, past the 9:00-9:14 window in Dhaka.
+    await processor.process({
+      ...job(DAILY_SUMMARY_SCAN_JOB, 's', {}, { prevMillis: scheduled }),
+      timestamp: Date.parse('2026-10-07T03:20:00Z'),
+    } as Job);
+
+    expect(composer.dailySummariesDue).toHaveBeenCalledWith(new Date(scheduled));
   });
 
   it('writes the summary for the job day', async () => {

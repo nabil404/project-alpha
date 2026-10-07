@@ -170,6 +170,7 @@ export class ConversationsService {
               state: stateAfterHandBack(
                 collectedSlotsSchema.parse(found.conversation.collectedSlots),
               ),
+              handedOffAt: null,
             }
           : {}),
       });

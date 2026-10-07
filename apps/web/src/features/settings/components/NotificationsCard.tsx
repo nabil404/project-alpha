@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import type { NotificationKind, NotificationSettings } from '@app/shared';
@@ -41,9 +41,17 @@ export function NotificationsCard({ settings }: { settings: NotificationSettings
   const toast = useToast();
   const update = useUpdateNotificationSettings();
   const id = useId();
+  // Not update.error: the mutation tracks only the latest toggle, so an earlier
+  // one failing while a later is in flight would put its switch back unexplained.
+  const [error, setError] = useState<unknown>(null);
 
-  const toggle = (name: NotificationKind, on: boolean) =>
-    update.mutate({ [name]: on }, { onSuccess: () => toast.success(t('notifications.saved')) });
+  const toggle = (name: NotificationKind, on: boolean) => {
+    setError(null);
+    void update.mutateAsync({ [name]: on }).then(
+      () => toast.success(t('notifications.saved')),
+      (failure: unknown) => setError(failure),
+    );
+  };
 
   return (
     <section className="flex flex-col gap-6 rounded-lg border border-border bg-surface p-6 shadow-card">
@@ -52,7 +60,7 @@ export function NotificationsCard({ settings }: { settings: NotificationSettings
         <p className="text-body text-ink-muted">{t('notifications.description')}</p>
       </div>
 
-      {update.error && <ErrorBanner>{forError(update.error)}</ErrorBanner>}
+      {error != null && <ErrorBanner>{forError(error)}</ErrorBanner>}
 
       <ul className="flex flex-col divide-y divide-border">
         {ROWS.map(({ name, label, hint }) => (

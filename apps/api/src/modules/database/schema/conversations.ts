@@ -52,6 +52,12 @@ export const conversation = pgTable(
       .notNull()
       .default(sql`'{}'::jsonb`),
     botPaused: boolean('bot_paused').notNull().default(false),
+    /**
+     * When the assistant last handed the chat to the seller; null while it is
+     * not handed off. The customer-waiting email names the handoff it is about
+     * by this, so one from an earlier handoff stays quiet.
+     */
+    handedOffAt: instant('handed_off_at'),
     lastMessageAt: instant('last_message_at').notNull(),
     lastMessagePreview: text('last_message_preview').notNull(),
     lastMessageSender: text('last_message_sender', { enum: MESSAGE_SENDERS }).notNull(),

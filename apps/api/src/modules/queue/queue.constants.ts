@@ -42,7 +42,9 @@ export const REFRESH_PROFILES_JOB = 'refresh-stale-profiles';
  * Seller notification emails. The API and the worker both enqueue the event
  * jobs; only the worker processes them, and each email goes out as its own
  * SEND_EMAIL_JOB so a retry re-sends one message, never the whole batch.
- * Job ids are built from the event, so the same event never mails twice.
+ * Event job ids are built from the event, and BullMQ ignores an add whose id
+ * it still holds, so the same event never mails twice while its job is kept:
+ * see EVENT_JOB_RETENTION.
  */
 export const NOTIFICATIONS_QUEUE = 'notifications';
 export const ORDER_DRAFTED_JOB = 'order-drafted';
@@ -51,6 +53,16 @@ export const CUSTOMER_WAITING_JOB = 'customer-waiting';
 export const DAILY_SUMMARY_SCAN_JOB = 'daily-summary-scan';
 export const DAILY_SUMMARY_JOB = 'daily-summary';
 export const SEND_EMAIL_JOB = 'send-email';
+
+/** How long a handed-off chat waits for the seller before the email. */
+export const CUSTOMER_WAITING_DELAY_MS = 10 * 60 * 1000;
+
+/**
+ * Event jobs stay a week after they complete, by age alone: the queue's
+ * default also caps completed jobs at a count shared with every send, which
+ * a busy shop would reach in minutes and so forget the ids that dedupe.
+ */
+export const EVENT_JOB_RETENTION = { removeOnComplete: { age: 7 * 24 * 3_600 } } as const;
 
 export interface OrderDraftedJob {
   merchantId: string;

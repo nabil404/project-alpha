@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, notInArray, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { conversation, customer, merchantSettings, message, order } from '../database/schema/index';
 
@@ -15,6 +15,7 @@ export interface DraftedOrder {
 export interface WaitingConversation {
   id: string;
   state: (typeof conversation.$inferSelect)['state'];
+  handedOffAt: Date | null;
   customerName: string | null;
 }
 
@@ -26,7 +27,7 @@ export interface ShopRegion {
 
 export interface DayTotals {
   orders: number;
-  /** Minor units, leaving out cancelled and returned orders. */
+  /** Minor units. */
   revenue: number;
 }
 
@@ -59,7 +60,12 @@ export class NotificationReadsRepository {
     conversationId: string,
   ): Promise<WaitingConversation | undefined> {
     const [row] = await executor
-      .select({ id: conversation.id, state: conversation.state, customerName: customer.name })
+      .select({
+        id: conversation.id,
+        state: conversation.state,
+        handedOffAt: conversation.handedOffAt,
+        customerName: customer.name,
+      })
       .from(conversation)
       .innerJoin(
         customer,
@@ -107,7 +113,11 @@ export class NotificationReadsRepository {
     return row;
   }
 
-  /** Orders placed on the shop-local `day` (yyyy-MM-dd) in `timeZone`, the boundaries computed by Postgres. */
+  /**
+   * Orders placed on the shop-local `day` (yyyy-MM-dd) in `timeZone`, the
+   * boundaries computed by Postgres. Cancelled and returned orders count in
+   * neither the orders nor the revenue.
+   */
   async dayTotals(
     executor: Executor,
     { merchantId }: TenantScope,
@@ -119,15 +129,13 @@ export class NotificationReadsRepository {
     const [row] = await executor
       .select({
         orders: sql<number>`count(*)`.mapWith(Number),
-        revenue:
-          sql<number>`coalesce(sum(${order.total}) filter (where ${order.status} not in ('cancelled', 'returned')), 0)`.mapWith(
-            Number,
-          ),
+        revenue: sql<number>`coalesce(sum(${order.total}), 0)`.mapWith(Number),
       })
       .from(order)
       .where(
         and(
           eq(order.merchantId, merchantId),
+          notInArray(order.status, ['cancelled', 'returned']),
           sql`${order.placedAt} >= ${start}`,
           sql`${order.placedAt} < ${end}`,
         ),
