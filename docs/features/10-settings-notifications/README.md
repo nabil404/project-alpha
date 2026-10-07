@@ -7,7 +7,7 @@ The screens are the Settings – Notifications artboards in the design canvas.
 **Status (Oct 2026):** the API stores and serves the switches, and the worker
 sends all three emails. The daily summary goes out today; the other two
 wait for the AI work to report their events (see [Follow-ups](#follow-ups)).
-The page at `/settings/notifications` is not built.
+The page at `/settings/notifications` is built.
 
 ## Routes (session + TenantGuard)
 
@@ -68,6 +68,16 @@ retries alone. No mail call runs inside a transaction.
   are in the order's or the shop's currency; the summary's date is in the
   shop's date format.
 
+## Dashboard
+
+`/settings/notifications`: one card with a switch per email, in the design's
+order, each with its hint. A switch saves the moment it flips: the cache
+takes the change at once, a success toast confirms it, and a failed save
+puts that switch back and shows an `ErrorBanner` in the card. Only the last
+of several quick toggles refetches, so an earlier response cannot flip a
+switch back. The `Switch` primitive (`components/ui/switch.tsx`) is the
+design system's: accent track and `on-accent` thumb when on.
+
 ## Data model
 
 `notification_preference`: `(merchant_id, user_id)` primary key,
@@ -87,6 +97,9 @@ Migrations `0028_settings_notifications` and
 `NotificationReadsRepository` and `NotificationsProcessor` (in
 `NotificationsWorkerModule`, imported only by `WorkerModule`); the templates
 in `notification-emails.ts`, the shop clock in `shop-clock.ts`.
+Web: `apps/web/src/features/settings/components/NotificationsCard.tsx`,
+`apps/web/src/features/settings/notification-queries.ts`,
+`apps/web/src/components/ui/switch.tsx`.
 
 | Spec                                                                                                                                                 | Covers                                                                                                                          |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -100,8 +113,6 @@ in `notification-emails.ts`, the shop clock in `shop-clock.ts`.
 
 ## Follow-ups
 
-- **The page** at `/settings/notifications`, with "New order drafted" worded
-  as email only (the design says "A push and email").
 - **Reporting the two events**, part of the AI work:
   - call `NotificationsService.orderDrafted` after the transaction that
     writes a `source = assistant` order commits;
