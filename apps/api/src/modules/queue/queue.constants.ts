@@ -37,3 +37,35 @@ export const SWEEP_JOB = 'sweep-orphaned-images';
 /** Customer profile upkeep. Jobs are scheduled by the worker, never by the API. */
 export const PROFILE_QUEUE = 'customer-profiles';
 export const REFRESH_PROFILES_JOB = 'refresh-stale-profiles';
+
+/**
+ * Seller notification emails. The API and the worker both enqueue the event
+ * jobs; only the worker processes them, and each email goes out as its own
+ * SEND_EMAIL_JOB so a retry re-sends one message, never the whole batch.
+ * Job ids are built from the event, so the same event never mails twice.
+ */
+export const NOTIFICATIONS_QUEUE = 'notifications';
+export const ORDER_DRAFTED_JOB = 'order-drafted';
+export const CUSTOMER_WAITING_JOB = 'customer-waiting';
+/** Scheduled by the worker, never by the API: finds the shops where it is 9:00. */
+export const DAILY_SUMMARY_SCAN_JOB = 'daily-summary-scan';
+export const DAILY_SUMMARY_JOB = 'daily-summary';
+export const SEND_EMAIL_JOB = 'send-email';
+
+export interface OrderDraftedJob {
+  merchantId: string;
+  orderId: string;
+}
+
+export interface CustomerWaitingJob {
+  merchantId: string;
+  conversationId: string;
+  /** Epoch ms the conversation was handed to the seller. */
+  handedOffAt: number;
+}
+
+export interface DailySummaryJob {
+  merchantId: string;
+  /** The shop-local day summarised, yyyy-MM-dd. */
+  day: string;
+}
