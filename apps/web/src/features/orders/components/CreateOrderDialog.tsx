@@ -38,7 +38,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select, fieldProps } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { MoneyInput } from '@/features/catalog';
 import { CustomerAvatar, useCustomerName } from '@/features/conversations';
@@ -442,13 +442,13 @@ function NewOrderForm({
                 <FormItem>
                   <FormLabel>{t('payment.method')}</FormLabel>
                   <FormControl>
-                    <NativeSelect {...field}>
-                      {paymentMethods.map((option) => (
-                        <option key={option} value={option}>
-                          {paymentMethod(option)}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                    <Select
+                      {...fieldProps(field)}
+                      options={paymentMethods.map((option) => ({
+                        value: option,
+                        label: paymentMethod(option),
+                      }))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 
 import { orderRanges, type OrderRange, type OrderRangeChoice } from '../date-range';
 
@@ -21,20 +21,18 @@ export function DateRangeFilter({
   return (
     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
       <div className="w-full sm:w-48">
-        <NativeSelect
+        <Select
           aria-label={t('list.range.label')}
           value={value.range}
-          onChange={(event) => {
-            const range = event.target.value as OrderRange;
+          onValueChange={(next) => {
+            const range = next as OrderRange;
             onChange(range === 'custom' ? { ...value, range } : { range });
           }}
-        >
-          {orderRanges.map((range) => (
-            <option key={range} value={range}>
-              {t(`list.range.${range}`)}
-            </option>
-          ))}
-        </NativeSelect>
+          options={orderRanges.map((range) => ({
+            value: range,
+            label: t(`list.range.${range}`),
+          }))}
+        />
       </div>
       {value.range === 'custom' && (
         <div className="flex w-full items-center gap-2 sm:w-auto">

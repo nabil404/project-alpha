@@ -17,7 +17,7 @@ export interface ComboboxOption {
   value: string;
   label: string;
   /** Shown before the label, in the list and the trigger: a flag. */
-  prefix?: string;
+  prefix?: React.ReactNode;
   /** Other words the search matches: codes, aliases. */
   keywords?: string[];
   /** What the closed trigger shows instead of the label ("+880"). */

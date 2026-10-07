@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { OrderItemInput } from '@app/shared';
 
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 // The queries file, not the settings barrel, which reaches back into the catalog and orders.
 import { deliverySettingsQueryOptions } from '@/features/settings/delivery-queries';
 import { useFormatters } from '@/lib/format';
@@ -50,7 +50,7 @@ export function AreaSelect({
   area,
   onPick,
   ...props
-}: Omit<ComponentProps<typeof NativeSelect>, 'value' | 'onChange'> & {
+}: Omit<ComponentProps<typeof Select>, 'value' | 'onValueChange' | 'options'> & {
   rates: DeliveryRate[];
   chargeId: string | null;
   area: string;
@@ -61,25 +61,26 @@ export function AreaSelect({
   const unlisted = chargeId === null ? area.trim() !== '' : !rates.some((r) => r.id === chargeId);
 
   return (
-    <NativeSelect
+    <Select
       {...props}
       value={chargeId ?? (unlisted ? KEEP : '')}
-      onChange={(event) => {
-        const rate = rates.find((r) => r.id === event.target.value);
+      onValueChange={(next) => {
+        const rate = rates.find((r) => r.id === next);
         if (rate) onPick({ chargeId: rate.id, area: rate.areaName ?? '' });
-        else if (event.target.value === '') onPick({ chargeId: null, area: '' });
+        else if (next === '') onPick({ chargeId: null, area: '' });
       }}
-    >
-      {unlisted && <option value={chargeId ?? KEEP}>{area || t('delivery.elsewhere')}</option>}
-      {rates.map((rate) => (
-        <option key={rate.id} value={rate.id}>
-          {rate.areaName === null
-            ? t('delivery.elsewhereOption', { charge: formatMoney(rate.charge) })
-            : t('delivery.areaOption', { area: rate.areaName, charge: formatMoney(rate.charge) })}
-        </option>
-      ))}
-      <option value="">{t('delivery.noArea')}</option>
-    </NativeSelect>
+      options={[
+        ...(unlisted ? [{ value: chargeId ?? KEEP, label: area || t('delivery.elsewhere') }] : []),
+        ...rates.map((rate) => ({
+          value: rate.id,
+          label:
+            rate.areaName === null
+              ? t('delivery.elsewhereOption', { charge: formatMoney(rate.charge) })
+              : t('delivery.areaOption', { area: rate.areaName, charge: formatMoney(rate.charge) }),
+        })),
+        { value: '', label: t('delivery.noArea') },
+      ]}
+    />
   );
 }
 

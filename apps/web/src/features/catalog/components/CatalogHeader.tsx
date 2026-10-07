@@ -27,10 +27,7 @@ export function CatalogHeader({
         </div>
         {action}
       </header>
-      <nav
-        aria-label={t('list.tabs.label')}
-        className="-mt-2 flex gap-6 overflow-x-auto border-b border-border"
-      >
+      <nav aria-label={t('list.tabs.label')} className="-mt-2 flex gap-6 border-b border-border">
         <Link
           to="/catalog"
           aria-current={section === 'products' ? 'page' : undefined}

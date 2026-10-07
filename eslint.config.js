@@ -43,6 +43,21 @@ export default tseslint.config(
     },
   },
   {
+    // The browser's own dropdown ignores the design system; use Select (short
+    // lists) or Combobox (long, searchable ones) from components/ui.
+    files: ['apps/web/src/**/*.tsx'],
+    ignores: ['apps/web/src/components/ui/select.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXOpeningElement[name.name='select']",
+          message: 'Use Select or Combobox from @/components/ui, not a native <select>.',
+        },
+      ],
+    },
+  },
+  {
     // Standalone CLI scripts: run by node, not bundled into the app. Reporting
     // to stdout is their purpose, and they never touch a token.
     files: ['apps/api/scripts/**/*.mjs'],
