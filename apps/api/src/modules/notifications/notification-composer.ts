@@ -6,6 +6,7 @@ import { DATABASE, type Database } from '../database/database.module';
 import { withMerchant } from '../database/with-merchant';
 import type { MailContent, MailMessage } from '../mail/templates';
 import { listMerchantIds } from '../conversations/profiles/merchant-ids';
+import { CUSTOMER_WAITING_DELAY_MS } from '../queue/queue.constants';
 import {
   NotificationPreferencesRepository,
   type NotificationRecipient,
@@ -14,9 +15,6 @@ import { ShopProfileRepository } from '../settings/shop-profile.repository';
 import { customerWaitingEmail, dailySummaryEmail, orderDraftedEmail } from './notification-emails';
 import { NotificationReadsRepository, type ShopRegion } from './notification-reads.repository';
 import { dailySummaryDayDue } from './shop-clock';
-
-/** How long a handed-off chat waits for the seller before the email. */
-export const CUSTOMER_WAITING_DELAY_MS = 10 * 60 * 1000;
 
 /** One email for one person; `userId` makes its send job's id. */
 export interface NotificationEmail {
@@ -74,7 +72,10 @@ export class NotificationComposer {
     });
   }
 
-  /** Only if the chat is still handed off and nobody has replied since it was. */
+  /**
+   * Only if the chat is still on this handoff - not handed back, nor handed
+   * off again since - and nobody has replied since it was.
+   */
   customerWaiting(
     merchantId: string,
     conversationId: string,
@@ -84,6 +85,7 @@ export class NotificationComposer {
     return withMerchant(this.db, merchantId, async (tx) => {
       const found = await this.reads.conversation(tx, scope, conversationId);
       if (!found || found.state !== 'handed_off') return [];
+      if (found.handedOffAt?.getTime() !== handedOffAt.getTime()) return [];
       if (await this.reads.sellerRepliedSince(tx, scope, conversationId, handedOffAt)) return [];
       const recipients = await this.preferences.recipients(tx, scope, 'customerWaiting');
       if (recipients.length === 0) return [];
@@ -102,18 +104,20 @@ export class NotificationComposer {
   }
 
   /**
-   * The shops whose 9:00 falls on this scan, with the day to summarise. A shop
-   * is read only if it has someone to send to, so most cost one query.
+   * The shops whose 9:00 falls on the scan scheduled for `now`, with the day
+   * to summarise. Each shop costs one primary-key read of its zone; only a
+   * shop at its 9:00 is asked whether anyone wants the summary.
    */
   async dailySummariesDue(now: Date): Promise<{ merchantId: string; day: string }[]> {
     const due: { merchantId: string; day: string }[] = [];
     for (const merchantId of await listMerchantIds(this.db)) {
       const scope: TenantScope = { merchantId };
       const day = await withMerchant(this.db, merchantId, async (tx) => {
-        const recipients = await this.preferences.recipients(tx, scope, 'dailySummary');
-        if (recipients.length === 0) return null;
         const region = this.regionOrDefault(await this.reads.region(tx, scope));
-        return dailySummaryDayDue(now, region.timeZone);
+        const summarised = dailySummaryDayDue(now, region.timeZone);
+        if (!summarised) return null;
+        const recipients = await this.preferences.recipients(tx, scope, 'dailySummary');
+        return recipients.length > 0 ? summarised : null;
       });
       if (day) due.push({ merchantId, day });
     }

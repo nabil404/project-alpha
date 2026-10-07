@@ -86,7 +86,7 @@ export function dailySummaryEmail(input: {
     subject: `${input.shopName}: ${orders} on ${input.date}`,
     lines: [
       `${input.shopName} took ${orders} on ${input.date}, for ${input.revenue} in revenue.`,
-      `Revenue leaves out cancelled and returned orders.`,
+      `Cancelled and returned orders are left out of both.`,
     ],
     action: 'View your orders',
     url: `${input.appUrl}/orders`,

@@ -7,6 +7,7 @@ import {
   CUSTOMER_WAITING_JOB,
   DAILY_SUMMARY_JOB,
   DAILY_SUMMARY_SCAN_JOB,
+  EVENT_JOB_RETENTION,
   NOTIFICATIONS_QUEUE,
   ORDER_DRAFTED_JOB,
   SEND_EMAIL_JOB,
@@ -19,6 +20,15 @@ import { DAILY_SUMMARY_SCAN_MINUTES } from './shop-clock';
 
 const DAILY_SUMMARY_SCHEDULE = `*/${DAILY_SUMMARY_SCAN_MINUTES} * * * *`;
 const DAILY_SUMMARY_SCHEDULER_ID = 'daily-summary-scan';
+
+/**
+ * The moment the scheduler meant a scan for, not when a worker got to it: a
+ * scan that waits behind sends or retries still summarises the shops whose
+ * 9:00 it was for, rather than finding none at 9:15.
+ */
+function scheduledFor(job: Job): Date {
+  return new Date(job.opts.prevMillis ?? job.timestamp);
+}
 
 /** What a job reports, for Bull Board and the specs. */
 export interface NotificationJobResult {
@@ -68,12 +78,12 @@ export class NotificationsProcessor extends WorkerHost implements OnApplicationB
         return this.queueEmails(job, emails);
       }
       case DAILY_SUMMARY_SCAN_JOB: {
-        const due = await this.composer.dailySummariesDue(new Date());
+        const due = await this.composer.dailySummariesDue(scheduledFor(job));
         await this.queue.addBulk(
           due.map(({ merchantId, day }) => ({
             name: DAILY_SUMMARY_JOB,
             data: { merchantId, day } satisfies DailySummaryJob,
-            opts: { jobId: `daily-summary-${merchantId}-${day}` },
+            opts: { ...EVENT_JOB_RETENTION, jobId: `daily-summary-${merchantId}-${day}` },
           })),
         );
         return { queued: due.length };

@@ -242,7 +242,7 @@ export class ConversationRepository {
     executor: Executor,
     { merchantId }: TenantScope,
     id: string,
-    values: { botPaused?: boolean; state?: ConversationState },
+    values: { botPaused?: boolean; state?: ConversationState; handedOffAt?: Date | null },
   ): Promise<ConversationRow | null> {
     const [row] = await executor
       .update(conversation)

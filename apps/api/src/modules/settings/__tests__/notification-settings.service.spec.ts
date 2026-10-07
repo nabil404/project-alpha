@@ -165,7 +165,6 @@ describeDb('NotificationSettingsService', () => {
         {
           userId: verified,
           email: `${verified}@notifications.example.test`,
-          name: expect.any(String),
         },
       ]);
     });

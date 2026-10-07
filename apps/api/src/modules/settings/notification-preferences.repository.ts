@@ -13,7 +13,6 @@ import { member, notificationPreference, user } from '../database/schema/index';
 export interface NotificationRecipient {
   userId: string;
   email: string;
-  name: string;
 }
 
 const switches = {
@@ -75,7 +74,7 @@ export class NotificationPreferencesRepository {
   ): Promise<NotificationRecipient[]> {
     const wants = sql<boolean>`coalesce(${switches[kind]}, ${NOTIFICATION_DEFAULTS[kind]})`;
     return executor
-      .select({ userId: user.id, email: user.email, name: user.name })
+      .select({ userId: user.id, email: user.email })
       .from(member)
       .innerJoin(user, eq(user.id, member.userId))
       .leftJoin(

@@ -1,7 +1,11 @@
 import { jest } from '@jest/globals';
 import type { Queue } from 'bullmq';
-import { CUSTOMER_WAITING_JOB, ORDER_DRAFTED_JOB } from '../../queue/queue.constants';
-import { CUSTOMER_WAITING_DELAY_MS } from '../notification-composer';
+import {
+  CUSTOMER_WAITING_DELAY_MS,
+  CUSTOMER_WAITING_JOB,
+  EVENT_JOB_RETENTION,
+  ORDER_DRAFTED_JOB,
+} from '../../queue/queue.constants';
 import { NotificationsService } from '../notifications.service';
 
 describe('NotificationsService', () => {
@@ -16,7 +20,7 @@ describe('NotificationsService', () => {
     expect(add).toHaveBeenCalledWith(
       ORDER_DRAFTED_JOB,
       { merchantId: 'm-1', orderId: 'order-1' },
-      { jobId: 'order-drafted-order-1' },
+      { ...EVENT_JOB_RETENTION, jobId: 'order-drafted-order-1' },
     );
   });
 
@@ -28,8 +32,16 @@ describe('NotificationsService', () => {
     expect(add).toHaveBeenCalledWith(
       CUSTOMER_WAITING_JOB,
       { merchantId: 'm-1', conversationId: 'conv-1', handedOffAt: at.getTime() },
-      { jobId: `customer-waiting-conv-1-${at.getTime()}`, delay: CUSTOMER_WAITING_DELAY_MS },
+      {
+        ...EVENT_JOB_RETENTION,
+        jobId: `customer-waiting-conv-1-${at.getTime()}`,
+        delay: CUSTOMER_WAITING_DELAY_MS,
+      },
     );
+  });
+
+  it('keeps event jobs by age alone, so their ids dedupe past a busy hour', () => {
+    expect(EVENT_JOB_RETENTION.removeOnComplete).toEqual({ age: 7 * 24 * 3_600 });
   });
 
   it('never puts a colon in a job id, which BullMQ refuses', async () => {

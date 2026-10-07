@@ -138,7 +138,10 @@ describeDb('NotificationComposer', () => {
 
     it('writes the email while the chat is still handed off and unanswered', async () => {
       const owner = await seedMember(t.merchantA);
-      const conversation = await seedConversation(t.db, t.merchantA, { state: 'handed_off' });
+      const conversation = await seedConversation(t.db, t.merchantA, {
+        state: 'handed_off',
+        handedOffAt,
+      });
       // A reply before the handoff doesn't count.
       await seedMessage(t.db, t.merchantA, conversation.id, {
         sender: 'seller',
@@ -154,7 +157,10 @@ describeDb('NotificationComposer', () => {
 
     it('stays quiet once the seller has replied', async () => {
       await seedMember(t.merchantA);
-      const conversation = await seedConversation(t.db, t.merchantA, { state: 'handed_off' });
+      const conversation = await seedConversation(t.db, t.merchantA, {
+        state: 'handed_off',
+        handedOffAt,
+      });
       await seedMessage(t.db, t.merchantA, conversation.id, { sender: 'seller' });
 
       await expect(
@@ -171,9 +177,25 @@ describeDb('NotificationComposer', () => {
       ).resolves.toEqual([]);
     });
 
+    it('stays quiet when the chat was handed off again since', async () => {
+      await seedMember(t.merchantA);
+      // Handed back and handed off again two minutes ago: that handoff has its own job.
+      const conversation = await seedConversation(t.db, t.merchantA, {
+        state: 'handed_off',
+        handedOffAt: new Date(Date.now() - 2 * 60 * 1000),
+      });
+
+      await expect(
+        composer.customerWaiting(t.merchantA, conversation.id, handedOffAt),
+      ).resolves.toEqual([]);
+    });
+
     it('stays quiet when nobody wants it', async () => {
       await seedMember(t.merchantA, { customerWaiting: false });
-      const conversation = await seedConversation(t.db, t.merchantA, { state: 'handed_off' });
+      const conversation = await seedConversation(t.db, t.merchantA, {
+        state: 'handed_off',
+        handedOffAt,
+      });
 
       await expect(
         composer.customerWaiting(t.merchantA, conversation.id, handedOffAt),
@@ -222,7 +244,7 @@ describeDb('NotificationComposer', () => {
       );
     });
 
-    it("totals the shop-local day's orders, leaving cancelled ones out of revenue", async () => {
+    it("totals the shop-local day's orders, leaving cancelled ones out of both", async () => {
       const owner = await seedMember(t.merchantA, { dailySummary: true });
       const customer = await seedCustomer(t.db, t.merchantA);
       // Dhaka is UTC+6: 6 Oct runs from 5 Oct 18:00 to 6 Oct 18:00 UTC.
@@ -241,8 +263,21 @@ describeDb('NotificationComposer', () => {
       const emails = await composer.dailySummary(t.merchantA, '2026-10-06');
 
       expect(emails.map((e) => e.message.to)).toEqual([owner]);
-      expect(emails[0]?.message.subject).toBe("Rahim's Kitchen: 2 orders on 6 Oct 2026");
+      expect(emails[0]?.message.subject).toBe("Rahim's Kitchen: 1 order on 6 Oct 2026");
       expect(emails[0]?.message.text).toContain(`for ${bdt(100000)} in revenue`);
+    });
+
+    it("sends nothing when the day's only orders were cancelled or returned", async () => {
+      await seedMember(t.merchantA, { dailySummary: true });
+      const customer = await seedCustomer(t.db, t.merchantA);
+      for (const status of ['cancelled', 'returned'] as const) {
+        await seedOrder(t.db, t.merchantA, customer.id, {
+          placedAt: new Date('2026-10-06T06:00:00Z'),
+          status,
+        });
+      }
+
+      await expect(composer.dailySummary(t.merchantA, '2026-10-06')).resolves.toEqual([]);
     });
 
     it('sends nothing for a day without orders', async () => {

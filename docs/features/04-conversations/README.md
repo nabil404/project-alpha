@@ -170,7 +170,8 @@ or removes it (`DELETE /:id/messages/:messageId`).
   `state = handed_off` is the assistant giving up, and is what "Needs you" shows.
   Handing back clears the first and, if the conversation was `handed_off`,
   resumes it at `collecting_details` when any detail was collected, otherwise
-  `browsing`. The assistant resumes only on Hand back.
+  `browsing`, and clears `handed_off_at`. The assistant resumes only on Hand
+  back.
 - **24-hour window.** A reply is allowed while
   `now − last_inbound_at < 24 h` (API clock), and refused with
   `409 MESSENGER_WINDOW_CLOSED` from then on; no `HUMAN_AGENT` tag.
@@ -206,8 +207,10 @@ into another shop.
   Contact details and notes: [05 · Customers](../05-customers/README.md).
 - `conversation`: `facebook_page_id` (text, deliberately not a foreign key),
   `customer_id`, `state` (default `browsing`), `collected_slots` (jsonb),
-  `bot_paused`, `last_message_at`, `last_message_preview`,
-  `last_message_sender`, `last_inbound_at`, `seller_last_read_at`.
+  `bot_paused`, `handed_off_at` (set with `state = handed_off`, null
+  otherwise; migration `0030_conversation_handed_off_at`), `last_message_at`,
+  `last_message_preview`, `last_message_sender`, `last_inbound_at`,
+  `seller_last_read_at`.
   `UNIQUE (merchant_id, facebook_page_id, customer_id)`; indexes on the list
   order and partial ones for `handed_off` and `awaiting_confirmation`.
 - `message`: `sender`, `text`, `meta_message_id` (null while `sending`),
@@ -244,9 +247,10 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 
 - Queue the assistant's turn from `InboundMessageIngest` (AI work), honouring
   the conversation's `bot_paused` and the Page's `bot_enabled`.
-- When the assistant hands a conversation off, call
-  `NotificationsService.handedOff` after that write commits, so the seller is
-  emailed if nobody replies in 10 minutes
+- When the assistant hands a conversation off, set `handed_off_at` in the
+  same write as `state = handed_off`, and call `NotificationsService.handedOff`
+  with that same moment after the write commits, so the seller is emailed if
+  nobody replies in 10 minutes
   ([Settings – Notifications](../10-settings-notifications/README.md#sending)).
 - The drafted-order panel and the customer's order history beside the thread.
   The seller's own "Confirm" is settled: it is the second confirmation of an
