@@ -158,7 +158,13 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
       // like a fresh sign-up so the form can't be used to probe for accounts.
       // The real owner hears about it here instead.
       onExistingUserSignUp: async ({ user }) => {
-        mailer.dispatch({ to: user.email, ...existingAccountEmail(`${settings.appUrl}/sign-in`) });
+        mailer.dispatch({
+          to: user.email,
+          ...existingAccountEmail({
+            signInUrl: `${settings.appUrl}/sign-in`,
+            forgotPasswordUrl: `${settings.appUrl}/forgot-password`,
+          }),
+        });
       },
     },
     emailVerification: {

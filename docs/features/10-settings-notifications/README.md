@@ -104,7 +104,10 @@ reads `conversation.handed_off_at`
 `NotificationsModule`, imported by `AppModule`), and `NotificationComposer`,
 `NotificationReadsRepository` and `NotificationsProcessor` (in
 `NotificationsWorkerModule`, imported only by `WorkerModule`); the templates
-in `notification-emails.ts`, the shop clock in `shop-clock.ts`.
+in `notification-emails.ts`, which renders through the shared MJML templates
+in `apps/api/src/modules/mail/templates.ts` (see
+[Auth](../01-auth/README.md#email-and-password-flows)), the shop clock in
+`shop-clock.ts`.
 Web: `apps/web/src/features/settings/components/NotificationsCard.tsx`,
 `apps/web/src/features/settings/notification-queries.ts`,
 `apps/web/src/components/ui/switch.tsx`.
