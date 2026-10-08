@@ -10,7 +10,8 @@ worker; the API lists, searches, counts and shows conversations, marks them
 read, takes over and hands back, sends seller replies, deletes failed ones,
 and streams changes over SSE. The dashboard has the inbox at
 `/conversations` and `/conversations/:id`. Not built yet: assistant replies
-(AI work), and the drafted-order panel and order history in the thread. See
+([11 · AI implementation](../11-ai-implementation/README.md)), and the
+drafted-order panel and order history in the thread. See
 [Follow-ups](#follow-ups).
 
 ## Webhook

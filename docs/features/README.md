@@ -17,6 +17,7 @@ feature's page in the same change as its code.
 | 08  | [Settings – Account](08-settings-account/README.md)             | Built                                                                               |
 | 09  | [Settings – Delivery charges](09-settings-delivery/README.md)   | Built; the assistant quoting delivery waits for the AI work                         |
 | 10  | [Settings – Notifications](10-settings-notifications/README.md) | Built; the AI work reporting orders and handoffs is not                             |
+| 11  | [AI implementation](11-ai-implementation/README.md)             | Not started: nine phases, from the assistant's turn to comments and Live sales      |
 
 ## Each page
 
@@ -30,7 +31,8 @@ In [MVP 01's scope](../mvp/01-messenger-to-order/scope.md) or
 [Meta requirements](../mvp/01-messenger-to-order/meta-requirements.md), with no
 feature page because no code exists yet:
 
-- **The AI assistant**: intent classification, product matching from
+- **The AI assistant**, planned phase by phase in
+  [AI implementation](11-ai-implementation/README.md): intent classification, product matching from
   `findSellableCatalog`, slot-filling, the confirmation card, mid-flow edits,
   handoff when unsure or when the LLM fails, and writing `source = assistant`
   orders with the order ID sent to the customer. Its hooks are listed in

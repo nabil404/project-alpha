@@ -4,7 +4,8 @@ These bind every change, backend and frontend alike.
 
 ## Non-negotiable rules
 
-- The assistant never creates an order without explicit customer confirmation (Confirm button on the summary card). The only other way an order exists is a seller adding one by hand for a customer who has messaged the Page ([Domain](domain.md#data-model)).
+- The assistant never creates an order without explicit customer confirmation (Confirm button on the summary card). The only other way an order exists is a seller adding one by hand for a customer who has messaged the Page ([Domain](domain.md#data-model)). A reaction, sticker, emoji, comment, edit, photo or shared post is never a confirmation.
+- Public replies (comments) never quote prices, stock, or any customer's name, phone or address.
 - The AI only quotes prices, variants, stock, and delivery charges from the seller's catalog. It never invents discounts or availability.
 - When unsure (low confidence, repeated confusion, complaints, human request), hand off to the seller instead of guessing.
 - If the LLM fails or times out, hand off gracefully. The customer is never left without a reply.
