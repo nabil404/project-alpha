@@ -14,7 +14,19 @@
   product in several), CSV import. Sellers organize by category;
   the AI browses by it.
 - AI: intent classification, product matching, slot-filling, confirmation,
-  mid-flow edits.
+  mid-flow edits. Built in phases:
+  [07 · AI implementation](../../features/07-ai-implementation/README.md).
+- Customer interactions beyond a text message:
+  - Messenger: product photos and screenshots (matched to the catalog, always
+    confirmed by the customer); Page posts and ads shared into the chat;
+    stickers, 👍, reactions and edited messages (never a confirmation); a
+    shared location as the delivery address.
+  - Entry points: Get Started, ice breakers, persistent menu and quick-reply
+    browsing; `m.me` links and QR codes per product; click-to-Messenger ads
+    mapped to a product.
+  - Public: comments on posts, ads and reels answered with one private reply
+    in Messenger and an optional public reply; order codes in Facebook Live
+    comments; mentions and visitor posts listed for the seller.
 - Automatic order creation with the order ID sent to the customer.
 - Human handoff, and bot auto-pause when the seller replies manually.
 - Seller dashboard: orders list and detail with transcript, status changes,
@@ -27,9 +39,9 @@
 
 Instagram, WhatsApp, website chat; online payments (assume cash on delivery or
 manual confirmation); courier integrations and external inventory sync;
-multi-user team roles and mobile apps; image/screenshot product matching, stats
-page, post-order status messages, comment-to-Messenger replies, abandoned-chat
-follow-ups, repeat-customer recognition.
+multi-user team roles and mobile apps; stats page, post-order status messages,
+abandoned-chat follow-ups, repeat-customer recognition; voice messages, Page
+reviews and recommendations, Lead Ad forms, post reaction analytics.
 
 "Multi-user team roles" above means several users inside one organization. It is
 not the same thing as several organizations per seller, which the data model

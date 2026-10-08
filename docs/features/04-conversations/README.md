@@ -8,7 +8,8 @@ page describes what is built.
 **Status (Sep 2026):** inbound messages and seller echoes are stored by the
 worker; the API lists, searches, counts and shows conversations, marks them
 read, takes over and hands back, sends seller replies, and streams changes
-over SSE. Not built yet: assistant replies (AI work), the drafted-order panel
+over SSE. Not built yet: assistant replies
+([07 · AI implementation](../07-ai-implementation/README.md)), the drafted-order panel
 and order history (orders work), and the web route (the sidebar item exists,
 disabled).
 
