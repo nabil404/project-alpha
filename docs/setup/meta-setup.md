@@ -73,6 +73,9 @@ their Facebook sign-in identity.
   are requested by the Messenger app in the separate Page connection step,
   never at sign-in ([auth feature doc](../features/01-auth/README.md),
   [Page connection feature doc](../features/03-facebook-page/README.md)).
+  The [AI phases](../features/11-ai-implementation/README.md#app-review) add
+  `pages_read_engagement`, `pages_read_user_content` and
+  `pages_manage_engagement` to that step as they land.
 - Facebook identities never link automatically to an existing account by
   email, because Facebook does not guarantee a verified address.
 - The webhook needs a public HTTPS URL, even in development (see
@@ -169,6 +172,20 @@ it needs its own redirect URI and the Page permissions.
      app lists `https://<your-domain>/api/v1/messenger/page/oauth/callback`.
 3. **Save changes.**
 
+The AI phases need more Page permissions. Add each to the same
+**Permissions** list when its phase lands, not before: the code requests only
+what is in its Page permission list in
+[`meta-graph.client.ts`](../../apps/api/src/modules/messenger/page/meta-graph.client.ts).
+
+| Permission                | Phase                                                                                                                                                               | For                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `pages_read_engagement`   | [11.5](../features/11-ai-implementation/phase-5-shared-posts/README.md)                                                                                             | Reading a shared post's caption; the post picker |
+| `pages_read_user_content` | [11.7](../features/11-ai-implementation/phase-7-comments-to-messenger/README.md), [11.9](../features/11-ai-implementation/phase-9-mentions-visitor-posts/README.md) | Reading comments, mentions and visitor posts     |
+| `pages_manage_engagement` | [11.7](../features/11-ai-implementation/phase-7-comments-to-messenger/README.md)                                                                                    | Public replies to comments                       |
+
+A Page connected before a permission was added does not have it: the seller
+must connect the Page again to grant it.
+
 ### 6. Generate `META_VERIFY_TOKEN`
 
 The verify token is a shared secret **you** invent. Meta sends it back once,
@@ -234,6 +251,23 @@ internet over HTTPS, so locally you need a tunnel to your machine.
    as seller messages; echoes of replies sent by this app are skipped). Other
    fields, and messages without text, are acknowledged and ignored.
 
+   The AI phases add fields. Each is subscribed by the app itself once its
+   phase adds it to `PAGE_WEBHOOK_FIELDS` in
+   [`meta-graph.client.ts`](../../apps/api/src/modules/messenger/page/meta-graph.client.ts);
+   Pages connected before then must be connected again. Tick the same fields
+   here so the dashboard's **Test** buttons work.
+
+   | Field                 | Phase                                                                                                                                                              | Delivers                                               |
+   | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+   | `messaging_referrals` | [11.3](../features/11-ai-implementation/phase-3-entry-points/README.md), [11.5](../features/11-ai-implementation/phase-5-shared-posts/README.md)                   | `m.me` links, QR codes and click-to-Messenger ads      |
+   | `message_reactions`   | [11.4](../features/11-ai-implementation/phase-4-non-text-events/README.md)                                                                                         | Reactions to messages                                  |
+   | `message_edits`       | [11.4](../features/11-ai-implementation/phase-4-non-text-events/README.md)                                                                                         | Edited messages                                        |
+   | `feed`                | [11.7](../features/11-ai-implementation/phase-7-comments-to-messenger/README.md)–[11.9](../features/11-ai-implementation/phase-9-mentions-visitor-posts/README.md) | Comments on posts, ads, reels and Lives; visitor posts |
+   | `mention`             | [11.9](../features/11-ai-implementation/phase-9-mentions-visitor-posts/README.md)                                                                                  | Mentions and tags of the Page                          |
+
+   Check the field names against Meta's current webhook reference before
+   ticking them; Meta renames them occasionally.
+
 6. Connect your test Page, either way:
    - **In the app (preferred):** sign in, open **Settings → Messenger** and
      click **Connect**. This runs the Page connection through `META_APP_ID`
@@ -243,6 +277,16 @@ internet over HTTPS, so locally you need a tunnel to your machine.
 
 If you generate a Page access token in the dashboard for manual testing, treat
 it as a secret: never commit it, paste it in an issue, or log it.
+
+#### Messenger Profile (phase 11.3)
+
+From [phase 11.3](../features/11-ai-implementation/phase-3-entry-points/README.md)
+on, the app sets the Page's Get Started button, ice breakers, persistent menu
+and greeting itself, through the Page token, when the Page connects and when
+the seller changes them. Nothing is configured in the dashboard. To see what a
+Page has, open the [Graph API Explorer](https://developers.facebook.com/tools/explorer/),
+pick the Messenger app and the Page, and run
+`GET /me/messenger_profile?fields=get_started,ice_breakers,persistent_menu,greeting`.
 
 ### 9. Roles and testers
 
@@ -288,6 +332,10 @@ Restart the API and the worker after any change.
    send a text message to the test Page. The API answers `EVENT_RECEIVED` and
    the worker log shows the `inbound-message` job. The dashboard's **Test**
    button next to a webhook field sends a sample payload too.
+5. **Assistant reply** (from
+   [phase 11.1](../features/11-ai-implementation/phase-1-foundation/README.md)
+   on): with `LLM_API_KEY` set ([LLM setup](llm-setup.md)) and the worker
+   running, the same message gets an AI reply in Messenger.
 
 ## HTTPS through a tunnel
 
@@ -327,6 +375,8 @@ A named Cloudflare tunnel keeps one host.
 | Every webhook POST answers 401 `WEBHOOK_INVALID_SIGNATURE`                      | `META_APP_SECRET` is not the Messenger app's App Secret (the sign-in app's, another environment's, or reset since). Copy it again from the Messenger app's **App settings → Basic**.                                                                                                                                                                            |
 | Handshake works but no messages arrive                                          | The Page is not connected ([step 8.6](#8-subscribe-the-messenger-webhook)), `messages` is not subscribed, or the sender has no role on the Messenger app while it is in Development mode.                                                                                                                                                                       |
 | API refuses to boot: `META_GRAPH_VERSION`                                       | The value is not in `vNN.N` form.                                                                                                                                                                                                                                                                                                                               |
+| A feature from a new AI phase fails with a permission error                     | The Page was connected before the phase added its permission or webhook field. Connect the Page again from **Settings → Messenger**, and check the permission is on the Messenger app ([step 5](#5-configure-the-page-connection-messenger-app)).                                                                                                               |
+| Comment, mention or Live webhooks never arrive                                  | `feed` / `mention` is not subscribed ([step 8](#8-subscribe-the-messenger-webhook)), or the Page lacks `pages_read_user_content`. In Development mode, the commenter must also have a role on the Messenger app.                                                                                                                                                |
 
 ## Secrets
 
@@ -363,12 +413,27 @@ customer messages:
    Make sure those pages are live on the production domain.
 
 3. **App Review** of the **Messenger app** (**App Review → Requests**) for
-   advanced access to the permissions the Page connection and Messenger need,
-   typically `pages_messaging`, `pages_show_list`, `pages_manage_metadata` and
-   `pages_read_engagement`. Each needs a written use case and a screencast of
-   the flow. The MVP plan targets submission by the end of week 4. The sign-in
-   app's `public_profile` and `email` need no review.
+   advanced access. Each permission needs a written use case and its own
+   screencast of the flow on the dev Page:
+
+   | Permission                | Use case to describe                                                   |
+   | ------------------------- | ---------------------------------------------------------------------- |
+   | `pages_show_list`         | The seller picks which of their Pages to connect                       |
+   | `pages_manage_metadata`   | Subscribing the connected Page to the app's webhooks                   |
+   | `pages_messaging`         | The assistant answers customers and sends the order summary to confirm |
+   | `pages_read_engagement`   | Linking posts to products; answering about a post shared into the chat |
+   | `pages_read_user_content` | Reading comments, mentions and visitor posts for the seller            |
+   | `pages_manage_engagement` | A short public reply under a customer's comment                        |
+
+   The MVP plan targets one submission by the end of week 4. Features that are
+   not built by then cannot be recorded; the
+   [AI implementation](../features/11-ai-implementation/README.md#app-review)
+   page tracks that conflict. A rejection drops only the features that need
+   that permission. The sign-in app's `public_profile` and `email` need no
+   review.
+
 4. Switch **both** apps from **Development** to **Live** with the toggle at the
    top of the dashboard.
 5. Remember the Messenger **24-hour window**: a Page may reply freely only
-   within 24 hours of the customer's last message.
+   within 24 hours of the customer's last message. A private reply to a
+   comment is allowed once per comment, within Meta's own time limit.

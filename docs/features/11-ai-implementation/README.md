@@ -55,7 +55,9 @@ with its own screencast:
 | `pages_manage_engagement` | Phases 7, 8   | A comment answered with a private and a public reply         |
 | `pages_read_user_content` | Phases 7–9    | Comments, mentions and visitor posts listed in the dashboard |
 
-Check the exact permission names and webhook fields against Meta's current
+How to add the permissions and fields to the Meta app, and the review itself:
+[Meta setup](../../setup/meta-setup.md#going-live). Check the exact permission
+names and webhook fields against Meta's current
 documentation before submitting. A rejection drops only the phases that need
 that permission; Pages connected earlier must reconnect to grant new ones.
 

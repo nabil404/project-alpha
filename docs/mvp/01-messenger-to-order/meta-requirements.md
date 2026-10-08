@@ -1,5 +1,8 @@
 # Meta requirements
 
+What Meta requires of the MVP. How to set up the apps, permissions and
+webhooks: [Meta setup](../../setup/meta-setup.md).
+
 - Business Verification — start Week 1.
 - App Review for advanced access — submit by end of Week 4, one screencast per
   permission. Check names against Meta's current docs before submitting:

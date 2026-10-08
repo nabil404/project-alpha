@@ -41,7 +41,8 @@ AssistantTurnProcessor → AssistantTurnService.run()
 
 - **Dependencies** (`apps/api`): `ai`, `@ai-sdk/anthropic`. Load the
   `claude-api` skill first and check the installed SDK's structured-output API.
-- **Config** (`src/modules/config/env.schema.ts`): fix the
+- **Config** (`src/modules/config/env.schema.ts`; the key and models are set up
+  as in [LLM setup](../../../setup/llm-setup.md)): fix the
   `LLM_MODEL_EXTRACTION` default to a current model ID; add `LLM_TIMEOUT_MS`
   (default 15000). With no `LLM_API_KEY`, no turns are queued (the same pattern
   as Graph being unconfigured). Add `*.apiKey` to the pino redact list in
