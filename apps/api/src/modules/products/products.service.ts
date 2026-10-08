@@ -21,6 +21,8 @@ import { withMerchant } from '../database/with-merchant';
 import { toCategory } from '../categories/category-mappers';
 import { CategoriesRepository } from '../categories/categories.repository';
 import { categoryNotFound } from '../categories/category-errors';
+import { DeliveryChargesRepository } from '../settings/delivery-charges.repository';
+import { deliveryChargeNotFound } from '../settings/delivery-errors';
 import { ObjectStorage } from '../storage/object-storage';
 import { deleteObjectsQuietly, objectKeysFor } from './images/product-image-objects';
 import { ProductImageRepository } from './images/product-image.repository';
@@ -35,6 +37,10 @@ import {
   productStale,
   variantNotFound,
 } from './product-errors';
+import {
+  ProductDeliveryRepository,
+  type ProductDeliveryChargeValue,
+} from './product-delivery.repository';
 import { toProduct, toProductImage, toProductListItem } from './product-mappers';
 import { ProductsRepository, type ProductRow } from './products.repository';
 import { normalizeSku } from './sku';
@@ -57,6 +63,8 @@ export class ProductsService {
     private readonly options: ProductOptionsRepository,
     private readonly writer: ProductWriter,
     private readonly storage: ObjectStorage,
+    private readonly deliveryCharges: DeliveryChargesRepository,
+    private readonly productDelivery: ProductDeliveryRepository,
   ) {}
 
   async create(merchantId: string, input: CreateProduct): Promise<Product> {
@@ -69,9 +77,10 @@ export class ProductsService {
         description: doc.description,
         status: doc.status,
         aliases: doc.aliases,
-        deliveryCharge: doc.deliveryCharge,
+        customDelivery: doc.customDelivery,
       });
       await this.writer.apply(tx, scope, row.id, planProductDocument(EMPTY_PRODUCT_STATE, doc));
+      await this.writeDeliveryCharges(tx, scope, row.id, doc.customDelivery, doc.deliveryCharges);
       await this.linkCategories(tx, scope, row.id, doc.categoryIds);
       return this.load(tx, scope, row.id);
     });
@@ -172,10 +181,11 @@ export class ProductsService {
         description: doc.description,
         status: doc.status,
         aliases: doc.aliases,
-        deliveryCharge: doc.deliveryCharge,
+        customDelivery: doc.customDelivery,
         coverImageId: plan.coverImageId ?? null,
       });
       await this.writer.apply(tx, scope, id, plan);
+      await this.writeDeliveryCharges(tx, scope, id, doc.customDelivery, doc.deliveryCharges);
       await this.linkCategories(tx, scope, id, doc.categoryIds);
       return this.load(tx, scope, id);
     });
@@ -185,13 +195,17 @@ export class ProductsService {
   update(merchantId: string, id: string, input: UpdateProduct): Promise<Product> {
     return withMerchant(this.db, merchantId, async (tx) => {
       const scope = { merchantId };
-      const { categoryIds, ...fields } = input;
-      if (!(await this.products.findProduct(tx, scope, id, { lock: true }))) {
-        throw productNotFound(id);
-      }
+      const { categoryIds, deliveryCharges, ...fields } = input;
+      const row = await this.products.findProduct(tx, scope, id, { lock: true });
+      if (!row) throw productNotFound(id);
 
       if (Object.values(input).some((value) => value !== undefined)) {
         await this.products.updateProduct(tx, scope, id, fields);
+      }
+      const customDelivery = fields.customDelivery ?? row.customDelivery;
+      // Turning custom off drops its charges; new ones replace the old.
+      if (!customDelivery || deliveryCharges !== undefined) {
+        await this.writeDeliveryCharges(tx, scope, id, customDelivery, deliveryCharges ?? []);
       }
       if (categoryIds !== undefined) await this.linkCategories(tx, scope, id, categoryIds);
       return this.load(tx, scope, id);
@@ -302,6 +316,7 @@ export class ProductsService {
     );
     const categoryIds = await this.products.categoryIdsByProduct(tx, scope, ids);
     const images = await this.images.listForProducts(tx, scope, ids);
+    const deliveryCharges = await this.productDelivery.listForProducts(tx, scope, ids);
 
     return rows.map((row) => {
       const ownVariants = variants.filter((variant) => variant.productId === row.id);
@@ -317,8 +332,32 @@ export class ProductsService {
         images: images
           .filter((image) => image.productId === row.id)
           .map((image) => toProductImage(image, this.storage)),
+        deliveryCharges: deliveryCharges
+          .filter((charge) => charge.productId === row.id)
+          .map(({ deliveryChargeId, charge }) => ({ deliveryChargeId, charge })),
       });
     });
+  }
+
+  /**
+   * A product's own delivery charges, kept only while it sets them; every
+   * area must be one of the shop's.
+   */
+  private async writeDeliveryCharges(
+    tx: Transaction,
+    scope: TenantScope,
+    productId: string,
+    customDelivery: boolean,
+    deliveryCharges: ProductDeliveryChargeValue[],
+  ): Promise<void> {
+    const rows = customDelivery ? deliveryCharges : [];
+    const ids = rows.map((row) => row.deliveryChargeId);
+    const found = new Set(
+      (await this.deliveryCharges.findMany(tx, scope, ids)).map((row) => row.id),
+    );
+    const missing = ids.find((id) => !found.has(id));
+    if (missing) throw deliveryChargeNotFound(missing);
+    await this.productDelivery.replace(tx, scope, productId, rows);
   }
 
   private async linkCategories(

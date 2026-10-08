@@ -13,6 +13,7 @@ import {
   messagePageSchema,
   messageSchema,
 } from '@app/shared';
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { AuthModule } from '../../auth/auth.module';
 import { configureApp, NEST_APP_OPTIONS } from '../../../bootstrap';
@@ -33,6 +34,7 @@ import {
   seedFacebookPage,
   seedMessage,
 } from '../../database/__tests__/conversation-seeds';
+import * as schema from '../../database/schema/index';
 import { MailService } from '../../mail/mail.service';
 import { META_GRAPH } from '../../messenger/page/facebook-page.service';
 import type { ConversationEvent } from '../events/conversation-event';
@@ -76,6 +78,7 @@ describeDb('conversation routes over HTTP', () => {
         customerId: nusrat.id,
         facebookPageId: page.pageId,
         state: 'handed_off',
+        handedOffAt: new Date(now - 60_000),
         lastMessageAt: new Date(now - 60_000),
         lastInboundAt: new Date(now - 60_000),
       })
@@ -267,6 +270,12 @@ describeDb('conversation routes over HTTP', () => {
       ).body,
     );
     expect(handedBack).toMatchObject({ botPaused: false, state: 'browsing' });
+    // Off the handoff, so its pending customer-waiting email stays quiet.
+    const [row] = await t.db
+      .select({ handedOffAt: schema.conversation.handedOffAt })
+      .from(schema.conversation)
+      .where(eq(schema.conversation.id, handedOff));
+    expect(row?.handedOffAt).toBeNull();
 
     const refused = await request(server())
       .patch(`/api/v1/conversations/${handedOff}`)

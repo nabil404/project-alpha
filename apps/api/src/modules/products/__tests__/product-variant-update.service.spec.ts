@@ -21,7 +21,6 @@ describeDb('ProductsService — updateVariant', () => {
       merchantId,
       createProductSchema.parse({
         name: 'Kurti',
-        deliveryCharge: 0,
         options: [{ name: 'Size', values: [{ value: 'M' }, { value: 'L' }] }],
         variants: [
           { optionValues: ['M'], sku: sku('m'), price: 160000, stock: 9 },

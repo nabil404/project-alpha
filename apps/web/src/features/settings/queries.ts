@@ -18,6 +18,8 @@ import { apiFetch } from '@/lib/api';
 export const settingsKeys = {
   all: ['settings'] as const,
   general: () => [...settingsKeys.all, 'general'] as const,
+  delivery: () => [...settingsKeys.all, 'delivery'] as const,
+  notifications: () => [...settingsKeys.all, 'notifications'] as const,
 };
 
 export const generalSettingsQueryOptions = () =>
@@ -38,11 +40,13 @@ export function useUpdateGeneralSettings() {
     onSuccess: async (saved, input) => {
       const before = queryClient.getQueryData<GeneralSettings>(settingsKeys.general());
       queryClient.setQueryData(settingsKeys.general(), saved);
-      // A currency change rescales stored prices when the decimals differ, so
-      // every cached amount (catalog, customers) may be stale.
+      // A currency change rescales stored prices and delivery charges when the
+      // decimals differ, so every cached amount (catalog, customers, delivery
+      // charges) may be stale.
       if (input.currency !== undefined && before?.currency !== saved.currency) {
         await queryClient.invalidateQueries({
-          predicate: (query) => query.queryKey[0] !== settingsKeys.all[0],
+          predicate: ({ queryKey: [domain, section] }) =>
+            !(domain === settingsKeys.all[0] && section === settingsKeys.general()[1]),
         });
       }
     },

@@ -66,8 +66,8 @@ and are marked ⚠️ below.
 `src/modules/database/schema/` holds one file per area, exported in dependency
 order from `index.ts`: `auth.ts` (Better Auth's tables, generated, never
 hand-written), `pages.ts`, `catalog.ts`, `customers.ts` (with
-`customer_note`), `conversations.ts` and `orders.ts` (provisional until the
-orders work creates orders). `columns.ts` has the shared builders: `id()`,
+`customer_note`), `conversations.ts` and `orders.ts` (with `order_item` and
+`order_event`). `columns.ts` has the shared builders: `id()`,
 `merchantId()`, `createdAt()`/`updatedAt()`, `instant()` for millisecond
 timestamps that sort a keyset list, `merchantIsolation()` for the policy and
 `oneOf()` for enum checks. A business table you reference that does not exist

@@ -32,6 +32,18 @@ async function insertMerchant(db: Database): Promise<string> {
 }
 
 async function purge(db: Database, merchantIds: string[]): Promise<void> {
+  // Orders first: their lines point at variants and products, their rows at
+  // customers and conversations.
+  await db.delete(schema.orderEvent).where(inArray(schema.orderEvent.merchantId, merchantIds));
+  await db.delete(schema.orderItem).where(inArray(schema.orderItem.merchantId, merchantIds));
+  await db.delete(schema.order).where(inArray(schema.order.merchantId, merchantIds));
+  // Product charges cascade from their product and area; delete them first anyway.
+  await db
+    .delete(schema.productDeliveryCharge)
+    .where(inArray(schema.productDeliveryCharge.merchantId, merchantIds));
+  await db
+    .delete(schema.deliveryCharge)
+    .where(inArray(schema.deliveryCharge.merchantId, merchantIds));
   // Junction and variants first; categories in one statement so the self-FK is
   // checked only once they are all gone. Images cascade from their product.
   await db
@@ -42,9 +54,7 @@ async function purge(db: Database, merchantIds: string[]): Promise<void> {
     .where(inArray(schema.productVariant.merchantId, merchantIds));
   await db.delete(schema.product).where(inArray(schema.product.merchantId, merchantIds));
   await db.delete(schema.category).where(inArray(schema.category.merchantId, merchantIds));
-  // Orders and notes point at customers and conversations, so they go first.
-  await db.delete(schema.orderItem).where(inArray(schema.orderItem.merchantId, merchantIds));
-  await db.delete(schema.order).where(inArray(schema.order.merchantId, merchantIds));
+  // Notes point at customers, so they go before them.
   await db.delete(schema.customerNote).where(inArray(schema.customerNote.merchantId, merchantIds));
   // Conversations: messages cascade from their conversation, but delete them
   // explicitly so a failed test cannot leave a row holding the merchant.
@@ -55,6 +65,9 @@ async function purge(db: Database, merchantIds: string[]): Promise<void> {
   await db
     .delete(schema.merchantSettings)
     .where(inArray(schema.merchantSettings.merchantId, merchantIds));
+  await db
+    .delete(schema.notificationPreference)
+    .where(inArray(schema.notificationPreference.merchantId, merchantIds));
   await db.delete(schema.organization).where(inArray(schema.organization.id, merchantIds));
 }
 

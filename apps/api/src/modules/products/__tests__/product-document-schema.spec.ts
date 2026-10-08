@@ -5,7 +5,6 @@ import { zodIssuesToFields } from '../../../common/errors/validation-fields';
 const doc = (overrides: Partial<Record<keyof SaveProduct, unknown>> = {}) => ({
   version: '3',
   name: 'Blue kurti',
-  deliveryCharge: 6000,
   options: [
     { name: 'Size', values: [{ value: 'S' }, { value: 'M' }] },
     { name: 'Sleeve', values: [{ value: 'Short' }, { value: 'Long' }] },
@@ -30,6 +29,26 @@ function fieldCodes(input: unknown): Record<string, string[]> {
 }
 
 describe('saveProductSchema', () => {
+  it('uses the shop delivery charges unless told otherwise', () => {
+    const parsed = saveProductSchema.parse(doc());
+    expect(parsed).toMatchObject({ customDelivery: false, deliveryCharges: [] });
+  });
+
+  it("refuses the same area twice in a product's own delivery charges", () => {
+    const area = randomUUID();
+    expect(
+      fieldCodes(
+        doc({
+          customDelivery: true,
+          deliveryCharges: [
+            { deliveryChargeId: area, charge: 8000 },
+            { deliveryChargeId: area, charge: 9000 },
+          ],
+        }),
+      ),
+    ).toEqual({ 'deliveryCharges.1.deliveryChargeId': ['DUPLICATE'] });
+  });
+
   it('accepts a product without options sold as one variant, filling defaults', () => {
     const parsed = saveProductSchema.parse(doc({ options: [], variants: [{ price: 50000 }] }));
     expect(parsed.variants).toEqual([{ optionValues: [], price: 50000, stock: 0, imageId: null }]);

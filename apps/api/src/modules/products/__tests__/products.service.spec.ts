@@ -19,7 +19,6 @@ describeDb('ProductsService — products and category links', () => {
   const input = (overrides: Partial<Record<keyof CreateProduct, unknown>> = {}): CreateProduct =>
     createProductSchema.parse({
       name: 'Cotton Panjabi',
-      deliveryCharge: 6000,
       variants: [{ price: 150000, stock: 3 }],
       ...overrides,
     });
@@ -160,7 +159,6 @@ describeDb('ProductsService — products and category links', () => {
         name: 'Silk Panjabi',
         status: 'active',
         aliases: ['silk'],
-        deliveryCharge: 8000,
         categoryIds: [second.id],
       });
 
@@ -168,7 +166,6 @@ describeDb('ProductsService — products and category links', () => {
         name: 'Silk Panjabi',
         status: 'active',
         aliases: ['silk'],
-        deliveryCharge: 8000,
         categoryIds: [second.id],
       });
     });

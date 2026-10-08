@@ -63,12 +63,6 @@ describeDb('catalog schema constraints', () => {
         code: '23514',
         constraint: 'product_variant_stock_ck',
       });
-      await expect(
-        pgErrorOf(seedProduct(t.db, t.merchantA, { deliveryCharge: -1 })),
-      ).resolves.toEqual({
-        code: '23514',
-        constraint: 'product_delivery_charge_ck',
-      });
     });
 
     it('ties is_default to an unnamed variant, both ways', async () => {

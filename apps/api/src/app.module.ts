@@ -15,8 +15,10 @@ import { ProductsModule } from './modules/products/products.module';
 import { MessengerModule } from './modules/messenger/messenger.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { OrdersModule } from './modules/orders/orders.module';
 import { AccountModule } from './modules/account/account.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CryptoService } from './common/crypto.service';
 import { serializeRequest } from './common/request-log';
 
@@ -69,8 +71,10 @@ import { serializeRequest } from './common/request-log';
     MessengerModule,
     ConversationsModule,
     CustomersModule,
+    OrdersModule,
     AccountModule,
     SettingsModule,
+    NotificationsModule,
   ],
   providers: [
     CryptoService,

@@ -1,8 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { one } from '../database/rows';
-import { merchantSettings, order, product, productVariant } from '../database/schema/index';
+import {
+  deliveryCharge,
+  merchantSettings,
+  order,
+  product,
+  productDeliveryCharge,
+  productVariant,
+} from '../database/schema/index';
 
 export type MerchantSettingsRow = typeof merchantSettings.$inferSelect;
 export type MerchantSettingsValues = Omit<
@@ -79,8 +87,9 @@ export class MerchantSettingsRepository {
   }
 
   /**
-   * Multiplies every catalog amount - variant prices and product delivery
-   * charges, archived ones too - by `factor`, rounding half away from zero, so
+   * Multiplies every stored amount - variant prices (archived ones too),
+   * delivery charges, products' own delivery charges and the free-delivery
+   * threshold - by `factor`, rounding half away from zero, so
    * a price keeps its number when the currency's decimals change (৳1,600.00
    * stays 1,600 as ¥1,600). Bumps each product's revision, as every write to
    * its variants must.
@@ -90,7 +99,7 @@ export class MerchantSettingsRepository {
     { merchantId }: TenantScope,
     factor: string,
   ): Promise<void> {
-    const scaled = (column: typeof productVariant.price | typeof product.deliveryCharge) =>
+    const scaled = (column: AnyPgColumn) =>
       sql`round(${column}::numeric * ${factor}::numeric)::integer`;
     await executor
       .update(productVariant)
@@ -98,10 +107,20 @@ export class MerchantSettingsRepository {
       .where(eq(productVariant.merchantId, merchantId));
     await executor
       .update(product)
-      .set({
-        deliveryCharge: scaled(product.deliveryCharge),
-        revision: sql`${product.revision} + 1`,
-      })
+      .set({ revision: sql`${product.revision} + 1` })
       .where(eq(product.merchantId, merchantId));
+    await executor
+      .update(deliveryCharge)
+      .set({ charge: scaled(deliveryCharge.charge) })
+      .where(eq(deliveryCharge.merchantId, merchantId));
+    await executor
+      .update(productDeliveryCharge)
+      .set({ charge: scaled(productDeliveryCharge.charge) })
+      .where(eq(productDeliveryCharge.merchantId, merchantId));
+    // round(null) stays null, so an unset threshold stays unset.
+    await executor
+      .update(merchantSettings)
+      .set({ freeDeliveryOver: scaled(merchantSettings.freeDeliveryOver) })
+      .where(eq(merchantSettings.merchantId, merchantId));
   }
 }

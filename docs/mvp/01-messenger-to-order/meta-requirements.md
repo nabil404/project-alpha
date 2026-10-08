@@ -11,7 +11,7 @@
 
   `pages_show_list` and `pages_manage_metadata` (Page connection and webhook
   subscription) are requested alongside. A rejection drops only the
-  [AI phases](../../features/07-ai-implementation/README.md#app-review) that
+  [AI phases](../../features/11-ai-implementation/README.md#app-review) that
   need that permission.
 
 - Page webhook fields: `messages`, `messaging_postbacks`, `message_echoes`,

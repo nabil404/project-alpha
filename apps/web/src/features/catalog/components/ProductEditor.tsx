@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useBlocker, useNavigate } from '@tanstack/react-router';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useForm, useWatch, type Path, type Resolver } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import {
@@ -32,6 +32,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, fieldProps } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
@@ -45,6 +46,7 @@ import { catalogKeys, productQueryOptions, useCreateProduct, useSaveProduct } fr
 import { CategoryPicker } from './CategoryPicker';
 import { CommaListInput } from './CommaListInput';
 import { DeleteProductButton } from './DeleteProductButton';
+import { DeliveryChargeCard } from './DeliveryChargeCard';
 import { PhotosCard } from './PhotosCard';
 import { ProductStatusBadge } from './ProductStatusBadge';
 import { VariantsCard } from './VariantsCard';
@@ -263,6 +265,7 @@ export function ProductEditor({ product }: { product?: Product }) {
               <StatusCard />
               <OrganisationCard />
               <StockSummaryCard />
+              <DeliveryChargeCard className={card} />
             </div>
           </div>
         </form>
@@ -341,32 +344,24 @@ function StatusCard() {
             <h2 className="text-heading">
               <FormLabel className="text-heading">{t('status.title')}</FormLabel>
             </h2>
-            <div className="relative flex items-center">
-              <span
-                aria-hidden
-                className={cn(
-                  'pointer-events-none absolute left-3.5 size-2 rounded-full',
-                  field.value === 'active' ? 'bg-success' : 'bg-ink-muted',
-                )}
+            <FormControl>
+              <Select
+                {...fieldProps(field)}
+                icon={
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'size-2 shrink-0 rounded-full',
+                      field.value === 'active' ? 'bg-success' : 'bg-ink-muted',
+                    )}
+                  />
+                }
+                options={productStatusSchema.options.map((status) => ({
+                  value: status,
+                  label: productStatus(status),
+                }))}
               />
-              <FormControl>
-                <select
-                  {...field}
-                  className="h-10 w-full min-w-0 cursor-pointer appearance-none rounded-md border border-border-strong bg-surface pr-10 pl-8 text-body text-ink"
-                >
-                  {productStatusSchema.options.map((status) => (
-                    <option key={status} value={status}>
-                      {productStatus(status)}
-                    </option>
-                  ))}
-                </select>
-              </FormControl>
-              <ChevronDown
-                aria-hidden
-                className="pointer-events-none absolute right-3 size-4 text-ink-muted"
-                strokeWidth={1.5}
-              />
-            </div>
+            </FormControl>
             <FormDescription>{t('status.hint')}</FormDescription>
             <FormMessage />
           </FormItem>

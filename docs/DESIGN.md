@@ -147,6 +147,10 @@ changes ~120ms, fades ~200ms, no bounces or slides.
 - **Disabled:** `text-ink-disabled` on `bg-surface-sunken`,
   `disabled:cursor-not-allowed`.
 - **Clickable:** every clickable primitive sets `cursor-pointer`.
+- **Dropdowns:** never a native `<select>` (ESLint rejects it). Use `Select`
+  from `components/ui/select.tsx` for lists of about ten or fewer options, and
+  `Combobox` for longer, searchable ones. Both share the input's border, the
+  `rounded-lg` popover with `shadow-popover`, and a check on the chosen item.
 
 ## Components
 
@@ -172,6 +176,8 @@ new enum member fails the build instead of rendering unstyled.
 | Order `confirmed`, `packed`, `shipped`             | neutral                      |
 | Order `delivered`, stock `in_stock`                | success                      |
 | Order `cancelled`, stock `out_of_stock`            | danger                       |
+| Order `returned`, payment `refunded`               | warning                      |
+| Payment `unpaid` / `paid`                          | neutral / success            |
 | Conversation `awaiting_confirmation`, `handed_off` | warning                      |
 | Conversation `abandoned`                           | neutral                      |
 | Product `active` (Published)                       | success                      |

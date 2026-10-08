@@ -50,7 +50,9 @@ export function toCustomerDetail(
 export function toCustomerOrder({ order, items }: CustomerOrderRow): CustomerOrder {
   return {
     id: order.id,
+    reference: order.reference,
     number: order.number,
+    year: order.year,
     status: order.status,
     total: order.total,
     placedAt: order.placedAt.toISOString(),

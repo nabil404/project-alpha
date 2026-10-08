@@ -35,7 +35,7 @@ describeDb('ProductsService — remove', () => {
   it('refuses with PRODUCT_IN_USE while a row points at one of its variants, and keeps it', async () => {
     const product = await service.create(
       t.merchantA,
-      createProductSchema.parse({ name: 'Ordered', deliveryCharge: 0, variants: [{ price: 1 }] }),
+      createProductSchema.parse({ name: 'Ordered', variants: [{ price: 1 }] }),
     );
     await t.db.execute(
       sql`INSERT INTO ${table} VALUES (${t.merchantA}, ${product.variants[0]!.id})`,
@@ -50,7 +50,7 @@ describeDb('ProductsService — remove', () => {
   it('deletes a product nothing points at', async () => {
     const product = await service.create(
       t.merchantA,
-      createProductSchema.parse({ name: 'Free', deliveryCharge: 0, variants: [{ price: 1 }] }),
+      createProductSchema.parse({ name: 'Free', variants: [{ price: 1 }] }),
     );
     await service.remove(t.merchantA, product.id);
     await expectCoded(service.get(t.merchantA, product.id), 'PRODUCT_NOT_FOUND');

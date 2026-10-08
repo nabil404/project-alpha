@@ -15,7 +15,7 @@
   the AI browses by it.
 - AI: intent classification, product matching, slot-filling, confirmation,
   mid-flow edits. Built in phases:
-  [07 · AI implementation](../../features/07-ai-implementation/README.md).
+  [11 · AI implementation](../../features/11-ai-implementation/README.md).
 - Customer interactions beyond a text message:
   - Messenger: product photos and screenshots (matched to the catalog, always
     confirmed by the customer); Page posts and ads shared into the chat;

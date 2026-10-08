@@ -24,13 +24,10 @@ describeDb('ProductsService — list and counts', () => {
   let categoryA: string;
   let categoryB: string;
 
-  const create = async (
-    key: string,
-    input: Omit<z.input<typeof createProductSchema>, 'name' | 'deliveryCharge'>,
-  ) => {
+  const create = async (key: string, input: Omit<z.input<typeof createProductSchema>, 'name'>) => {
     made[key] = await service.create(
       t.merchantA,
-      createProductSchema.parse({ name: key, deliveryCharge: 0, status: 'active', ...input }),
+      createProductSchema.parse({ name: key, status: 'active', ...input }),
     );
   };
   const list = (query: Partial<Record<keyof ListProductsQuery, unknown>> = {}) =>

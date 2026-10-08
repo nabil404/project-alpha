@@ -6,6 +6,7 @@ import {
   type CustomerFilter,
   type CustomerSort,
   type CustomerStatus,
+  type OrderStatus,
   type SortDirection,
 } from '@app/shared';
 import {
@@ -16,7 +17,7 @@ import {
   getTableColumns,
   ilike,
   inArray,
-  ne,
+  notInArray,
   or,
   sql,
   type SQL,
@@ -35,6 +36,8 @@ import {
 } from '../database/schema/index';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Orders that never count towards a customer's figures. */
+const UNSOLD: OrderStatus[] = ['cancelled', 'returned'];
 const daysBefore = (now: Date, days: number) => new Date(now.getTime() - days * DAY_MS);
 
 /** A customer with the figures the list and detail derive from orders and conversations. */
@@ -74,7 +77,7 @@ export interface CustomerSummaryRow {
 }
 
 export interface CustomerOrderRow {
-  order: Pick<OrderRow, 'id' | 'number' | 'status' | 'total' | 'placedAt'>;
+  order: Pick<OrderRow, 'id' | 'reference' | 'number' | 'year' | 'status' | 'total' | 'placedAt'>;
   items: Pick<OrderItemRow, 'productName' | 'variantName' | 'quantity'>[];
 }
 
@@ -114,7 +117,7 @@ export class CustomersRepository {
         lastOrderAt: sql<Date>`max(${order.placedAt})`.mapWith(toDate).as('last_order_at'),
       })
       .from(order)
-      .where(and(eq(order.merchantId, merchantId), ne(order.status, 'cancelled')))
+      .where(and(eq(order.merchantId, merchantId), notInArray(order.status, UNSOLD)))
       .groupBy(order.customerId)
       .as('order_stats');
 
@@ -264,7 +267,7 @@ export class CustomersRepository {
           ),
       })
       .from(order)
-      .where(and(eq(order.merchantId, merchantId), ne(order.status, 'cancelled')));
+      .where(and(eq(order.merchantId, merchantId), notInArray(order.status, UNSOLD)));
     return {
       all: customers?.all ?? 0,
       needsYou: customers?.needsYou ?? 0,
@@ -308,7 +311,9 @@ export class CustomersRepository {
     const orders = await executor
       .select({
         id: order.id,
+        reference: order.reference,
         number: order.number,
+        year: order.year,
         status: order.status,
         total: order.total,
         placedAt: order.placedAt,

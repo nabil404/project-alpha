@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import type { ListCustomerOrdersQuery } from '@app/shared';
 
@@ -9,22 +10,21 @@ import { useErrorMessages } from '@/i18n/error-keys';
 import { useFormatters } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-import { orderReference, useOrderItemsLabel } from '../format';
+import { OrderStatusBadge, useLinesLabel } from '@/features/orders';
+
 import { useCustomerOrders } from '../queries';
-import { OrderStatusBadge } from './OrderStatusBadge';
 
 const ORDER_PAGE_SIZES = [10, 25, 50] as const;
 
 /**
  * Every order the customer placed, newest first, cancelled ones included:
- * a table from `sm` up, a stack of rows below it. Not links yet, since there
- * is no order page to open.
+ * a table from `sm` up, a stack of rows below it, each opening its order.
  */
 export function CustomerOrdersCard({ customerId }: { customerId: string }) {
   const { t } = useTranslation(['customers', 'common']);
   const { forError } = useErrorMessages();
   const { formatDate, formatMoney, formatNumber } = useFormatters();
-  const itemsLabel = useOrderItemsLabel();
+  const itemsLabel = useLinesLabel();
   const [query, setQuery] = useState<ListCustomerOrdersQuery>({
     page: 1,
     pageSize: ORDER_PAGE_SIZES[0],
@@ -75,9 +75,13 @@ export function CustomerOrdersCard({ customerId }: { customerId: string }) {
             {orders.data.data.map((order) => (
               <li key={order.id} className="flex flex-col gap-1 border-t border-border px-4 py-3">
                 <span className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-code text-ink-muted">
-                    {orderReference(order)}
-                  </span>
+                  <Link
+                    to="/orders/$orderId"
+                    params={{ orderId: order.id }}
+                    className="font-mono text-code text-link underline-offset-4 hover:underline"
+                  >
+                    {order.reference}
+                  </Link>
                   <OrderStatusBadge status={order.status} />
                 </span>
                 <span className="flex justify-between gap-2 text-body">
@@ -116,8 +120,14 @@ export function CustomerOrdersCard({ customerId }: { customerId: string }) {
               <tbody>
                 {orders.data.data.map((order) => (
                   <tr key={order.id} className="border-t border-border">
-                    <td className="py-3 pr-4 pl-6 font-mono text-code whitespace-nowrap text-ink-muted">
-                      {orderReference(order)}
+                    <td className="py-3 pr-4 pl-6 whitespace-nowrap">
+                      <Link
+                        to="/orders/$orderId"
+                        params={{ orderId: order.id }}
+                        className="font-mono text-code text-link underline-offset-4 hover:underline"
+                      >
+                        {order.reference}
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-body">{itemsLabel(order.items)}</td>
                     <td className="px-4 py-3 text-right text-body whitespace-nowrap tabular-nums">

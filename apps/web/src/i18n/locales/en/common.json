@@ -76,9 +76,24 @@
       "cancelled": "Cancelled",
       "confirmed": "Confirmed",
       "delivered": "Delivered",
-      "new": "New",
+      "new": "Drafted",
       "packed": "Packed",
+      "returned": "Returned",
       "shipped": "Shipped"
+    },
+    "orderSource": {
+      "assistant": "Assistant",
+      "seller": "Added by you"
+    },
+    "payment": {
+      "paid": "Paid",
+      "refunded": "Refunded",
+      "unpaid": "Unpaid"
+    },
+    "paymentMethod": {
+      "bank_transfer": "Bank transfer",
+      "cash_on_delivery": "Cash on delivery",
+      "mobile_wallet": "Mobile wallet"
     },
     "product": {
       "active": "Published",

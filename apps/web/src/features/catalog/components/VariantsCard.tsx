@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { FormControl, FormField, FormItem, FormMessage, useFormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 
 import {
   addCombinations,
@@ -499,22 +500,17 @@ function AddCombination({
             <label htmlFor={`${id}-${i}`} className="text-label">
               {option.name}
             </label>
-            <select
+            <Select
               id={`${id}-${i}`}
-              value={combo[i]}
-              onChange={(event) => {
+              value={combo[i] ?? ''}
+              onValueChange={(chosen) => {
                 const next = [...combo];
-                next[i] = event.target.value;
+                next[i] = chosen;
                 setPicked(next);
               }}
-              className="h-10 min-w-28 cursor-pointer rounded-md border border-border-strong bg-surface px-3 text-body text-ink"
-            >
-              {option.values.map((v) => (
-                <option key={v.id ?? v.value} value={v.value}>
-                  {v.value}
-                </option>
-              ))}
-            </select>
+              options={option.values.map((v) => ({ value: v.value, label: v.value }))}
+              className="min-w-28"
+            />
           </div>
         ))}
         <Button type="button" disabled={exists} onClick={() => onAdd([combo])}>

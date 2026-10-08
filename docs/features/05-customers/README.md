@@ -10,11 +10,9 @@ This page describes what is built.
 
 **Status (Oct 2026):** built end to end: list, summary, detail, contact edits,
 a customer's orders, and notes, in the API and at `/customers` and
-`/customers/:id` in the dashboard. The `order` and `order_item` tables exist
-only so these pages can read order history. They are **provisional**:
-nothing creates orders yet, and the orders work owns their shape and may
-change it. Not built yet: export and the items under
-[Follow-ups](#follow-ups).
+`/customers/:id` in the dashboard. The order tables these pages read belong
+to [Orders](../07-orders/README.md). Not built yet: export and the items
+under [Follow-ups](#follow-ups).
 
 ## Routes (`/api/v1/customers`, session + TenantGuard)
 
@@ -48,9 +46,10 @@ Money is integer minor units; timestamps are ISO strings.
   `customersWithOrders`, so the page picks the repeat-rate denominator;
   `averageOrderValue { allTime, currentWindow, previousWindow }`, each null
   when there was nothing to average. "Need a reply" is `counts.needsYou`.
-- `CustomerOrder`: `{ id, number, status, total, placedAt, items: [{ productName, variantName | null, quantity }] }`.
-  `number` is the shop's sequence as an integer; the web formats it
-  (`ORD-2026-00481`).
+- `CustomerOrder`: `{ id, reference, number, year, status, total, placedAt, items: [{ productName, variantName | null, quantity }] }`.
+  `reference` (`ORD-2026-00481`) is assigned by the API and shown as is;
+  `number` counts the shop's orders within `year`, the year placed in the
+  shop's time zone ([Orders](../07-orders/README.md#routes-apiv1orders-session--tenantguard)).
 - `CustomerNote`: `{ id, body, author: { id, name } | null, createdAt }`.
 
 ## Rules
@@ -63,15 +62,16 @@ Money is integer minor units; timestamps are ISO strings.
   4. `new`: everyone else, including customers with no orders.
 - **Last activity** is the latest of first contact, any conversation's
   `last_message_at`, and the last order.
-- **Cancelled orders never count**: not in `orderCount`, `totalSpent`,
+- **Cancelled and returned orders never count**: not in `orderCount`, `totalSpent`,
   `lastOrderAt`, the status, or average order value. The customer's order list
   still shows them.
 - **Windows are rolling,** not calendar months: "this month" is the last 30
   days (`CUSTOMER_STATS_WINDOW_DAYS`) and "vs last month" the 30 before, so no
   shop time zone is needed.
 - **Search** is a case-insensitive substring on name, area or phone; `%`, `_`
-  and `\` are matched literally. A term with 3 or more digits also matches the
-  phone with its separators stripped, so `01712345678` finds `01712-345678`.
+  and `\` are matched literally. A term with 3 or more digits also matches on
+  digits alone, so `1712-345 678` finds `+8801712345678` (phones are stored in
+  E.164).
 - **Sorting.** Customers with no orders sort last in either direction; `id`
   breaks ties in the sort's direction.
 - **Pagination** is by page number, not a cursor: the design shows "1–10 of
@@ -100,17 +100,8 @@ and composite `(merchant_id, id)` foreign keys.
 - `customer_note`: `customer_id` (cascades with the customer), `author_id` →
   `user.id` `ON DELETE SET NULL`, `body`. Indexed on
   `(merchant_id, customer_id, created_at DESC, id)`.
-- `order` (provisional): `number` (`UNIQUE (merchant_id, number)`, > 0),
-  `customer_id`, `conversation_id` (nullable), `status` (the shared order
-  statuses, default `new`), `subtotal`, `delivery_charge`, `total`
-  (`total = subtotal + delivery_charge`), the delivery snapshot
-  `customer_name`, `phone`, `delivery_address`, `notes`, `placed_at`
-  (millisecond precision). Indexed on `(merchant_id, customer_id, placed_at DESC, id)`
-  and `(merchant_id, placed_at DESC, id)`.
-- `order_item` (provisional): `order_id` (cascades), `product_id` and
-  `variant_id` (plain references, no foreign key: products are hard-deleted),
-  snapshots `product_name` and `variant_name`, `quantity` > 0,
-  `unit_price` ≥ 0, `position` (`UNIQUE (merchant_id, order_id, position)`).
+- `order` and `order_item`: see [Orders](../07-orders/README.md#data-model).
+  These pages read them through `(merchant_id, customer_id, placed_at DESC, id)`.
 
 ## Web
 
@@ -127,8 +118,8 @@ and composite `(merchant_id, id)` foreign keys.
   shown only when both exist. "Need a reply" links to Conversations filtered
   to `needs_you`.
 - **`/customers/:id`**: the badge and "Customer since", Open chat (the latest
-  conversation), the three figures, the orders (paged, `ORD-<year placed>-<number
-padded to 5>`, not links until orders have a page), the latest conversation,
+  conversation), the three figures, the orders (paged, by `reference`, each
+  linking to `/orders/:id`), the latest conversation,
   the contact card with an Edit dialog (the shared `updateCustomerSchema`; a
   blank field clears), and the notes with a box to add one.
 - **Badges.** Repeat is accent, New success, Needs you warning, Inactive
@@ -136,8 +127,9 @@ padded to 5>`, not links until orders have a page), the latest conversation,
   DESIGN.md already lists.
 - Code: `apps/web/src/features/customers/`, routes under
   `apps/web/src/routes/_app/customers/`. The pagination bar is shared from
-  `src/components/PaginationBar.tsx`, and the shop's currency is `SHOP_CURRENCY`
-  in `src/lib/currency.ts`.
+  `src/components/PaginationBar.tsx`. Money renders in the shop's currency
+  through `useFormatters()`, which reads `ShopRegionProvider`
+  ([Settings – General](../06-settings-general/README.md#dashboard)).
 
 ## Code
 
@@ -152,19 +144,15 @@ HTTP) and `database/__tests__/orders-schema.spec.ts` (keys, checks, RLS).
 
 ## Follow-ups
 
-- **Orders work:** create orders from a confirmed conversation (per-shop
-  `number` sequence, idempotency), and decide the `order_item` product and
-  variant keys. Revisit these tables then; this page's routes read only
-  `customer_id`, `status`, `total`, `placed_at`, `number` and the item
-  snapshots.
 - **Contact details from the chat:** copy phone and address into the customer
   when an order is confirmed, so the list fills without the seller typing.
 - **Web:** a sort control on phones (below `sm` the list keeps the URL's sort
-  but shows no headers to change it), and links from an order row once orders
-  have a page.
-- **Not built:** export (the design's Export button), "New order" (orders
-  work), "Preferred payment" (no payment method in the domain yet), deleting
-  or editing a note, and "Add customer" (see Rules).
+  but shows no headers to change it).
+- **Not built:** export (the design's Export button), "New order" on the
+  customer page (Orders' Create order dialog exists; this page doesn't open it
+  yet), "Preferred payment" (orders record a payment method, but nothing
+  derives a customer's preference), deleting or editing a note, and "Add
+  customer" (see Rules).
 - **Scale:** the list aggregates every order and conversation of the shop on
   each request. That is fine at MVP size; past a few thousand customers,
   denormalize the figures onto `customer`, or add trigram indexes on `phone`

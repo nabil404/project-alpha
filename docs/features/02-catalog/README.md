@@ -1,42 +1,42 @@
 # 02 · Product catalog
 
-How a seller's products, variants, categories and photos are stored, kept
-consistent, and read back by the dashboard and the AI. Scope comes from the
-MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
-[data model](../../mvp/01-messenger-to-order/domain.md#data-model). The designs
-behind it are the
-[catalog data model](../../superpowers/specs/2026-09-27-catalog-data-model-design.md)
-and [product image storage](../../superpowers/specs/2026-09-27-product-image-storage-design.md)
-specs. This page describes what is actually built.
+How a seller's products, options, variants, categories and photos are stored,
+kept consistent, and read back by the dashboard and the AI. Scope comes from
+the MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
+[data model](../../mvp/01-messenger-to-order/domain.md#data-model). This page
+describes what is actually built.
 
-**Status (Sep 2026):** the data layer is done. That covers five tables with
-composite tenant keys and forced row-level security, `CategoriesService` and
-`ProductsService` with every rule below (including the AI's
-`findSellableCatalog` read), product image upload/delete/reorder over HTTP,
-object storage on Cloudflare R2, a daily orphan sweep in the worker, and the
-dashboard's products list, add/edit page and Categories page, and the
-category routes. Not built yet: CSV import and stock movement on orders (see
-[Not yet built](#not-yet-built)).
+**Status (Oct 2026):** built end to end, except CSV import (see
+[Not yet built](#not-yet-built)). That covers eight tables with composite
+tenant keys and forced row-level security; `CategoriesService` and
+`ProductsService` with every rule below, including the AI's
+`findSellableCatalog` read; the product routes, with options and variants
+saved as one versioned document; image upload, delete, reorder and cover;
+object storage on Cloudflare R2; a daily orphan sweep in the worker; and the
+dashboard's products list, add/edit page and Categories page. Stock moves
+with orders; see [Orders](../07-orders/README.md#rules).
 
 ## At a glance
 
-| Concern          | Decision                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Tables           | `product`, `product_variant`, `category`, `product_category`, `product_image`                                       |
-| Tenant integrity | Composite foreign keys on `(merchant_id, id)` so no row can point at another merchant's row; RLS forced on all five |
-| Lifecycle        | Product `status` (`draft` / `active` / `archived`); variants archived (`archived_at`); categories soft-deleted      |
-| Sellable         | The AI sees only `active` products, their live variants and live categories                                         |
-| Money            | Integer minor units (`price`, `delivery_charge`), never floats                                                      |
-| Variants         | At least one live per product; a product without options has one unnamed default variant                            |
-| SKU              | Required, unique per merchant among live variants, case-insensitive; generated when left blank                      |
-| Categories       | A flat list, no nesting; a product can sit in several                                                               |
-| Images           | Up to 8 per product, 10 MB per upload, re-encoded by `sharp`, stored in R2 through the S3 API                       |
+| Concern          | Decision                                                                                                                                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tables           | `product`, `product_option`, `product_option_value`, `product_variant`, `product_variant_option_value`, `product_image`, `category`, `product_category` (and `product_delivery_charge`, see [Settings – Delivery charges](../09-settings-delivery/README.md)) |
+| Tenant integrity | Composite foreign keys on `(merchant_id, id)` so no row can point at another merchant's row; RLS forced on all eight                                                                                                                                          |
+| Lifecycle        | Product `status` (`draft` / `active` / `archived`); variants archived (`archived_at`); categories soft-deleted                                                                                                                                                |
+| Sellable         | The AI sees only `active` products, their options, live variants and live categories                                                                                                                                                                          |
+| Money            | Integer minor units (`price`, a product's own delivery charges), never floats                                                                                                                                                                                 |
+| Options          | Up to 3 per product (Size, Sleeve), each with up to 30 ordered values; a variant is one value per option                                                                                                                                                      |
+| Variants         | 1–100 live per product; a product without options has exactly one, unnamed, the default                                                                                                                                                                       |
+| Concurrency      | `product.revision`, `version` on the wire; a save from an older read is `409 PRODUCT_STALE`                                                                                                                                                                   |
+| SKU              | Required, unique per merchant among live variants, case-insensitive; generated when left blank                                                                                                                                                                |
+| Categories       | A flat list, no nesting; a product can sit in several                                                                                                                                                                                                         |
+| Images           | Up to 8 per product, 10 MB per upload, re-encoded by `sharp`, stored in R2 through the S3 API; the cover is chosen, not the first in order                                                                                                                    |
 
 ## Data model
 
 Defined in
 [`database/schema/catalog.ts`](../../../apps/api/src/modules/database/schema/catalog.ts).
-Every table has a `text` UUID `id` (the junction table has none), a
+Every table has a `text` UUID `id` (the two link tables have none), a
 `merchant_id` referencing `organization(id)`, `created_at`, and a
 `<table>_merchant_isolation` policy on `merchant_id = app_current_merchant()`.
 Every table also has `UNIQUE (merchant_id, id)`, which the composite foreign
@@ -44,18 +44,22 @@ keys point at. RLS filters reads, but it does not check the ids a row points
 at. The composite keys do that, so a bug that writes another merchant's
 `product_id` or `category_id` fails in the database.
 
-| Table              | Key columns                                                                                             | Constraints worth knowing                                                                                                                                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `product`          | `name`, `description`, `aliases text[]`, `status`, `delivery_charge`                                    | `status` check; `delivery_charge >= 0`                                                                                                                                                                                         |
-| `product_variant`  | `product_id`, `name` (null = default), `sku`, `price`, `stock`, `is_default`, `image_id`, `archived_at` | FK to product `ON DELETE CASCADE`; `price`, `stock >= 0`; `is_default = (name IS NULL)`; partial unique `(merchant_id, sku) WHERE archived_at IS NULL`; partial unique `(product_id) WHERE is_default AND archived_at IS NULL` |
-| `category`         | `name`, `deleted_at`                                                                                    | Partial unique `(merchant_id, lower(name)) WHERE deleted_at IS NULL`                                                                                                                                                           |
-| `product_category` | PK `(merchant_id, product_id, category_id)`                                                             | FK to product `ON DELETE CASCADE`; FK to category                                                                                                                                                                              |
-| `product_image`    | `product_id`, `storage_key`, `position`, `width`, `height`, `byte_size`                                 | FK to product `ON DELETE CASCADE`; `storage_key` unique; `position` dense `0..n-1`, `0` is the cover, deliberately not unique so a reorder needs no deferral                                                                   |
+| Table                          | Key columns                                                                                             | Constraints worth knowing                                                                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `product`                      | `name`, `description`, `aliases text[]`, `status`, `custom_delivery`, `cover_image_id`, `revision`      | `status` check; `revision >= 0`                                                                                                                                                                                                |
+| `product_option`               | `product_id`, `name`, `position`                                                                        | FK to product `ON DELETE CASCADE`; `position` dense `0..n-1` (the order customers are asked in), not unique. Name uniqueness within a product is the service's, under the product row lock                                     |
+| `product_option_value`         | `option_id`, `value`, `position`                                                                        | FK to option `ON DELETE CASCADE`; `UNIQUE (merchant_id, option_id, id)`, the target of the link table's key                                                                                                                    |
+| `product_variant`              | `product_id`, `name` (null = default), `sku`, `price`, `stock`, `is_default`, `image_id`, `archived_at` | FK to product `ON DELETE CASCADE`; `price`, `stock >= 0`; `is_default = (name IS NULL)`; partial unique `(merchant_id, sku) WHERE archived_at IS NULL`; partial unique `(product_id) WHERE is_default AND archived_at IS NULL` |
+| `product_variant_option_value` | PK `(merchant_id, variant_id, option_id)`, `option_value_id`                                            | One value per option per variant; the value key carries `option_id`, so the value must be that option's. Both keys cascade                                                                                                     |
+| `product_image`                | `product_id`, `storage_key`, `position`, `width`, `height`, `byte_size`                                 | FK to product `ON DELETE CASCADE`; `storage_key` unique; `position` dense `0..n-1`, gallery order only, deliberately not unique so a reorder needs no deferral                                                                 |
+| `category`                     | `name`, `deleted_at`                                                                                    | Partial unique `(merchant_id, lower(name)) WHERE deleted_at IS NULL`                                                                                                                                                           |
+| `product_category`             | PK `(merchant_id, product_id, category_id)`                                                             | FK to product `ON DELETE CASCADE`; FK to category                                                                                                                                                                              |
 
-`product_variant.image_id` references `product_image (merchant_id, id)`
-`ON DELETE SET NULL (image_id)`. drizzle-kit can't model the column list, and a
-plain composite `SET NULL` would also null `merchant_id` and fail its
-`NOT NULL`. So that key lives in a custom migration, not in `catalog.ts`.
+`product_variant.image_id` and `product.cover_image_id` reference
+`product_image (merchant_id, id)` `ON DELETE SET NULL (<column>)`. drizzle-kit
+can't model the column list, and a plain composite `SET NULL` would also null
+`merchant_id` and fail its `NOT NULL`. So those keys live in custom migrations
+(`0006`, `0014`), not in `catalog.ts`.
 
 drizzle-kit generates the tables, `ENABLE ROW LEVEL SECURITY` and the policies;
 `FORCE ROW LEVEL SECURITY` and the two `SET NULL (column)` image keys are custom
@@ -93,42 +97,86 @@ rather than pre-checked, so two racing requests can't both take the name.
 Deleting a category releases its name. A rename takes no lock: if it loses a
 race to a delete it finds no live row and answers `CATEGORY_NOT_FOUND`.
 
+### The product document
+
+The edit page saves a product's fields, options, values and variants as **one
+document** (`PUT /products/:id`, `saveProductSchema`), planned without the
+database by
+[`product-document-plan.ts`](../../../apps/api/src/modules/products/options/product-document-plan.ts)
+and applied by `ProductWriter` in one transaction under the product row lock.
+Creation (`POST /products`) takes the same document without a `version`.
+
+- **Ids keep, absence removes.** An option, value or variant sent with its `id`
+  is kept (and may be renamed); one sent without is created. Options and values
+  left out are deleted; variants left out are **archived**, never deleted. An
+  id that isn't this product's → `PRODUCT_OPTION_NOT_FOUND` or
+  `VARIANT_NOT_FOUND`.
+- **Variants pick values by text.** `optionValues` names one value per option,
+  in the options' order, so a variant can use a value created in the same save.
+  The shared refinements (`refineProductDocument`, run by the form and again by
+  the API) report field codes under `VALIDATION_FAILED`:
+  `OPTION_VALUES_MISMATCH` (not one value per option), `UNKNOWN_OPTION_VALUE`,
+  `VARIANTS_NEED_OPTION` (several variants and no options) and `DUPLICATE` (an
+  option name, a value, a variant's values or name, or a SKU repeated). Text
+  compares trimmed and case-insensitively.
+- **Default variant.** A product with no options has exactly one variant,
+  unnamed and `is_default`. Otherwise a variant's name is the seller's, or else
+  its values joined (`M / Short`), written on every save and kept on archived
+  variants so order lines still read.
+- **Delivery charge.** `customDelivery: false` (the default) prices delivery
+  at the shop's charges ([Settings – Delivery charges](../09-settings-delivery/README.md)).
+  `true` uses `deliveryCharges`, `[{ deliveryChargeId, charge }]`: the
+  product's own charge per shop area, everywhere else included, stored in
+  `product_delivery_charge`. An area it leaves out costs the shop charge.
+  Every save replaces them, and saving with `customDelivery: false` drops
+  them. An id that isn't one of the shop's areas → `DELIVERY_CHARGE_NOT_FOUND`;
+  one listed twice → `DUPLICATE` at `deliveryCharges.<i>.deliveryChargeId`.
+  Removing an area in Settings removes every product's charge for it.
+- **Version.** Every write to the product's fields, options or variants bumps
+  `revision`, sent as an opaque `version`. A save whose `version` isn't the
+  current one → `409 PRODUCT_STALE`, so of two saves from one read the second
+  is refused rather than overwriting. Order stock moves bump it too. Gallery
+  changes don't: the edit page doesn't hold the gallery.
+
 ### Variants
 
-- **At least one live variant.** Creating a product with none, or archiving the
-  last one → `PRODUCT_NEEDS_VARIANT`.
-- **Default variant.** A product created with one unnamed variant makes it the
-  default. With more than one, all must be named (`VARIANT_NAME_REQUIRED`).
-  Adding a variant to a product whose only live variant is the default requires
-  `defaultVariantName` in the same call, which names it and clears its flag.
-  `name: null` is accepted on update only for a product's single live variant.
 - **SKU.** Trimmed and upper-cased on write ([`sku.ts`](../../../apps/api/src/modules/products/sku.ts)).
   A blank SKU is generated as `SKU-` plus 8 Crockford base32 characters (no I,
   L, O or U), inserted with `ON CONFLICT DO NOTHING` and retried up to 5 times.
   A SKU the seller typed that a live variant already uses → `SKU_TAKEN`.
   Archiving a variant releases its SKU.
-- **Archive, never delete.** Order lines will reference variants, so a variant
-  is archived. That also stops the AI from calling a discontinued option "out
-  of stock".
+- **Archive, never delete.** Order lines reference variants, so a variant is
+  archived. That also stops the AI from calling a discontinued option "out of
+  stock". Removing an option value means leaving out the variants that used
+  it, which archives them.
+- **One variant on its own.** `PATCH /products/:id/variants/:variantId`
+  changes a live variant's SKU, price, stock or image outside the document (a
+  quick stock change). Its option values change only through a save. It bumps
+  the version, so an edit page still holding the old one can't overwrite it.
 - **Image.** `imageId` must be one of the same product's images, else
   `PRODUCT_IMAGE_NOT_FOUND`. The composite key already keeps it inside the
   merchant. `null` falls back to the product's cover.
-- **Stock** is written by the seller only. The derived `stockStatus`
-  (`in_stock` / `out_of_stock`) is computed on read.
-
-Every variant change locks the product row first (`findProduct(…, { lock: true })`),
-so two concurrent archives can't both pass the last-variant check.
+- **Stock** is written by the seller, and moved by orders. The derived
+  `stockStatus` (`in_stock` / `out_of_stock`) is computed on read.
 
 ### Products
 
 - `status` moves freely between `draft`, `active` and `archived`.
-- `categoryIds` on create or update **replaces** the product's links. It is
-  checked for liveness under the category lock, so a category can't be
+  `PATCH /products/:id` changes only the fields sent (the status dropdown, say),
+  takes no `version`, and bumps it.
+- `categoryIds` on create, save or update **replaces** the product's links. It
+  is checked for liveness under the category lock, so a category can't be
   deleted between the check and the link (`CATEGORY_NOT_FOUND`).
-- **Hard delete** cascades to variants, category links and image rows. The
-  image objects are deleted from storage after commit, best-effort. Once orders
-  exist, their `RESTRICT` key to `product_variant` will make the database refuse
-  this, and the seller archives instead.
+- **Cover.** `cover_image_id` is the photo the assistant sends when no variant
+  is picked, and for variants without their own. It is null exactly when the
+  product has no photos: the first upload becomes it, deleting it promotes the
+  first remaining photo, and a save with `coverImageId: null` (or a photo
+  deleted since the page read) picks the first. Reordering the gallery never
+  changes it.
+- **Hard delete** cascades to options, variants, category links and image rows.
+  The image objects are deleted from storage after commit, best-effort. Once an
+  order line references one of its variants, the database refuses it and the
+  API answers `409 PRODUCT_IN_USE`; the seller archives instead.
 
 ### Products list
 
@@ -180,10 +228,11 @@ predicate:
 | `liveCategory`    | `deleted_at IS NULL`  | [`category-visibility.ts`](../../../apps/api/src/modules/categories/category-visibility.ts) |
 
 - **`ProductsService.findSellableCatalog(merchantId)`**, the AI's read, returns
-  active products with their live variants, category ids and images, plus the
-  merchant's live categories.
+  active products with their options, live variants, category ids and images,
+  plus the merchant's live categories.
 - **Dashboard reads** (`get`, and the result of every write) return a product
-  of any status, but never archived variants or deleted categories.
+  of any status, with its options, but never archived variants or deleted
+  categories.
 
 ## Product images
 
@@ -234,13 +283,15 @@ recover whose object it's looking at.
 
 ### Delete and reorder
 
-- **Delete:** one transaction locks the product, deletes the row and rewrites
-  the remaining positions to `0..n-1`. The objects are deleted after commit;
+- **Delete:** one transaction locks the product, deletes the row, rewrites
+  the remaining positions to `0..n-1` and, if it was the cover, makes the first
+  remaining photo the cover. The objects are deleted after commit;
   a failure is logged and left to the sweep. Another merchant's product answers
   exactly like a missing image.
 - **Reorder:** one transaction locks the product and checks that `imageIds` is
   a permutation of the current ids (`PRODUCT_IMAGE_ORDER_MISMATCH` otherwise).
-  It then rewrites positions. The first id becomes the cover.
+  It then rewrites positions. The order is the gallery's only; the cover is
+  set separately (see [Products](#products)).
 
 ### Orphan sweep
 
@@ -263,6 +314,26 @@ processor is registered only in the worker, never in the API process.
 
 ## HTTP surface
 
+The product routes are in
+[`products.controller.ts`](../../../apps/api/src/modules/products/products.controller.ts),
+behind the session and `TenantGuard`, so the merchant always comes from the
+session. Every product answer is `productSchema`: the product with `options`,
+live `variants`, `categoryIds`, `images`, `coverImageId`, `customDelivery`,
+`deliveryCharges` and `version`.
+
+| Method | Path                                       | Body                  | Success               | Errors                                                                                                                                                                                      |
+| ------ | ------------------------------------------ | --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/v1/products`                         | `createProductSchema` | 201, the product      | 400 `VALIDATION_FAILED`, 404 `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `SKU_TAKEN`                                                                                            |
+| GET    | `/api/v1/products`                         | query, below          | 200, a page           | 400 `VALIDATION_FAILED`                                                                                                                                                                     |
+| GET    | `/api/v1/products/counts`                  | —                     | 200, count per filter | —                                                                                                                                                                                           |
+| GET    | `/api/v1/products/:id`                     | —                     | 200, the product      | 404 `PRODUCT_NOT_FOUND`                                                                                                                                                                     |
+| PUT    | `/api/v1/products/:id`                     | `saveProductSchema`   | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `PRODUCT_OPTION_NOT_FOUND` / `VARIANT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `PRODUCT_STALE` / `SKU_TAKEN` |
+| PATCH  | `/api/v1/products/:id`                     | `updateProductSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`                                                                                       |
+| PATCH  | `/api/v1/products/:id/variants/:variantId` | `updateVariantSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `VARIANT_NOT_FOUND` / `PRODUCT_IMAGE_NOT_FOUND`, 409 `SKU_TAKEN`                                                                         |
+| DELETE | `/api/v1/products/:id`                     | —                     | 204                   | 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_IN_USE`                                                                                                                                               |
+
+A non-UUID `:id` is `400 VALIDATION_FAILED` on every route.
+
 The image routes are in
 ([`product-images.controller.ts`](../../../apps/api/src/modules/products/images/product-images.controller.ts)).
 They need a session and carry `TenantGuard`, so the merchant always comes from
@@ -280,11 +351,10 @@ global limit. The image resource is
 in that shape, ordered by position, so there is no list endpoint. A variant's
 image is set through the variant update (`imageId`), not these routes.
 
-The products list is `GET /api/v1/products` (query `filter`, `q`,
-`categoryId`, `page`, `limit`; 400 `VALIDATION_FAILED` on anything else) and
-`GET /api/v1/products/counts`, in
-[`products.controller.ts`](../../../apps/api/src/modules/products/products.controller.ts)
-beside the product routes. See [Products list](#products-list).
+The products list takes the query `filter`, `q`, `categoryId`, `page` and
+`limit` (400 `VALIDATION_FAILED` on anything else). It names its page size
+`limit`, where the newer Customers and Orders lists say `pageSize`; the meaning
+is the same. See [Products list](#products-list).
 
 The category routes are in
 [`categories.controller.ts`](../../../apps/api/src/modules/categories/categories.controller.ts),
@@ -312,22 +382,29 @@ All are thrown as `Coded*Exception`s from
 the categories service, the upload interceptor, and
 [`s3-object-storage.ts`](../../../apps/api/src/modules/storage/s3-object-storage.ts).
 
-| Code                             | Status | Params           | When                                                        |
-| -------------------------------- | ------ | ---------------- | ----------------------------------------------------------- |
-| `PRODUCT_NOT_FOUND`              | 404    | `{ id }`         | No such product for this merchant                           |
-| `VARIANT_NOT_FOUND`              | 404    | `{ id }`         | No such live variant on the product                         |
-| `CATEGORY_NOT_FOUND`             | 404    | `{ id }` or `{}` | Missing or deleted category (as target or link)             |
-| `CATEGORY_NAME_TAKEN`            | 409    | `{ name }`       | Name used by another live category, ignoring case           |
-| `PRODUCT_NEEDS_VARIANT`          | 409    | `{ id }` or `{}` | No variants on create, or archiving the last live one       |
-| `VARIANT_NAME_REQUIRED`          | 400    | —                | An unnamed variant where the product has (or gets) several  |
-| `SKU_TAKEN`                      | 409    | `{ sku }`        | Typed SKU already used by a live variant                    |
-| `PRODUCT_IMAGE_TOO_LARGE`        | 413    | `{ maxBytes }`   | Upload over 10 MB                                           |
-| `PRODUCT_IMAGE_UNSUPPORTED_TYPE` | 415    | —                | Not JPEG, PNG or WebP                                       |
-| `PRODUCT_IMAGE_INVALID`          | 400    | —                | Undecodable, over 40 MP, or not exactly one file in `file`  |
-| `PRODUCT_IMAGE_LIMIT_REACHED`    | 409    | `{ max }`        | Product already has 8 images                                |
-| `PRODUCT_IMAGE_ORDER_MISMATCH`   | 400    | —                | Reorder ids aren't a permutation of the current images      |
-| `PRODUCT_IMAGE_NOT_FOUND`        | 404    | `{ id }`         | No such image on this product, or a variant's foreign image |
-| `STORAGE_UNAVAILABLE`            | 503    | —                | R2 rejected or failed a request                             |
+| Code                             | Status | Params           | When                                                         |
+| -------------------------------- | ------ | ---------------- | ------------------------------------------------------------ |
+| `PRODUCT_NOT_FOUND`              | 404    | `{ id }`         | No such product for this merchant                            |
+| `VARIANT_NOT_FOUND`              | 404    | `{ id }`         | No such live variant on the product                          |
+| `CATEGORY_NOT_FOUND`             | 404    | `{ id }` or `{}` | Missing or deleted category (as target or link)              |
+| `CATEGORY_NAME_TAKEN`            | 409    | `{ name }`       | Name used by another live category, ignoring case            |
+| `PRODUCT_OPTION_NOT_FOUND`       | 404    | `{ id }`         | A save names an option or value id that isn't this product's |
+| `PRODUCT_STALE`                  | 409    | `{ id }`         | A save's `version` isn't the product's current one           |
+| `PRODUCT_IN_USE`                 | 409    | `{ id }`         | Deleting a product an order line references                  |
+| `SKU_TAKEN`                      | 409    | `{ sku }`        | Typed SKU already used by a live variant                     |
+| `DELIVERY_CHARGE_NOT_FOUND`      | 404    | `{ id }`         | A product's own charge names an area the shop doesn't have   |
+| `PRODUCT_IMAGE_TOO_LARGE`        | 413    | `{ maxBytes }`   | Upload over 10 MB                                            |
+| `PRODUCT_IMAGE_UNSUPPORTED_TYPE` | 415    | —                | Not JPEG, PNG or WebP                                        |
+| `PRODUCT_IMAGE_INVALID`          | 400    | —                | Undecodable, over 40 MP, or not exactly one file in `file`   |
+| `PRODUCT_IMAGE_LIMIT_REACHED`    | 409    | `{ max }`        | Product already has 8 images                                 |
+| `PRODUCT_IMAGE_ORDER_MISMATCH`   | 400    | —                | Reorder ids aren't a permutation of the current images       |
+| `PRODUCT_IMAGE_NOT_FOUND`        | 404    | `{ id }`         | No such image on this product, or a variant's foreign image  |
+| `STORAGE_UNAVAILABLE`            | 503    | —                | R2 rejected or failed a request                              |
+
+A product document's own rules answer `400 VALIDATION_FAILED` with field
+codes rather than top-level ones: `DUPLICATE`, `UNKNOWN_OPTION_VALUE`,
+`OPTION_VALUES_MISMATCH` and `VARIANTS_NEED_OPTION` (see
+[The product document](#the-product-document)).
 
 Each new code is a three-file change: `packages/shared/src/errors/codes.ts`,
 `apps/web/src/i18n/error-keys.ts` and `apps/web/src/i18n/locales/en/errors.json`
@@ -338,16 +415,21 @@ Each new code is a three-file change: `packages/shared/src/errors/codes.ts`,
 [`packages/shared/src/schemas/catalog.ts`](../../../packages/shared/src/schemas/catalog.ts)
 is used by both apps:
 
-- **Resources:** `productSchema` (with `variants`, `categoryIds`, `images`),
-  `variantSchema` (with derived `stockStatus`), `categorySchema`,
-  `categoryWithCountSchema`,
-  `productImageSchema`.
-- **Inputs:** `createProductSchema` (status defaults to `draft`; refines that
-  every variant is named when there are several), `updateProductSchema`,
-  `addVariantSchema`, `updateVariantSchema`, `createCategorySchema`,
-  `updateCategorySchema`, `reorderProductImagesSchema`, `productCsvRowSchema`.
+- **Resources:** `productSchema` (with `options`, `variants`, `categoryIds`,
+  `images`, `coverImageId`, `version`), `productOptionSchema`,
+  `variantSchema` (with derived `stockStatus` and `optionValueIds`),
+  `categorySchema`, `categoryWithCountSchema`, `productImageSchema`, and the
+  list's `productListItemSchema` and `productCountsSchema`.
+- **Inputs:** `createProductSchema` and `saveProductSchema` (the document;
+  status defaults to `draft`; both run `refineProductDocument`),
+  `productOptionInputSchema`, `productVariantInputSchema`,
+  `updateProductSchema`, `updateVariantSchema`, `listProductsQuerySchema`,
+  `createCategorySchema`, `updateCategorySchema`, `reorderProductImagesSchema`,
+  `productCsvRowSchema`.
 - **Constants:** `PRODUCT_IMAGE_MAX_BYTES` (10 MB),
-  `PRODUCT_IMAGE_MAX_COUNT` (8).
+  `PRODUCT_IMAGE_MAX_COUNT` (8), `PRODUCT_OPTION_MAX_COUNT` (3),
+  `PRODUCT_OPTION_VALUE_MAX_COUNT` (30), `PRODUCT_VARIANT_MAX_COUNT` (100),
+  `LOW_STOCK_THRESHOLD` (5).
 - **Enums:** `productStatusSchema` and `stockStatusSchema`. Each has an entry
   in `apps/web/src/i18n/status-keys.ts`.
 
@@ -389,19 +471,25 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 
 ## Tests
 
-| Spec                                                                                                                                       | Covers                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| [`database/__tests__/catalog-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-schema.spec.ts)                     | Constraints: composite keys, checks, partial unique indexes                                            |
-| [`database/__tests__/catalog-rls.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-rls.spec.ts)                           | Two-merchant isolation under RLS                                                                       |
-| [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)         | Create, rename, delete, name clashes, product counts, two-merchant isolation                           |
-| [`categories/__tests__/categories.e2e.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.e2e.spec.ts)                 | Category routes over HTTP: status codes, error envelopes, unlinking on delete, two-merchant isolation  |
-| [`products/__tests__/products.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/products.service.spec.ts)                 | Product create, update, delete, category links                                                         |
-| [`products/__tests__/product-variants.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-variants.service.spec.ts) | Last-variant guard, default-variant rule, SKUs, variant images                                         |
-| [`products/__tests__/product-gallery.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-gallery.service.spec.ts)   | Images embedded in products; object cleanup on product delete                                          |
-| [`products/__tests__/sellable-catalog.spec.ts`](../../../apps/api/src/modules/products/__tests__/sellable-catalog.spec.ts)                 | `findSellableCatalog` visibility                                                                       |
-| [`products/__tests__/sku.spec.ts`](../../../apps/api/src/modules/products/__tests__/sku.spec.ts)                                           | SKU normalization and generation                                                                       |
-| [`products/images/__tests__/`](../../../apps/api/src/modules/products/images/__tests__/)                                                   | Normalization, keys, interceptor, repository, service, sweep, and a multipart e2e through the Nest app |
-| [`storage/__tests__/s3-object-storage.spec.ts`](../../../apps/api/src/modules/storage/__tests__/s3-object-storage.spec.ts)                 | The S3 adapter and its error mapping                                                                   |
+| Spec                                                                                                                                                   | Covers                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| [`database/__tests__/catalog-schema.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-schema.spec.ts)                                 | Constraints: composite keys, checks, partial unique indexes                                                   |
+| [`database/__tests__/catalog-rls.spec.ts`](../../../apps/api/src/modules/database/__tests__/catalog-rls.spec.ts)                                       | Two-merchant isolation under RLS                                                                              |
+| [`categories/__tests__/categories.service.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.service.spec.ts)                     | Create, rename, delete, name clashes, product counts, two-merchant isolation                                  |
+| [`categories/__tests__/categories.e2e.spec.ts`](../../../apps/api/src/modules/categories/__tests__/categories.e2e.spec.ts)                             | Category routes over HTTP: status codes, error envelopes, unlinking on delete, two-merchant isolation         |
+| [`products/__tests__/products.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/products.service.spec.ts)                             | Product create, update, category links                                                                        |
+| [`products/__tests__/product-save.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-save.service.spec.ts)                     | The document save: options, values, variants kept, created and archived; `PRODUCT_STALE`                      |
+| [`products/__tests__/product-document-schema.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-document-schema.spec.ts)               | `refineProductDocument`'s field codes                                                                         |
+| [`products/options/__tests__/`](../../../apps/api/src/modules/products/options/__tests__/)                                                             | The document plan and the options repository                                                                  |
+| [`products/__tests__/product-variant-update.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-variant-update.service.spec.ts) | One variant's SKU, price, stock and image                                                                     |
+| [`products/__tests__/product-delete.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-delete.service.spec.ts)                 | Hard delete, and `PRODUCT_IN_USE` while an order line points at a variant                                     |
+| [`products/__tests__/product-list.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-list.service.spec.ts)                     | The list, its filters, search and counts                                                                      |
+| [`products/__tests__/product-gallery.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-gallery.service.spec.ts)               | Images embedded in products; object cleanup on product delete                                                 |
+| [`products/__tests__/products.e2e.spec.ts`](../../../apps/api/src/modules/products/__tests__/products.e2e.spec.ts)                                     | Product routes over HTTP                                                                                      |
+| [`products/__tests__/sellable-catalog.spec.ts`](../../../apps/api/src/modules/products/__tests__/sellable-catalog.spec.ts)                             | `findSellableCatalog` visibility                                                                              |
+| [`products/__tests__/sku.spec.ts`](../../../apps/api/src/modules/products/__tests__/sku.spec.ts)                                                       | SKU normalization and generation                                                                              |
+| [`products/images/__tests__/`](../../../apps/api/src/modules/products/images/__tests__/)                                                               | Normalization, keys, interceptor, repository, service, cover, sweep, and a multipart e2e through the Nest app |
+| [`storage/__tests__/s3-object-storage.spec.ts`](../../../apps/api/src/modules/storage/__tests__/s3-object-storage.spec.ts)                             | The S3 adapter and its error mapping                                                                          |
 
 The database-backed specs are **skipped** unless `DATABASE_ADMIN_URL` is set.
 CI sets it. No test contacts R2. Locally:
@@ -414,37 +502,46 @@ pnpm dev:up
 DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products categories
 ```
 
+## Dashboard
+
+- **`/catalog`**: the products list (see [Products list](#products-list)).
+- **`/catalog/products/new`** and **`/catalog/products/$productId`**: basic
+  details, the option editor and variant table, the variant image picker,
+  status, categories and aliases (shown as Tags), the Delivery charge card
+  (shop charges, or a custom charge per area with the shop charge beside it),
+  and the photo dialogs (Add
+  photos with per-file progress, All photos with delete and the default
+  choice, and a full-screen viewer). The default photo (the cover) is saved
+  with the page; uploads and deletes happen at once. A save sends the
+  product's `version`; a `PRODUCT_STALE` answer means someone (or an order)
+  changed it since the page read it.
+- **`/catalog/categories`**: the Categories page (see
+  [Categories page](#categories-page)).
+
 ## Not yet built
 
-- **Dashboard UI, beyond the edit page.** `/catalog/products/new` and
-  `/catalog/products/$productId` are built: basic details, the option editor
-  and variant table, the variant image picker, status, categories and
-  aliases, and the photo dialogs (Add photos with per-file progress, All
-  photos with delete and the default choice, and a full-screen viewer). The
-  default photo is saved with the page; uploads and deletes happen at once.
-  The products list at `/catalog` and the Categories page at
-  `/catalog/categories` are built too. Still to come: reordering photos, the
-  Categories page's insights panel (what customers ask for, categories they
-  ask for that don't exist, and the needs-attention list), and fields the
-  design shows that the API doesn't hold yet: a per-product delivery charge
-  choice, the assistant notes, a per-seller low-stock threshold and sales
-  figures.
+- **Dashboard extras.** Reordering photos; the Categories page's insights
+  panel (what customers ask for, categories they ask for that don't exist,
+  and the needs-attention list); and fields the design shows that the API
+  doesn't hold yet: the assistant notes, a per-seller low-stock threshold and
+  sales figures. The design's product-level "Free delivery" option was left
+  out on purpose; the only free delivery is the shop's threshold.
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
-- **Stock movement.** Decrement on order confirmation (row lock, reject if
-  insufficient) and restore on cancellation land with the orders work.
 - **AI prompt wiring.** `findSellableCatalog` returns what the prompt needs,
-  including categories. The LLM work consumes it.
+  including options and categories. The LLM work consumes it.
 - **Bulk object removal on account deletion.** The `m/{merchantId}/` prefix
   makes it one prefix delete.
 
 ## Key files
 
-- [`apps/api/src/modules/database/schema/catalog.ts`](../../../apps/api/src/modules/database/schema/catalog.ts): all five tables
+- [`apps/api/src/modules/database/schema/catalog.ts`](../../../apps/api/src/modules/database/schema/catalog.ts): all eight tables
 - [`apps/api/src/modules/categories/categories.service.ts`](../../../apps/api/src/modules/categories/categories.service.ts): create, rename, delete
 - [`apps/api/src/modules/categories/categories.repository.ts`](../../../apps/api/src/modules/categories/categories.repository.ts): category lock, soft delete
 - [`apps/api/src/modules/products/products.service.ts`](../../../apps/api/src/modules/products/products.service.ts): product and variant rules, `findSellableCatalog`
 - [`apps/api/src/modules/products/products.repository.ts`](../../../apps/api/src/modules/products/products.repository.ts): queries, SKU generation retries
+- [`apps/api/src/modules/products/options/product-document-plan.ts`](../../../apps/api/src/modules/products/options/product-document-plan.ts): what a document save keeps, creates and archives
+- [`apps/api/src/modules/products/options/product-writer.ts`](../../../apps/api/src/modules/products/options/product-writer.ts): applies the plan
 - [`apps/api/src/modules/products/images/product-images.service.ts`](../../../apps/api/src/modules/products/images/product-images.service.ts): upload, delete, reorder
 - [`apps/api/src/modules/products/images/normalize-product-image.ts`](../../../apps/api/src/modules/products/images/normalize-product-image.ts): `sharp` pipeline
 - [`apps/api/src/modules/products/images/sweep-orphaned-images.ts`](../../../apps/api/src/modules/products/images/sweep-orphaned-images.ts): orphan sweep
