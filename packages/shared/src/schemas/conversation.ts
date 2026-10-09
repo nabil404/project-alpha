@@ -13,36 +13,43 @@ export const conversationStates = [
 export const conversationStateSchema = z.enum(conversationStates);
 export type ConversationState = z.infer<typeof conversationStateSchema>;
 
-/** Every field the state machine must collect before a summary can be shown. */
-export const requiredOrderFields = [
+/**
+ * What the assistant collects, in the order it asks. Phase 2 adds the variant,
+ * asked only when the matched product has options.
+ */
+export const slotNames = [
   'product',
-  'variant',
   'quantity',
   'customerName',
   'phone',
   'deliveryAddress',
 ] as const;
+export const slotNameSchema = z.enum(slotNames);
+export type SlotName = z.infer<typeof slotNameSchema>;
 
 export const collectedSlotsSchema = z.object({
+  /** The product in the customer's own words; phase 2 resolves it to productId. */
+  productText: z.string().min(1).optional(),
+  variantText: z.string().min(1).optional(),
   productId: z.string().uuid().optional(),
   variantId: z.string().uuid().optional(),
   quantity: z.number().int().positive().optional(),
   customerName: z.string().min(1).optional(),
+  /** E.164. */
   phone: z.string().min(1).optional(),
   deliveryAddress: z.string().min(1).optional(),
+  /** The slot asked for last and how many times in a row; the third ask hands off instead. */
+  lastAsked: z.object({ slot: slotNameSchema, times: z.number().int().positive() }).optional(),
 });
 export type CollectedSlots = z.infer<typeof collectedSlotsSchema>;
 
-export function missingSlots(slots: CollectedSlots): string[] {
-  const required: (keyof CollectedSlots)[] = [
-    'productId',
-    'variantId',
-    'quantity',
-    'customerName',
-    'phone',
-    'deliveryAddress',
-  ];
-  return required.filter((field) => slots[field] === undefined);
+export function isSlotFilled(slots: CollectedSlots, slot: SlotName): boolean {
+  if (slot === 'product') return slots.productText !== undefined || slots.productId !== undefined;
+  return slots[slot] !== undefined;
+}
+
+export function nextMissingSlot(slots: CollectedSlots): SlotName | null {
+  return slotNames.find((slot) => !isSlotFilled(slots, slot)) ?? null;
 }
 
 /** Who wrote a message: the customer, our assistant, or the seller (dashboard or Facebook's own inbox). */

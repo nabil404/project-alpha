@@ -1,4 +1,10 @@
-import { REPLY_WINDOW_MS, type CollectedSlots, type ConversationState } from '@app/shared';
+import {
+  isSlotFilled,
+  REPLY_WINDOW_MS,
+  slotNames,
+  type CollectedSlots,
+  type ConversationState,
+} from '@app/shared';
 
 /** How much of the last message the conversation list shows. */
 export const PREVIEW_LENGTH = 140;
@@ -26,9 +32,7 @@ export function messagePreview(text: string): string {
  * assistant's state machine re-presents a summary if one is due.
  */
 export function stateAfterHandBack(slots: CollectedSlots): ConversationState {
-  return Object.values(slots).some((value) => value !== undefined)
-    ? 'collecting_details'
-    : 'browsing';
+  return slotNames.some((slot) => isSlotFilled(slots, slot)) ? 'collecting_details' : 'browsing';
 }
 
 /** Messenger's standard window: a seller may reply until 24h after the customer's last message. */

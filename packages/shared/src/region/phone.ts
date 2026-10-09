@@ -1,4 +1,8 @@
-import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import {
+  isSupportedCountry,
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from 'libphonenumber-js/max';
 import { z } from 'zod';
 
 /**
@@ -33,4 +37,33 @@ export function formatPhoneInternational(e164: string): string {
 /** The country a stored number belongs to, for preselecting the calling code picker. */
 export function phoneCountryOf(e164: string): CountryCode | null {
   return parsePhoneNumberFromString(e164)?.country ?? null;
+}
+
+/** Bangla digits (০-৯) as Latin ones; everything else unchanged. */
+export function toLatinDigits(text: string): string {
+  return text.replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6));
+}
+
+/**
+ * A phone number a customer typed, as E.164, or null when it is not a real
+ * number. A local number is read in the shop's country; one written with `+`
+ * is read as written.
+ */
+export function parseCustomerPhone(text: string, country: string): string | null {
+  const region: CountryCode | undefined = isSupportedCountry(country) ? country : undefined;
+  const parsed = parsePhoneNumberFromString(toLatinDigits(text).trim(), region);
+  return parsed?.isValid() ? parsed.number : null;
+}
+
+/** Every digit-only spelling of a stored number: E.164 without `+`, national, and national with its trunk prefix. */
+export function phoneDigitForms(e164: string): string[] {
+  const parsed = parsePhoneNumberFromString(e164);
+  if (!parsed) return [e164.replace(/\D/g, '')];
+  return [
+    ...new Set([
+      parsed.number.replace(/\D/g, ''),
+      parsed.nationalNumber,
+      parsed.formatNational().replace(/\D/g, ''),
+    ]),
+  ];
 }

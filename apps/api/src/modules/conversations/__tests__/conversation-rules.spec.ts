@@ -38,6 +38,11 @@ describe('stateAfterHandBack', () => {
   it('browses when nothing was collected, otherwise keeps collecting', () => {
     expect(stateAfterHandBack({})).toBe('browsing');
     expect(stateAfterHandBack({ quantity: 2 })).toBe('collecting_details');
+    expect(stateAfterHandBack({ productText: 'red saree' })).toBe('collecting_details');
+  });
+
+  it('ignores the ask counter: being asked is not having answered', () => {
+    expect(stateAfterHandBack({ lastAsked: { slot: 'product', times: 2 } })).toBe('browsing');
   });
 });
 
