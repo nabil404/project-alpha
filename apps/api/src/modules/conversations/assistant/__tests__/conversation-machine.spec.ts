@@ -73,7 +73,8 @@ describe('decideTurn: every state × intent', () => {
       } else if (intent === 'ask_question') {
         expect(reply).toEqual({ kind: 'handoff', reason: 'question' });
       } else if (state === 'awaiting_confirmation') {
-        expect(reply.kind).toBe('summary');
+        // Nothing changed: the customer already saw the summary, so the shop takes over.
+        expect(reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
       } else {
         expect(reply).toMatchObject({ kind: 'ask_slot', slot: 'product', intent });
       }
@@ -99,7 +100,9 @@ describe('decideTurn', () => {
       kind: 'handoff',
       reason: 'low_confidence',
     });
-    expect(decideTurn(turn({ extracted: { ...nothing, confidence: 0.5 } })).reply).toEqual({
+    expect(
+      decideTurn(turn({ extracted: { ...nothing, quantity: 2, confidence: 0.5 } })).reply,
+    ).toEqual({
       kind: 'handoff',
       reason: 'low_confidence',
     });
@@ -256,6 +259,56 @@ describe('decideTurn', () => {
     expect(decision.state).toBe('awaiting_confirmation');
     expect(decision.slots.lastAsked).toBeUndefined();
     expect(decision.reply).toEqual({ kind: 'summary', facts: FULL });
+  });
+
+  it('hands off to the seller when a turn in awaiting_confirmation changes no slot', () => {
+    const decision = decideTurn(
+      turn({
+        state: 'awaiting_confirmation',
+        slots: { ...FULL, lastAsked: { slot: 'phone', times: 1 } },
+        classified: asked('other'),
+        extracted: nothing,
+      }),
+    );
+    expect(decision.state).toBe('handed_off');
+    expect(decision.slots).toEqual({ ...FULL, lastAsked: undefined });
+    expect(decision.reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
+  });
+
+  it('ignores an extraction that restates the same values while awaiting confirmation', () => {
+    const decision = decideTurn(
+      turn({
+        state: 'awaiting_confirmation',
+        slots: FULL,
+        classified: asked('other'),
+        extracted: { ...nothing, quantity: 2 },
+      }),
+    );
+    expect(decision.reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
+  });
+
+  it('ignores low extraction confidence when nothing was extracted', () => {
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: { productText: 'red saree' },
+        classified: asked('other'),
+        extracted: { ...nothing, confidence: 0.1 },
+      }),
+    );
+    expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'quantity' });
+  });
+
+  it('still hands off on low extraction confidence when a field was filled', () => {
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: { productText: 'red saree' },
+        classified: asked('other'),
+        extracted: { ...nothing, quantity: 2, confidence: 0.1 },
+      }),
+    );
+    expect(decision.reply).toEqual({ kind: 'handoff', reason: 'low_confidence' });
   });
 
   it('re-sends the summary while awaiting confirmation, with any edit applied', () => {

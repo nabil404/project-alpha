@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { MockLanguageModelV4 } from 'ai/test';
 import { AiSdkLlmClient } from '../ai-sdk-llm.client';
@@ -102,7 +103,28 @@ describe('AiSdkLlmClient', () => {
 
   it('reports output that fails the Zod schema as invalid_output', async () => {
     const result = await client('{"intent":"order","confidence":1.7}').classifyIntent(history);
-    expect(result).toMatchObject({ ok: false, reason: 'invalid_output' });
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'invalid_output',
+      usage: { inputTokens: 12, outputTokens: 5 },
+    });
+  });
+
+  it('logs the error name and HTTP status of a failure, never its message', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      const error = Object.assign(new Error('secret upstream body'), {
+        name: 'AI_APICallError',
+        statusCode: 401,
+      });
+      await client(error).classifyIntent(history);
+      const line = String(warn.mock.calls[0]?.[0]);
+      expect(line).toContain('AI_APICallError');
+      expect(line).toContain('401');
+      expect(line).not.toContain('secret upstream body');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('reports a provider error as provider_error, with no tokens', async () => {

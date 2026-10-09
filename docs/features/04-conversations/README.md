@@ -246,9 +246,6 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 
 ## Follow-ups
 
-The assistant's own follow-ups are on the
-[phase 11.1 page](../11-ai-implementation/phase-1-foundation/README.md#follow-ups).
-
 - The drafted-order panel and the customer's order history beside the thread.
   The seller's own "Confirm" is settled: it is the second confirmation of an
   order the customer already confirmed ([Orders](../07-orders/README.md#rules)).
@@ -263,6 +260,10 @@ The assistant's own follow-ups are on the
 - A reply can stay `sending` if the process dies mid-send or the final write
   fails. The web shows a stored `sending` row in place of its local copy, but
   nothing yet turns an abandoned one into `failed`; a sweep should.
+
+The assistant's own follow-ups are on the
+[phase 11.1 page](../11-ai-implementation/phase-1-foundation/README.md#follow-ups).
+
 - A send that times out may still have been delivered; it is recorded as
   failed (its echo carries our app id and is skipped), so retyping it can send
   it twice.

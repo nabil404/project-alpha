@@ -37,6 +37,9 @@ interface Tokens {
 /** Structured output that parsed as JSON but broke a bound the provider's strict mode does not enforce. */
 class InvalidOutput extends Error {
   override name = 'InvalidOutput';
+  constructor(readonly tokens: Tokens) {
+    super('invalid output');
+  }
 }
 
 const INVALID_OUTPUT_ERRORS = new Set([
@@ -109,7 +112,7 @@ export class AiSdkLlmClient implements LlmClient {
       });
       // Again with Zod: strict JSON-schema mode can drop bounds such as confidence's 0..1.
       const parsed = schema.safeParse(result.output);
-      if (!parsed.success) throw new InvalidOutput();
+      if (!parsed.success) throw new InvalidOutput(result.usage);
       return { value: parsed.data as z.infer<S>, tokens: result.usage };
     });
   }
@@ -133,9 +136,9 @@ export class AiSdkLlmClient implements LlmClient {
       return { ok: true, value, usage: usage(tokens) };
     } catch (error) {
       const reason = failureOf(error, signal);
-      const result = { ok: false as const, reason, usage: usage() };
+      const result = { ok: false as const, reason, usage: usage(billedTokens(error)) };
       this.logger.warn(
-        `LLM ${purpose} on ${model.modelId} failed: ${reason} after ${result.usage.latencyMs}ms`,
+        `LLM ${purpose} on ${model.modelId} failed: ${reason}${describe(error)} after ${result.usage.latencyMs}ms`,
       );
       return result;
     }
@@ -147,4 +150,24 @@ function failureOf(error: unknown, signal: AbortSignal): LlmFailure {
   const cause = RetryError.isInstance(error) ? error.lastError : error;
   if (cause instanceof Error && INVALID_OUTPUT_ERRORS.has(cause.name)) return 'invalid_output';
   return 'provider_error';
+}
+
+function causeOf(error: unknown): unknown {
+  return RetryError.isInstance(error) ? error.lastError : error;
+}
+
+/** Tokens the provider billed for a call that still failed, when the error carries them. */
+function billedTokens(error: unknown): Tokens | undefined {
+  const cause = causeOf(error);
+  if (cause instanceof InvalidOutput) return cause.tokens;
+  const usage = (cause as { usage?: Tokens } | null)?.usage;
+  return typeof usage === 'object' && usage !== null ? usage : undefined;
+}
+
+/** The error's name and HTTP status: enough to tell a 401 from a 429, with no message or body. */
+function describe(error: unknown): string {
+  const cause = causeOf(error);
+  if (!(cause instanceof Error)) return '';
+  const status = (cause as { statusCode?: unknown }).statusCode;
+  return ` (${cause.name}${typeof status === 'number' ? ` ${status}` : ''})`;
 }

@@ -12,7 +12,8 @@ export type HandoffReason =
   | 'complain'
   | 'request_human'
   | 'question'
-  | 'repeated_confusion';
+  | 'repeated_confusion'
+  | 'awaiting_seller';
 
 /** What the turn says, decided by code. The LLM only words it. */
 export type ReplyIntent =

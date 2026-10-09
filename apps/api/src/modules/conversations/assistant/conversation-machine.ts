@@ -48,14 +48,22 @@ export function shouldExtract(state: ActiveState, intent: CustomerIntent): boole
   return intent === 'order' || intent === 'edit_order';
 }
 
-export function decideTurn({ slots, classified, extracted, country }: TurnInput): TurnDecision {
+export function decideTurn({
+  state,
+  slots,
+  classified,
+  extracted,
+  country,
+}: TurnInput): TurnDecision {
   if (classified === 'failed' || extracted === 'failed') return handOff(slots, 'llm_failed');
   if (classified.intent === 'complain' || classified.intent === 'request_human') {
     return handOff(slots, classified.intent);
   }
   if (
     classified.confidence < CONFIDENCE_FLOOR ||
-    (extracted !== 'skipped' && extracted.confidence < CONFIDENCE_FLOOR)
+    (extracted !== 'skipped' &&
+      !isEmptyExtraction(extracted) &&
+      extracted.confidence < CONFIDENCE_FLOOR)
   ) {
     return handOff(slots, 'low_confidence');
   }
@@ -68,6 +76,10 @@ export function decideTurn({ slots, classified, extracted, country }: TurnInput)
 
   const slot = nextMissingSlot(merged.slots);
   if (slot === null) {
+    // The customer already saw the summary and added nothing: it is the shop's move.
+    if (state === 'awaiting_confirmation' && sameSlots(slots, merged.slots)) {
+      return handOff(merged.slots, 'awaiting_seller');
+    }
     return {
       state: 'awaiting_confirmation',
       slots: { ...merged.slots, lastAsked: undefined },
@@ -89,6 +101,21 @@ export function decideTurn({ slots, classified, extracted, country }: TurnInput)
       facts: factsOf(merged.slots),
     },
   };
+}
+
+/** An extraction that filled nothing says nothing about how sure it is. */
+function isEmptyExtraction(extraction: ExtractedOrder): boolean {
+  const { confidence: _confidence, ...fields } = extraction;
+  return Object.values(fields).every((value) => value === null);
+}
+
+function sameSlots(a: CollectedSlots, b: CollectedSlots): boolean {
+  const x = factsOf(a);
+  const y = factsOf(b);
+  return (
+    (Object.keys(x) as (keyof typeof x)[]).length === Object.keys(y).length &&
+    (Object.keys(x) as (keyof typeof x)[]).every((key) => x[key] === y[key])
+  );
 }
 
 /** A non-null field replaces the slot; null never does. A phone is kept only if it is a real number. */

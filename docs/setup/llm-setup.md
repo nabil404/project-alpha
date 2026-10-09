@@ -21,17 +21,17 @@ assistant turns are queued, so customers get no AI reply.
 
 `LLM_PROVIDER` accepts only `openai`. An environment still set to
 `LLM_PROVIDER=anthropic` (the old default) fails validation at boot: change it
-in every local `.env` and in Parameter Store before deploying.
+in every local `.env` and in Parameter Store before deploying. Update or unset `LLM_MODEL_ROUTING` and `LLM_MODEL_EXTRACTION` there too: old Claude model IDs would make every call fail.
 
 ## What each variable is for
 
-| Variable               | Used for                                                                                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LLM_PROVIDER`         | The provider behind the AI SDK. Only `openai` is supported.                                                                                                                                       |
-| `LLM_MODEL_ROUTING`    | The efficient model: classifying intent and phrasing replies, every turn                                                                                                                          |
-| `LLM_MODEL_EXTRACTION` | The mid-tier model: extracting order details when the customer is ordering or editing an order; product photos in [phase 11.6](../features/11-ai-implementation/phase-6-product-photos/README.md) |
-| `LLM_TIMEOUT_MS`       | A timeout for each call, 15000 by default. A call that exceeds it counts as a failure and the conversation is handed off                                                                          |
-| `LLM_API_KEY`          | The provider's API key. A secret                                                                                                                                                                  |
+| Variable               | Used for                                                                                                                                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LLM_PROVIDER`         | The provider behind the AI SDK. Only `openai` is supported.                                                                                                                                                                                                                       |
+| `LLM_MODEL_ROUTING`    | The efficient model: classifying intent and phrasing replies, every turn                                                                                                                                                                                                          |
+| `LLM_MODEL_EXTRACTION` | The mid-tier model: extracting order details on every mid-flow turn (collecting details or awaiting confirmation), and while browsing when the customer is ordering or editing; product photos in [phase 11.6](../features/11-ai-implementation/phase-6-product-photos/README.md) |
+| `LLM_TIMEOUT_MS`       | A timeout for each call, 15000 by default. A call that exceeds it counts as a failure and the conversation is handed off                                                                                                                                                          |
+| `LLM_API_KEY`          | The provider's API key. A secret                                                                                                                                                                                                                                                  |
 
 Model IDs change as new models ship; check
 [OpenAI's models page](https://developers.openai.com/api/docs/models) before
@@ -87,12 +87,12 @@ Store with the other secrets ([deployment](../architecture/deployment.md)).
 
 ## Troubleshooting
 
-| Symptom                                               | Cause and fix                                                                                                          |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| The API will not boot, with a `LLM_PROVIDER` error    | The env still says `anthropic`. Set `LLM_PROVIDER=openai`.                                                             |
-| Messages are stored but no turn appears in Bull Board | `LLM_API_KEY` is unset, the worker is not running, the bot is paused on that conversation, or the Page's bot is off.   |
-| Every conversation goes straight to `handed_off`      | The key is wrong or revoked, the project is out of credit or over its budget, or a model ID no longer exists.          |
-| Replies are slow, or many turns time out              | The provider is degraded or the extraction model is overloaded; the turns hand off as designed. Check its status page. |
+| Symptom                                               | Cause and fix                                                                                                                                |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| The API will not boot, with a `LLM_PROVIDER` error    | The env still says `anthropic`. Set `LLM_PROVIDER=openai`.                                                                                   |
+| Messages are stored but no turn appears in Bull Board | `LLM_API_KEY` is unset, the worker is not running, `META_APP_ID` is unset, the bot is paused on that conversation, or the Page's bot is off. |
+| Every conversation goes straight to `handed_off`      | The key is wrong or revoked, the project is out of credit or over its budget, or a model ID no longer exists.                                |
+| Replies are slow, or many turns time out              | The provider is degraded or the extraction model is overloaded; the turns hand off as designed. Check its status page.                       |
 
 ## Secrets
 
