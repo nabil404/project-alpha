@@ -12,10 +12,21 @@ interface InboundMessageBase {
   sentAt: number;
 }
 
-/** A customer wrote to the Page. */
+/** A customer wrote to the Page, or tapped one of our quick replies (which carries its payload). */
 export interface CustomerMessageJob extends InboundMessageBase {
   kind: 'customer-message';
   senderPsid: string;
+  payload?: string;
+}
+
+/**
+ * A customer tapped a button of ours. `text` is the button's title and
+ * `messageId` Meta's mid, or one derived from the tap when Meta sends none.
+ */
+export interface CustomerPostbackJob extends InboundMessageBase {
+  kind: 'customer-postback';
+  senderPsid: string;
+  payload: string;
 }
 
 /**
@@ -28,7 +39,7 @@ export interface PageEchoJob extends InboundMessageBase {
   appId?: string;
 }
 
-export type InboundMessageJob = CustomerMessageJob | PageEchoJob;
+export type InboundMessageJob = CustomerMessageJob | CustomerPostbackJob | PageEchoJob;
 
 /** Housekeeping for object storage. Jobs are scheduled by the worker, never by the API. */
 export const STORAGE_QUEUE = 'storage-maintenance';

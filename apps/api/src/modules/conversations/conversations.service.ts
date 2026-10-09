@@ -215,7 +215,7 @@ export class ConversationsService {
       return { row, psid: customer.psid, encryptedToken: page.accessToken };
     });
 
-    const final = await this.outbound.deliver(scope, pending);
+    const final = await this.outbound.deliver(scope, { ...pending, content: { kind: 'text' } });
     if (final.status === 'failed') throw messengerSendFailed();
     return toMessage(final);
   }

@@ -29,6 +29,13 @@ const inboundMessageJobSchema = z.preprocess(
       ...inboundMessageBase,
       kind: z.literal('customer-message'),
       senderPsid: z.string().min(1),
+      payload: z.string().min(1).optional(),
+    }),
+    z.object({
+      ...inboundMessageBase,
+      kind: z.literal('customer-postback'),
+      senderPsid: z.string().min(1),
+      payload: z.string().min(1),
     }),
     z.object({
       ...inboundMessageBase,

@@ -59,6 +59,38 @@ export class GraphError extends Error {
 
 type FetchFn = typeof fetch;
 
+/** A quick reply or button: what the customer sees and what comes back when they tap it. */
+export interface GraphOption {
+  title: string;
+  payload: string;
+}
+
+/** Messenger's limits: 13 quick replies and 3 buttons, 20 characters a title, 640 for a button template's text. */
+export const QUICK_REPLY_MAX = 13;
+export const BUTTON_MAX = 3;
+export const OPTION_TITLE_MAX = 20;
+export const BUTTON_TEXT_MAX = 640;
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/**
+ * Cut to at most `max` characters, counted as code points (a Bangla letter
+ * with its vowel sign is two), never splitting a grapheme; an ellipsis marks
+ * the cut.
+ */
+export function cutText(text: string, max: number): string {
+  if (Array.from(text).length <= max) return text;
+  let kept = '';
+  let length = 0;
+  for (const { segment } of graphemes.segment(text)) {
+    const size = Array.from(segment).length;
+    if (length + size > max - 1) break;
+    kept += segment;
+    length += size;
+  }
+  return `${kept}…`;
+}
+
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /**
@@ -195,9 +227,64 @@ export class MetaGraphClient {
    * enforces the window; Facebook refusing anyway surfaces as a GraphError.
    */
   async sendText(pageToken: string, psid: string, text: string): Promise<{ messageId: string }> {
+    return this.sendMessage(pageToken, psid, { text });
+  }
+
+  /** Text with quick-reply chips under it; the chips disappear once one is tapped. */
+  async sendQuickReplies(
+    pageToken: string,
+    psid: string,
+    text: string,
+    options: readonly GraphOption[],
+  ): Promise<{ messageId: string }> {
+    return this.sendMessage(pageToken, psid, {
+      text,
+      quick_replies: options.slice(0, QUICK_REPLY_MAX).map((option) => ({
+        content_type: 'text',
+        title: cutText(option.title, OPTION_TITLE_MAX),
+        payload: option.payload,
+      })),
+    });
+  }
+
+  /** A button template: text up to 640 characters and postback buttons. */
+  async sendButtonTemplate(
+    pageToken: string,
+    psid: string,
+    text: string,
+    buttons: readonly GraphOption[],
+  ): Promise<{ messageId: string }> {
+    return this.sendMessage(pageToken, psid, {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'button',
+          text: cutText(text, BUTTON_TEXT_MAX),
+          buttons: buttons.slice(0, BUTTON_MAX).map((button) => ({
+            type: 'postback',
+            title: cutText(button.title, OPTION_TITLE_MAX),
+            payload: button.payload,
+          })),
+        },
+      },
+    });
+  }
+
+  /** An image by its public URL. */
+  async sendImage(pageToken: string, psid: string, url: string): Promise<{ messageId: string }> {
+    return this.sendMessage(pageToken, psid, {
+      attachment: { type: 'image', payload: { url, is_reusable: true } },
+    });
+  }
+
+  private async sendMessage(
+    pageToken: string,
+    psid: string,
+    message: unknown,
+  ): Promise<{ messageId: string }> {
     const body = await this.request<{ message_id?: unknown }>('POST', '/me/messages', {
       token: pageToken,
-      json: { recipient: { id: psid }, messaging_type: 'RESPONSE', message: { text } },
+      json: { recipient: { id: psid }, messaging_type: 'RESPONSE', message },
     });
     if (typeof body.message_id !== 'string' || !body.message_id) {
       throw new GraphError(502, undefined, 'Graph POST /me/messages returned no message id');

@@ -108,6 +108,8 @@ export const message = pgTable(
     sender: text('sender', { enum: MESSAGE_SENDERS }).notNull(),
     text: text('text').notNull(),
     metaMessageId: text('meta_message_id'),
+    /** A quick reply's or button's payload, for a tap; null for typed text and for our sends. */
+    payload: text('payload'),
     status: text('status', { enum: MESSAGE_STATUSES }).notNull(),
     sentAt: instant('sent_at').notNull(),
     createdAt: createdAt(),

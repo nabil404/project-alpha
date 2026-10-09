@@ -143,6 +143,7 @@ export class AssistantTurnService {
       row: staged.row,
       psid: staged.psid,
       encryptedToken: page.accessToken,
+      content: { kind: 'text' },
     });
     let handedOffAt = staged.handedOffAt;
     if (final.status === 'failed' && !handedOffAt) {
