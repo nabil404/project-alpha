@@ -55,16 +55,16 @@ export class MessageRepository {
       .limit(limit);
   }
 
-  /** A seller reply, stored before it is sent so the thread shows it while Messenger answers. */
+  /** A reply, stored before it is sent so the thread shows it while Messenger answers. */
   async insertSending(
     executor: Executor,
     { merchantId }: TenantScope,
-    values: { conversationId: string; text: string; sentAt: Date },
+    values: { conversationId: string; sender: 'seller' | 'assistant'; text: string; sentAt: Date },
   ): Promise<MessageRow> {
     return one(
       await executor
         .insert(message)
-        .values({ ...values, merchantId, sender: 'seller', status: 'sending' })
+        .values({ ...values, merchantId, status: 'sending' })
         .returning(),
       'message insert',
     );
