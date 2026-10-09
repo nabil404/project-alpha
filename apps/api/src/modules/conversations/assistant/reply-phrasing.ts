@@ -5,6 +5,7 @@ import type { ReplyFacts, ReplyIntent } from './reply-intent';
 
 const ASK: Record<SlotName, string> = {
   product: 'Ask which product the customer would like to order.',
+  variant: 'Ask which variant (colour, size) they would like.',
   quantity: 'Ask how many they would like.',
   customerName: 'Ask for the name to put on the order.',
   phone: 'Ask for their mobile number.',
@@ -12,13 +13,10 @@ const ASK: Record<SlotName, string> = {
 };
 
 /** The facts as the phrasing call sees them; the phone in its readable international form. */
-function factValues(facts: ReplyFacts): Record<string, string | number> {
-  const values: Record<string, string | number> = {};
-  for (const [key, value] of Object.entries(facts)) {
-    if (value === undefined) continue;
-    values[key] = key === 'phone' ? formatPhoneInternational(String(value)) : value;
-  }
-  return values;
+function factValues(facts: ReplyFacts): Record<string, unknown> {
+  return facts.phone === undefined
+    ? { ...facts }
+    : { ...facts, phone: formatPhoneInternational(facts.phone) };
 }
 
 /** What code decided, as an instruction. Hand-offs are never phrased. */
@@ -38,7 +36,7 @@ export function phraseRequestFor(
     reply.intent === 'browse' || reply.intent === 'other'
       ? 'Briefly acknowledge their last message first.'
       : '',
-    reply.slot === 'phone' && reply.invalidPhone
+    reply.reason === 'invalid_phone'
       ? 'Say the phone number they gave looks incomplete or wrong, and ask for it again.'
       : ASK[reply.slot],
   ];

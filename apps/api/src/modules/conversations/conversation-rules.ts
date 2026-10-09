@@ -1,7 +1,6 @@
 import {
-  isSlotFilled,
+  hasCollectedAnything,
   REPLY_WINDOW_MS,
-  slotNames,
   type CollectedSlots,
   type ConversationState,
 } from '@app/shared';
@@ -32,7 +31,7 @@ export function messagePreview(text: string): string {
  * assistant's state machine re-presents a summary if one is due.
  */
 export function stateAfterHandBack(slots: CollectedSlots): ConversationState {
-  return slotNames.some((slot) => isSlotFilled(slots, slot)) ? 'collecting_details' : 'browsing';
+  return hasCollectedAnything(slots) ? 'collecting_details' : 'browsing';
 }
 
 /** Messenger's standard window: a seller may reply until 24h after the customer's last message. */

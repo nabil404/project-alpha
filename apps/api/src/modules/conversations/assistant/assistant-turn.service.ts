@@ -1,11 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { collectedSlotsSchema, DEFAULT_COUNTRY, type CollectedSlots } from '@app/shared';
+import {
+  collectedSlotsSchema,
+  DEFAULT_COUNTRY,
+  emptySlots,
+  type CollectedSlots,
+} from '@app/shared';
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
 import { withMerchant } from '../../database/with-merchant';
 import {
   LLM,
   type ChatLine,
+  type ExtractionContext,
   type LlmCallRecord,
   type LlmClient,
   type LlmResult,
@@ -218,7 +224,7 @@ export class AssistantTurnService {
     const classified = record(await llm.classifyIntent(history), calls);
     const extracted =
       classified !== 'failed' && shouldExtract(state, classified.intent)
-        ? record(await llm.extractOrder(history, slots), calls)
+        ? record(await llm.extractOrder(history, extractionContext(slots)), calls)
         : 'skipped';
     return decideTurn({ state, slots, classified, extracted, country });
   }
@@ -245,8 +251,21 @@ function record<T>(result: LlmResult<T>, calls: LlmCallRecord[]): T | 'failed' {
   return result.ok ? result.value : 'failed';
 }
 
+function extractionContext(slots: CollectedSlots): ExtractionContext {
+  return {
+    items: slots.items.map((item, ref) => ({
+      ref,
+      product: item.productQuery ?? '',
+      ...(item.quantity === undefined ? {} : { quantity: item.quantity }),
+    })),
+    ...(slots.customerName === undefined ? {} : { customerName: slots.customerName }),
+    ...(slots.phone === undefined ? {} : { phone: slots.phone }),
+    ...(slots.deliveryAddress === undefined ? {} : { deliveryAddress: slots.deliveryAddress }),
+  };
+}
+
 /** Slots written by an older shape, or by hand, read as nothing collected rather than failing the turn. */
 function readSlots(value: unknown): CollectedSlots {
   const parsed = collectedSlotsSchema.safeParse(value);
-  return parsed.success ? parsed.data : {};
+  return parsed.success ? parsed.data : emptySlots();
 }

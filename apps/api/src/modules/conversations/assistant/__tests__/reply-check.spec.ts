@@ -2,8 +2,7 @@ import { checkReply, REPLY_MAX_GRAPHEMES } from '../reply-check';
 import type { ReplyFacts } from '../reply-intent';
 
 const facts: ReplyFacts = {
-  productText: 'red saree',
-  quantity: 2,
+  items: [{ productName: 'Red saree', quantity: 2 }],
   customerName: 'Rahim',
   phone: '+8801812000000',
   deliveryAddress: 'House 12, Road 5, Dhanmondi',

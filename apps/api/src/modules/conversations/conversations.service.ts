@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   collectedSlotsSchema,
+  emptySlots,
   type CollectedSlots,
   type ConversationCounts,
   type ConversationDetail,
@@ -169,7 +170,7 @@ export class ConversationsService {
         ...(slots === undefined ? {} : { collectedSlots: { ...slots, lastAsked: undefined } }),
         ...(handBack
           ? {
-              state: stateAfterHandBack(slots ?? {}),
+              state: stateAfterHandBack(slots ?? emptySlots()),
               handedOffAt: null,
             }
           : {}),
@@ -233,5 +234,5 @@ function cursorOrReject(field: 'cursor' | 'before', value: string): CursorKey {
 /** A malformed row reads as empty, as the assistant's turn does. */
 function readSlots(value: unknown): CollectedSlots {
   const parsed = collectedSlotsSchema.safeParse(value);
-  return parsed.success ? parsed.data : {};
+  return parsed.success ? parsed.data : emptySlots();
 }

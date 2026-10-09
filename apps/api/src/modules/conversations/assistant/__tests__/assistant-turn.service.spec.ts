@@ -51,12 +51,11 @@ const failed = <T>(purpose: LlmPurpose): LlmResult<T> => ({
   usage: usage(purpose),
 });
 const NOTHING: ExtractedOrder = {
-  productName: null,
-  variantName: null,
-  quantity: null,
+  items: null,
   customerName: null,
   phone: null,
   deliveryAddress: null,
+  deliveryArea: null,
   confidence: 0.9,
 };
 let nextMid = 1;
@@ -197,7 +196,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     expect(sent).toEqual([{ psid: customer.psid, text: 'Which product would you like?' }]);
     expect(await conversationRow(convo.id)).toMatchObject({
       state: 'browsing',
-      collectedSlots: { lastAsked: { slot: 'product', times: 1 } },
+      collectedSlots: { items: [], lastAsked: { slot: 'product', item: 0, times: 1 } },
       lastMessageSender: 'assistant',
       botPaused: false,
     });
@@ -308,7 +307,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
     expect(sent.map((s) => s.text)).toEqual([
       fallbackText(
-        { kind: 'ask_slot', slot: 'product', intent: 'browse', invalidPhone: false, facts: {} },
+        { kind: 'ask_slot', slot: 'product', item: 0, intent: 'browse', facts: { items: [] } },
         'bn',
       ),
     ]);
@@ -322,7 +321,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
     expect(sent.map((s) => s.text)).toEqual([
       fallbackText(
-        { kind: 'ask_slot', slot: 'product', intent: 'browse', invalidPhone: false, facts: {} },
+        { kind: 'ask_slot', slot: 'product', item: 0, intent: 'browse', facts: { items: [] } },
         'bn',
       ),
     ]);
@@ -336,19 +335,21 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
     expect(sent.map((s) => s.text)).toEqual([
       fallbackText(
-        { kind: 'ask_slot', slot: 'product', intent: 'browse', invalidPhone: false, facts: {} },
+        { kind: 'ask_slot', slot: 'product', item: 0, intent: 'browse', facts: { items: [] } },
         'en',
       ),
     ]);
   });
 
   it('reads unreadable slots as empty', async () => {
-    const { convo, job } = await thread(t.merchantA, { collectedSlots: { quantity: 'two' } });
+    const { convo, job } = await thread(t.merchantA, { collectedSlots: { items: 'two' } });
 
     await expect(service().run(job)).resolves.toBe('replied');
 
     expect((await conversationRow(convo.id))?.collectedSlots).toEqual({
-      lastAsked: { slot: 'product', times: 1 },
+      items: [],
+      revision: 0,
+      lastAsked: { slot: 'product', item: 0, times: 1 },
     });
   });
 
@@ -357,7 +358,10 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     const { convo, job } = await thread(t.merchantA, {
       state: 'handed_off',
       botPaused: true,
-      collectedSlots: { productText: 'red saree', lastAsked: { slot: 'quantity', times: 2 } },
+      collectedSlots: {
+        items: [{ productQuery: 'red saree' }],
+        lastAsked: { slot: 'product', item: 0, times: 2 },
+      },
     });
     const publisher = { publish: async () => undefined } as unknown as ConversationEventsPublisher;
     const conversations = new ConversationsService(
@@ -375,22 +379,30 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
     expect(await conversationRow(convo.id)).toMatchObject({
       state: 'collecting_details',
-      collectedSlots: { productText: 'red saree', lastAsked: { slot: 'quantity', times: 1 } },
+      collectedSlots: {
+        items: [{ productQuery: 'red saree' }],
+        lastAsked: { slot: 'product', item: 0, times: 1 },
+      },
     });
   });
 
   it('runs extraction mid-flow even for a bare answer', async () => {
     llm.intent = ok({ intent: 'other', confidence: 0.9 }, 'classify');
-    llm.extraction = ok({ ...NOTHING, quantity: 2 }, 'extract');
+    llm.extraction = ok({ ...NOTHING, customerName: 'Rahim' }, 'extract');
     const { convo, job } = await thread(t.merchantA, {
       state: 'collecting_details',
-      collectedSlots: { productText: 'red saree', lastAsked: { slot: 'quantity', times: 1 } },
+      collectedSlots: {
+        items: [{ productQuery: 'red saree' }],
+        lastAsked: { slot: 'product', item: 0, times: 1 },
+      },
     });
 
     await service().run(job);
 
     expect(llm.calls).toEqual(['classify', 'extract', 'phrase']);
-    expect((await conversationRow(convo.id))?.collectedSlots).toMatchObject({ quantity: 2 });
+    expect((await conversationRow(convo.id))?.collectedSlots).toMatchObject({
+      customerName: 'Rahim',
+    });
   });
 
   it('does nothing for a conversation on a Page the shop no longer has', async () => {

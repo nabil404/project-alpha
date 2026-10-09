@@ -2,25 +2,20 @@ import { slotNames } from '@app/shared';
 import { fallbackText, languageFor, type ReplyLanguage } from '../assistant-fallbacks';
 import type { ReplyIntent } from '../reply-intent';
 
-const facts = {
-  productText: 'red saree',
-  variantText: 'XL',
-  quantity: 2,
-  customerName: 'Rahim',
-  phone: '+8801812000000',
-  deliveryAddress: 'House 12, Road 5, Dhanmondi',
-};
-
 const replies: ReplyIntent[] = [
   ...slotNames.map((slot): ReplyIntent => ({
     kind: 'ask_slot',
     slot,
     intent: 'order',
-    invalidPhone: false,
-    facts: {},
+    facts: { items: [] },
   })),
-  { kind: 'ask_slot', slot: 'phone', intent: 'other', invalidPhone: true, facts: {} },
-  { kind: 'summary', facts },
+  {
+    kind: 'ask_slot',
+    slot: 'phone',
+    intent: 'other',
+    reason: 'invalid_phone',
+    facts: { items: [] },
+  },
   { kind: 'handoff', reason: 'llm_failed' },
   { kind: 'handoff', reason: 'awaiting_seller' },
 ];
@@ -47,10 +42,9 @@ describe('fallbackText', () => {
       kind: 'ask_slot',
       slot: 'phone',
       intent: 'order',
-      invalidPhone: false,
-      facts: {},
+      facts: { items: [] },
     };
-    expect(fallbackText({ ...first, invalidPhone: true }, 'en')).not.toBe(
+    expect(fallbackText({ ...first, reason: 'invalid_phone' }, 'en')).not.toBe(
       fallbackText(first, 'en'),
     );
   });
@@ -61,19 +55,5 @@ describe('fallbackText', () => {
     expect(fallbackText(seller, 'en')).toBe('Thanks! The shop will confirm your order shortly.');
     expect(fallbackText(seller, 'bn')).toBe('ধন্যবাদ! আপনার অর্ডারটি দোকান শিগগিরই নিশ্চিত করবে।');
     expect(fallbackText(seller, 'en')).not.toBe(fallbackText(generic, 'en'));
-  });
-
-  it('fills the summary from the facts only', () => {
-    const text = fallbackText({ kind: 'summary', facts }, 'en');
-    for (const part of [
-      'red saree',
-      'XL',
-      '2',
-      'Rahim',
-      '+880 1812 000000',
-      'House 12, Road 5, Dhanmondi',
-    ]) {
-      expect(text).toContain(part);
-    }
   });
 });

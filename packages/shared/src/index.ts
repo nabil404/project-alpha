@@ -5,6 +5,7 @@ export * from './schemas/order';
 export * from './schemas/customer';
 export * from './schemas/catalog';
 export * from './schemas/llm';
+export * from './schemas/assistant-payload';
 export * from './schemas/auth';
 export * from './schemas/account';
 export * from './schemas/messenger';

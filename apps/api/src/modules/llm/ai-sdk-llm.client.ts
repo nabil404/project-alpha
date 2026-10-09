@@ -3,7 +3,6 @@ import { generateText, Output, RetryError, type LanguageModel } from 'ai';
 import {
   extractedOrderSchema,
   intentResultSchema,
-  type CollectedSlots,
   type ExtractedOrder,
   type IntentResult,
 } from '@app/shared';
@@ -14,6 +13,7 @@ import { PHRASE_REPLY_SYSTEM, phraseReplyPrompt } from './prompts/phrase-reply';
 import { transcript } from './prompts/transcript';
 import type {
   ChatLine,
+  ExtractionContext,
   LlmClient,
   LlmFailure,
   LlmPurpose,
@@ -70,13 +70,16 @@ export class AiSdkLlmClient implements LlmClient {
     );
   }
 
-  extractOrder(history: ChatLine[], slots: CollectedSlots): Promise<LlmResult<ExtractedOrder>> {
+  extractOrder(
+    history: ChatLine[],
+    context: ExtractionContext,
+  ): Promise<LlmResult<ExtractedOrder>> {
     return this.object(
       'extract',
       this.options.extraction,
       extractedOrderSchema,
       EXTRACT_ORDER_SYSTEM,
-      extractOrderPrompt(history, slots),
+      extractOrderPrompt(history, context),
     );
   }
 

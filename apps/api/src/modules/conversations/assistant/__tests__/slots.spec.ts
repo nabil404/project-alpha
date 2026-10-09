@@ -1,52 +1,114 @@
 import {
   collectedSlotsSchema,
+  emptySlots,
+  encodePayload,
+  MAX_ORDER_ITEMS,
   nextMissingSlot,
+  parsePayload,
   parseCustomerPhone,
   phoneDigitForms,
   toLatinDigits,
+  type CollectedSlots,
 } from '@app/shared';
 
+const P1 = '6f1c1f0e-6f8a-4d43-9a43-6f2b3b1c0d11';
+const P2 = '7a2d2e1f-1b2c-4d5e-8f90-112233445566';
+const V1 = '8b3e3f2a-2c3d-4e5f-9a01-223344556677';
+const slots = (overrides: Partial<CollectedSlots> = {}): CollectedSlots => ({
+  ...emptySlots(),
+  ...overrides,
+});
+const noVariants = () => false;
+
 describe('nextMissingSlot', () => {
-  it('asks in order: product, quantity, name, phone, address', () => {
-    expect(nextMissingSlot({})).toBe('product');
-    expect(nextMissingSlot({ productText: 'red saree' })).toBe('quantity');
-    expect(nextMissingSlot({ productText: 'red saree', quantity: 2 })).toBe('customerName');
-    expect(nextMissingSlot({ productText: 'red saree', quantity: 2, customerName: 'Rahim' })).toBe(
-      'phone',
-    );
-    expect(
-      nextMissingSlot({
-        productText: 'red saree',
-        quantity: 2,
-        customerName: 'Rahim',
-        phone: '+8801812000000',
-      }),
-    ).toBe('deliveryAddress');
+  it('asks for a first product when there are no items', () => {
+    expect(nextMissingSlot(slots(), noVariants)).toEqual({ slot: 'product', item: 0 });
   });
 
-  it('counts a matched product id as the product', () => {
-    expect(nextMissingSlot({ productId: '6f1c1f0e-6f8a-4d43-9a43-6f2b3b1c0d11' })).toBe('quantity');
-  });
-
-  it('returns null when every slot is filled; a variant is never required', () => {
+  it('walks each item (product, variant when needed, quantity), then the order details', () => {
+    const items = [
+      { productQuery: 'saree', productId: P1, quantity: 1 },
+      { productQuery: 'kurti', productId: P2 },
+    ];
+    expect(nextMissingSlot(slots({ items: [{ productQuery: 'saree' }] }), noVariants)).toEqual({
+      slot: 'product',
+      item: 0,
+    });
+    expect(nextMissingSlot(slots({ items }), noVariants)).toEqual({ slot: 'quantity', item: 1 });
+    expect(nextMissingSlot(slots({ items }), (id) => id === P2)).toEqual({
+      slot: 'variant',
+      item: 1,
+    });
+    const complete = [items[0]!, { ...items[1]!, variantId: V1, quantity: 2 }];
+    expect(nextMissingSlot(slots({ items: complete }), noVariants)).toEqual({
+      slot: 'customerName',
+    });
+    expect(nextMissingSlot(slots({ items: complete, customerName: 'Rahim' }), noVariants)).toEqual({
+      slot: 'phone',
+    });
     expect(
-      nextMissingSlot({
-        productText: 'red saree',
-        quantity: 2,
-        customerName: 'Rahim',
-        phone: '+8801812000000',
-        deliveryAddress: 'House 12, Road 5, Dhanmondi',
-      }),
+      nextMissingSlot(
+        slots({ items: complete, customerName: 'Rahim', phone: '+8801812000000' }),
+        noVariants,
+      ),
+    ).toEqual({ slot: 'deliveryAddress' });
+    expect(
+      nextMissingSlot(
+        slots({
+          items: complete,
+          customerName: 'Rahim',
+          phone: '+8801812000000',
+          deliveryAddress: 'House 12, Road 5, Dhanmondi',
+        }),
+        noVariants,
+      ),
     ).toBeNull();
   });
 
-  it('parses the ask counter and rejects an unknown slot name', () => {
-    expect(collectedSlotsSchema.parse({ lastAsked: { slot: 'phone', times: 2 } })).toEqual({
-      lastAsked: { slot: 'phone', times: 2 },
-    });
+  it('reads an older shape as nothing collected, and rejects an unknown slot name', () => {
+    expect(collectedSlotsSchema.parse({ productText: 'red saree', quantity: 2 })).toEqual(
+      emptySlots(),
+    );
+    expect(
+      collectedSlotsSchema.parse({ lastAsked: { slot: 'variant', item: 1, times: 2 } }),
+    ).toEqual(slots({ lastAsked: { slot: 'variant', item: 1, times: 2 } }));
     expect(
       collectedSlotsSchema.safeParse({ lastAsked: { slot: 'colour', times: 1 } }).success,
     ).toBe(false);
+  });
+
+  it(`holds at most ${MAX_ORDER_ITEMS} items`, () => {
+    const items = Array.from({ length: MAX_ORDER_ITEMS + 1 }, () => ({ productQuery: 'saree' }));
+    expect(collectedSlotsSchema.safeParse({ items }).success).toBe(false);
+  });
+});
+
+describe('assistant payloads', () => {
+  const conversationId = '11111111-2222-4333-8444-555555555555';
+
+  it('round-trips every kind', () => {
+    for (const payload of [
+      { kind: 'confirm', conversationId, revision: 3 },
+      { kind: 'change', conversationId, revision: 0 },
+      { kind: 'pick', slot: 'product', id: P1 },
+      { kind: 'pick', slot: 'variant', id: V1 },
+    ] as const) {
+      expect(parsePayload(encodePayload(payload))).toEqual(payload);
+    }
+  });
+
+  it('reads anything it did not encode as null', () => {
+    for (const text of [
+      '',
+      'GET_STARTED',
+      `confirm:${conversationId}`,
+      `confirm:${conversationId}:-1`,
+      `confirm:not-a-uuid:1`,
+      `pick:size:${P1}`,
+      `pick:product:${P1}:extra`,
+    ]) {
+      expect(parsePayload(text)).toBeNull();
+    }
   });
 });
 

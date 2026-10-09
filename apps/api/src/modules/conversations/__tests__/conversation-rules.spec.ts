@@ -1,3 +1,4 @@
+import { emptySlots } from '@app/shared';
 import {
   PREVIEW_LENGTH,
   PROFILE_REFRESH_MS,
@@ -36,13 +37,19 @@ describe('messagePreview', () => {
 
 describe('stateAfterHandBack', () => {
   it('browses when nothing was collected, otherwise keeps collecting', () => {
-    expect(stateAfterHandBack({})).toBe('browsing');
-    expect(stateAfterHandBack({ quantity: 2 })).toBe('collecting_details');
-    expect(stateAfterHandBack({ productText: 'red saree' })).toBe('collecting_details');
+    expect(stateAfterHandBack(emptySlots())).toBe('browsing');
+    expect(stateAfterHandBack({ ...emptySlots(), customerName: 'Rahim' })).toBe(
+      'collecting_details',
+    );
+    expect(stateAfterHandBack({ ...emptySlots(), items: [{ productQuery: 'red saree' }] })).toBe(
+      'collecting_details',
+    );
   });
 
   it('ignores the ask counter: being asked is not having answered', () => {
-    expect(stateAfterHandBack({ lastAsked: { slot: 'product', times: 2 } })).toBe('browsing');
+    expect(
+      stateAfterHandBack({ ...emptySlots(), lastAsked: { slot: 'product', item: 0, times: 2 } }),
+    ).toBe('browsing');
   });
 });
 

@@ -13,12 +13,17 @@ export const conversationStates = [
 export const conversationStateSchema = z.enum(conversationStates);
 export type ConversationState = z.infer<typeof conversationStateSchema>;
 
+/** The most items one assistant order holds; extraction and the slots are capped at it. */
+export const MAX_ORDER_ITEMS = 10;
+
 /**
- * What the assistant collects, in the order it asks. Phase 2 adds the variant,
- * asked only when the matched product has options.
+ * What the assistant collects, in the order it asks: for each item in turn its
+ * product, its variant (only when the product has more than one) and its
+ * quantity; then the order's name, phone and address.
  */
 export const slotNames = [
   'product',
+  'variant',
   'quantity',
   'customerName',
   'phone',
@@ -27,29 +32,126 @@ export const slotNames = [
 export const slotNameSchema = z.enum(slotNames);
 export type SlotName = z.infer<typeof slotNameSchema>;
 
-export const collectedSlotsSchema = z.object({
-  /** The product in the customer's own words; phase 2 resolves it to productId. */
-  productText: z.string().min(1).optional(),
-  variantText: z.string().min(1).optional(),
-  productId: z.string().uuid().optional(),
-  variantId: z.string().uuid().optional(),
+/** Slots that belong to one item of the order rather than to the order. */
+export type ItemSlotName = Extract<SlotName, 'product' | 'variant' | 'quantity'>;
+
+const words = z.string().min(1);
+const uuid = z.string().uuid();
+const minor = z.number().int().nonnegative();
+
+/**
+ * One item of the order. The `*Query` fields are the customer's own words,
+ * kept so a later turn can match them again; `*Alt` is the same words in the
+ * other script (Bangla ⇄ Latin). The ids are what code matched them to.
+ */
+export const orderItemSlotSchema = z.object({
+  productQuery: words.optional(),
+  productQueryAlt: words.optional(),
+  variantQuery: words.optional(),
+  variantQueryAlt: words.optional(),
+  productId: uuid.optional(),
+  variantId: uuid.optional(),
   quantity: z.number().int().positive().optional(),
-  customerName: z.string().min(1).optional(),
+});
+export type OrderItemSlot = z.infer<typeof orderItemSlotSchema>;
+
+/** One priced line of a quote, in minor units. */
+export const quoteLineSchema = z.object({
+  productId: uuid,
+  variantId: uuid,
+  quantity: z.number().int().positive(),
+  unitPrice: minor,
+  lineTotal: minor,
+});
+export type QuoteLine = z.infer<typeof quoteLineSchema>;
+
+/** The numbers the summary card with `revision` showed. Confirm creates an order only if they still hold. */
+export const quoteSchema = z.object({
+  revision: z.number().int().positive(),
+  lines: z.array(quoteLineSchema).min(1).max(MAX_ORDER_ITEMS),
+  subtotal: minor,
+  deliveryChargeId: uuid,
+  deliveryFee: minor,
+  total: minor,
+  currency: z.string().length(3),
+});
+export type Quote = z.infer<typeof quoteSchema>;
+
+/** Quick replies Messenger shows at most. */
+export const MAX_QUICK_REPLIES = 13;
+
+export const collectedSlotsSchema = z.object({
+  items: z.array(orderItemSlotSchema).max(MAX_ORDER_ITEMS).default([]),
+  customerName: words.optional(),
   /** E.164. */
-  phone: z.string().min(1).optional(),
-  deliveryAddress: z.string().min(1).optional(),
-  /** The slot asked for last and how many times in a row; the third ask hands off instead. */
-  lastAsked: z.object({ slot: slotNameSchema, times: z.number().int().positive() }).optional(),
+  phone: words.optional(),
+  deliveryAddress: words.optional(),
+  /** The area or district the customer named, in their words. */
+  deliveryArea: words.optional(),
+  /** The shop's delivery charge the address matched, or its everywhere-else row. */
+  deliveryChargeId: uuid.optional(),
+  /** Candidates offered as quick replies for one item; a tap must name one of them. */
+  offered: z
+    .object({
+      slot: z.enum(['product', 'variant']),
+      item: z.number().int().nonnegative(),
+      ids: z.array(uuid).min(1).max(MAX_QUICK_REPLIES),
+    })
+    .optional(),
+  /** Bumped by every summary card sent; a Confirm carrying an older one is refused. */
+  revision: z.number().int().nonnegative().default(0),
+  /** What the card with `revision` showed. */
+  quote: quoteSchema.optional(),
+  /** The slot (and item) asked for last and how many times in a row; the third ask hands off instead. */
+  lastAsked: z
+    .object({
+      slot: slotNameSchema,
+      item: z.number().int().nonnegative().optional(),
+      times: z.number().int().positive(),
+    })
+    .optional(),
 });
 export type CollectedSlots = z.infer<typeof collectedSlotsSchema>;
 
-export function isSlotFilled(slots: CollectedSlots, slot: SlotName): boolean {
-  if (slot === 'product') return slots.productText !== undefined || slots.productId !== undefined;
-  return slots[slot] !== undefined;
+/** Nothing collected yet. */
+export function emptySlots(): CollectedSlots {
+  return { items: [], revision: 0 };
 }
 
-export function nextMissingSlot(slots: CollectedSlots): SlotName | null {
-  return slotNames.find((slot) => !isSlotFilled(slots, slot)) ?? null;
+export type MissingSlot =
+  { slot: ItemSlotName; item: number } | { slot: Exclude<SlotName, ItemSlotName> };
+
+/**
+ * The next thing to ask for, or null when the order is complete. An empty
+ * item list asks for a product. `needsVariant` says whether a matched product
+ * has more than one variant to choose from.
+ */
+export function nextMissingSlot(
+  slots: CollectedSlots,
+  needsVariant: (productId: string) => boolean,
+): MissingSlot | null {
+  if (slots.items.length === 0) return { slot: 'product', item: 0 };
+  for (const [item, entry] of slots.items.entries()) {
+    if (entry.productId === undefined) return { slot: 'product', item };
+    if (entry.variantId === undefined && needsVariant(entry.productId)) {
+      return { slot: 'variant', item };
+    }
+    if (entry.quantity === undefined) return { slot: 'quantity', item };
+  }
+  if (slots.customerName === undefined) return { slot: 'customerName' };
+  if (slots.phone === undefined) return { slot: 'phone' };
+  if (slots.deliveryAddress === undefined) return { slot: 'deliveryAddress' };
+  return null;
+}
+
+/** Whether the customer has given anything towards an order yet. */
+export function hasCollectedAnything(slots: CollectedSlots): boolean {
+  return (
+    slots.items.length > 0 ||
+    slots.customerName !== undefined ||
+    slots.phone !== undefined ||
+    slots.deliveryAddress !== undefined
+  );
 }
 
 /** Who wrote a message: the customer, our assistant, or the seller (dashboard or Facebook's own inbox). */
