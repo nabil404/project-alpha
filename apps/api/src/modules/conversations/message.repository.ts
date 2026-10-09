@@ -22,6 +22,7 @@ export class MessageRepository {
       text: string;
       metaMessageId: string;
       sentAt: Date;
+      payload?: string | null;
     },
   ): Promise<MessageRow | null> {
     const [row] = await executor

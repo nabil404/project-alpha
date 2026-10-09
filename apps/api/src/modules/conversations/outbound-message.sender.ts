@@ -5,10 +5,19 @@ import { DATABASE, type Database } from '../database/database.module';
 import type { ConversationRow, MessageRow } from '../database/schema/index';
 import { withMerchant } from '../database/with-merchant';
 import { META_GRAPH } from '../messenger/page/facebook-page.service';
-import type { MetaGraphClient } from '../messenger/page/meta-graph.client';
+import type { GraphOption, MetaGraphClient } from '../messenger/page/meta-graph.client';
 import { ConversationRepository } from './conversation.repository';
 import { ConversationEventsPublisher } from './events/conversation-events.publisher';
 import { MessageRepository } from './message.repository';
+
+/**
+ * How a staged row goes out. The row's text is the body in every case, and
+ * what the dashboard thread shows.
+ */
+export type OutboundContent =
+  | { kind: 'text' }
+  | { kind: 'quick_replies'; options: GraphOption[] }
+  | { kind: 'card'; buttons: GraphOption[] };
 
 /**
  * A reply to a customer, from the seller or the assistant, in two halves so no
@@ -55,12 +64,23 @@ export class OutboundMessageSender {
   /** After commit: send, record the outcome, announce it. */
   async deliver(
     scope: TenantScope,
-    { row, psid, encryptedToken }: { row: MessageRow; psid: string; encryptedToken: string },
+    {
+      row,
+      psid,
+      encryptedToken,
+      content,
+    }: { row: MessageRow; psid: string; encryptedToken: string; content: OutboundContent },
   ): Promise<MessageRow> {
     let delivered: { messageId: string } | null = null;
     if (this.graph) {
       try {
-        delivered = await this.graph.sendText(this.crypto.decrypt(encryptedToken), psid, row.text);
+        delivered = await this.send(
+          this.graph,
+          this.crypto.decrypt(encryptedToken),
+          psid,
+          row.text,
+          content,
+        );
       } catch (error) {
         this.logger.warn(
           `${row.sender} reply not delivered: ${error instanceof Error ? error.message : 'unknown error'}`,
@@ -78,5 +98,39 @@ export class OutboundMessageSender {
       kind: 'message',
     });
     return final;
+  }
+
+  /**
+   * A product photo before the turn's text. Best effort and unstored: the
+   * text that follows carries the turn, and the echo is skipped as our own.
+   */
+  async deliverImage(psid: string, encryptedToken: string, url: string): Promise<boolean> {
+    if (!this.graph) return false;
+    try {
+      await this.graph.sendImage(this.crypto.decrypt(encryptedToken), psid, url);
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `assistant image not delivered: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      return false;
+    }
+  }
+
+  private send(
+    graph: MetaGraphClient,
+    token: string,
+    psid: string,
+    text: string,
+    content: OutboundContent,
+  ): Promise<{ messageId: string }> {
+    switch (content.kind) {
+      case 'text':
+        return graph.sendText(token, psid, text);
+      case 'quick_replies':
+        return graph.sendQuickReplies(token, psid, text, content.options);
+      case 'card':
+        return graph.sendButtonTemplate(token, psid, text, content.buttons);
+    }
   }
 }

@@ -221,6 +221,82 @@ describe('MetaGraphClient', () => {
       });
     });
 
+    it('sends quick replies with titles cut to 20 characters without splitting a letter, at most 13', async () => {
+      const fetch = fakeFetch({ body: { message_id: 'm_q' } });
+      const client = new MetaGraphClient(settings, fetch.fn);
+      const options = Array.from({ length: 14 }, (_, i) => ({
+        title: i === 0 ? 'লাল জামদানি শাড়ি (বড় সাইজ)' : `Option ${i}`,
+        payload: `pick:product:${i}`,
+      }));
+
+      await expect(
+        client.sendQuickReplies('page-token', 'psid-1', 'Which one?', options),
+      ).resolves.toEqual({ messageId: 'm_q' });
+
+      const body = fetch.calls[0]?.body as {
+        messaging_type: string;
+        message: {
+          text: string;
+          quick_replies: { content_type: string; title: string; payload: string }[];
+        };
+      };
+      expect(body.messaging_type).toBe('RESPONSE');
+      expect(body.message.text).toBe('Which one?');
+      expect(body.message.quick_replies).toHaveLength(13);
+      expect(body.message.quick_replies[1]).toEqual({
+        content_type: 'text',
+        title: 'Option 1',
+        payload: 'pick:product:1',
+      });
+      expect(body.message.quick_replies[0]!.title).toBe('লাল জামদানি শাড়ি (…');
+    });
+
+    it('sends a button template with postback buttons', async () => {
+      const fetch = fakeFetch({ body: { message_id: 'm_b' } });
+      const client = new MetaGraphClient(settings, fetch.fn);
+
+      await client.sendButtonTemplate('page-token', 'psid-1', 'Total: ৳3,260.00', [
+        { title: 'Confirm', payload: 'confirm:c:2' },
+        { title: 'Change something', payload: 'change:c:2' },
+      ]);
+
+      expect(fetch.calls[0]?.body).toEqual({
+        recipient: { id: 'psid-1' },
+        messaging_type: 'RESPONSE',
+        message: {
+          attachment: {
+            type: 'template',
+            payload: {
+              template_type: 'button',
+              text: 'Total: ৳3,260.00',
+              buttons: [
+                { type: 'postback', title: 'Confirm', payload: 'confirm:c:2' },
+                { type: 'postback', title: 'Change something', payload: 'change:c:2' },
+              ],
+            },
+          },
+        },
+      });
+    });
+
+    it('sends an image by its URL', async () => {
+      const fetch = fakeFetch({ body: { message_id: 'm_i' } });
+      const client = new MetaGraphClient(settings, fetch.fn);
+
+      await client.sendImage('page-token', 'psid-1', 'https://cdn.test/saree.jpg');
+
+      expect(fetch.calls[0]?.body).toEqual({
+        recipient: { id: 'psid-1' },
+        messaging_type: 'RESPONSE',
+        message: {
+          attachment: {
+            type: 'image',
+            payload: { url: 'https://cdn.test/saree.jpg', is_reusable: true },
+          },
+        },
+      });
+    });
+
     it('fails a send Facebook refused, without the token in the error', async () => {
       const client = new MetaGraphClient(
         settings,

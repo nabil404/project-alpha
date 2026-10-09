@@ -12,7 +12,11 @@ import {
   type CatalogTestDb,
 } from '../../../database/__tests__/catalog-test-db';
 import { randomPageId, seedFacebookPage } from '../../../database/__tests__/conversation-seeds';
-import type { CustomerMessageJob, PageEchoJob } from '../../../queue/queue.constants';
+import type {
+  CustomerMessageJob,
+  CustomerPostbackJob,
+  PageEchoJob,
+} from '../../../queue/queue.constants';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-graph.client';
 import { ConversationRepository } from '../../conversation.repository';
@@ -410,5 +414,67 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
     } as unknown as AppConfig);
     await ingest.handle(customerMessage());
     expect(turns.added).toEqual([]);
+  });
+
+  it('stores a button tap as a customer message with its payload and queues it at once', async () => {
+    const first = customerMessage();
+    await ingest.handle(first);
+    const conversationId = (await threadOf(first.senderPsid))!.conversation.id;
+    const tap: CustomerPostbackJob = {
+      kind: 'customer-postback',
+      messageId: `mid-${randomUUID()}`,
+      pageId: pageA,
+      senderPsid: first.senderPsid,
+      text: 'Confirm',
+      payload: `confirm:${conversationId}:1`,
+      sentAt: Date.parse('2026-09-29T10:05:00Z'),
+    };
+
+    await expect(ingest.handle(tap)).resolves.toBe('stored');
+
+    const stored = (await messagesOf(conversationId)).find(
+      (m) => m.metaMessageId === tap.messageId,
+    );
+    expect(stored).toMatchObject({ sender: 'customer', text: 'Confirm', payload: tap.payload });
+    expect(turns.added[1]).toMatchObject({
+      data: { conversationId, triggerMessageId: stored!.id },
+      opts: { jobId: `turn-${tap.messageId}`, delay: 0 },
+    });
+  });
+
+  it('keeps a quick-reply payload and the usual delay', async () => {
+    const job = customerMessage({ text: 'Red saree', payload: 'pick:product:abc' });
+    await ingest.handle(job);
+
+    const thread = await threadOf(job.senderPsid);
+    const [stored] = await messagesOf(thread!.conversation.id);
+    expect(stored?.payload).toBe('pick:product:abc');
+    expect(turns.added[0]).toMatchObject({ opts: { delay: 2_500 } });
+  });
+
+  it('answers a Confirm tap on a confirmed chat, and nothing else there', async () => {
+    const first = customerMessage();
+    await ingest.handle(first);
+    const conversationId = (await threadOf(first.senderPsid))!.conversation.id;
+    await t.db
+      .update(schema.conversation)
+      .set({ state: 'confirmed' })
+      .where(eq(schema.conversation.id, conversationId));
+    const tap = (payload: string): CustomerPostbackJob => ({
+      kind: 'customer-postback',
+      messageId: `mid-${randomUUID()}`,
+      pageId: pageA,
+      senderPsid: first.senderPsid,
+      text: 'Confirm',
+      payload,
+      sentAt: Date.parse('2026-09-29T10:06:00Z'),
+    });
+
+    await ingest.handle(customerMessage({ senderPsid: first.senderPsid, text: 'thanks' }));
+    await ingest.handle(tap(`change:${conversationId}:1`));
+    await ingest.handle(tap(`confirm:${conversationId}:1`));
+
+    expect(turns.added).toHaveLength(2);
+    expect(turns.added[1]).toMatchObject({ opts: { delay: 0 } });
   });
 });

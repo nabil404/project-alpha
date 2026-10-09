@@ -51,6 +51,28 @@ describe('InboundMessageProcessor', () => {
     expect(handled).toEqual([echo]);
   });
 
+  it('hands a button tap and a quick-reply tap to the ingest with their payloads', async () => {
+    const { processor, handled } = recordingProcessor();
+    const postback: InboundMessageJob = {
+      kind: 'customer-postback',
+      messageId: 'pb-1',
+      pageId: '1',
+      senderPsid: 'psid-1',
+      text: 'Confirm',
+      payload: 'confirm:c:1',
+      sentAt: 0,
+    };
+    const quickReply: InboundMessageJob = { ...data, payload: 'pick:product:p' };
+
+    await processor.process(jobOf(INBOUND_MESSAGE_JOB, postback));
+    await processor.process(jobOf(INBOUND_MESSAGE_JOB, quickReply));
+    await expect(
+      processor.process(jobOf(INBOUND_MESSAGE_JOB, { ...postback, payload: undefined })),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+
+    expect(handled).toEqual([postback, quickReply]);
+  });
+
   it('reads a job queued before messages had a kind as a customer message', async () => {
     const { processor, handled } = recordingProcessor();
     const legacy = {
