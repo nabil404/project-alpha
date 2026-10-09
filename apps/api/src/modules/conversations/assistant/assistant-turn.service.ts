@@ -82,6 +82,9 @@ export class AssistantTurnService {
     });
     if (!read) return 'stale';
     const gate = turnGate(read.conversation, read.recent, triggerMessageId);
+    if (gate === 'closed' || gate === 'answered') {
+      return (await this.resume(scope, conversationId, read, triggerMessageId, gate)) ?? gate;
+    }
     if (gate !== 'go') return gate;
     const state = read.conversation.state;
     if (!isActiveState(state)) return 'closed';
@@ -102,7 +105,6 @@ export class AssistantTurnService {
     const text = await this.words(decision.reply, history, language, calls);
 
     // 3. Re-check under the lock and write.
-    const now = new Date();
     const staged = await withMerchant(this.db, merchantId, async (tx) => {
       const locked = await this.conversations.findById(tx, scope, conversationId, { lock: true });
       if (!locked) return { outcome: 'stale' as const };
@@ -112,6 +114,9 @@ export class AssistantTurnService {
       });
       const recheck = turnGate(locked.conversation, recent, triggerMessageId);
       if (recheck !== 'go') return { outcome: recheck };
+      // The reply must sort after its trigger even when Meta's clock runs ahead of ours.
+      const trigger = recent.find((message) => message.id === triggerMessageId);
+      const now = new Date(Math.max(Date.now(), (trigger?.sentAt.getTime() ?? 0) + 1));
       if (!isReplyWindowOpen(locked.conversation.lastInboundAt, now))
         return { outcome: 'window_closed' as const };
 
@@ -123,7 +128,7 @@ export class AssistantTurnService {
       });
       if (!updated) return { outcome: 'stale' as const };
       const row = await this.outbound.stage(tx, scope, updated, { sender: 'assistant', text, now });
-      return { outcome: 'go' as const, row, psid: locked.customer.psid, handedOffAt };
+      return { outcome: 'go' as const, row, psid: locked.customer.psid, handedOffAt, now };
     });
     if (staged.outcome !== 'go') return staged.outcome;
 
@@ -135,18 +140,69 @@ export class AssistantTurnService {
     });
     let handedOffAt = staged.handedOffAt;
     if (final.status === 'failed' && !handedOffAt) {
-      const at = new Date();
-      handedOffAt = at;
-      await withMerchant(this.db, merchantId, (tx) =>
-        this.conversations.update(tx, scope, conversationId, {
-          state: 'handed_off',
-          handedOffAt: at,
-        }),
-      );
+      handedOffAt = await this.handOffAfterFailedSend(scope, conversationId, staged.now);
     }
     if (handedOffAt) await this.notifications.handedOff(merchantId, conversationId, handedOffAt);
     if (final.status === 'failed') return 'send_failed';
     return handedOffAt ? 'handed_off' : 'replied';
+  }
+
+  /**
+   * A retry that finds its work already committed: finish what the failed
+   * attempt did not. Null when there is nothing to finish. No LLM call.
+   */
+  private async resume(
+    scope: TenantScope,
+    conversationId: string,
+    read: {
+      conversation: { state: string; handedOffAt: Date | null };
+      recent: { id: string; sender: string; status: string; sentAt: Date }[];
+    },
+    triggerMessageId: string,
+    gate: 'closed' | 'answered',
+  ): Promise<TurnOutcome | null> {
+    const trigger = read.recent.find((message) => message.id === triggerMessageId);
+    if (!trigger) return null;
+    const { conversation } = read;
+    if (
+      conversation.state === 'handed_off' &&
+      conversation.handedOffAt &&
+      conversation.handedOffAt >= trigger.sentAt
+    ) {
+      await this.notifications.handedOff(
+        scope.merchantId,
+        conversationId,
+        conversation.handedOffAt,
+      );
+      return 'handed_off';
+    }
+    if (gate !== 'answered') return null;
+    const reply = read.recent.find((message) => message.sender === 'assistant');
+    if (!reply || reply.sentAt <= trigger.sentAt || reply.status !== 'failed') return null;
+    const at = new Date(Math.max(Date.now(), trigger.sentAt.getTime() + 1));
+    const wrote = await this.handOffAfterFailedSend(scope, conversationId, at);
+    if (!wrote) return null;
+    await this.notifications.handedOff(scope.merchantId, conversationId, wrote);
+    return 'send_failed';
+  }
+
+  /** Under the conversation lock; null (and nothing written) for a chat already paused or handed off. */
+  private async handOffAfterFailedSend(
+    scope: TenantScope,
+    conversationId: string,
+    at: Date,
+  ): Promise<Date | null> {
+    return withMerchant(this.db, scope.merchantId, async (tx) => {
+      const locked = await this.conversations.findById(tx, scope, conversationId, { lock: true });
+      if (!locked || locked.conversation.botPaused || locked.conversation.state === 'handed_off') {
+        return null;
+      }
+      await this.conversations.update(tx, scope, conversationId, {
+        state: 'handed_off',
+        handedOffAt: at,
+      });
+      return at;
+    });
   }
 
   private async decide(
