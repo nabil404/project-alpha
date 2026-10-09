@@ -23,11 +23,13 @@ exist ([04 · Conversations](../../04-conversations/README.md)).
 ```
 InboundMessageIngest (after commit, sender = customer, stored)
   └─ if !botPaused && page.botEnabled && state ∉ {handed_off, confirmed} && LLM configured
+        && Graph configured (META_APP_ID set)
      → ASSISTANT_QUEUE add('assistant-turn', {merchantId, conversationId, triggerMessageId},
                            {jobId: `turn-${metaMessageId}`, delay: 2500 ms})   // one turn per burst
 AssistantTurnProcessor → AssistantTurnService.run()
-  1. read (withMerchant): conversation, last ~20 messages, Page token
-     bail if paused / handed_off / the trigger is no longer the latest customer message
+  1. read (withMerchant): conversation, last ~20 messages, Page token, the shop's country
+     bail if paused / handed_off / confirmed, the trigger is no longer the latest customer
+     message, or the turn gate says 'answered' (an assistant reply already follows the trigger)
   2. LLM, no transaction open: classifyIntent (routing model)
      → extractOrder (extraction model): in browsing only for order / edit_order; in
        collecting_details and awaiting_confirmation for every intent except
@@ -50,10 +52,11 @@ AssistantTurnProcessor → AssistantTurnService.run()
   as Graph being unconfigured). `*.apiKey` is in the pino redact list in
   `src/app.module.ts`.
 - **`src/modules/llm/`**: `LlmClient` with `classifyIntent(history)`,
-  `extractOrder(history, slots)` and `phraseReply(intent, facts, history)`,
+  `extractOrder(history, slots)` and `phraseReply(request, history)`,
   validated with `intentResultSchema` / `extractedOrderSchema` from
   `packages/shared/src/schemas/llm.ts`. It never throws: it returns
-  `{ ok: true, value, usage }` or `{ ok: false, reason }`, with an
+  `{ ok: true, value, usage }` or `{ ok: false, reason, usage }` (a failure carries
+  `usage` too, with the billed tokens when the provider reported them), with an
   `AbortSignal.timeout` on each call. Message text is never logged. Provider
   token `LLM`, so tests inject a fake. One prompt file per call in `prompts/`.
 - **Cost tracking:** an `llm_call` table in `schema/assistant.ts`
@@ -81,8 +84,10 @@ AssistantTurnProcessor → AssistantTurnService.run()
   sent.
 - **Fallbacks** follow the shop's country (`merchant_settings.country`,
   Bangladesh when there is no row): a `country → language` map (BD → `bn`,
-  others → `en`) picks from `Record<language, Record<ReplyKind, string>>`; a
-  missing sentence fails typecheck; there is no runtime fallback. The hand-off message is always the fixed
+  others → `en`) picks from `Record<language, Record<FallbackKey, (facts) => string>>`
+  (`FallbackKey` is `ask_<slot>`, `ask_phone_invalid`, `summary`, `handoff`,
+  `handoff_awaiting_seller`); a missing sentence fails typecheck; there is no
+  runtime fallback. The hand-off message is always the fixed
   fallback, with no LLM call.
 - **Hand-off** (state `handed_off`, fixed reply) when the LLM errors or times
   out, the output fails Zod, confidence is below 0.6, the intent is `complain`
@@ -93,7 +98,16 @@ AssistantTurnProcessor → AssistantTurnService.run()
   the seller is emailed if nobody replies in 10 minutes
   ([Settings – Notifications](../../10-settings-notifications/README.md#sending)).
 - **All slots filled** → `awaiting_confirmation` and a phrased summary. No
-  prices yet; phase 2 adds them to `facts`.
+  prices yet; phase 2 adds them to `facts`. In `awaiting_confirmation`, a turn
+  that changes no slot (a bare "yes", say) hands off with reason
+  `awaiting_seller` and its own fixed sentence ("The shop will confirm your
+  order shortly") instead of repeating the summary; a turn that changes a slot
+  re-sends the summary with the edit.
+- **Empty extractions skip the confidence floor.** When every extracted field is
+  null, its confidence says nothing, so `decideTurn` ignores it (the prompt
+  tells the model to return 1 then). A filled field below 0.6 still hands off.
+- **A hand-back clears the repeat counter** (`lastAsked`) in
+  `ConversationsService.update`, so the next turn starts counting afresh.
 - **Shared send path:** the store-`sending` → `graph.sendText` →
   `markSent` / `markFailed` → publish sequence lives in `OutboundMessageSender`,
   used by `ConversationsService.send` and the assistant, with `sender` as a parameter.
@@ -148,12 +162,19 @@ tokens or message text.
 
 An environment with `LLM_PROVIDER=anthropic` (the old default) now fails
 validation at boot. Set it to `openai` in every local `.env` and in Parameter
-Store before deploying.
+Store before deploying. Likewise update or unset `LLM_MODEL_ROUTING` and
+`LLM_MODEL_EXTRACTION` in both places: old Claude model IDs would make every
+call fail, and every turn would hand off.
 
 ## Follow-ups
 
 - A sweep of assistant rows stuck in `sending`. A crash between the commit and
   Graph leaves one, and the retry treats the turn as answered.
+- A turn whose retries are exhausted ends with no reply and no hand-off; the
+  processor needs a `failed` handler that hands the chat off.
+- A narrow race: a customer message ingested just after a reply commits, but
+  sent before it, is treated as answered. Its text is still in the next turn's
+  history.
 - A native-speaker review of the Bangla fallback sentences.
 - A turn is lost if Redis refuses the queue add after the ingest committed.
 - `llm_call` has no `(merchant_id, conversation_id)` index yet.

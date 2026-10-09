@@ -22,6 +22,7 @@ const replies: ReplyIntent[] = [
   { kind: 'ask_slot', slot: 'phone', intent: 'other', invalidPhone: true, facts: {} },
   { kind: 'summary', facts },
   { kind: 'handoff', reason: 'llm_failed' },
+  { kind: 'handoff', reason: 'awaiting_seller' },
 ];
 
 describe('languageFor', () => {
@@ -52,6 +53,14 @@ describe('fallbackText', () => {
     expect(fallbackText({ ...first, invalidPhone: true }, 'en')).not.toBe(
       fallbackText(first, 'en'),
     );
+  });
+
+  it('words the awaiting_seller hand-off as its own sentence', () => {
+    const generic: ReplyIntent = { kind: 'handoff', reason: 'llm_failed' };
+    const seller: ReplyIntent = { kind: 'handoff', reason: 'awaiting_seller' };
+    expect(fallbackText(seller, 'en')).toBe('Thanks! The shop will confirm your order shortly.');
+    expect(fallbackText(seller, 'bn')).toBe('ধন্যবাদ! আপনার অর্ডারটি দোকান শিগগিরই নিশ্চিত করবে।');
+    expect(fallbackText(seller, 'en')).not.toBe(fallbackText(generic, 'en'));
   });
 
   it('fills the summary from the facts only', () => {

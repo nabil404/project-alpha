@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   collectedSlotsSchema,
+  type CollectedSlots,
   type ConversationCounts,
   type ConversationDetail,
   type ConversationListResponse,
@@ -161,13 +162,14 @@ export class ConversationsService {
       const found = await this.conversations.findById(tx, scope, id, { lock: true });
       if (!found) throw conversationNotFound();
       const handBack = !botPaused && found.conversation.state === 'handed_off';
+      // A hand-back or un-pause starts the repeat count afresh.
+      const slots = botPaused ? undefined : readSlots(found.conversation.collectedSlots);
       const row = await this.conversations.update(tx, scope, id, {
         botPaused,
+        ...(slots === undefined ? {} : { collectedSlots: { ...slots, lastAsked: undefined } }),
         ...(handBack
           ? {
-              state: stateAfterHandBack(
-                collectedSlotsSchema.parse(found.conversation.collectedSlots),
-              ),
+              state: stateAfterHandBack(slots ?? {}),
               handedOffAt: null,
             }
           : {}),
@@ -226,4 +228,10 @@ function cursorOrReject(field: 'cursor' | 'before', value: string): CursorKey {
     });
   }
   return key;
+}
+
+/** A malformed row reads as empty, as the assistant's turn does. */
+function readSlots(value: unknown): CollectedSlots {
+  const parsed = collectedSlotsSchema.safeParse(value);
+  return parsed.success ? parsed.data : {};
 }

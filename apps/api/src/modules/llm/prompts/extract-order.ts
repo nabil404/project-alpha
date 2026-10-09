@@ -10,7 +10,7 @@ Rules:
 - customerName, phone, deliveryAddress: as the customer wrote them.
 - Use null for anything the customer has not given. Never invent a value.
 - When the customer changes a detail, return the new value.
-- confidence is a number from 0 to 1: how sure you are of the fields you filled.
+- confidence is a number from 0 to 1: how sure you are of the fields you filled. If you filled nothing, return confidence 1.
 
 ${DATA_RULE}`;
 

@@ -22,6 +22,7 @@ import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-g
 import type { NotificationsService } from '../../../notifications/notifications.service';
 import { MerchantSettingsRepository } from '../../../settings/merchant-settings.repository';
 import { ConversationRepository } from '../../conversation.repository';
+import { ConversationsService } from '../../conversations.service';
 import type { ConversationEventsPublisher } from '../../events/conversation-events.publisher';
 import { MessageRepository } from '../../message.repository';
 import { OutboundMessageSender } from '../../outbound-message.sender';
@@ -348,6 +349,33 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
     expect((await conversationRow(convo.id))?.collectedSlots).toEqual({
       lastAsked: { slot: 'product', times: 1 },
+    });
+  });
+
+  it('starts the repeat count afresh after the seller hands the chat back', async () => {
+    llm.intent = ok({ intent: 'other', confidence: 0.9 }, 'classify');
+    const { convo, job } = await thread(t.merchantA, {
+      state: 'handed_off',
+      botPaused: true,
+      collectedSlots: { productText: 'red saree', lastAsked: { slot: 'quantity', times: 2 } },
+    });
+    const publisher = { publish: async () => undefined } as unknown as ConversationEventsPublisher;
+    const conversations = new ConversationsService(
+      runtime.db,
+      new ConversationRepository(),
+      new MessageRepository(),
+      new FacebookPageRepository(),
+      null,
+      publisher,
+      {} as unknown as OutboundMessageSender,
+    );
+
+    await conversations.update({ merchantId: t.merchantA }, convo.id, { botPaused: false });
+    await expect(service().run(job)).resolves.toBe('replied');
+
+    expect(await conversationRow(convo.id)).toMatchObject({
+      state: 'collecting_details',
+      collectedSlots: { productText: 'red saree', lastAsked: { slot: 'quantity', times: 1 } },
     });
   });
 

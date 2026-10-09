@@ -3,7 +3,8 @@ import type { ReplyFacts, ReplyIntent } from './reply-intent';
 
 export type ReplyLanguage = 'bn' | 'en';
 
-type FallbackKey = `ask_${SlotName}` | 'ask_phone_invalid' | 'summary' | 'handoff';
+type FallbackKey =
+  `ask_${SlotName}` | 'ask_phone_invalid' | 'summary' | 'handoff' | 'handoff_awaiting_seller';
 
 /** The shop's country picks the fallback language: Bangladesh answers in Bangla. */
 export function languageFor(country: string): ReplyLanguage {
@@ -46,6 +47,7 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (facts: ReplyFacts) =
         address: 'ঠিকানা',
       })}\nকিছু বদলাতে চাইলে জানান।`,
     handoff: () => 'ধন্যবাদ! আমাদের একজন প্রতিনিধি শিগগিরই আপনার সাথে কথা বলবেন।',
+    handoff_awaiting_seller: () => 'ধন্যবাদ! আপনার অর্ডারটি দোকান শিগগিরই নিশ্চিত করবে।',
   },
   en: {
     ask_product: () => 'Which product would you like to order?',
@@ -64,6 +66,7 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (facts: ReplyFacts) =
         address: 'Address',
       })}\nTell us if anything should change.`,
     handoff: () => 'Thanks! Someone from the shop will reply to you shortly.',
+    handoff_awaiting_seller: () => 'Thanks! The shop will confirm your order shortly.',
   },
 };
 
@@ -77,6 +80,8 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
     case 'summary':
       return sentences.summary(reply.facts);
     case 'handoff':
-      return sentences.handoff({});
+      return reply.reason === 'awaiting_seller'
+        ? sentences.handoff_awaiting_seller({})
+        : sentences.handoff({});
   }
 }
