@@ -12,6 +12,7 @@
  *   6. orders
  *   7. settings
  *   8. delivery
+ *   9. assistant
  *
  * Money is stored as integer minor units (e.g. paisa/cents), never floats or
  * numeric. Every business table carries merchantId, and every one of them
@@ -29,3 +30,4 @@ export * from './conversations';
 export * from './orders';
 export * from './settings';
 export * from './delivery';
+export * from './assistant';
