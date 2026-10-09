@@ -86,17 +86,23 @@ describeDb('LlmCallRepository (app_runtime)', () => {
     );
     expect(seenByB).toEqual([]);
 
-    // B's context writing a row on A's conversation: refused by the policy and the composite FK.
+    // B's context, B's scope, A's conversation: no such (merchant, conversation)
+    // pair, so the composite foreign key refuses it.
     await expect(
       withMerchant(runtime.db, t.merchantB, (tx) =>
         repo.insertMany(tx, { merchantId: t.merchantB }, convoA.id, [call()]),
       ),
-    ).rejects.toThrow();
-    // A scope that does not match the context: refused by the policy's WITH CHECK.
+    ).rejects.toMatchObject({ cause: { code: '23503', constraint: 'llm_call_conversation_fk' } });
+
+    // The foreign key is valid here (B's own conversation), so only the policy's
+    // WITH CHECK can refuse a scope that differs from the context.
+    const convoB = await seedConversation(t.db, t.merchantB);
     await expect(
       withMerchant(runtime.db, t.merchantA, (tx) =>
-        repo.insertMany(tx, { merchantId: t.merchantB }, convoA.id, [call()]),
+        repo.insertMany(tx, { merchantId: t.merchantB }, convoB.id, [call()]),
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      cause: { code: '42501', message: expect.stringMatching(/row-level security/) },
+    });
   });
 });
