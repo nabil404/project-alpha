@@ -1,6 +1,6 @@
 # 11.1 · Foundation: the assistant's turn
 
-**Status:** not started.
+**Status:** built (Oct 2026).
 
 ## Goal
 
@@ -24,7 +24,7 @@ exist ([04 · Conversations](../../04-conversations/README.md)).
 InboundMessageIngest (after commit, sender = customer, stored)
   └─ if !botPaused && page.botEnabled && state ∉ {handed_off, confirmed} && LLM configured
      → ASSISTANT_QUEUE add('assistant-turn', {merchantId, conversationId, triggerMessageId},
-                           {jobId: `turn:${metaMessageId}`, delay: ~2.5s})   // one turn per burst
+                           {jobId: `turn-${metaMessageId}`, delay: 2500 ms})   // one turn per burst
 AssistantTurnProcessor → AssistantTurnService.run()
   1. read (withMerchant): conversation, last ~20 messages, Page token
      bail if paused / handed_off / the trigger is no longer the latest customer message
@@ -39,12 +39,13 @@ AssistantTurnProcessor → AssistantTurnService.run()
 
 ## Scope
 
-- **Dependencies** (`apps/api`): `ai`, `@ai-sdk/anthropic`. Load the
-  `claude-api` skill first and check the installed SDK's structured-output API.
+- **Dependencies** (`apps/api`): `ai` 7.x and `@ai-sdk/openai`.
 - **Config** (`src/modules/config/env.schema.ts`; the key and models are set up
-  as in [LLM setup](../../../setup/llm-setup.md)): fix the
-  `LLM_MODEL_EXTRACTION` default to a current model ID; add `LLM_TIMEOUT_MS`
-  (default 15000). With no `LLM_API_KEY`, no turns are queued (the same pattern
+  as in [LLM setup](../../../setup/llm-setup.md)): `LLM_PROVIDER` accepts only
+  `openai`; the defaults are `LLM_MODEL_ROUTING=gpt-6-luna` (OpenAI's efficient
+  tier) and `LLM_MODEL_EXTRACTION=gpt-6.1-sol` (the mid tier), from
+  [OpenAI's models page](https://developers.openai.com/api/docs/models); new
+  `LLM_TIMEOUT_MS` (default 15000). With no `LLM_API_KEY`, no turns are queued (the same pattern
   as Graph being unconfigured). Add `*.apiKey` to the pino redact list in
   `src/app.module.ts`.
 - **`src/modules/llm/`** (new): `LlmClient` with `classifyIntent(history)`,
@@ -105,6 +106,32 @@ AssistantTurnProcessor → AssistantTurnService.run()
   (`packages/shared/src/schemas/conversation.ts`) for repeated confusion. Any
   new enum member follows the three-file rule in `AGENTS.md`.
 
+## Decisions
+
+- **The product stays the customer's words.** `collected_slots` holds
+  `productText` and `variantText` until [phase 2](../phase-2-catalog-confirm-orders/README.md)
+  matches them to catalog IDs. There is no variant slot until then.
+- **`browse` and `other` ask the next slot.** `ask_question` hands off, because
+  nothing yet answers delivery, payment or catalog questions from facts.
+- **Extraction runs by state**, not only on `order` and `edit_order` intents.
+- **The phone is strict.** `parseCustomerPhone` accepts only a number it can
+  read, and the slot stores it as E.164.
+- **Replies are capped at 500 graphemes.**
+- **Fallback Bangla awaits a native-speaker review.** The sentences are in
+  `assistant-fallbacks.ts`.
+- **Job id `turn-<metaMessageId>`.** BullMQ refuses `:` in a custom id. Queue
+  `assistant-turns`, delay 2500 ms, concurrency 4.
+- **A retried turn resumes an unfinished hand-off.** If the first run failed
+  after its write committed, the retry re-notifies the seller, or hands off
+  after a failed send, instead of stopping. The failed-send hand-off runs under
+  the conversation lock and skips a paused chat.
+- **The assistant reply is stamped at least 1 ms after its trigger**, so clock
+  skew cannot make the turn look unanswered and send twice.
+- `OutboundMessageSender` takes the database: `deliver` opens its own short
+  transaction, as `ConversationsService.send` did.
+- With no LLM configured but a turn already queued, the turn hands off with the
+  fixed reply (the "always a reply" rule).
+
 ## Meta / App Review
 
 None new. `pages_messaging` is already requested.
@@ -115,6 +142,20 @@ From the MVP [rules](../../../mvp/01-messenger-to-order/rules.md): when unsure,
 hand off; if the LLM fails, the customer still gets a reply; never call the LLM
 inside a transaction; every repository method takes `merchantId`; never log
 tokens or message text.
+
+## Operational note
+
+An environment with `LLM_PROVIDER=anthropic` (the old default) now fails
+validation at boot. Set it to `openai` in every local `.env` and in Parameter
+Store before deploying.
+
+## Follow-ups
+
+- A sweep of assistant rows stuck in `sending`. A crash between the commit and
+  Graph leaves one, and the retry treats the turn as answered.
+- A native-speaker review of the Bangla fallback sentences.
+- A turn is lost if Redis refuses the queue add after the ingest committed.
+- `llm_call` has no `(merchant_id, conversation_id)` index yet.
 
 ## Tests
 

@@ -9,9 +9,9 @@ page describes what is built.
 worker; the API lists, searches, counts and shows conversations, marks them
 read, takes over and hands back, sends seller replies, deletes failed ones,
 and streams changes over SSE. The dashboard has the inbox at
-`/conversations` and `/conversations/:id`. Not built yet: assistant replies
-([11 · AI implementation](../11-ai-implementation/README.md)), and the
-drafted-order panel and order history in the thread. See
+`/conversations` and `/conversations/:id`. Assistant replies are sent
+([phase 11.1](../11-ai-implementation/phase-1-foundation/README.md)). Not built
+yet: the drafted-order panel and order history in the thread. See
 [Follow-ups](#follow-ups).
 
 ## Webhook
@@ -216,7 +216,7 @@ into another shop.
   order and partial ones for `handed_off` and `awaiting_confirmation`.
 - `message`: `sender`, `text`, `meta_message_id` (null while `sending`),
   `status`, `sent_at`. `UNIQUE (merchant_id, meta_message_id)`; cascades with
-  its conversation; trigram index on `text`. Nothing writes `assistant` yet.
+  its conversation; trigram index on `text`. The assistant writes `assistant` rows through `OutboundMessageSender`.
 
 **The Page resolver.** The worker must find a Page's merchant before any
 merchant context exists. `app_page_merchant(text)` returns that merchant id, or
@@ -246,13 +246,9 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 
 ## Follow-ups
 
-- Queue the assistant's turn from `InboundMessageIngest` (AI work), honouring
-  the conversation's `bot_paused` and the Page's `bot_enabled`.
-- When the assistant hands a conversation off, set `handed_off_at` in the
-  same write as `state = handed_off`, and call `NotificationsService.handedOff`
-  with that same moment after the write commits, so the seller is emailed if
-  nobody replies in 10 minutes
-  ([Settings – Notifications](../10-settings-notifications/README.md#sending)).
+The assistant's own follow-ups are on the
+[phase 11.1 page](../11-ai-implementation/phase-1-foundation/README.md#follow-ups).
+
 - The drafted-order panel and the customer's order history beside the thread.
   The seller's own "Confirm" is settled: it is the second confirmation of an
   order the customer already confirmed ([Orders](../07-orders/README.md#rules)).
