@@ -19,6 +19,7 @@ import { ConversationsService } from '../conversations.service';
 import type { ConversationEvent } from '../events/conversation-event';
 import type { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { MessageRepository } from '../message.repository';
+import { OutboundMessageSender } from '../outbound-message.sender';
 
 const crypto = new CryptoService({
   get: () => Buffer.alloc(32, 7).toString('base64'),
@@ -31,18 +32,27 @@ describeDb('deleting a reply that was not delivered (app_runtime, two merchants)
   let runtime: ReturnType<typeof openRuntimeDb>;
   let events: ConversationEvent[];
 
-  const service = () =>
-    new ConversationsService(
+  const service = () => {
+    const publisher = {
+      publish: async (event: ConversationEvent) => void events.push(event),
+    } as unknown as ConversationEventsPublisher;
+    return new ConversationsService(
       runtime.db,
       new ConversationRepository(),
       messages,
       new FacebookPageRepository(),
-      crypto,
       null,
-      {
-        publish: async (event: ConversationEvent) => void events.push(event),
-      } as unknown as ConversationEventsPublisher,
+      publisher,
+      new OutboundMessageSender(
+        runtime.db,
+        new ConversationRepository(),
+        messages,
+        crypto,
+        null,
+        publisher,
+      ),
     );
+  };
 
   /**
    * A customer's question at minute 1, then a failed seller reply at minute 2,

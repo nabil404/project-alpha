@@ -22,6 +22,7 @@ import { ConversationsService } from '../conversations.service';
 import type { ConversationEvent } from '../events/conversation-event';
 import type { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { MessageRepository } from '../message.repository';
+import { OutboundMessageSender } from '../outbound-message.sender';
 
 const crypto = new CryptoService({
   get: () => Buffer.alloc(32, 7).toString('base64'),
@@ -49,18 +50,27 @@ describeDb('ConversationsService.send (app_runtime)', () => {
   let graph: FakeGraph;
   let events: ConversationEvent[];
 
-  const service = (withGraph: MetaGraphClient | null = graph as unknown as MetaGraphClient) =>
-    new ConversationsService(
+  const service = (withGraph: MetaGraphClient | null = graph as unknown as MetaGraphClient) => {
+    const publisher = {
+      publish: async (event: ConversationEvent) => void events.push(event),
+    } as unknown as ConversationEventsPublisher;
+    return new ConversationsService(
       runtime.db,
       new ConversationRepository(),
       new MessageRepository(),
       new FacebookPageRepository(),
-      crypto,
       withGraph,
-      {
-        publish: async (event: ConversationEvent) => void events.push(event),
-      } as unknown as ConversationEventsPublisher,
+      publisher,
+      new OutboundMessageSender(
+        runtime.db,
+        new ConversationRepository(),
+        new MessageRepository(),
+        crypto,
+        withGraph,
+        publisher,
+      ),
     );
+  };
   const threadFor = async (
     merchantId: string,
     lastInboundAgoMs: number,

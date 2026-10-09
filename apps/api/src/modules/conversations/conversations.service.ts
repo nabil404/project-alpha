@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   collectedSlotsSchema,
   type ConversationCounts,
@@ -11,7 +11,6 @@ import {
   type SendMessage,
   type UpdateConversation,
 } from '@app/shared';
-import { CryptoService } from '../../common/crypto.service';
 import { CodedValidationException } from '../../common/errors/index';
 import type { TenantScope } from '../database/base.repository';
 import { DATABASE, type Database } from '../database/database.module';
@@ -34,25 +33,24 @@ import { isReplyWindowOpen, replyWindowClosesAt, stateAfterHandBack } from './co
 import { decodeCursor, encodeCursor, type CursorKey } from './cursor';
 import { ConversationEventsPublisher } from './events/conversation-events.publisher';
 import { MessageRepository } from './message.repository';
+import { OutboundMessageSender } from './outbound-message.sender';
 
 /**
  * The seller's side of Messenger conversations. Every read and write runs in
- * a short withMerchant transaction; Graph calls (send, Task 11) happen between
+ * a short withMerchant transaction; Graph calls (OutboundMessageSender) happen between
  * transactions, never inside one. Writes publish an event after commit.
  */
 @Injectable()
 export class ConversationsService {
-  private readonly logger = new Logger(ConversationsService.name);
-
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly conversations: ConversationRepository,
     // Not `messages`: that would shadow the messages() method below.
     private readonly messageRows: MessageRepository,
     private readonly pages: FacebookPageRepository,
-    private readonly crypto: CryptoService,
     @Inject(META_GRAPH) private readonly graph: MetaGraphClient | null,
     private readonly events: ConversationEventsPublisher,
+    private readonly outbound: OutboundMessageSender,
   ) {}
 
   async list(scope: TenantScope, query: ListConversationsQuery): Promise<ConversationListResponse> {
@@ -193,8 +191,7 @@ export class ConversationsService {
    * back carries our app id and is skipped by the ingest.
    */
   async send(scope: TenantScope, id: string, { text }: SendMessage): Promise<Message> {
-    const graph = this.graph;
-    if (!graph) throw messengerNotConfigured();
+    if (!this.graph) throw messengerNotConfigured();
     const now = new Date();
 
     const pending = await withMerchant(this.db, scope.merchantId, async (tx) => {
@@ -207,44 +204,16 @@ export class ConversationsService {
       const page = await this.pages.findForMerchant(tx, scope);
       if (!page || page.pageId !== conversation.facebookPageId) throw messengerPageNotConnected();
 
-      const row = await this.messageRows.insertSending(tx, scope, {
-        conversationId: id,
-        text,
-        sentAt: now,
-      });
-      await this.conversations.applyMessage(tx, scope, conversation, {
+      const row = await this.outbound.stage(tx, scope, conversation, {
         sender: 'seller',
         text,
-        sentAt: now,
-        pauseBot: true,
+        now,
       });
       return { row, psid: customer.psid, encryptedToken: page.accessToken };
     });
 
-    let delivered: { messageId: string } | null = null;
-    try {
-      delivered = await graph.sendText(
-        this.crypto.decrypt(pending.encryptedToken),
-        pending.psid,
-        text,
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Seller reply not delivered: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-    }
-
-    const final = await withMerchant(this.db, scope.merchantId, (tx) =>
-      delivered
-        ? this.messageRows.markSent(tx, scope, pending.row.id, delivered.messageId)
-        : this.messageRows.markFailed(tx, scope, pending.row.id),
-    );
-    await this.events.publish({
-      merchantId: scope.merchantId,
-      conversationId: id,
-      kind: 'message',
-    });
-    if (!delivered) throw messengerSendFailed();
+    const final = await this.outbound.deliver(scope, pending);
+    if (final.status === 'failed') throw messengerSendFailed();
     return toMessage(final);
   }
 }

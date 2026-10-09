@@ -7,6 +7,7 @@ import { ConversationsService } from './conversations.service';
 import { CustomerRepository } from './customer.repository';
 import { ConversationEventsModule } from './events/conversation-events.module';
 import { MessageRepository } from './message.repository';
+import { OutboundMessageSender } from './outbound-message.sender';
 
 /**
  * The seller-facing conversations API, and the repositories the worker's
@@ -21,7 +22,8 @@ import { MessageRepository } from './message.repository';
     ConversationRepository,
     MessageRepository,
     ConversationsService,
+    OutboundMessageSender,
   ],
-  exports: [CustomerRepository, ConversationRepository, MessageRepository],
+  exports: [CustomerRepository, ConversationRepository, MessageRepository, OutboundMessageSender],
 })
 export class ConversationsModule {}
