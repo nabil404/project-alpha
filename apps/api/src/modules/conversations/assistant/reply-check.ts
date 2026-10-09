@@ -17,9 +17,22 @@ const URL_LIKE =
 function digitRuns(text: string): string[] {
   return (
     toLatinDigits(text)
+      // A zero fraction says nothing: "1,600.00" and "1600" are the same price.
+      .replace(/(\d)\.0+(?!\d)/g, '$1')
       .replace(/(\d)[\s,.-](?=\d)/g, '$1')
       .match(/\d+/g) ?? []
   );
+}
+
+/** Every number the facts hold, as the digit runs a reply may write it with. */
+function allowedRuns(value: unknown, key = ''): string[] {
+  if (typeof value === 'number') return [String(value)];
+  if (typeof value === 'string') return key === 'phone' ? phoneDigitForms(value) : digitRuns(value);
+  if (Array.isArray(value)) return value.flatMap((entry) => allowedRuns(entry));
+  if (typeof value === 'object' && value !== null) {
+    return Object.entries(value).flatMap(([field, entry]) => allowedRuns(entry, field));
+  }
+  return [];
 }
 
 /**
@@ -35,13 +48,7 @@ export function checkReply(text: string, facts: ReplyFacts): ReplyCheck {
   }
   if (URL_LIKE.test(reply)) return { ok: false, reason: 'url' };
 
-  const allowed = new Set([
-    ...[facts.productText, facts.variantText, facts.customerName, facts.deliveryAddress]
-      .filter((value): value is string => value !== undefined)
-      .flatMap(digitRuns),
-    ...(facts.quantity === undefined ? [] : [String(facts.quantity)]),
-    ...(facts.phone === undefined ? [] : phoneDigitForms(facts.phone)),
-  ]);
+  const allowed = new Set(allowedRuns(facts));
   return digitRuns(reply).every((run) => allowed.has(run))
     ? { ok: true }
     : { ok: false, reason: 'number' };

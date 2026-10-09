@@ -44,13 +44,20 @@ const client = (
     timeoutMs,
   });
 
-const ORDER = JSON.stringify({
-  productName: 'red saree',
-  variantName: null,
+const RED_SAREE = {
+  ref: null,
+  productQuery: 'red saree',
+  productQueryAlt: 'রেড শাড়ি',
+  variantQuery: null,
+  variantQueryAlt: null,
   quantity: 2,
+};
+const ORDER = JSON.stringify({
+  items: [RED_SAREE],
   customerName: null,
   phone: null,
   deliveryAddress: null,
+  deliveryArea: null,
   confidence: 0.92,
 });
 
@@ -72,17 +79,17 @@ describe('AiSdkLlmClient', () => {
   });
 
   it('extracts with the extraction model', async () => {
-    const result = await client('unused', ORDER).extractOrder(history, {});
+    const result = await client('unused', ORDER).extractOrder(history, { items: [] });
     expect(result).toMatchObject({
       ok: true,
-      value: { productName: 'red saree', quantity: 2 },
+      value: { items: [RED_SAREE] },
       usage: { purpose: 'extract', model: 'mock-extraction' },
     });
   });
 
   it('phrases with the routing model and trims the text', async () => {
     const result = await client('  Which colour would you like?  ').phraseReply(
-      { instruction: 'Ask which colour.', facts: { productText: 'red saree' }, language: 'en' },
+      { instruction: 'Ask which colour.', facts: { productName: 'Red saree' }, language: 'en' },
       history,
     );
     expect(result).toMatchObject({

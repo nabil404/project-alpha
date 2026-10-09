@@ -1,4 +1,4 @@
-import type { CollectedSlots, ExtractedOrder, IntentResult } from '@app/shared';
+import type { ExtractedOrder, IntentResult } from '@app/shared';
 
 /** What each call was for; one row per call in llm_call. */
 export const LLM_PURPOSES = ['classify', 'extract', 'phrase'] as const;
@@ -34,13 +34,26 @@ export interface ChatLine {
 /** What to say, decided by code, and the only facts the reply may use. */
 export interface PhraseRequest {
   instruction: string;
-  facts: Record<string, string | number>;
+  facts: Record<string, unknown>;
   /** Used when the customer's own language is unclear. */
   language: 'bn' | 'en';
 }
 
+/**
+ * What extraction is told is already collected. Each item carries the index a
+ * returned `ref` points at, and the catalog's name once code matched it (the
+ * customer's words until then).
+ */
+export interface ExtractionContext {
+  items: { ref: number; product: string; variant?: string; quantity?: number }[];
+  customerName?: string;
+  phone?: string;
+  deliveryAddress?: string;
+  deliveryArea?: string;
+}
+
 export interface LlmClient {
   classifyIntent(history: ChatLine[]): Promise<LlmResult<IntentResult>>;
-  extractOrder(history: ChatLine[], slots: CollectedSlots): Promise<LlmResult<ExtractedOrder>>;
+  extractOrder(history: ChatLine[], context: ExtractionContext): Promise<LlmResult<ExtractedOrder>>;
   phraseReply(request: PhraseRequest, history: ChatLine[]): Promise<LlmResult<string>>;
 }

@@ -15,10 +15,11 @@ function summaryLines(
   facts: ReplyFacts,
   labels: Record<'product' | 'qty' | 'name' | 'phone' | 'address', string>,
 ) {
-  const product = [facts.productText, facts.variantText].filter(Boolean).join(', ');
+  const items = facts.items.map(
+    (item) => `${labels.product}: ${item.productName}, ${labels.qty}: ${item.quantity ?? ''}`,
+  );
   return [
-    `${labels.product}: ${product}`,
-    `${labels.qty}: ${facts.quantity ?? ''}`,
+    ...items,
     `${labels.name}: ${facts.customerName ?? ''}`,
     `${labels.phone}: ${facts.phone === undefined ? '' : formatPhoneInternational(facts.phone)}`,
     `${labels.address}: ${facts.deliveryAddress ?? ''}`,
@@ -33,6 +34,7 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (facts: ReplyFacts) =
   // Draft: to be reviewed by a Bangla speaker before any pilot.
   bn: {
     ask_product: () => 'আপনি কোন পণ্যটি অর্ডার করতে চান?',
+    ask_variant: () => 'কোনটি নেবেন?',
     ask_quantity: () => 'কয়টি নিতে চান?',
     ask_customerName: () => 'অর্ডারের জন্য আপনার নামটি বলবেন?',
     ask_phone: () => 'আপনার মোবাইল নম্বরটি দিন, প্লিজ।',
@@ -51,6 +53,7 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (facts: ReplyFacts) =
   },
   en: {
     ask_product: () => 'Which product would you like to order?',
+    ask_variant: () => 'Which one would you like?',
     ask_quantity: () => 'How many would you like?',
     ask_customerName: () => 'What name should we put on the order?',
     ask_phone: () => 'Could you share your mobile number, please?',
@@ -74,14 +77,14 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
   const sentences = FALLBACKS[language];
   switch (reply.kind) {
     case 'ask_slot':
-      return reply.slot === 'phone' && reply.invalidPhone
+      return reply.reason === 'invalid_phone'
         ? sentences.ask_phone_invalid(reply.facts)
         : sentences[`ask_${reply.slot}`](reply.facts);
     case 'summary':
       return sentences.summary(reply.facts);
     case 'handoff':
       return reply.reason === 'awaiting_seller'
-        ? sentences.handoff_awaiting_seller({})
-        : sentences.handoff({});
+        ? sentences.handoff_awaiting_seller({ items: [] })
+        : sentences.handoff({ items: [] });
   }
 }
