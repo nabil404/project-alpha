@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
+import type { Queue } from 'bullmq';
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../../common/crypto.service';
 import type { AppConfig } from '../../../config/app.config';
@@ -48,6 +49,13 @@ class FakePublisher {
   }
 }
 
+class FakeQueue {
+  added: { name: string; data: unknown; opts: unknown }[] = [];
+  async add(name: string, data: unknown, opts: unknown) {
+    this.added.push({ name, data, opts });
+  }
+}
+
 // As app_runtime: the Page lookup, the reads and the writes all run under the
 // same row-level security as production.
 describeDb('InboundMessageIngest (app_runtime)', () => {
@@ -57,6 +65,7 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
   let pageB: string;
   let graph: FakeGraph;
   let publisher: FakePublisher;
+  let turns: FakeQueue;
   let ingest: InboundMessageIngest;
 
   const customerMessage = (overrides: Partial<CustomerMessageJob> = {}): CustomerMessageJob => ({
@@ -91,6 +100,25 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
   const messagesOf = (conversationId: string) =>
     t.db.select().from(schema.message).where(eq(schema.message.conversationId, conversationId));
 
+  const defaultConfig = {
+    get: (key: string) =>
+      (({ META_APP_ID: OUR_APP, LLM_API_KEY: 'test-key' }) as Record<string, string | undefined>)[
+        key
+      ],
+  } as unknown as AppConfig;
+  const makeIngest = (config: AppConfig = defaultConfig) =>
+    new InboundMessageIngest(
+      runtime.db,
+      config,
+      new CustomerProfileReader(crypto, graph as unknown as MetaGraphClient),
+      new FacebookPageRepository(),
+      new CustomerRepository(),
+      new ConversationRepository(),
+      new MessageRepository(),
+      publisher as unknown as ConversationEventsPublisher,
+      turns as unknown as Queue,
+    );
+
   beforeAll(async () => {
     Logger.overrideLogger(false);
     t = await openCatalogTestDb();
@@ -104,18 +132,8 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
   beforeEach(() => {
     graph = new FakeGraph();
     publisher = new FakePublisher();
-    ingest = new InboundMessageIngest(
-      runtime.db,
-      {
-        get: (key: string) => (key === 'META_APP_ID' ? OUR_APP : undefined),
-      } as unknown as AppConfig,
-      new CustomerProfileReader(crypto, graph as unknown as MetaGraphClient),
-      new FacebookPageRepository(),
-      new CustomerRepository(),
-      new ConversationRepository(),
-      new MessageRepository(),
-      publisher as unknown as ConversationEventsPublisher,
-    );
+    turns = new FakeQueue();
+    ingest = makeIngest();
   });
 
   afterAll(async () => {
@@ -325,5 +343,72 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
     );
     expect(sameCustomer).toHaveLength(1);
     expect(await messagesOf(thread!.conversation.id)).toHaveLength(2);
+  });
+
+  it("queues the assistant's turn after a customer's message", async () => {
+    const job = customerMessage();
+    await ingest.handle(job);
+
+    const thread = await threadOf(job.senderPsid);
+    const [stored] = await messagesOf(thread!.conversation.id);
+    expect(turns.added).toEqual([
+      {
+        name: 'assistant-turn',
+        data: {
+          merchantId: t.merchantA,
+          conversationId: thread!.conversation.id,
+          triggerMessageId: stored!.id,
+        },
+        opts: { jobId: `turn-${job.messageId}`, delay: 2_500 },
+      },
+    ]);
+  });
+
+  it('queues nothing for a duplicate, an echo, or a paused conversation', async () => {
+    const first = customerMessage();
+    await ingest.handle(first);
+    await ingest.handle(first);
+    await ingest.handle(echo({ recipientPsid: first.senderPsid }));
+    await ingest.handle(customerMessage({ senderPsid: first.senderPsid }));
+
+    expect(turns.added).toHaveLength(1);
+  });
+
+  it('queues nothing while the conversation is handed off', async () => {
+    const first = customerMessage();
+    await ingest.handle(first);
+    const thread = await threadOf(first.senderPsid);
+    await t.db
+      .update(schema.conversation)
+      .set({ state: 'handed_off' })
+      .where(eq(schema.conversation.id, thread!.conversation.id));
+
+    await ingest.handle(customerMessage({ senderPsid: first.senderPsid }));
+
+    expect(turns.added).toHaveLength(1);
+  });
+
+  it("queues nothing when the Page's assistant is switched off", async () => {
+    await t.db
+      .update(schema.facebookPage)
+      .set({ botEnabled: false })
+      .where(eq(schema.facebookPage.pageId, pageA));
+    try {
+      await ingest.handle(customerMessage());
+      expect(turns.added).toEqual([]);
+    } finally {
+      await t.db
+        .update(schema.facebookPage)
+        .set({ botEnabled: true })
+        .where(eq(schema.facebookPage.pageId, pageA));
+    }
+  });
+
+  it('queues nothing without an LLM key', async () => {
+    ingest = makeIngest({
+      get: (key: string) => (key === 'META_APP_ID' ? OUR_APP : undefined),
+    } as unknown as AppConfig);
+    await ingest.handle(customerMessage());
+    expect(turns.added).toEqual([]);
   });
 });
