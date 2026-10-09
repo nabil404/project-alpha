@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  CollectedSlots,
   ConversationCounts,
   ConversationFilter,
   ConversationState,
@@ -242,7 +243,12 @@ export class ConversationRepository {
     executor: Executor,
     { merchantId }: TenantScope,
     id: string,
-    values: { botPaused?: boolean; state?: ConversationState; handedOffAt?: Date | null },
+    values: {
+      botPaused?: boolean;
+      state?: ConversationState;
+      handedOffAt?: Date | null;
+      collectedSlots?: CollectedSlots;
+    },
   ): Promise<ConversationRow | null> {
     const [row] = await executor
       .update(conversation)

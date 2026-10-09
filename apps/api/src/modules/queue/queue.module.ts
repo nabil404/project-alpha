@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfig } from '../config/app.config';
 import {
+  ASSISTANT_QUEUE,
   MESSENGER_QUEUE,
   NOTIFICATIONS_QUEUE,
   PROFILE_QUEUE,
@@ -29,6 +30,7 @@ import {
       { name: STORAGE_QUEUE },
       { name: PROFILE_QUEUE },
       { name: NOTIFICATIONS_QUEUE },
+      { name: ASSISTANT_QUEUE },
     ),
   ],
   exports: [BullModule],

@@ -81,3 +81,26 @@ export interface DailySummaryJob {
   /** The shop-local day summarised, yyyy-MM-dd. */
   day: string;
 }
+
+/**
+ * The assistant's turns. Queued by the worker's ingest after a stored customer
+ * message, delayed so a burst ("hi" / "red saree" / "2 pcs") gets one answer:
+ * every message queues, and each turn runs only if its message is still the
+ * customer's latest.
+ */
+export const ASSISTANT_QUEUE = 'assistant-turns';
+export const ASSISTANT_TURN_JOB = 'assistant-turn';
+export const ASSISTANT_TURN_DELAY_MS = 2_500;
+/**
+ * Turns spend most of their time waiting on the LLM and hold a connection only
+ * in their short transactions, so 4 stays well under DATABASE_POOL_MAX (10)
+ * next to the other processors. Raise it only after measuring.
+ */
+export const ASSISTANT_CONCURRENCY = 4;
+
+export interface AssistantTurnJob {
+  merchantId: string;
+  conversationId: string;
+  /** Our message row id of the customer message that queued the turn. */
+  triggerMessageId: string;
+}

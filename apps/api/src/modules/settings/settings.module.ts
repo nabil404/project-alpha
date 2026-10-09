@@ -31,6 +31,7 @@ import { ShopProfileRepository } from './shop-profile.repository';
     NotificationSettingsService,
   ],
   exports: [
+    MerchantSettingsRepository,
     GeneralSettingsService,
     DeliveryChargesRepository,
     NotificationPreferencesRepository,
