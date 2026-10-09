@@ -29,7 +29,9 @@ AssistantTurnProcessor → AssistantTurnService.run()
   1. read (withMerchant): conversation, last ~20 messages, Page token
      bail if paused / handed_off / the trigger is no longer the latest customer message
   2. LLM, no transaction open: classifyIntent (routing model)
-     → extractOrder (extraction model) when intent ∈ {order, edit_order}
+     → extractOrder (extraction model): in browsing only for order / edit_order; in
+       collecting_details and awaiting_confirmation for every intent except
+       complain / request_human (shouldExtract)
   3. decideTurn(state, slots, intent, extraction): pure, in conversation-machine.ts
   4. short tx: lock the conversation, re-check step 1, write state + collected_slots
      + the llm_call rows, insert the assistant message as `sending`
@@ -44,18 +46,17 @@ AssistantTurnProcessor → AssistantTurnService.run()
   as in [LLM setup](../../../setup/llm-setup.md)): `LLM_PROVIDER` accepts only
   `openai`; the defaults are `LLM_MODEL_ROUTING=gpt-6-luna` (OpenAI's efficient
   tier) and `LLM_MODEL_EXTRACTION=gpt-6.1-sol` (the mid tier), from
-  [OpenAI's models page](https://developers.openai.com/api/docs/models); new
-  `LLM_TIMEOUT_MS` (default 15000). With no `LLM_API_KEY`, no turns are queued (the same pattern
-  as Graph being unconfigured). Add `*.apiKey` to the pino redact list in
+  [OpenAI's models page](https://developers.openai.com/api/docs/models); `LLM_TIMEOUT_MS` (default 15000). With no `LLM_API_KEY`, no turns are queued (the same pattern
+  as Graph being unconfigured). `*.apiKey` is in the pino redact list in
   `src/app.module.ts`.
-- **`src/modules/llm/`** (new): `LlmClient` with `classifyIntent(history)`,
+- **`src/modules/llm/`**: `LlmClient` with `classifyIntent(history)`,
   `extractOrder(history, slots)` and `phraseReply(intent, facts, history)`,
   validated with `intentResultSchema` / `extractedOrderSchema` from
   `packages/shared/src/schemas/llm.ts`. It never throws: it returns
   `{ ok: true, value, usage }` or `{ ok: false, reason }`, with an
   `AbortSignal.timeout` on each call. Message text is never logged. Provider
   token `LLM`, so tests inject a fake. One prompt file per call in `prompts/`.
-- **Cost tracking:** an `llm_call` table in a new `schema/assistant.ts`
+- **Cost tracking:** an `llm_call` table in `schema/assistant.ts`
   (merchant_id, conversation_id, purpose, model, input and output tokens,
   latency_ms, outcome, created_at), with an RLS policy plus `FORCE` via
   `db:custom`. Its repository takes `Executor` and `TenantScope`. Rows are
@@ -63,7 +64,7 @@ AssistantTurnProcessor → AssistantTurnService.run()
 - **Queue** (`src/modules/queue/queue.constants.ts`): `ASSISTANT_QUEUE =
 'assistant-turns'`, `ASSISTANT_TURN_JOB` and the `AssistantTurnJob` type,
   registered in `queue.module.ts` (Bull Board picks it up).
-- **`src/modules/conversations/assistant/`** (new):
+- **`src/modules/conversations/assistant/`**:
   `assistant-turn.processor.ts` (same shape as `InboundMessageProcessor`: name
   check, Zod parse, `UnrecoverableError`), `assistant-turn.service.ts`,
   `conversation-machine.ts` (pure `decideTurn`), `reply-intent.ts`,
@@ -71,8 +72,8 @@ AssistantTurnProcessor → AssistantTurnService.run()
   `assistant.module.ts`, added to `src/worker.module.ts`.
 - **Code decides, the LLM phrases.** `decideTurn` returns a typed reply intent,
   not text: `{ kind: 'ask_slot', slot }`, `{ kind: 'summary', facts }`,
-  `{ kind: 'handoff' }`. Slot order: product → variant → quantity → name →
-  phone → address. `phraseReply` (routing model) writes it in the customer's
+  `{ kind: 'handoff' }`. Slot order: product → quantity → name → phone →
+  address (no variant slot until phase 2). `phraseReply` (routing model) writes it in the customer's
   language and tone. `checkReply(text, facts)` then requires every number in
   the reply (prices, quantities, phone digits; Bangla digits normalised) to
   appear in `facts`, caps the length, and rejects URLs. If phrasing fails,
@@ -81,7 +82,7 @@ AssistantTurnProcessor → AssistantTurnService.run()
 - **Fallbacks** follow the shop's country (`merchant_settings.country`,
   Bangladesh when there is no row): a `country → language` map (BD → `bn`,
   others → `en`) picks from `Record<language, Record<ReplyKind, string>>`; a
-  missing entry falls back to English. The hand-off message is always the fixed
+  missing sentence fails typecheck; there is no runtime fallback. The hand-off message is always the fixed
   fallback, with no LLM call.
 - **Hand-off** (state `handed_off`, fixed reply) when the LLM errors or times
   out, the output fails Zod, confidence is below 0.6, the intent is `complain`
@@ -93,15 +94,15 @@ AssistantTurnProcessor → AssistantTurnService.run()
   ([Settings – Notifications](../../10-settings-notifications/README.md#sending)).
 - **All slots filled** → `awaiting_confirmation` and a phrased summary. No
   prices yet; phase 2 adds them to `facts`.
-- **Shared send path:** factor the store-`sending` → `graph.sendText` →
-  `markSent` / `markFailed` → publish sequence out of `ConversationsService.send`
-  into an `OutboundMessageSender` used by both, with `sender` as a parameter.
+- **Shared send path:** the store-`sending` → `graph.sendText` →
+  `markSent` / `markFailed` → publish sequence lives in `OutboundMessageSender`,
+  used by `ConversationsService.send` and the assistant, with `sender` as a parameter.
   The 24-hour window check stays.
 - **Ingest** (`ingest/inbound-message.ingest.ts`): return the locked
   conversation's `botPaused` and `state` from the transaction and queue the
   turn after `events.publish`, honouring the Page's `bot_enabled`. This and the
-  hand-off email close the first two
-  [Conversations follow-ups](../../04-conversations/README.md#follow-ups).
+  hand-off email closed the Conversations follow-ups for queueing the turn and
+  setting `handed_off_at`.
 - **Shared:** a counter field on `collectedSlotsSchema`
   (`packages/shared/src/schemas/conversation.ts`) for repeated confusion. Any
   new enum member follows the three-file rule in `AGENTS.md`.
@@ -181,7 +182,7 @@ Colocated in `__tests__/`.
   pass.
 - Schema loop: `db:generate` → review the SQL → `db:custom` for `FORCE` →
   `db:migrate` → `db:verify-rls`.
-- Manually, with a real `LLM_API_KEY`: a message to the dev Page gets an AI
+- Manually (still to run by the maintainer), with a real `LLM_API_KEY`: a message to the dev Page gets an AI
   reply, the turn shows in Bull Board, and an `llm_call` row is written. With a
   bad key, the conversation goes to `handed_off` with the fallback reply.
 - The backend skill no longer says `extractOrder()` is not built; the

@@ -393,7 +393,7 @@ The strictest rules in the project. The LLM is a parser, not the driver.
 - **Structured JSON output with Zod schemas from `@app/shared`**, behind
   `LlmClient` (`apps/api/src/modules/llm/`): `classifyIntent`, `extractOrder`
   and `phraseReply`, which never throw and return `{ ok, … }`; schemas in
-  `packages/shared/src/schemas/llm.ts`. Provider: OpenAI through the AI SDK. Provider and model come from env — `LLM_PROVIDER`,
+  `packages/shared/src/schemas/llm.ts`. Provider: OpenAI through the AI SDK; provider and model come from env — `LLM_PROVIDER`,
   `LLM_MODEL_ROUTING`, `LLM_MODEL_EXTRACTION` — with the smaller model for
   intent and routing and the larger one only for extraction.
 - **Hand off instead of guessing**: low confidence, repeated confusion, a
