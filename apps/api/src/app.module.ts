@@ -46,6 +46,7 @@ import { serializeRequest } from './common/request-log';
             '*.newPassword',
             '*.token',
             '*.secretAccessKey',
+            '*.apiKey',
           ],
           // Email links and OAuth callbacks carry their credential in the URL,
           // and in the parsed query, which is why fields are listed, not spread.

@@ -47,9 +47,15 @@ const envObject = z.object({
   /** Where the bucket is served publicly; object keys are appended after a slash. */
   STORAGE_PUBLIC_BASE_URL: z.string().url(),
 
-  LLM_PROVIDER: z.string().default('anthropic'),
-  LLM_MODEL_ROUTING: z.string().default('claude-haiku-4-5-20251001'),
-  LLM_MODEL_EXTRACTION: z.string().default('claude-sonnet-5'),
+  /** The assistant's provider. Only OpenAI is wired; adding one is an enum member and a factory line in LlmModule. */
+  LLM_PROVIDER: z.enum(['openai']).default('openai'),
+  /** Intent and phrasing, every turn: the small, fast model. */
+  LLM_MODEL_ROUTING: z.string().min(1).default('gpt-6-luna'),
+  /** Order extraction, mid-flow turns only: the larger model. */
+  LLM_MODEL_EXTRACTION: z.string().min(1).default('gpt-6.1-sol'),
+  /** Per call; the AI SDK's one retry happens inside it. */
+  LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  /** Optional: without it the worker stores messages but queues no assistant turns. */
   LLM_API_KEY: optional(z.string()),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
