@@ -89,6 +89,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
   let llm: FakeLlm;
   let sent: { psid: string; text: string }[];
   let graphFails: boolean;
+  let notifyFailures: number;
   let handoffs: { merchantId: string; conversationId: string; at: Date }[];
 
   const graph = {
@@ -118,19 +119,24 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         publisher,
       ),
       {
-        handedOff: async (merchantId: string, conversationId: string, at: Date) =>
-          void handoffs.push({ merchantId, conversationId, at }),
+        handedOff: async (merchantId: string, conversationId: string, at: Date) => {
+          if (notifyFailures > 0) {
+            notifyFailures -= 1;
+            throw new Error('queue down');
+          }
+          handoffs.push({ merchantId, conversationId, at });
+        },
       } as unknown as NotificationsService,
     );
   };
 
-  /** A conversation whose newest message is a customer's, `agoMs` ago. */
+  /** A conversation whose newest message is a customer's, sent at `sentAt` (a second ago by default). */
   const thread = async (
     merchantId = t.merchantA,
     overrides: Partial<typeof schema.conversation.$inferInsert> = {},
+    sentAt = new Date(Date.now() - 1_000),
   ) => {
     const customer = await seedCustomer(t.db, merchantId);
-    const sentAt = new Date(Date.now() - 1_000);
     const convo = await seedConversation(t.db, merchantId, {
       customerId: customer.id,
       facebookPageId: merchantId === t.merchantA ? pageA : pageB,
@@ -174,6 +180,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     sent = [];
     graphFails = false;
     handoffs = [];
+    notifyFailures = 0;
   });
   afterAll(async () => {
     await runtime.close();
@@ -362,5 +369,107 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     const { job } = await thread(t.merchantA, { facebookPageId: 'old-page' });
     await expect(service().run(job)).resolves.toBe('no_page');
     expect(llm.calls).toEqual([]);
+  });
+  it('refuses to reply once the 24-hour window has closed, recording only the calls', async () => {
+    const { convo, job } = await thread(t.merchantA, {
+      lastInboundAt: new Date(Date.now() - 25 * 3_600_000),
+    });
+
+    await expect(service().run(job)).resolves.toBe('window_closed');
+
+    expect(sent).toEqual([]);
+    expect((await messagesOf(convo.id)).filter((m) => m.sender === 'assistant')).toEqual([]);
+    expect(await llmCallsOf(convo.id)).toHaveLength(2);
+  });
+
+  it('hands off a complaint with the fixed reply and notifies with the stored timestamp', async () => {
+    llm.intent = ok({ intent: 'complain', confidence: 0.9 }, 'classify');
+    const { convo, job } = await thread();
+
+    await expect(service().run(job)).resolves.toBe('handed_off');
+
+    expect(sent).toHaveLength(1);
+    const row = await conversationRow(convo.id);
+    expect(row).toMatchObject({ state: 'handed_off' });
+    expect(row?.handedOffAt).toBeInstanceOf(Date);
+    expect(handoffs).toEqual([
+      { merchantId: t.merchantA, conversationId: convo.id, at: row?.handedOffAt },
+    ]);
+  });
+
+  it('writes nothing but the calls when a newer message lands during the LLM call', async () => {
+    const { convo, job } = await thread();
+    llm.onClassify = async () => {
+      await seedMessage(t.db, t.merchantA, convo.id, { sentAt: new Date(), text: 'red saree' });
+    };
+
+    await expect(service().run(job)).resolves.toBe('stale');
+
+    expect(sent).toEqual([]);
+    expect((await messagesOf(convo.id)).filter((m) => m.sender === 'assistant')).toEqual([]);
+    expect(await llmCallsOf(convo.id)).toHaveLength(2);
+  });
+
+  it('resumes a hand-off whose notification failed: notifies again, sends nothing', async () => {
+    llm.intent = ok({ intent: 'complain', confidence: 0.9 }, 'classify');
+    const { convo, job } = await thread();
+    notifyFailures = 1;
+
+    await expect(service().run(job)).rejects.toThrow('queue down');
+    expect(sent).toHaveLength(1);
+    expect(handoffs).toEqual([]);
+    llm.calls = [];
+
+    await expect(service().run(job)).resolves.toBe('handed_off');
+
+    const row = await conversationRow(convo.id);
+    expect(handoffs).toEqual([
+      { merchantId: t.merchantA, conversationId: convo.id, at: row?.handedOffAt },
+    ]);
+    expect(sent).toHaveLength(1);
+    expect(llm.calls).toEqual([]);
+  });
+
+  it('resumes a failed send that never reached the hand-off', async () => {
+    const { convo, job, trigger } = await thread();
+    await seedMessage(t.db, t.merchantA, convo.id, {
+      sender: 'assistant',
+      status: 'failed',
+      sentAt: new Date(trigger.sentAt.getTime() + 10),
+      text: 'Which product would you like?',
+    });
+
+    await expect(service().run(job)).resolves.toBe('send_failed');
+
+    const row = await conversationRow(convo.id);
+    expect(row?.state).toBe('handed_off');
+    expect(handoffs).toEqual([
+      { merchantId: t.merchantA, conversationId: convo.id, at: row?.handedOffAt },
+    ]);
+    expect(sent).toEqual([]);
+    expect(llm.calls).toEqual([]);
+  });
+
+  it('does not hand off a failed send on a chat the seller has since paused', async () => {
+    const { convo, job, trigger } = await thread(t.merchantA, { botPaused: true });
+    await seedMessage(t.db, t.merchantA, convo.id, {
+      sender: 'assistant',
+      status: 'failed',
+      sentAt: new Date(trigger.sentAt.getTime() + 10),
+    });
+
+    await expect(service().run(job)).resolves.toBe('paused');
+    expect(handoffs).toEqual([]);
+  });
+
+  it('orders the reply after a trigger stamped ahead of our clock, and a retry sends nothing twice', async () => {
+    const { convo, job, trigger } = await thread(t.merchantA, {}, new Date(Date.now() + 5_000));
+
+    await expect(service().run(job)).resolves.toBe('replied');
+
+    const reply = (await messagesOf(convo.id)).find((m) => m.sender === 'assistant');
+    expect(reply?.sentAt.getTime()).toBeGreaterThan(trigger.sentAt.getTime());
+    await expect(service().run(job)).resolves.toBe('answered');
+    expect(sent).toHaveLength(1);
   });
 });
