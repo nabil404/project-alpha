@@ -1,11 +1,19 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { MessageSender } from '@app/shared';
+import type { Queue } from 'bullmq';
+import type { ConversationState, MessageSender } from '@app/shared';
 import { AppConfig } from '../../config/app.config';
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
 import { withMerchant } from '../../database/with-merchant';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
-import type { InboundMessageJob } from '../../queue/queue.constants';
+import {
+  ASSISTANT_QUEUE,
+  ASSISTANT_TURN_DELAY_MS,
+  ASSISTANT_TURN_JOB,
+  type AssistantTurnJob,
+  type InboundMessageJob,
+} from '../../queue/queue.constants';
 import { ConversationRepository } from '../conversation.repository';
 import { needsProfile } from '../conversation-rules';
 import { CustomerRepository } from '../customer.repository';
@@ -24,9 +32,9 @@ export type IngestOutcome = 'stored' | 'duplicate' | 'own-echo' | 'unknown-page'
  * customer's profile outside any transaction, then one short transaction that
  * locks the conversation and writes, then publish after commit.
  *
- * This is where the AI spec will queue the assistant's turn, after a stored
- * customer message, when the conversation is not paused and the Page's bot is
- * enabled. Until then nothing replies automatically.
+ * After a stored customer message it queues the assistant's turn, unless the
+ * seller has taken over, the Page's assistant is off, the chat is handed off or
+ * confirmed, or no LLM or Graph is configured.
  */
 @Injectable()
 export class InboundMessageIngest {
@@ -41,6 +49,7 @@ export class InboundMessageIngest {
     private readonly conversations: ConversationRepository,
     private readonly messages: MessageRepository,
     private readonly events: ConversationEventsPublisher,
+    @InjectQueue(ASSISTANT_QUEUE) private readonly assistantTurns: Queue,
   ) {}
 
   async handle(job: InboundMessageJob): Promise<IngestOutcome> {
@@ -72,7 +81,7 @@ export class InboundMessageIngest {
         ? (await this.profiles.read(page.accessToken, psid)).profile
         : undefined;
 
-    const conversationId = await withMerchant(this.db, merchantId, async (tx) => {
+    const written = await withMerchant(this.db, merchantId, async (tx) => {
       const customerRow = await this.customers.upsert(tx, scope, { psid, profile });
       const thread = await this.conversations.lockOrCreate(tx, scope, {
         facebookPageId: job.pageId,
@@ -93,11 +102,48 @@ export class InboundMessageIngest {
         sentAt,
         pauseBot: sender === 'seller',
       });
-      return thread.id;
+      return {
+        conversationId: thread.id,
+        messageId: stored.id,
+        botPaused: thread.botPaused,
+        state: thread.state,
+      };
     });
 
-    if (!conversationId) return 'duplicate';
-    await this.events.publish({ merchantId, conversationId, kind: 'message' });
+    if (!written) return 'duplicate';
+    await this.events.publish({
+      merchantId,
+      conversationId: written.conversationId,
+      kind: 'message',
+    });
+    if (sender === 'customer' && page?.botEnabled === true && this.assistantWanted(written)) {
+      const data: AssistantTurnJob = {
+        merchantId,
+        conversationId: written.conversationId,
+        triggerMessageId: written.messageId,
+      };
+      await this.assistantTurns.add(ASSISTANT_TURN_JOB, data, {
+        jobId: `turn-${job.messageId}`,
+        delay: ASSISTANT_TURN_DELAY_MS,
+      });
+    }
     return 'stored';
+  }
+
+  /** Graph to send with and an LLM to think with; a chat the seller holds or the assistant left stays theirs. */
+  private assistantWanted({
+    botPaused,
+    state,
+  }: {
+    botPaused: boolean;
+    state: ConversationState;
+  }): boolean {
+    return (
+      Boolean(this.config.get('LLM_API_KEY')) &&
+      Boolean(this.config.get('META_APP_ID')) &&
+      !botPaused &&
+      state !== 'handed_off' &&
+      state !== 'confirmed'
+    );
   }
 }
