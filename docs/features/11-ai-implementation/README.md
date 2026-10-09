@@ -6,9 +6,9 @@ bound by its [rules](../../mvp/01-messenger-to-order/rules.md). This page is the
 index; each phase has its own page with goal, scope, tests and a definition of
 done.
 
-**Status (Oct 2026):** not started. Inbound text messages and seller echoes are
-stored ([04 · Conversations](../04-conversations/README.md)); nothing writes
-`sender = assistant` yet.
+**Status (Oct 2026):** phase 1 is built: a customer's text message gets an
+assistant reply, or a hand-off with a fixed reply. The other phases are not
+started.
 
 ## Phases
 

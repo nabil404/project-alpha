@@ -16,6 +16,11 @@ machine and phrased replies.
 
 ## Scope
 
+- **Resolves phase 1's words.** `collected_slots.productText` / `variantText`
+  become `productId` / `variantId`; the variant is asked for only when the
+  matched product has options. Owns the open gap: `ask_question` still hands
+  off in every phase; answering delivery, payment and catalog questions from
+  facts is unplanned.
 - **Extraction returns raw words.** `extractOrder` returns `productQuery` and
   `variantQuery` as the customer wrote them, plus a transliteration into the
   catalog's script (Bangla, Banglish or English). The LLM never picks a product
