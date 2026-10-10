@@ -468,6 +468,36 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     expect((await ordersFor(convo.id))[0]).toMatchObject({ subtotal: 340_000 });
   });
 
+  it('makes no order when the shop changed its currency, and sends a fresh card in the new one', async () => {
+    const lungi = await product('Currency Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    const shopIn = (currency: string) =>
+      t.db
+        .insert(schema.merchantSettings)
+        .values({
+          merchantId: t.merchantA,
+          country: 'BD',
+          currency,
+          timeZone: 'Asia/Dhaka',
+          dateFormat: 'dd/MM/yyyy',
+        })
+        .onConflictDoUpdate({ target: schema.merchantSettings.merchantId, set: { currency } });
+    await shopIn('USD');
+    try {
+      await expect(tap(convo.id, confirm(convo.id))).resolves.toBe('price_changed');
+    } finally {
+      await shopIn('BDT');
+    }
+
+    expect(await ordersFor(convo.id)).toEqual([]);
+    expect(readSlots((await conversationRow(convo.id)).collectedSlots)).toMatchObject({
+      revision: 2,
+      quote: { revision: 2, currency: 'USD', total: 172_000 },
+    });
+    expect(sent.map((entry) => entry.kind)).toEqual(['card']);
+    expect(sent[0]?.payloads).toEqual([`confirm:${convo.id}:2`, `change:${convo.id}:2`]);
+  });
+
   it('goes back to collecting on Change, and refuses the old card afterwards', async () => {
     const lungi = await product('Change Lungi', 160_000);
     const convo = await shown([{ ...lungi, quantity: 1 }]);

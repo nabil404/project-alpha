@@ -106,7 +106,11 @@ export class OrderConfirmationService {
       const decided =
         tap.kind === 'change'
           ? this.change(locked.conversation, slots, tap, language)
-          : await this.confirm(tx, scope, locked.conversation, slots, tap, language, answered);
+          : await this.confirm(tx, scope, locked.conversation, slots, tap, {
+              language,
+              currency: settings.currency,
+              answered,
+            });
 
       // The reply must sort after its tap even when Meta's clock runs ahead of ours.
       const now = new Date(Math.max(Date.now(), (trigger?.sentAt.getTime() ?? 0) + 1));
@@ -178,8 +182,11 @@ export class OrderConfirmationService {
     conversation: ConversationRow,
     slots: CollectedSlots,
     tap: CardTap,
-    language: ReplyLanguage,
-    answered: boolean,
+    {
+      language,
+      currency,
+      answered,
+    }: { language: ReplyLanguage; currency: string; answered: boolean },
   ): Promise<Decided> {
     const key = confirmKey(conversation.id, tap.revision);
     const existing = await this.orders.findByIdempotencyKey(tx, scope, key);
@@ -244,12 +251,14 @@ export class OrderConfirmationService {
     const fee = await this.deliveryQuote.feeFor(tx, scope, area.id, lines);
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
     const changed =
+      currency !== quote.currency ||
       fee.fee !== quote.deliveryFee ||
       lines.some((line, index) => line.unitPrice !== quote.lines[index]!.unitPrice);
     if (changed) {
       const revision = slots.revision + 1;
       const fresh: Quote = {
         ...quote,
+        currency,
         revision,
         lines,
         subtotal,
