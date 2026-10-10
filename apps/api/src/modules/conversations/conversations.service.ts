@@ -153,6 +153,9 @@ export class ConversationsService {
   /**
    * Take over (pause) never changes state. Handing back a conversation the
    * assistant had handed off resumes it where its collected details put it.
+   * Handing back a chat paused on a summary card retires that card: the
+   * seller may have agreed other terms, so the customer's next message gets a
+   * fresh one.
    */
   async update(
     scope: TenantScope,
@@ -162,18 +165,30 @@ export class ConversationsService {
     const detail = await withMerchant(this.db, scope.merchantId, async (tx) => {
       const found = await this.conversations.findById(tx, scope, id, { lock: true });
       if (!found) throw conversationNotFound();
-      const handBack = !botPaused && found.conversation.state === 'handed_off';
+      const { state } = found.conversation;
+      const handBack = !botPaused && state === 'handed_off';
+      const retireCard =
+        !botPaused && found.conversation.botPaused && state === 'awaiting_confirmation';
       // A hand-back or un-pause starts the repeat count afresh.
       const slots = botPaused ? undefined : readSlots(found.conversation.collectedSlots);
       const row = await this.conversations.update(tx, scope, id, {
         botPaused,
-        ...(slots === undefined ? {} : { collectedSlots: { ...slots, lastAsked: undefined } }),
+        ...(slots === undefined
+          ? {}
+          : {
+              collectedSlots: {
+                ...slots,
+                lastAsked: undefined,
+                ...(retireCard ? { revision: slots.revision + 1, quote: undefined } : {}),
+              },
+            }),
         ...(handBack
           ? {
               state: stateAfterHandBack(slots ?? emptySlots()),
               handedOffAt: null,
             }
           : {}),
+        ...(retireCard ? { state: 'collecting_details' as const } : {}),
       });
       if (!row) throw conversationNotFound();
       return toConversationDetail(row, found.customer);

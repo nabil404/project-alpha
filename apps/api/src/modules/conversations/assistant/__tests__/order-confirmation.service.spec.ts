@@ -31,6 +31,7 @@ import { productsService } from '../../../products/__tests__/products-service.fi
 import { DeliveryChargesRepository } from '../../../settings/delivery-charges.repository';
 import { MerchantSettingsRepository } from '../../../settings/merchant-settings.repository';
 import { ConversationRepository } from '../../conversation.repository';
+import { ConversationsService } from '../../conversations.service';
 import type { ConversationEventsPublisher } from '../../events/conversation-events.publisher';
 import { MessageRepository } from '../../message.repository';
 import { OutboundMessageSender } from '../../outbound-message.sender';
@@ -317,6 +318,32 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
 
     expect(await ordersFor(convo.id)).toEqual([]);
     expect(sent).toEqual([]);
+  });
+
+  it('refuses the card shown before a take-over once the seller hands the chat back', async () => {
+    const lungi = await product('Handback Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    const publisher = { publish: async () => undefined } as unknown as ConversationEventsPublisher;
+    const conversations = new ConversationsService(
+      runtime.db,
+      new ConversationRepository(),
+      new MessageRepository(),
+      new FacebookPageRepository(),
+      null,
+      publisher,
+      {} as unknown as OutboundMessageSender,
+    );
+    await conversations.update({ merchantId: t.merchantA }, convo.id, { botPaused: true });
+    await conversations.update({ merchantId: t.merchantA }, convo.id, { botPaused: false });
+
+    await expect(tap(convo.id, confirm(convo.id))).resolves.toBe('stale_card');
+
+    expect(await ordersFor(convo.id)).toEqual([]);
+    const row = await conversationRow(convo.id);
+    expect(row.state).toBe('collecting_details');
+    expect(readSlots(row.collectedSlots)).toMatchObject({ revision: 2 });
+    expect(readSlots(row.collectedSlots).quote).toBeUndefined();
+    expect(drafted).toEqual([]);
   });
 
   it('does nothing for a button naming another conversation, or another merchant', async () => {
