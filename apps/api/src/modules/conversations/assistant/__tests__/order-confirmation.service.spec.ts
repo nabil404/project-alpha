@@ -51,6 +51,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
   let fallbackA: string;
   let sent: { kind: string; text: string; payloads: string[] }[];
   let drafted: { orderId: string; committed: boolean }[];
+  let notifyFailures: number;
 
   const send =
     (kind: string) =>
@@ -107,6 +108,10 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
       ),
       {
         orderDrafted: async (_merchantId: string, orderId: string) => {
+          if (notifyFailures > 0) {
+            notifyFailures -= 1;
+            throw new Error('queue down');
+          }
           // Read on another connection: only a committed order is visible there.
           const [row] = await t.db.select().from(schema.order).where(eq(schema.order.id, orderId));
           drafted.push({ orderId, committed: row !== undefined });
@@ -208,6 +213,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
   beforeEach(() => {
     sent = [];
     drafted = [];
+    notifyFailures = 0;
   });
   afterAll(async () => {
     await runtime.close();
@@ -273,7 +279,29 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
       confirmText({ kind: 'reference', reference: orders[0]!.reference }, 'bn'),
       confirmText({ kind: 'reference', reference: orders[0]!.reference }, 'bn'),
     ]);
-    expect(drafted).toHaveLength(1);
+    // The second call is a no-op: the queue's job id is per order.
+    expect(drafted.map((entry) => entry.orderId)).toEqual([orders[0]!.id, orders[0]!.id]);
+  });
+
+  it('finishes a run whose email failed after commit: no second reference, the email queued', async () => {
+    const lungi = await product('Retry Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    const message = await seedMessage(t.db, t.merchantA, convo.id, {
+      text: 'Confirm',
+      payload: `confirm:${convo.id}:1`,
+    });
+    const job = { merchantId: t.merchantA, conversationId: convo.id, triggerMessageId: message.id };
+    notifyFailures = 1;
+
+    await expect(service().run(job, confirm(convo.id))).rejects.toThrow('queue down');
+    await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
+
+    const orders = await ordersFor(convo.id);
+    expect(orders).toHaveLength(1);
+    expect(sent.map((entry) => entry.text)).toEqual([
+      confirmText({ kind: 'reference', reference: orders[0]!.reference }, 'bn'),
+    ]);
+    expect(drafted).toEqual([{ orderId: orders[0]!.id, committed: true }]);
   });
 
   it('creates one order when two taps race', async () => {
@@ -286,8 +314,9 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     ]);
 
     expect(outcomes.sort()).toEqual(['ordered', 'replayed']);
-    expect(await ordersFor(convo.id)).toHaveLength(1);
-    expect(drafted).toHaveLength(1);
+    const orders = await ordersFor(convo.id);
+    expect(orders).toHaveLength(1);
+    expect(new Set(drafted.map((entry) => entry.orderId))).toEqual(new Set([orders[0]!.id]));
   });
 
   it('refuses the Confirm of an older card', async () => {
