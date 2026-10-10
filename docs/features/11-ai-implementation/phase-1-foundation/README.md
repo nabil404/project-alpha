@@ -134,7 +134,8 @@ AssistantTurnProcessor → AssistantTurnService.run()
 - **Replies are capped at 500 graphemes.**
 - **Fallback Bangla awaits a native-speaker review.** The sentences are in
   `assistant-fallbacks.ts`.
-- **Job id `turn-<metaMessageId>`.** BullMQ refuses `:` in a custom id. Queue
+- **Job id `turn-<metaMessageId>`,** its `%` and `:` escaped
+  (`queue/job-id.ts`): BullMQ refuses `:` in a custom id. Queue
   `assistant-turns`, delay 2500 ms, concurrency 4.
 - **A retried turn resumes an unfinished hand-off.** If the first run failed
   after its write committed, the retry re-notifies the seller, or hands off

@@ -22,6 +22,7 @@ import {
   MESSENGER_QUEUE,
   type InboundMessageJob,
 } from '../queue/queue.constants';
+import { customJobId } from '../queue/job-id';
 import { verifyMetaSignature } from './signature';
 import { parseInboundJobs, parseWebhookBody } from './webhook-payload';
 import type { RawBodyRequest } from './raw-body';
@@ -121,7 +122,7 @@ export class MessengerController {
     }
 
     for (const job of parseInboundJobs(payload)) {
-      await this.queue.add(INBOUND_MESSAGE_JOB, job, { jobId: job.messageId });
+      await this.queue.add(INBOUND_MESSAGE_JOB, job, { jobId: customJobId('', job.messageId) });
     }
 
     return 'EVENT_RECEIVED';

@@ -368,6 +368,16 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
     ]);
   });
 
+  it('keeps the colon BullMQ refuses out of the job id, one id per mid', async () => {
+    const tail = randomUUID();
+    await ingest.handle(customerMessage({ messageId: `m_${tail}:1` }));
+    await ingest.handle(customerMessage({ messageId: `m_${tail}%3A1` }));
+
+    const ids = turns.added.map((added) => (added.opts as { jobId: string }).jobId);
+    expect(ids.every((id) => !id.includes(':'))).toBe(true);
+    expect(new Set(ids).size).toBe(2);
+  });
+
   it('queues nothing for a duplicate, an echo, or a paused conversation', async () => {
     const first = customerMessage();
     await ingest.handle(first);

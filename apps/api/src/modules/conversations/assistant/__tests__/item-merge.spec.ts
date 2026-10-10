@@ -30,7 +30,11 @@ const collected: OrderItemSlot[] = [
 
 describe('mergeItems', () => {
   it('leaves the items alone when extraction said nothing about them', () => {
-    expect(mergeItems(collected, null)).toEqual({ items: collected, origins: [0, 1] });
+    expect(mergeItems(collected, null)).toEqual({
+      items: collected,
+      origins: [0, 1],
+      refs: [0, 1],
+    });
   });
 
   it('turns two products in one message into two new items', () => {
@@ -89,13 +93,14 @@ describe('mergeItems', () => {
   });
 
   it('clears the ids of an item whose product words changed, keeping its quantity', () => {
-    const { items, origins } = mergeItems(collected, [
+    const { items, origins, refs } = mergeItems(collected, [
       said({ ref: 0, productQuery: 'blue jamdani', productQueryAlt: 'ব্লু জামদানি' }),
     ]);
     expect(items).toEqual([
       { productQuery: 'blue jamdani', productQueryAlt: 'ব্লু জামদানি', quantity: 1 },
     ]);
     expect(origins).toEqual([null]);
+    expect(refs).toEqual([0]);
   });
 
   it('clears only the variant when only the variant words changed', () => {

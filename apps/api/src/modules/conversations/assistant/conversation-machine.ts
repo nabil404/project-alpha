@@ -162,7 +162,12 @@ export function decideTurn(input: TurnInput): TurnDecision {
 
   const resolved = resolveItems(slots.items, catalog, picked);
   slots = resolveDelivery(
-    { ...slots, items: resolved.items, offered: remapOffered(slots.offered, resolved.moved) },
+    {
+      ...slots,
+      items: resolved.items,
+      offered: remapOffered(slots.offered, resolved.moved),
+      lastAsked: remapLastAsked(slots.lastAsked, resolved.moved),
+    },
     input.delivery,
   );
   const image = imageFor(resolved.items, resolved.touched, catalog);
@@ -403,6 +408,20 @@ function resolveItems(
   };
 }
 
+/**
+ * The ask counter follows its item to its new index (`to[old]`); an item
+ * removed takes the counter with it. An ask for an item not yet in the list
+ * (the first product) is left as it is.
+ */
+function remapLastAsked(
+  last: CollectedSlots['lastAsked'],
+  to: readonly (number | undefined)[],
+): CollectedSlots['lastAsked'] {
+  if (last?.item === undefined || last.item >= to.length) return last;
+  const item = to[last.item];
+  return item === undefined ? undefined : { ...last, item };
+}
+
 function remapOffered(
   offered: CollectedSlots['offered'],
   moved: number[],
@@ -579,7 +598,7 @@ export function mergeExtraction(
 ): { slots: CollectedSlots; invalidPhone: boolean } {
   const next: CollectedSlots = { ...slots };
   if (extraction.items !== null) {
-    const { items, origins } = mergeItems(
+    const { items, origins, refs } = mergeItems(
       slots.items,
       extraction.items,
       (id) => findProduct(catalog, id)?.name,
@@ -591,6 +610,13 @@ export function mergeExtraction(
       offered && at >= 0 && items[at]!.variantQuery === slots.items[offered.item]?.variantQuery
         ? { ...offered, item: at }
         : undefined;
+    next.lastAsked = remapLastAsked(
+      slots.lastAsked,
+      slots.items.map((_, old) => {
+        const index = refs.indexOf(old);
+        return index >= 0 ? index : undefined;
+      }),
+    );
   }
   const name = words(extraction.customerName);
   if (name !== undefined) next.customerName = name;

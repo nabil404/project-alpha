@@ -498,6 +498,58 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     expect(sent[0]?.payloads).toEqual([`confirm:${convo.id}:2`, `change:${convo.id}:2`]);
   });
 
+  it('makes no order when only the delivery fee changed: the area charge, or the free-delivery threshold', async () => {
+    const lungi = await product('Fee Lungi', 160_000);
+    const setCharge = (charge: number) =>
+      t.db
+        .update(schema.deliveryCharge)
+        .set({ charge })
+        .where(eq(schema.deliveryCharge.id, fallbackA));
+    const setThreshold = (freeDeliveryOver: number | null) =>
+      t.db
+        .insert(schema.merchantSettings)
+        .values({
+          merchantId: t.merchantA,
+          country: 'BD',
+          currency: 'BDT',
+          timeZone: 'Asia/Dhaka',
+          dateFormat: 'dd/MM/yyyy',
+          freeDeliveryOver,
+        })
+        .onConflictDoUpdate({
+          target: schema.merchantSettings.merchantId,
+          set: { freeDeliveryOver },
+        });
+
+    const charged = await shown([{ ...lungi, quantity: 1 }]);
+    await setCharge(15_000);
+    try {
+      await expect(tap(charged.id, confirm(charged.id))).resolves.toBe('price_changed');
+    } finally {
+      await setCharge(12_000);
+    }
+    expect(readSlots((await conversationRow(charged.id)).collectedSlots).quote).toMatchObject({
+      revision: 2,
+      deliveryFee: 15_000,
+      total: 175_000,
+    });
+
+    const free = await shown([{ ...lungi, quantity: 1 }]);
+    await setThreshold(100_000);
+    try {
+      await expect(tap(free.id, confirm(free.id))).resolves.toBe('price_changed');
+    } finally {
+      await setThreshold(null);
+    }
+    expect(readSlots((await conversationRow(free.id)).collectedSlots).quote).toMatchObject({
+      revision: 2,
+      deliveryFee: 0,
+      total: 160_000,
+    });
+    expect(await ordersFor(charged.id)).toEqual([]);
+    expect(await ordersFor(free.id)).toEqual([]);
+  });
+
   it('goes back to collecting on Change, and refuses the old card afterwards', async () => {
     const lungi = await product('Change Lungi', 160_000);
     const convo = await shown([{ ...lungi, quantity: 1 }]);

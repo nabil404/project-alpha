@@ -505,6 +505,47 @@ describe('decideTurn: several items', () => {
     expect(decision.slots.items.map((item) => item.productId)).toEqual([kajal.id]);
   });
 
+  it("counts the asks afresh for the item that moved into a removed one's place", () => {
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: slots({
+          items: [
+            { productQuery: 'lungi', productId: lungi.id, variantId: lungi.variants[0]!.id },
+            { productQuery: 'kajal', productId: kajal.id, variantId: kajal.variants[0]!.id },
+          ],
+          lastAsked: { slot: 'quantity', item: 0, times: 2 },
+        }),
+        trigger: message(
+          { ...nothing, items: [said({ ref: 1, productQuery: 'kajal' })] },
+          asked('edit_order'),
+        ),
+      }),
+    );
+    expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'quantity', item: 0 });
+    expect(decision.slots.lastAsked).toEqual({ slot: 'quantity', item: 0, times: 1 });
+  });
+
+  it('keeps counting the asks for an item that moved up', () => {
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: slots({
+          items: [
+            { productQuery: 'lungi', productId: lungi.id, variantId: lungi.variants[0]!.id },
+            { productQuery: 'kajal', productId: kajal.id, variantId: kajal.variants[0]!.id },
+          ],
+          lastAsked: { slot: 'quantity', item: 1, times: 1 },
+        }),
+        trigger: message(
+          { ...nothing, items: [said({ ref: 1, productQuery: 'kajal' })] },
+          asked('edit_order'),
+        ),
+      }),
+    );
+    expect(decision.slots.lastAsked).toEqual({ slot: 'quantity', item: 0, times: 2 });
+  });
+
   it('merges two items on the same variant, quantities summed', () => {
     const decision = decideTurn(
       turn({
