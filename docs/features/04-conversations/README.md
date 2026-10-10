@@ -10,7 +10,10 @@ worker; the API lists, searches, counts and shows conversations, marks them
 read, takes over and hands back, sends seller replies, deletes failed ones,
 and streams changes over SSE. The dashboard has the inbox at
 `/conversations` and `/conversations/:id`. Assistant replies are sent
-([phase 11.1](../11-ai-implementation/phase-1-foundation/README.md)). Not built
+([phase 11.1](../11-ai-implementation/phase-1-foundation/README.md)), with
+quick replies, product photos and a summary card whose Confirm button creates
+the order ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md));
+taps on them come back as customer messages carrying their payload. Not built
 yet: the drafted-order panel and order history in the thread. See
 [Follow-ups](#follow-ups).
 
@@ -29,7 +32,7 @@ so the verify token and the signature are its authentication.
   work: no raw body is `400 WEBHOOK_MISSING_RAW_BODY`, a bad signature
   `401 WEBHOOK_INVALID_SIGNATURE`, a body that isn't a JSON object
   `400 WEBHOOK_MALFORMED_PAYLOAD`. It then queues one job per text message
-  (`jobId = mid`) and answers `200 EVENT_RECEIVED` at once. `@SkipThrottle()`:
+  or button tap (`jobId = mid`) and answers `200 EVENT_RECEIVED` at once. `@SkipThrottle()`:
   Meta delivers every Page's events from a few addresses, so a per-IP limit
   would throttle all shops together.
 - The raw body survives because the auth module keeps `rawBody: true` on its
@@ -44,8 +47,8 @@ so the verify token and the signature are its authentication.
 ## Flow
 
 ```
-Meta  POST /api/v1/webhooks/messenger        → verified, one BullMQ job per text message (jobId = mid)
-                                                customer-message | page-echo (is_echo; customer = recipient)
+Meta  POST /api/v1/webhooks/messenger        → verified, one BullMQ job per text message or tap (jobId = mid)
+                                                customer-message | customer-postback | page-echo (is_echo; customer = recipient)
 Worker InboundMessageIngest                   → echo carrying our META_APP_ID → skipped (own-echo)
                                               → app_page_merchant(pageId) → merchant, or dropped (unknown-page)
        read customer + Page, Graph profile   (outside any transaction)
@@ -58,9 +61,17 @@ API    ConversationEventsHub (lazy SUBSCRIBE) → that merchant's SSE streams: c
 SPA    refetches over REST
 ```
 
-- **Text only.** A webhook event without `message.text` (attachments,
-  stickers, reactions, deliveries, postbacks) makes no job, so an image-only
-  first message creates no customer or conversation.
+- **Text and taps only.** A webhook event without `message.text`
+  (attachments, stickers, reactions, deliveries) makes no job, so an
+  image-only first message creates no customer or conversation.
+- **Taps.** A quick-reply tap is a text message carrying
+  `message.quick_reply.payload`; a button tap is a `postback` event, stored as
+  a customer message whose text is the button's title. Both keep their
+  payload in `message.payload`. A postback without a `mid` gets one derived
+  from the sender, timestamp and payload, so a redelivery stays a no-op. A
+  postback's assistant turn is queued with no delay, and a Confirm tap is
+  still queued on a `confirmed` chat, so a second tap gets the order's
+  reference again.
 - **Seller echoes.** An echo whose `app_id` is not ours (Facebook's own inbox,
   or another app on the Page) is stored as `sender = seller` and pauses the
   assistant. Our own sends are written by the sender, not the ingest.
@@ -215,7 +226,8 @@ into another shop.
   `UNIQUE (merchant_id, facebook_page_id, customer_id)`; indexes on the list
   order and partial ones for `handed_off` and `awaiting_confirmation`.
 - `message`: `sender`, `text`, `meta_message_id` (null while `sending`),
-  `status`, `sent_at`. `UNIQUE (merchant_id, meta_message_id)`; cascades with
+  `payload` (a tapped quick reply's or button's payload, else null; migration
+  `0033_message_payload`), `status`, `sent_at`. `UNIQUE (merchant_id, meta_message_id)`; cascades with
   its conversation; trigram index on `text`. The assistant writes `assistant` rows through `OutboundMessageSender`.
 
 **The Page resolver.** The worker must find a Page's merchant before any
@@ -262,7 +274,9 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
   nothing yet turns an abandoned one into `failed`; a sweep should.
 
 The assistant's own follow-ups are on the
-[phase 11.1 page](../11-ai-implementation/phase-1-foundation/README.md#follow-ups).
+[phase 11.1](../11-ai-implementation/phase-1-foundation/README.md#follow-ups) and
+[phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#follow-ups)
+pages.
 
 - A send that times out may still have been delivered; it is recorded as
   failed (its echo carries our app id and is skipped), so retyping it can send

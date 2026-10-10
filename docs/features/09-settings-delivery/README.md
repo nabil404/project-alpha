@@ -9,7 +9,9 @@ page's Delivery charge card and the Order detail's Delivery card.
 
 **Status (Oct 2026):** built: the API, the page at `/settings/delivery`, the
 product card, and the area picker and fee quote on orders. The assistant
-quoting delivery is for the AI work.
+matches a customer's address to an area, or Everywhere else, and quotes the
+fee with the same `deliveryFeeFor` rule
+([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#matching)).
 
 ## Routes (session + TenantGuard)
 
@@ -114,9 +116,8 @@ Migrations `0026_settings_delivery` and `0027_delivery_charge_force_rls`
 
 ## Follow-ups
 
-- The assistant matching a customer's address to an area or Everywhere else
-  and quoting with `DeliveryQuoteService.feeFor` and the delivery time; the
-  MVP rules let it quote only the seller's charges.
+- The assistant telling the customer the area's delivery time; it quotes
+  the fee but not yet the estimate.
 - A stale-save guard (`version`) if two people edit the page at once.
 - A place lookup for area names, if free text proves too loose.
 - Only the owner should change these once a shop has teammates.

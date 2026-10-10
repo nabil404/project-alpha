@@ -10,10 +10,12 @@ are the Orders and Order detail artboards in the design canvas. This page
 describes what is built.
 
 **Status (Oct 2026):** built end to end, in the API and at `/orders` and
-`/orders/:id` in the dashboard. Not built yet: CSV export, the order summary
-sent to the customer in Messenger on confirmation, the email to the seller
-about a new order, and the assistant's own order creation (the conversation
-flow will write `source = assistant` orders). See [Follow-ups](#follow-ups).
+`/orders/:id` in the dashboard. The assistant writes `source = assistant`
+orders when the customer taps Confirm on its summary card, and the seller is
+emailed about each one
+([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#confirm)).
+Not built yet: CSV export and the order summary sent to the customer in
+Messenger when the seller confirms. See [Follow-ups](#follow-ups).
 
 ## Routes (`/api/v1/orders`, session + TenantGuard)
 
@@ -103,8 +105,7 @@ earlierOrderCount, spentBefore }` ("Repeat customer · 2 earlier orders"),
   it in from `POST /delivery-quote`: each product's own charge for the area,
   or the shop's where it sets none; the highest of those, not the sum; and
   nothing once the subtotal reaches the shop's free-delivery threshold
-  (`deliveryFeeFor` in `@app/shared`, the rule the assistant will quote
-  with). The quote prices items as sent, else at the catalog price, archived
+  (`deliveryFeeFor` in `@app/shared`, the rule the assistant quotes with). The quote prices items as sent, else at the catalog price, archived
   variants included.
 - **Payment** is the seller's record only (`unpaid`, `paid`, `refunded`;
   `cash_on_delivery`, `bank_transfer`, `mobile_wallet`); the MVP takes no
@@ -129,6 +130,13 @@ earlierOrderCount, spentBefore }` ("Repeat customer · 2 earlier orders"),
   field). The currency is the shop's. Creation takes the shop's settings row
   lock, which serializes the yearly number sequence, the idempotency check and the
   currency lock. With an `Idempotency-Key`, a repeat returns the first order.
+- **Orders the assistant drafts** come only from the Confirm button on its
+  summary card. They go through the same `OrdersService.createInTransaction`
+  as a hand-made order, inside the assistant's own transaction, with
+  `source = assistant`, the conversation's `conversation_id`, a null actor on
+  the `created` event, and the idempotency key
+  `assistant:<conversationId>:<revision>`, so one card makes at most one order
+  ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#confirm)).
 - **A product that was ordered cannot be deleted** (`409 PRODUCT_IN_USE`):
   order lines keep foreign keys to their product and variant. The seller
   archives it instead.
@@ -239,9 +247,4 @@ Web: `apps/web/src/features/orders/`, routes under
 - The order summary in Messenger when the seller confirms ("When you confirm,
   Nusrat gets an order summary"): sent after the transaction commits, through
   the conversations send path, never inside it.
-- The assistant writing `source = assistant` orders from a confirmed
-  conversation, idempotent per confirmation.
 - CSV export of the filtered list.
-- Report each assistant order with `NotificationsService.orderDrafted` once
-  it commits, so the seller gets its email
-  ([Settings – Notifications](../10-settings-notifications/README.md#sending)).
