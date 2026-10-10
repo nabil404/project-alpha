@@ -45,11 +45,7 @@ export interface PhraseRequest {
  * customer's words until then).
  */
 export interface ExtractionContext {
-  /**
-   * `product` and `variant` are the catalog's names once matched, else the
-   * customer's words; `customerWords` and `customerVariantWords` are always
-   * the customer's own, so extraction can repeat either for an unchanged item.
-   */
+  /** Always the customer's own words, so extraction can repeat either form for an unchanged item. */
   items: {
     ref: number;
     product: string;
