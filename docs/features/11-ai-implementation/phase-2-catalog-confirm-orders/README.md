@@ -142,7 +142,9 @@ language (`confirmText`). One short transaction:
 2. **Change** on the current card → `collecting_details`, `revision + 1`,
    "what would you like to change?". On any other card, the stale sentence.
 3. **Confirm**: an order keyed `assistant:<conversationId>:<revision>` exists
-   → resend its reference (a double tap, or two racing taps, make one order).
+   → resend its reference (a double tap, or two racing taps, make one order),
+   unless a reply already follows this tap: then the run is a retry of the one
+   that made the order, and it sends nothing.
    State not `awaiting_confirmation`, or another revision → the stale
    sentence.
 4. Re-read every line's variant (`OrderCatalogRepository.findVariants`) and
@@ -156,8 +158,11 @@ language (`confirmText`). One short transaction:
    name, phone and address, cash on delivery; state `confirmed`; stage the
    reference.
 
-After commit: send the reply, then `NotificationsService.orderDrafted` only
-when this run created the order. Lock order is conversation, then the
+After commit: send the reply, then `NotificationsService.orderDrafted` for
+the card's order, whether this run made it or found it. Its queue job id is
+`order-drafted-<orderId>`, so a repeat is a no-op while the first job is
+kept (`EVENT_JOB_RETENTION`, seven days once completed); a retry after a
+failed enqueue still emails. Lock order is conversation, then the
 settings row; a seller-made order takes no conversation lock, so no cycle.
 
 ## Decisions
@@ -212,19 +217,19 @@ transaction. See the MVP [rules](../../../mvp/01-messenger-to-order/rules.md).
 
 Colocated in `apps/api/src/modules/conversations/assistant/__tests__/`.
 
-| Spec                                 | What it proves                                                                                                                                                                                                                                                                                                                            |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `catalog-match.spec.ts`              | pg_trgm's documented similarity; exact name, alias, misspelling, Banglish, Bangla; at most three candidates; none for what is not sold; only the given catalog matches; variants by value, out of stock still matched; area, address and fallback                                                                                         |
-| `catalog-match.eval.spec.ts`         | At least 90% on the eval set for products and variants, and no wrong product as a clear winner; prints the misses                                                                                                                                                                                                                         |
-| `catalog-match.live-eval.spec.ts`    | The same messages through the live extraction model (skipped unless `LLM_EVAL=1`)                                                                                                                                                                                                                                                         |
-| `item-merge.spec.ts`                 | Two products become two items; a ref keeps its ids; changed words clear them; removal; bad and reused refs; same-variant merge                                                                                                                                                                                                            |
-| `conversation-machine.spec.ts`       | Every state × intent; variant asked only with options; pick and refused pick; not found counts to the hand-off; out of stock; sold out; too many; "make the second one 3"; removal; summary, revision, own charges, threshold, fallback; edit after the card; the photo                                                                   |
-| `reply-check.spec.ts`                | A price one unit off is rejected; the formatted price and total pass in Latin and Bangla digits                                                                                                                                                                                                                                           |
-| `summary-card.spec.ts`               | The card text per language, the notice line, and the split past 640 characters                                                                                                                                                                                                                                                            |
-| `outgoing.spec.ts`                   | Quick-reply and card payloads; the item lines sent first for a long card                                                                                                                                                                                                                                                                  |
-| `assistant-fallbacks.spec.ts`        | A sentence per ask reason and per Confirm reply in both languages                                                                                                                                                                                                                                                                         |
-| `assistant-turn.service.spec.ts`     | (DB) The photo before the reply; candidates as quick replies and a tap filling the item with no LLM call; a tap never offered read as a message; the card's buttons carry its revision; a card tap routed to Confirm                                                                                                                      |
-| `order-confirmation.service.spec.ts` | (DB) One order with the card's numbers, the reference, `orderDrafted` after commit; double and racing taps; stale card; paused; another conversation or merchant; one of three lines archived; product drafted; short stock; price changed; Change; fee parity with `POST /orders/delivery-quote`; the old card refused after a hand-back |
+| Spec                                 | What it proves                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `catalog-match.spec.ts`              | pg_trgm's documented similarity; exact name, alias, misspelling, Banglish, Bangla; at most three candidates; none for what is not sold; only the given catalog matches; variants by value, out of stock still matched; area, address and fallback                                                                                                                                                            |
+| `catalog-match.eval.spec.ts`         | At least 90% on the eval set for products and variants, and no wrong product as a clear winner; prints the misses                                                                                                                                                                                                                                                                                            |
+| `catalog-match.live-eval.spec.ts`    | The same messages through the live extraction model (skipped unless `LLM_EVAL=1`)                                                                                                                                                                                                                                                                                                                            |
+| `item-merge.spec.ts`                 | Two products become two items; a ref keeps its ids; changed words clear them; removal; bad and reused refs; same-variant merge                                                                                                                                                                                                                                                                               |
+| `conversation-machine.spec.ts`       | Every state × intent; variant asked only with options; pick and refused pick; not found counts to the hand-off; out of stock; sold out; too many; "make the second one 3"; removal; summary, revision, own charges, threshold, fallback; edit after the card; the photo                                                                                                                                      |
+| `reply-check.spec.ts`                | A price one unit off is rejected; the formatted price and total pass in Latin and Bangla digits                                                                                                                                                                                                                                                                                                              |
+| `summary-card.spec.ts`               | The card text per language, the notice line, and the split past 640 characters                                                                                                                                                                                                                                                                                                                               |
+| `outgoing.spec.ts`                   | Quick-reply and card payloads; the item lines sent first for a long card                                                                                                                                                                                                                                                                                                                                     |
+| `assistant-fallbacks.spec.ts`        | A sentence per ask reason and per Confirm reply in both languages                                                                                                                                                                                                                                                                                                                                            |
+| `assistant-turn.service.spec.ts`     | (DB) The photo before the reply; candidates as quick replies and a tap filling the item with no LLM call; a tap never offered read as a message; the card's buttons carry its revision; a card tap routed to Confirm                                                                                                                                                                                         |
+| `order-confirmation.service.spec.ts` | (DB) One order with the card's numbers, the reference, `orderDrafted` after commit; double and racing taps; a retry after `orderDrafted` threw sends one reference and emails; stale card; paused; another conversation or merchant; one of three lines archived; product drafted; short stock; price changed; Change; fee parity with `POST /orders/delivery-quote`; the old card refused after a hand-back |
 
 Webhook postbacks and quick-reply payloads, and the three new Graph sends, are
 covered in `messenger/__tests__/webhook-payload.spec.ts` and
@@ -236,9 +241,9 @@ covered in `messenger/__tests__/webhook-payload.spec.ts` and
   Confirm sentences (`summary-card.ts`, `assistant-fallbacks.ts`).
 - Run `catalog-match.live-eval.spec.ts` with the live model and record the
   end-to-end score here.
-- A crash between the Confirm commit and `orderDrafted` loses that email; a
-  retry finds the order and does not re-email. The same kind of window as
-  phase 1's unsent `sending` rows.
+- A tap on a Confirm more than seven days after its order was made queues
+  `orderDrafted` again once the first job has aged out, and emails the seller
+  a second time.
 - A deleted delivery area under a shown card sends the stale sentence and
   re-matches on the next message; it could send a fresh card at once.
 - Showing the product photo in the dashboard thread.

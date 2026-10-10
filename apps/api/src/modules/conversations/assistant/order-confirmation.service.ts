@@ -53,7 +53,8 @@ interface Decided {
   slots?: CollectedSlots;
   state?: 'collecting_details' | 'awaiting_confirmation' | 'confirmed';
   outgoing: Outgoing[];
-  createdOrderId?: string;
+  /** The card's order, made by this run or found from an earlier one. */
+  orderId?: string;
 }
 
 /**
@@ -96,15 +97,17 @@ export class OrderConfirmationService {
       const settings = (await this.settings.find(tx, scope)) ?? defaultMerchantSettings();
       const language = languageFor(settings.country);
       const slots = readSlots(locked.conversation.collectedSlots);
+      const recent = await this.messages.listPage(tx, scope, conversationId, { limit: 20 });
+      const trigger = recent.find((message) => message.id === triggerMessageId);
+      const answered =
+        trigger !== undefined &&
+        recent.some((message) => message.sender !== 'customer' && message.sentAt > trigger.sentAt);
 
       const decided =
         tap.kind === 'change'
           ? this.change(locked.conversation, slots, tap, language)
-          : await this.confirm(tx, scope, locked.conversation, slots, tap, language);
+          : await this.confirm(tx, scope, locked.conversation, slots, tap, language, answered);
 
-      const [trigger] = (
-        await this.messages.listPage(tx, scope, conversationId, { limit: 20 })
-      ).filter((message) => message.id === triggerMessageId);
       // The reply must sort after its tap even when Meta's clock runs ahead of ours.
       const now = new Date(Math.max(Date.now(), (trigger?.sentAt.getTime() ?? 0) + 1));
       let conversation = locked.conversation;
@@ -143,8 +146,10 @@ export class OrderConfirmationService {
       });
       delivered = final.status !== 'failed';
     }
-    if (staged.decided.createdOrderId) {
-      await this.notifications.orderDrafted(merchantId, staged.decided.createdOrderId);
+    if (staged.decided.orderId) {
+      // Also for a replay: a retry whose first run committed but never queued
+      // the email. The job id is per order, so a second call is a no-op.
+      await this.notifications.orderDrafted(merchantId, staged.decided.orderId);
     }
     return delivered ? staged.decided.outcome : 'send_failed';
   }
@@ -174,15 +179,19 @@ export class OrderConfirmationService {
     slots: CollectedSlots,
     tap: CardTap,
     language: ReplyLanguage,
+    answered: boolean,
   ): Promise<Decided> {
     const key = confirmKey(conversation.id, tap.revision);
     const existing = await this.orders.findByIdempotencyKey(tx, scope, key);
     if (existing) {
+      // A retry of the run that made it finds its reply already stored; a
+      // second tap is a new trigger and gets the reference again.
       return {
         outcome: 'replayed',
-        outgoing: [
-          text(confirmText({ kind: 'reference', reference: existing.reference }, language)),
-        ],
+        orderId: existing.id,
+        outgoing: answered
+          ? []
+          : [text(confirmText({ kind: 'reference', reference: existing.reference }, language))],
       };
     }
     const quote = slots.quote;
@@ -293,7 +302,7 @@ export class OrderConfirmationService {
       state: 'confirmed',
       slots: { ...slots, lastAsked: undefined, offered: undefined },
       outgoing: [text(confirmText({ kind: 'reference', reference: order.reference }, language))],
-      ...(created ? { createdOrderId: order.id } : {}),
+      orderId: order.id,
     };
   }
 }
