@@ -1,48 +1,9 @@
-import { matchProduct, matchVariant, type ProductMatch, type VariantMatch } from '../catalog-match';
-import {
-  EVAL_CATALOG,
-  EVAL_PRODUCTS,
-  PRODUCT_CASES,
-  VARIANT_CASES,
-  productByKey,
-} from './fixtures/match-eval';
+import { matchProduct, matchVariant } from '../catalog-match';
+import { EVAL_CATALOG, PRODUCT_CASES, VARIANT_CASES, productByKey } from './fixtures/match-eval';
+import { keyOf, productOutcome, score, variantOutcome } from './fixtures/match-score';
 
 /** The success metric: the matcher identifies the product (or says none) for at least this share. */
 const TARGET = 0.9;
-
-const keyOf = (id: string) => EVAL_PRODUCTS.find((product) => product.id === id)?.key ?? id;
-
-function productOutcome(match: ProductMatch): string | { some: string[] } {
-  if (match.kind === 'one') return keyOf(match.productId);
-  if (match.kind === 'some') return { some: match.productIds.map(keyOf).sort() };
-  return 'none';
-}
-
-function variantOutcome(product: string, match: VariantMatch): string | { some: string[] } {
-  const nameOf = (id: string) =>
-    productByKey(product).variants.find((variant) => variant.id === id)?.name ?? id;
-  if (match.kind === 'one') return nameOf(match.variantId);
-  if (match.kind === 'some') return { some: match.variantIds.map(nameOf).sort() };
-  return 'none';
-}
-
-const same = (a: string | { some: string[] }, b: string | { some: string[] }) =>
-  JSON.stringify(typeof a === 'string' ? a : { some: [...a.some].sort() }) ===
-  JSON.stringify(typeof b === 'string' ? b : { some: [...b.some].sort() });
-
-function score<T extends { queries: string[]; expected: string | { some: string[] } }>(
-  cases: T[],
-  outcome: (entry: T) => string | { some: string[] },
-  label: (entry: T) => string,
-) {
-  const misses = cases.flatMap((entry) => {
-    const got = outcome(entry);
-    return same(got, entry.expected)
-      ? []
-      : [`${label(entry)}: expected ${JSON.stringify(entry.expected)}, got ${JSON.stringify(got)}`];
-  });
-  return { rate: (cases.length - misses.length) / cases.length, misses };
-}
 
 describe('catalog matching eval set', () => {
   it('holds at least 60 cases', () => {

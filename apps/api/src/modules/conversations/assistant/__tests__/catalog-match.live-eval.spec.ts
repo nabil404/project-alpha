@@ -2,7 +2,8 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { envSchema } from '../../../config/env.schema';
 import { AiSdkLlmClient } from '../../../llm/ai-sdk-llm.client';
 import { matchProduct } from '../catalog-match';
-import { EVAL_CATALOG, EVAL_PRODUCTS, PRODUCT_CASES } from './fixtures/match-eval';
+import { EVAL_CATALOG, PRODUCT_CASES } from './fixtures/match-eval';
+import { keyOf } from './fixtures/match-score';
 
 /**
  * The end-to-end figure: the live extraction model reads each eval message and
@@ -21,7 +22,6 @@ const live = process.env.LLM_EVAL === '1' && Boolean(process.env.LLM_API_KEY);
       extraction: openai(env.LLM_MODEL_EXTRACTION),
       timeoutMs: env.LLM_TIMEOUT_MS,
     });
-    const keyOf = (id: string) => EVAL_PRODUCTS.find((product) => product.id === id)?.key ?? id;
 
     const misses: string[] = [];
     for (const entry of PRODUCT_CASES) {
