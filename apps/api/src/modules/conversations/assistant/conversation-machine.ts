@@ -598,11 +598,12 @@ export function mergeExtraction(
 ): { slots: CollectedSlots; invalidPhone: boolean } {
   const next: CollectedSlots = { ...slots };
   if (extraction.items !== null) {
-    const { items, origins, refs } = mergeItems(
-      slots.items,
-      extraction.items,
-      (id) => findProduct(catalog, id)?.name,
-    );
+    const { items, origins, refs } = mergeItems(slots.items, extraction.items, (id, queries) => {
+      const match = matchProduct(queries, catalog);
+      return match.kind === 'one'
+        ? match.productId === id
+        : match.kind === 'some' && match.productIds.includes(id);
+    });
     next.items = items;
     const offered = slots.offered;
     const at = offered ? origins.indexOf(offered.item) : -1;

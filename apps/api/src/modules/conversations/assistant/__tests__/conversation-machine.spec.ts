@@ -494,6 +494,60 @@ describe('decideTurn: several items', () => {
     ]);
   });
 
+  it('keeps the picked product when new words for it still name it among others', () => {
+    const katan = productByKey('katan');
+    const katanRed = variantOf(katan, 'Red');
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: slots({
+          items: [
+            {
+              productQuery: 'red saree',
+              productId: katan.id,
+              variantQuery: 'red',
+              variantId: katanRed.id,
+              quantity: 1,
+            },
+          ],
+        }),
+        trigger: message(
+          { ...nothing, items: [said({ ref: 0, productQuery: 'saree', quantity: 3 })] },
+          asked('edit_order'),
+        ),
+      }),
+    );
+    expect(decision.slots.items).toEqual([
+      expect.objectContaining({ productId: katan.id, variantId: katanRed.id, quantity: 3 }),
+    ]);
+  });
+
+  it('clears the product when new words name a different one', () => {
+    const katan = productByKey('katan');
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: slots({
+          items: [
+            {
+              productQuery: 'saree',
+              productId: katan.id,
+              variantQuery: 'red',
+              variantId: variantOf(katan, 'Red').id,
+            },
+          ],
+        }),
+        trigger: message(
+          { ...nothing, items: [said({ ref: 0, productQuery: 'jamdani saree' })] },
+          asked('edit_order'),
+        ),
+      }),
+    );
+    expect(decision.slots.items).toEqual([
+      { productQuery: 'jamdani saree', productId: jamdani.id },
+    ]);
+  });
+
   it('removes the item the customer dropped', () => {
     const decision = decideTurn(
       turn({

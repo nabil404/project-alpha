@@ -25,16 +25,16 @@ const sameWords = (a: string | undefined, b: string | undefined) =>
  * The customer's item list after extraction. A null list leaves the items as
  * they are. Otherwise the returned list replaces them: an entry whose `ref`
  * names a collected item continues it and keeps its matched ids unless its
- * words changed; words equal to the matched product's catalog name
- * (`productName`) are not a change, since extraction is shown that name. An
- * item left out is removed. A `ref` that does not exist,
+ * words changed. New words that still name its matched product
+ * (`stillNames`: its catalog name echoed back, or "saree" for the Katan
+ * Saree picked from two) are not a change. An item left out is removed. A `ref` that does not exist,
  * or that an earlier entry already used, starts a new item. An entry with no
  * product words and nothing to continue is dropped.
  */
 export function mergeItems(
   current: readonly OrderItemSlot[],
   extracted: readonly ExtractedItem[] | null,
-  productName: (productId: string) => string | undefined = () => undefined,
+  stillNames: (productId: string, queries: string[]) => boolean = () => false,
 ): MergedItems {
   if (extracted === null) {
     const same = current.map((_, index) => index);
@@ -56,7 +56,8 @@ export function mergeItems(
       kept !== undefined &&
       (product === undefined ||
         sameWords(product, kept.productQuery) ||
-        (kept.productId !== undefined && sameWords(product, productName(kept.productId))));
+        (kept.productId !== undefined &&
+          stillNames(kept.productId, [product, words(entry.productQueryAlt)].filter(isText))));
     const next: OrderItemSlot = sameProduct
       ? { ...kept }
       : { productQuery: product, ...optional('productQueryAlt', words(entry.productQueryAlt)) };
@@ -79,6 +80,8 @@ export function mergeItems(
   }
   return { items, origins, refs };
 }
+
+const isText = (value: string | undefined): value is string => value !== undefined;
 
 function optional<K extends string>(key: K, value: string | undefined): Partial<Record<K, string>> {
   return value === undefined ? {} : ({ [key]: value } as Record<K, string>);
