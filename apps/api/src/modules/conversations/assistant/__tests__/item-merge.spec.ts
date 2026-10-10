@@ -54,41 +54,42 @@ describe('mergeItems', () => {
 
   it('changes only the quantity of the item a ref names, keeping its matched ids', () => {
     const { items, origins } = mergeItems(collected, [
-      said({ ref: 0, productQuery: 'red saree' }),
-      said({ ref: 1, productQuery: 'kajal', quantity: 3 }),
+      said({ ref: 0 }),
+      said({ ref: 1, quantity: 3 }),
     ]);
     expect(items).toEqual([collected[0], { ...collected[1], quantity: 3 }]);
     expect(origins).toEqual([0, 1]);
   });
 
-  it('keeps an item whose words come back null or differently cased', () => {
-    const { items } = mergeItems(collected, [
-      said({ ref: 0 }),
-      said({ ref: 1, productQuery: '  KAJAL ' }),
+  it.each([
+    ['its own words', 'red saree'],
+    ['its own words recased', '  RED SAREE '],
+    ['its catalog name', 'Red Silk Saree'],
+  ])('matches an item again when its product words come back as %s', (_label, productQuery) => {
+    const { items, origins, refs } = mergeItems(collected, [
+      said({ ref: 0, productQuery, quantity: 3 }),
     ]);
-    expect(items).toEqual(collected);
+    expect(items).toEqual([{ productQuery: productQuery.trim(), quantity: 3 }]);
+    expect(origins).toEqual([null]);
+    expect(refs).toEqual([0]);
   });
 
-  it('keeps an item whose new words still name its matched product', () => {
-    const saree: OrderItemSlot = {
-      productQuery: 'saree',
-      productId: SAREE,
-      variantId: SAREE_RED,
-      variantQuery: 'red',
-    };
-    const stillNames = (id: string, _variantId: string | undefined, queries: string[]) =>
-      id === SAREE && queries.includes('Red Silk Saree');
-    const { items, origins } = mergeItems(
-      [saree],
-      [said({ ref: 0, productQuery: 'Red Silk Saree', quantity: 3 })],
-      stillNames,
-    );
-    expect(items).toEqual([{ ...saree, quantity: 3 }]);
+  it('matches the variant again when its words come back, even unchanged', () => {
+    const { items, origins } = mergeItems(collected, [said({ ref: 0, variantQuery: 'red' })]);
+    expect(items).toEqual([
+      {
+        productQuery: 'red saree',
+        productQueryAlt: 'রেড শাড়ি',
+        variantQuery: 'red',
+        productId: SAREE,
+        quantity: 1,
+      },
+    ]);
     expect(origins).toEqual([0]);
   });
 
   it('removes an item the returned list leaves out', () => {
-    const { items, origins } = mergeItems(collected, [said({ ref: 1, productQuery: 'kajal' })]);
+    const { items, origins } = mergeItems(collected, [said({ ref: 1 })]);
     expect(items).toEqual([collected[1]]);
     expect(origins).toEqual([1]);
   });

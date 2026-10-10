@@ -174,12 +174,13 @@ describeDb('conversation simulator', () => {
 
       const edited = await sim.step({
         say: 'make the saree 3',
-        llm: {
-          intent: 'edit_order',
-          items: [{ ref: 0, productQuery: 'saree', quantity: 3 }, { ref: 1 }],
-        },
+        llm: { intent: 'edit_order', items: [{ ref: 0, quantity: 3 }, { ref: 1 }] },
       });
       expect(edited.sends.map((sent) => sent.kind)).toEqual(['card']);
+      expect(edited.slots.items[0]).toMatchObject({
+        variantId: sim.variantId('Katan Saree / Red'),
+        quantity: 3,
+      });
       expect(edited.slots.quote).toMatchObject({
         subtotal: 3 * 450_000 + 2 * 120_000,
         total: 3 * 450_000 + 2 * 120_000 + 6_000,
@@ -198,6 +199,35 @@ describeDb('conversation simulator', () => {
       );
     } finally {
       sim.print('edit after the card: "make the saree 3", then the old card');
+    }
+  }, 60_000);
+
+  it('asks again, never keeping the pick, when extraction echoes "saree" for "make the saree 3"', async () => {
+    const sim = await ConversationSimulator.open(t, runtime.db, SHOP);
+    try {
+      for (const step of TO_THE_CARD) await sim.step(step);
+
+      const echoed = await sim.step({
+        say: 'make the saree 3',
+        llm: {
+          intent: 'edit_order',
+          items: [
+            { ref: 0, productQuery: 'saree', productQueryAlt: 'শাড়ি', quantity: 3 },
+            { ref: 1 },
+          ],
+        },
+      });
+      const asked = echoed.sends.at(-1);
+      expect(asked?.kind).toBe('quick_replies');
+      expect(asked?.options.map((option) => option.title).sort()).toEqual([
+        'Jamdani Saree',
+        'Katan Saree',
+      ]);
+      expect(echoed.state).toBe('collecting_details');
+      expect(echoed.slots.items[0]).not.toHaveProperty('productId');
+      expect(echoed.slots.items[0]).toMatchObject({ productQuery: 'saree', quantity: 3 });
+    } finally {
+      sim.print('echoed "saree" on a picked item: asks again');
     }
   }, 60_000);
 });

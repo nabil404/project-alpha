@@ -74,6 +74,16 @@ const variantOf = (product: Product, name: string | null) =>
   product.variants.find((variant) => variant.name === name)!;
 const RED = variantOf(jamdani, 'Red');
 
+/** One edit: the middle letter of the name's longest word dropped ("jamdani" → "jamani"). */
+const oneEdit = (name: string) => {
+  const longest = name.split(' ').reduce((a, b) => (b.length > a.length ? b : a));
+  const at = Math.floor(longest.length / 2);
+  return name.replace(longest, longest.slice(0, at) + longest.slice(at + 1));
+};
+/** The other spelling of a Bangla word's final i-vowel sign: জামদানি and জামদানী. */
+const banglaVariant = (text: string) =>
+  /ি/u.test(text) ? text.replace('ি', 'ী') : text.replace('ী', 'ি');
+
 const asked = (intent: CustomerIntent, confidence = 0.9): IntentResult => ({ intent, confidence });
 const message = (
   extracted: ExtractedOrder | 'failed' | 'skipped' = 'skipped',
@@ -455,7 +465,7 @@ describe('decideTurn: several items', () => {
         trigger: message(
           {
             ...nothing,
-            items: [said({ ref: 0 }), said({ ref: 1, productQuery: 'kajal', quantity: 3 })],
+            items: [said({ ref: 0 }), said({ ref: 1, quantity: 3 })],
           },
           asked('edit_order'),
         ),
@@ -464,7 +474,7 @@ describe('decideTurn: several items', () => {
     expect(decision.slots.items.map((item) => item.quantity)).toEqual([2, 3]);
   });
 
-  it("keeps the matched variant when extraction echoes the catalog's product name", () => {
+  it('keeps the pick and its variant when extraction returns no product words', () => {
     const katan = productByKey('katan');
     const katanRed = variantOf(katan, 'Red');
     const decision = decideTurn(
@@ -481,38 +491,7 @@ describe('decideTurn: several items', () => {
           ],
         }),
         trigger: message(
-          {
-            ...nothing,
-            items: [said({ ref: 0, productQuery: 'Katan Silk Saree', quantity: 3 })],
-          },
-          asked('edit_order'),
-        ),
-      }),
-    );
-    expect(decision.slots.items).toEqual([
-      expect.objectContaining({ productId: katan.id, variantId: katanRed.id, quantity: 3 }),
-    ]);
-  });
-
-  it('keeps the picked product when new words for it still name it among others', () => {
-    const katan = productByKey('katan');
-    const katanRed = variantOf(katan, 'Red');
-    const decision = decideTurn(
-      turn({
-        state: 'collecting_details',
-        slots: slots({
-          items: [
-            {
-              productQuery: 'red saree',
-              productId: katan.id,
-              variantQuery: 'red',
-              variantId: katanRed.id,
-              quantity: 1,
-            },
-          ],
-        }),
-        trigger: message(
-          { ...nothing, items: [said({ ref: 0, productQuery: 'saree', quantity: 3 })] },
+          { ...nothing, items: [said({ ref: 0, quantity: 3 })] },
           asked('edit_order'),
         ),
       }),
@@ -576,6 +555,21 @@ describe('decideTurn: several items', () => {
         }),
       ).slots.items[0]!;
 
+    const afterWords = (current: CollectedSlots, productQuery: string, productQueryAlt?: string) =>
+      decideTurn(
+        turn({
+          state: 'collecting_details',
+          slots: current,
+          trigger: message(
+            {
+              ...nothing,
+              items: [said({ ref: 0, productQuery, productQueryAlt: productQueryAlt ?? null })],
+            },
+            asked('edit_order'),
+          ),
+        }),
+      );
+
     it.each([
       'not katan, jamdani',
       'jamdani instead of katan',
@@ -588,40 +582,67 @@ describe('decideTurn: several items', () => {
       expect(after(picked(lungi, 'lungi'), 'check shirt').productId).not.toBe(lungi.id);
     });
 
-    it.each(['saree', 'red saree', 'Katan Silk Saree'])('keeps the Katan Saree for %s', (words) => {
-      const item = after(picked(katan, 'katan'), words);
-      expect(item).toEqual(
-        expect.objectContaining({ productId: katan.id, variantId: variantOf(katan, 'Red').id }),
-      );
+    it.each([
+      ['saree', undefined],
+      ['red saree', 'রেড শাড়ি'],
+      ['katan na jamdni dao', undefined],
+      ['katan na, jamdni', undefined],
+      ['কাতান না জামদানী', 'katan na jamdani'],
+    ])('asks again rather than keep the Katan Saree for %s', (productQuery, productQueryAlt) => {
+      const decision = afterWords(picked(katan, 'katan'), productQuery, productQueryAlt);
+      expect(decision.slots.items[0]!.productId).toBeUndefined();
+      expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'product', item: 0 });
     });
 
-    it('keeps the Katan Saree when only one script of the words is its own', () => {
-      const item = decideTurn(
+    it('asks Kurti or Kurti Set for "kurti" on a picked Kurti Set', () => {
+      const kurti = productByKey('kurti');
+      const set = { ...kurti, id: '00000000-0000-4000-8999-0000000000c1', name: 'Kurti Set' };
+      const catalog = { products: [...EVAL_PRODUCTS, set] };
+      const decision = decideTurn(
         turn({
           state: 'collecting_details',
-          slots: picked(katan, 'katan'),
+          catalog,
+          slots: picked(set, 'kurti set'),
           trigger: message(
-            {
-              ...nothing,
-              items: [said({ ref: 0, productQuery: 'red saree', productQueryAlt: 'রেড শাড়ি' })],
-            },
+            { ...nothing, items: [said({ ref: 0, productQuery: 'kurti' })] },
             asked('edit_order'),
           ),
         }),
-      ).slots.items[0]!;
-      expect(item).toEqual(expect.objectContaining({ productId: katan.id }));
+      );
+      expect(decision.slots.items[0]!.productId).toBeUndefined();
+      expect(decision.slots.offered).toEqual({
+        slot: 'product',
+        item: 0,
+        ids: expect.arrayContaining([kurti.id, set.id]),
+      });
     });
 
     it('never keeps A when the customer asks for B instead, over every pair of products', () => {
+      const bangla = (product: Product) =>
+        product.aliases.find((alias) => /\p{sc=Bengali}/u.test(alias))!;
       const kept: string[] = [];
       for (const a of EVAL_PRODUCTS) {
         for (const b of EVAL_PRODUCTS) {
           if (a === b) continue;
-          for (const words of [
-            `not the ${a.name}, the ${b.name}`,
-            `${b.name} instead of ${a.name}`,
-          ]) {
-            if (after(picked(a, a.name), words).productId === a.id) kept.push(`${a.key}: ${words}`);
+          const latin = [b.name, oneEdit(b.name)];
+          const script = [bangla(b), banglaVariant(bangla(b))];
+          const phrasings: [string, string | undefined][] = latin.flatMap((name) => [
+            [`not the ${a.name}, the ${name}`, undefined],
+            [`${name} instead of ${a.name}`, undefined],
+            ...script.map((alt): [string, string] => [
+              `${a.name} na ${name}`,
+              `${bangla(a)} না ${alt}`,
+            ]),
+            ...script.map((alt): [string, string] => [
+              `${bangla(a)} না ${alt}`,
+              `${a.name} na ${name}`,
+            ]),
+          ]);
+          for (const [productQuery, productQueryAlt] of phrasings) {
+            const item = afterWords(picked(a, a.name), productQuery, productQueryAlt).slots
+              .items[0]!;
+            if (item.productId === a.id)
+              kept.push(`${a.key}: ${productQuery} / ${productQueryAlt}`);
           }
         }
       }

@@ -1,12 +1,11 @@
 import type { ExtractedItem, OrderItemSlot } from '@app/shared';
-import { normalize } from './catalog-match';
 
 export interface MergedItems {
   items: OrderItemSlot[];
   /**
    * For each merged item, the index of the collected item it continues with
-   * its matched product kept, or null for a new item or one whose product
-   * words changed.
+   * its matched product kept, or null for a new item or one given product
+   * words.
    */
   origins: (number | null)[];
   /** For each merged item, the collected item its `ref` continued, its words changed or not. */
@@ -18,27 +17,21 @@ const words = (value: string | null | undefined): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
-const sameWords = (a: string | undefined, b: string | undefined) =>
-  a !== undefined && b !== undefined && normalize(a) === normalize(b);
-
 /**
  * The customer's item list after extraction. A null list leaves the items as
  * they are. Otherwise the returned list replaces them: an entry whose `ref`
- * names a collected item continues it and keeps its matched ids unless its
- * words changed. New words made only of its matched product's own words
- * (`stillNames`: its catalog name echoed back, or "saree" for the Katan
- * Saree picked from two) are not a change. An item left out is removed. A `ref` that does not exist,
- * or that an earlier entry already used, starts a new item. An entry with no
- * product words and nothing to continue is dropped.
+ * names a collected item continues it. Extraction returns product words on
+ * such an entry only when the customer changed which product it is, so null
+ * words keep its matched ids and any words drop them and match again; the
+ * variant likewise. A re-mention echoed anyway costs one question, never a
+ * kept product the customer turned down. An item left out is removed. A
+ * `ref` that does not exist, or that an earlier entry already used, starts a
+ * new item. An entry with no product words and nothing to continue is
+ * dropped.
  */
 export function mergeItems(
   current: readonly OrderItemSlot[],
   extracted: readonly ExtractedItem[] | null,
-  stillNames: (
-    productId: string,
-    variantId: string | undefined,
-    queries: string[],
-  ) => boolean = () => false,
 ): MergedItems {
   if (extracted === null) {
     const same = current.map((_, index) => index);
@@ -56,22 +49,13 @@ export function mergeItems(
     const product = words(entry.productQuery);
     if (product === undefined && kept === undefined) continue;
 
-    const sameProduct =
-      kept !== undefined &&
-      (product === undefined ||
-        sameWords(product, kept.productQuery) ||
-        (kept.productId !== undefined &&
-          stillNames(
-            kept.productId,
-            kept.variantId,
-            [product, words(entry.productQueryAlt)].filter(isText),
-          )));
-    const next: OrderItemSlot = sameProduct
-      ? { ...kept }
-      : { productQuery: product, ...optional('productQueryAlt', words(entry.productQueryAlt)) };
+    const next: OrderItemSlot =
+      product === undefined
+        ? { ...kept }
+        : { productQuery: product, ...optional('productQueryAlt', words(entry.productQueryAlt)) };
 
     const variant = words(entry.variantQuery);
-    if (variant !== undefined && !sameWords(variant, next.variantQuery)) {
+    if (variant !== undefined) {
       delete next.variantId;
       next.variantQuery = variant;
       const alt = words(entry.variantQueryAlt);
@@ -83,13 +67,11 @@ export function mergeItems(
     else next.quantity = quantity;
 
     items.push(next);
-    origins.push(sameProduct ? ref : null);
+    origins.push(product === undefined ? ref : null);
     refs.push(ref);
   }
   return { items, origins, refs };
 }
-
-const isText = (value: string | undefined): value is string => value !== undefined;
 
 function optional<K extends string>(key: K, value: string | undefined): Partial<Record<K, string>> {
   return value === undefined ? {} : ({ [key]: value } as Record<K, string>);
