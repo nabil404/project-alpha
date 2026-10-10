@@ -464,6 +464,36 @@ describe('decideTurn: several items', () => {
     expect(decision.slots.items.map((item) => item.quantity)).toEqual([2, 3]);
   });
 
+  it("keeps the matched variant when extraction echoes the catalog's product name", () => {
+    const katan = productByKey('katan');
+    const katanRed = variantOf(katan, 'Red');
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: slots({
+          items: [
+            {
+              productQuery: 'saree',
+              productId: katan.id,
+              variantQuery: 'red',
+              variantId: katanRed.id,
+            },
+          ],
+        }),
+        trigger: message(
+          {
+            ...nothing,
+            items: [said({ ref: 0, productQuery: 'Katan Silk Saree', quantity: 3 })],
+          },
+          asked('edit_order'),
+        ),
+      }),
+    );
+    expect(decision.slots.items).toEqual([
+      expect.objectContaining({ productId: katan.id, variantId: katanRed.id, quantity: 3 }),
+    ]);
+  });
+
   it('removes the item the customer dropped', () => {
     const decision = decideTurn(
       turn({

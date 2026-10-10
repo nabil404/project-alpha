@@ -65,6 +65,23 @@ describe('mergeItems', () => {
     expect(items).toEqual(collected);
   });
 
+  it("keeps an item whose words come back as its catalog product's name", () => {
+    const saree: OrderItemSlot = {
+      productQuery: 'saree',
+      productId: SAREE,
+      variantId: SAREE_RED,
+      variantQuery: 'red',
+    };
+    const nameOf = (id: string) => (id === SAREE ? 'Red Silk Saree' : undefined);
+    const { items, origins } = mergeItems(
+      [saree],
+      [said({ ref: 0, productQuery: 'Red Silk Saree', quantity: 3 })],
+      nameOf,
+    );
+    expect(items).toEqual([{ ...saree, quantity: 3 }]);
+    expect(origins).toEqual([0]);
+  });
+
   it('removes an item the returned list leaves out', () => {
     const { items, origins } = mergeItems(collected, [said({ ref: 1, productQuery: 'kajal' })]);
     expect(items).toEqual([collected[1]]);
