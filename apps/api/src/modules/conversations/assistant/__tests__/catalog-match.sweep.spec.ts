@@ -1,5 +1,6 @@
 import {
   decide,
+  decideProduct,
   MATCH_THRESHOLDS,
   productScores,
   variantScores,
@@ -31,13 +32,6 @@ interface Row {
 
 type Scored = { id: string; score: number }[];
 
-const asProduct = (picked: ReturnType<typeof decide>) =>
-  picked === null
-    ? ({ kind: 'none' } as const)
-    : typeof picked === 'string'
-      ? ({ kind: 'one', productId: picked } as const)
-      : ({ kind: 'some', productIds: picked } as const);
-
 const asVariant = (picked: ReturnType<typeof decide>) =>
   picked === null
     ? ({ kind: 'none' } as const)
@@ -50,7 +44,7 @@ function evaluate(t: MatchThresholds, products: Scored[], variants: Scored[]): R
   const misses: string[] = [];
   const wrong: string[] = [];
   PRODUCT_CASES.forEach((entry, index) => {
-    const match = asProduct(decide(products[index]!, t));
+    const match = decideProduct(products[index]!, entry.queries, EVAL_CATALOG, t);
     if (!same(productOutcome(match), entry.expected)) misses.push(entry.message);
     if (match.kind === 'one' && keyOf(match.productId) !== entry.expected)
       wrong.push(entry.message);

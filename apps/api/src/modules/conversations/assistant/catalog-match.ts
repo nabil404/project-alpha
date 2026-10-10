@@ -161,6 +161,25 @@ function withoutValueWords(
   return rest.length > 0 ? rest : query;
 }
 
+/**
+ * Whether the customer's words, in one of their scripts, are all the
+ * product's own name or alias words or the variant's values: "red saree" for
+ * the red Katan Silk Saree, but not "jamdani instead of katan". One script is
+ * enough because the other is a transliteration the catalog may not carry.
+ */
+export function onlyNames(
+  queries: readonly string[],
+  product: Product,
+  variant: Variant | undefined,
+): boolean {
+  const own = new Set(
+    [product.name, ...product.aliases, ...(variant ? variantValues(product, variant) : [])].flatMap(
+      wordsOf,
+    ),
+  );
+  return queries.some((query) => wordsOf(query).every((word) => own.has(word)));
+}
+
 /** Each product's score for the customer's words; only `t.word` matters here. */
 export function productScores(
   queries: readonly (string | undefined)[],
@@ -185,11 +204,57 @@ export function matchProduct(
   catalog: CatalogView,
   t: MatchThresholds = MATCH_THRESHOLDS,
 ): ProductMatch {
-  const result = decide(productScores(queries, catalog, t), t);
+  return decideProduct(productScores(queries, catalog, t), queries, catalog, t);
+}
+
+/**
+ * `decide` over product scores, except that a clear winner is only offered
+ * alongside any product whose own word the customer also wrote: "not katan,
+ * jamdani" names the Katan Saree in full, but "jamdani" is the Jamdani's.
+ */
+export function decideProduct(
+  scored: { id: string; score: number }[],
+  queries: readonly (string | undefined)[],
+  catalog: CatalogView,
+  t: MatchThresholds,
+): ProductMatch {
+  const result = decide(scored, t);
   if (result === null) return { kind: 'none' };
-  return typeof result === 'string'
-    ? { kind: 'one', productId: result }
-    : { kind: 'some', productIds: result };
+  if (typeof result !== 'string') return { kind: 'some', productIds: result };
+  const rivals = namedRivals(queries, catalog, result);
+  if (rivals.length === 0) return { kind: 'one', productId: result };
+  const score = new Map(scored.map((entry) => [entry.id, entry.score]));
+  rivals.sort((a, b) => (score.get(b) ?? 0) - (score.get(a) ?? 0));
+  return { kind: 'some', productIds: [result, ...rivals].slice(0, MAX_CANDIDATES) };
+}
+
+const ownWords = (product: Product) => new Set([product.name, ...product.aliases].flatMap(wordsOf));
+
+/**
+ * Other products owning a word of the customer's that the winner's name and
+ * aliases lack, in every script they wrote: a transliteration can land on
+ * another product's spelling ("shari" is only the Jamdani's alias).
+ */
+function namedRivals(
+  queries: readonly (string | undefined)[],
+  catalog: CatalogView,
+  winnerId: string,
+): string[] {
+  const mine = ownWords(catalog.products.find((product) => product.id === winnerId)!);
+  const others = catalog.products
+    .filter((product) => product.id !== winnerId)
+    .map((product) => ({ id: product.id, words: ownWords(product) }));
+  const perForm = forms(queries).map(
+    (words) =>
+      new Set(
+        others
+          .filter((other) => words.some((word) => !mine.has(word) && other.words.has(word)))
+          .map((other) => other.id),
+      ),
+  );
+  return others
+    .map((other) => other.id)
+    .filter((id) => perForm.length > 0 && perForm.every((named) => named.has(id)));
 }
 
 /** A variant's option values ("40", "White"), or its own name's parts when it has none. */

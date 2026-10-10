@@ -76,7 +76,7 @@ describe('mergeItems', () => {
       variantId: SAREE_RED,
       variantQuery: 'red',
     };
-    const stillNames = (id: string, queries: string[]) =>
+    const stillNames = (id: string, _variantId: string | undefined, queries: string[]) =>
       id === SAREE && queries.includes('Red Silk Saree');
     const { items, origins } = mergeItems(
       [saree],

@@ -59,6 +59,20 @@ describe('matchProduct', () => {
     expect(match.kind === 'some' && match.productIds).toHaveLength(3);
   });
 
+  it('offers the winner beside a product whose own word the customer also wrote', () => {
+    expect(matchProduct(['not katan, jamdani'], EVAL_CATALOG)).toEqual({
+      kind: 'some',
+      productIds: [id('katan'), id('jamdani')],
+    });
+  });
+
+  it('keeps a clear winner when only one script lands on another product word', () => {
+    expect(matchProduct(['কাতান শাড়ি', 'katan shari'], EVAL_CATALOG)).toEqual({
+      kind: 'one',
+      productId: id('katan'),
+    });
+  });
+
   it('finds nothing for what the shop does not sell, or for no words', () => {
     expect(matchProduct(['iphone 15', 'আইফোন ১৫'], EVAL_CATALOG)).toEqual({ kind: 'none' });
     expect(matchProduct([undefined, '  '], EVAL_CATALOG)).toEqual({ kind: 'none' });

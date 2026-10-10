@@ -17,7 +17,7 @@ import {
   type DeliveryView,
   type TurnInput,
 } from '../conversation-machine';
-import { EVAL_CATALOG, productByKey } from './fixtures/match-eval';
+import { EVAL_CATALOG, EVAL_PRODUCTS, productByKey } from './fixtures/match-eval';
 
 const intents = customerIntentSchema.options;
 const activeStates: ActiveState[] = [
@@ -546,6 +546,87 @@ describe('decideTurn: several items', () => {
     expect(decision.slots.items).toEqual([
       { productQuery: 'jamdani saree', productId: jamdani.id },
     ]);
+  });
+
+  describe('new words on a picked item', () => {
+    const katan = productByKey('katan');
+    const picked = (product: Product, query: string) => {
+      const variant = product.variants[0]!;
+      return slots({
+        items: [
+          {
+            productQuery: query,
+            productId: product.id,
+            ...(variant.name === null ? {} : { variantQuery: variant.name }),
+            variantId: variant.id,
+            quantity: 1,
+          },
+        ],
+      });
+    };
+    const after = (current: CollectedSlots, productQuery: string) =>
+      decideTurn(
+        turn({
+          state: 'collecting_details',
+          slots: current,
+          trigger: message(
+            { ...nothing, items: [said({ ref: 0, productQuery })] },
+            asked('edit_order'),
+          ),
+        }),
+      ).slots.items[0]!;
+
+    it.each([
+      'not katan, jamdani',
+      'jamdani instead of katan',
+      'Jamdani Saree instead of Katan Silk Saree',
+    ])('lets go of the Katan Saree for %s', (words) => {
+      expect(after(picked(katan, 'katan'), words).productId).not.toBe(katan.id);
+    });
+
+    it('lets go of the lungi for a check shirt', () => {
+      expect(after(picked(lungi, 'lungi'), 'check shirt').productId).not.toBe(lungi.id);
+    });
+
+    it.each(['saree', 'red saree', 'Katan Silk Saree'])('keeps the Katan Saree for %s', (words) => {
+      const item = after(picked(katan, 'katan'), words);
+      expect(item).toEqual(
+        expect.objectContaining({ productId: katan.id, variantId: variantOf(katan, 'Red').id }),
+      );
+    });
+
+    it('keeps the Katan Saree when only one script of the words is its own', () => {
+      const item = decideTurn(
+        turn({
+          state: 'collecting_details',
+          slots: picked(katan, 'katan'),
+          trigger: message(
+            {
+              ...nothing,
+              items: [said({ ref: 0, productQuery: 'red saree', productQueryAlt: 'রেড শাড়ি' })],
+            },
+            asked('edit_order'),
+          ),
+        }),
+      ).slots.items[0]!;
+      expect(item).toEqual(expect.objectContaining({ productId: katan.id }));
+    });
+
+    it('never keeps A when the customer asks for B instead, over every pair of products', () => {
+      const kept: string[] = [];
+      for (const a of EVAL_PRODUCTS) {
+        for (const b of EVAL_PRODUCTS) {
+          if (a === b) continue;
+          for (const words of [
+            `not the ${a.name}, the ${b.name}`,
+            `${b.name} instead of ${a.name}`,
+          ]) {
+            if (after(picked(a, a.name), words).productId === a.id) kept.push(`${a.key}: ${words}`);
+          }
+        }
+      }
+      expect(kept).toEqual([]);
+    });
   });
 
   it('removes the item the customer dropped', () => {

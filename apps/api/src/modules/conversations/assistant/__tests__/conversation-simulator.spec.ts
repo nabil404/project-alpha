@@ -18,7 +18,7 @@ import { ConversationSimulator, type Step } from './simulator/conversation-simul
 const SHOP = {
   products: [
     { name: 'Jamdani Saree', colors: ['Red', 'Green'], price: 380_000 },
-    { name: 'Katan Saree', colors: ['Red', 'Maroon'], price: 450_000 },
+    { name: 'Katan Saree', aliases: ['katan'], colors: ['Red', 'Maroon'], price: 450_000 },
     { name: 'Kurti', colors: ['Blue', 'Black'], price: 120_000 },
   ],
   areas: [
@@ -134,6 +134,36 @@ describeDb('conversation simulator', () => {
       expect(new Set(sim.drafted).size).toBe(1);
     } finally {
       sim.print('golden path: two items, a pick, details, Confirm twice');
+    }
+  }, 60_000);
+
+  it('switches a picked Katan Saree to the Jamdani for "not katan, jamdani"', async () => {
+    const sim = await ConversationSimulator.open(t, runtime.db, SHOP);
+    try {
+      for (const step of TO_THE_CARD) await sim.step(step);
+
+      let switched = await sim.step({
+        say: 'not katan, jamdani',
+        llm: {
+          intent: 'edit_order',
+          items: [{ ref: 0, productQuery: 'not katan, jamdani', variantQuery: 'red' }, { ref: 1 }],
+        },
+      });
+      const offered = switched.sends.at(-1);
+      if (offered?.kind === 'quick_replies') {
+        expect(offered.options.map((option) => option.title)).toContain('Jamdani Saree');
+        switched = await sim.step({ quickReply: 'Jamdani Saree' });
+      }
+
+      const card = switched.sends.find((sent) => sent.kind === 'card');
+      expect(switched.state).toBe('awaiting_confirmation');
+      expect(card?.text).toContain('Jamdani Saree');
+      expect(card?.text).not.toContain('Katan Saree');
+      expect(switched.slots.items[0]).toMatchObject({
+        variantId: sim.variantId('Jamdani Saree / Red'),
+      });
+    } finally {
+      sim.print('switch after the card: "not katan, jamdani"');
     }
   }, 60_000);
 
