@@ -5,6 +5,12 @@ import {
   emptySlots,
   type CollectedSlots,
 } from '@app/shared';
+import { ProductsService } from '../../products/products.service';
+import {
+  DeliveryChargesRepository,
+  type DeliveryChargeRow,
+} from '../../settings/delivery-charges.repository';
+import { defaultMerchantSettings } from '../../settings/general-settings.service';
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
 import { withMerchant } from '../../database/with-merchant';
@@ -26,11 +32,13 @@ import { MessageRepository } from '../message.repository';
 import { OutboundMessageSender } from '../outbound-message.sender';
 import { fallbackText, languageFor, type ReplyLanguage } from './assistant-fallbacks';
 import { toChatLines } from './assistant-history';
+import type { CatalogView } from './catalog-match';
 import {
   decideTurn,
   isActiveState,
   shouldExtract,
-  type ActiveState,
+  type DeliveryView,
+  type TurnInput,
   type TurnDecision,
 } from './conversation-machine';
 import { LlmCallRepository } from './llm-call.repository';
@@ -62,6 +70,8 @@ export class AssistantTurnService {
     private readonly messages: MessageRepository,
     private readonly pages: FacebookPageRepository,
     private readonly settings: MerchantSettingsRepository,
+    private readonly deliveryCharges: DeliveryChargesRepository,
+    private readonly products: ProductsService,
     private readonly llmCalls: LlmCallRepository,
     @Inject(LLM) private readonly llm: LlmClient | null,
     private readonly outbound: OutboundMessageSender,
@@ -79,11 +89,16 @@ export class AssistantTurnService {
     const read = await withMerchant(this.db, merchantId, async (tx) => {
       const found = await this.conversations.findById(tx, scope, conversationId);
       if (!found) return null;
+      const settings = (await this.settings.find(tx, scope)) ?? {
+        ...defaultMerchantSettings(),
+        country: DEFAULT_COUNTRY,
+      };
       return {
         ...found,
         recent: await this.messages.listPage(tx, scope, conversationId, { limit: HISTORY_LIMIT }),
         page: await this.pages.findForMerchant(tx, scope),
-        country: (await this.settings.find(tx, scope))?.country ?? DEFAULT_COUNTRY,
+        country: settings.country,
+        delivery: deliveryView(await this.deliveryCharges.list(tx, scope), settings),
       };
     });
     if (!read) return 'stale';
@@ -98,14 +113,20 @@ export class AssistantTurnService {
     if (!page || page.pageId !== read.conversation.facebookPageId) return 'no_page';
 
     // 2. Think, with no transaction open.
+    const catalog = await this.products.findSellableCatalog(merchantId);
     const calls: LlmCallRecord[] = [];
     const history = toChatLines(read.recent);
     const language = languageFor(read.country);
     const decision = await this.decide(
-      state,
-      readSlots(read.conversation.collectedSlots),
+      {
+        state,
+        slots: readSlots(read.conversation.collectedSlots),
+        country: read.country,
+        language,
+        catalog,
+        delivery: read.delivery,
+      },
       history,
-      read.country,
       calls,
     );
     const text = await this.words(decision.reply, history, language, calls);
@@ -213,24 +234,32 @@ export class AssistantTurnService {
   }
 
   private async decide(
-    state: ActiveState,
-    slots: CollectedSlots,
+    turn: Omit<TurnInput, 'trigger'>,
     history: ChatLine[],
-    country: string,
     calls: LlmCallRecord[],
   ): Promise<TurnDecision> {
     const llm = this.llm;
-    if (!llm)
-      return decideTurn({ state, slots, classified: 'failed', extracted: 'skipped', country });
+    if (!llm) {
+      return decideTurn({
+        ...turn,
+        trigger: { kind: 'message', classified: 'failed', extracted: 'skipped' },
+      });
+    }
     const classified = record(await llm.classifyIntent(history), calls);
     const extracted =
-      classified !== 'failed' && shouldExtract(state, classified.intent)
-        ? record(await llm.extractOrder(history, extractionContext(slots)), calls)
+      classified !== 'failed' && shouldExtract(turn.state, classified.intent)
+        ? record(
+            await llm.extractOrder(history, extractionContext(turn.slots, turn.catalog)),
+            calls,
+          )
         : 'skipped';
-    return decideTurn({ state, slots, classified, extracted, country });
+    return decideTurn({ ...turn, trigger: { kind: 'message', classified, extracted } });
   }
 
-  /** The phrased reply if it passes checkReply; otherwise, and always for a hand-off, the fixed sentence. */
+  /**
+   * The phrased reply if it passes checkReply; otherwise the fixed sentence.
+   * A hand-off and the summary are never phrased.
+   */
   private async words(
     reply: ReplyIntent,
     history: ChatLine[],
@@ -238,7 +267,7 @@ export class AssistantTurnService {
     calls: LlmCallRecord[],
   ): Promise<string> {
     const fallback = fallbackText(reply, language);
-    if (reply.kind === 'handoff' || !this.llm) return fallback;
+    if (reply.kind !== 'ask_slot' || !this.llm) return fallback;
     const phrased = record(
       await this.llm.phraseReply(phraseRequestFor(reply, language), history.slice(-PHRASE_HISTORY)),
       calls,
@@ -252,16 +281,42 @@ function record<T>(result: LlmResult<T>, calls: LlmCallRecord[]): T | 'failed' {
   return result.ok ? result.value : 'failed';
 }
 
-function extractionContext(slots: CollectedSlots): ExtractionContext {
+/** The collected items as extraction sees them: the catalog's names once matched, else the customer's words. */
+export function extractionContext(slots: CollectedSlots, catalog: CatalogView): ExtractionContext {
   return {
-    items: slots.items.map((item, ref) => ({
-      ref,
-      product: item.productQuery ?? '',
-      ...(item.quantity === undefined ? {} : { quantity: item.quantity }),
-    })),
+    items: slots.items.map((item, ref) => {
+      const product = catalog.products.find((entry) => entry.id === item.productId);
+      const variant = product?.variants.find((entry) => entry.id === item.variantId);
+      const variantName = variant?.name ?? item.variantQuery;
+      return {
+        ref,
+        product: product?.name ?? item.productQuery ?? '',
+        ...(variantName ? { variant: variantName } : {}),
+        ...(item.quantity === undefined ? {} : { quantity: item.quantity }),
+      };
+    }),
     ...(slots.customerName === undefined ? {} : { customerName: slots.customerName }),
     ...(slots.phone === undefined ? {} : { phone: slots.phone }),
     ...(slots.deliveryAddress === undefined ? {} : { deliveryAddress: slots.deliveryAddress }),
+  };
+}
+
+/** The shop's delivery rows and threshold, as the quote reads them. */
+function deliveryView(
+  rows: DeliveryChargeRow[],
+  settings: { currency: string; freeDeliveryOver?: number | null },
+): DeliveryView {
+  const area = (row: DeliveryChargeRow) => ({
+    id: row.id,
+    areaName: row.areaName,
+    charge: row.charge,
+  });
+  const fallback = rows.find((row) => row.isFallback);
+  return {
+    areas: rows.filter((row) => !row.isFallback).map(area),
+    fallback: fallback ? area(fallback) : null,
+    freeDeliveryOver: settings.freeDeliveryOver ?? null,
+    currency: settings.currency,
   };
 }
 

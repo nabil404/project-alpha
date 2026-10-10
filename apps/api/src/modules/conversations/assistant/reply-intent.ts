@@ -23,6 +23,8 @@ export interface ReplyFacts {
   /** E.164. */
   phone?: string;
   deliveryAddress?: string;
+  /** A product or variant just found out of stock, by name. */
+  unavailable?: string;
   areaName?: string;
   deliveryFee?: string;
   subtotal?: string;
