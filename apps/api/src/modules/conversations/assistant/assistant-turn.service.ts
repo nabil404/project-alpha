@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { collectedSlotsSchema, parsePayload, emptySlots, type CollectedSlots } from '@app/shared';
+import { parsePayload, type AssistantPayload, type CollectedSlots } from '@app/shared';
 import { ProductsService } from '../../products/products.service';
 import {
   DeliveryChargesRepository,
@@ -32,6 +32,7 @@ import type { CatalogView } from './catalog-match';
 import {
   decideTurn,
   isActiveState,
+  readSlots,
   shouldExtract,
   validPick,
   type DeliveryView,
@@ -42,6 +43,7 @@ import {
 import { LlmCallRepository } from './llm-call.repository';
 import { checkReply } from './reply-check';
 import type { ReplyIntent } from './reply-intent';
+import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmation.service';
 import { outgoingFor } from './outgoing';
 import { phraseRequestFor } from './reply-phrasing';
 import { turnGate, type TurnGate } from './turn-gate';
@@ -51,7 +53,13 @@ const HISTORY_LIMIT = 20;
 const PHRASE_HISTORY = 6;
 
 export type TurnOutcome =
-  'replied' | 'handed_off' | 'send_failed' | 'window_closed' | 'no_page' | Exclude<TurnGate, 'go'>;
+  | 'replied'
+  | 'handed_off'
+  | 'send_failed'
+  | 'window_closed'
+  | 'no_page'
+  | Exclude<TurnGate, 'go'>
+  | ConfirmOutcome;
 
 /**
  * One assistant turn, in the order invariant #1 requires: read, call the LLM
@@ -75,6 +83,7 @@ export class AssistantTurnService {
     @Inject(LLM) private readonly llm: LlmClient | null,
     private readonly outbound: OutboundMessageSender,
     private readonly notifications: NotificationsService,
+    private readonly confirmation: OrderConfirmationService,
   ) {}
 
   async run({
@@ -98,6 +107,10 @@ export class AssistantTurnService {
       };
     });
     if (!read) return 'stale';
+    const tap = tapIn(read.recent, triggerMessageId);
+    if (tap?.kind === 'confirm' || tap?.kind === 'change') {
+      return this.confirmation.run({ merchantId, conversationId, triggerMessageId }, tap);
+    }
     const gate = turnGate(read.conversation, read.recent, triggerMessageId);
     if (gate === 'closed' || gate === 'answered') {
       return (await this.resume(scope, conversationId, read, triggerMessageId, gate)) ?? gate;
@@ -313,9 +326,14 @@ function pickIn(
   triggerMessageId: string,
   slots: CollectedSlots,
 ): ItemPick | null {
-  const payload = recent.find((message) => message.id === triggerMessageId)?.payload;
-  const tap = payload ? parsePayload(payload) : null;
+  const tap = tapIn(recent, triggerMessageId);
   return tap?.kind === 'pick' ? validPick(slots, tap) : null;
+}
+
+/** What the trigger's button or quick reply carried, when it was ours. */
+function tapIn(recent: MessageRow[], triggerMessageId: string): AssistantPayload | null {
+  const payload = recent.find((message) => message.id === triggerMessageId)?.payload;
+  return payload ? parsePayload(payload) : null;
 }
 
 function record<T>(result: LlmResult<T>, calls: LlmCallRecord[]): T | 'failed' {
@@ -360,10 +378,4 @@ function deliveryView(
     freeDeliveryOver: settings.freeDeliveryOver ?? null,
     currency: settings.currency,
   };
-}
-
-/** Slots written by an older shape, or by hand, read as nothing collected rather than failing the turn. */
-function readSlots(value: unknown): CollectedSlots {
-  const parsed = collectedSlotsSchema.safeParse(value);
-  return parsed.success ? parsed.data : emptySlots();
 }

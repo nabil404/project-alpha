@@ -1,5 +1,7 @@
 import {
+  collectedSlotsSchema,
   deliveryFeeFor,
+  emptySlots,
   formatMinorUnits,
   hasCollectedAnything,
   MAX_QUICK_REPLIES,
@@ -112,6 +114,12 @@ export function validPick(
 }
 
 export const LOCALES: Record<ReplyLanguage, string> = { bn: 'bn-BD', en: 'en-US' };
+
+/** Slots written by an older shape, or by hand, read as nothing collected rather than failing the turn. */
+export function readSlots(value: unknown): CollectedSlots {
+  const parsed = collectedSlotsSchema.safeParse(value);
+  return parsed.success ? parsed.data : emptySlots();
+}
 
 /**
  * One turn, decided by code: hand-off rules, then the tap or the extraction

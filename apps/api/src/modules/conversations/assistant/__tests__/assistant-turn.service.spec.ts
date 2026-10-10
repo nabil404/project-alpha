@@ -38,6 +38,7 @@ import { OutboundMessageSender } from '../../outbound-message.sender';
 import { fallbackText } from '../assistant-fallbacks';
 import { AssistantTurnService } from '../assistant-turn.service';
 import { LlmCallRepository } from '../llm-call.repository';
+import type { CardTap, OrderConfirmationService } from '../order-confirmation.service';
 
 const crypto = new CryptoService({
   get: () => Buffer.alloc(32, 7).toString('base64'),
@@ -105,6 +106,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
   let graphFails: boolean;
   let notifyFailures: number;
   let handoffs: { merchantId: string; conversationId: string; at: Date }[];
+  let cardTaps: CardTap[];
 
   const send = (
     kind: (typeof rich)[number]['kind'],
@@ -155,6 +157,12 @@ describeDb('AssistantTurnService (app_runtime)', () => {
           handoffs.push({ merchantId, conversationId, at });
         },
       } as unknown as NotificationsService,
+      {
+        run: async (_job: unknown, tap: CardTap) => {
+          cardTaps.push(tap);
+          return 'ordered';
+        },
+      } as unknown as OrderConfirmationService,
     );
   };
 
@@ -207,6 +215,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     llm = new FakeLlm();
     sent = [];
     rich = [];
+    cardTaps = [];
     graphFails = false;
     handoffs = [];
     notifyFailures = 0;
@@ -540,6 +549,20 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     expect(reply?.sentAt.getTime()).toBeGreaterThan(trigger.sentAt.getTime());
     await expect(service().run(job)).resolves.toBe('answered');
     expect(sent).toHaveLength(1);
+  });
+
+  it('hands a Confirm or Change tap to the Confirm path with no LLM call, even once confirmed', async () => {
+    const { convo, job } = await thread(t.merchantA, { state: 'confirmed' });
+    const tap = await seedMessage(t.db, t.merchantA, convo.id, {
+      sentAt: new Date(),
+      text: 'Confirm',
+      payload: `confirm:${convo.id}:3`,
+    });
+
+    await expect(service().run({ ...job, triggerMessageId: tap.id })).resolves.toBe('ordered');
+
+    expect(cardTaps).toEqual([{ kind: 'confirm', conversationId: convo.id, revision: 3 }]);
+    expect(llm.calls).toEqual([]);
   });
 
   describe('with a catalog', () => {

@@ -53,6 +53,12 @@ export interface OrderActor {
   id: string;
 }
 
+/** Who an order comes from: a seller by hand, or the assistant from a conversation. */
+export type OrderOrigin =
+  { source: 'seller'; conversationId: null } | { source: 'assistant'; conversationId: string };
+
+const SELLER_ORIGIN: OrderOrigin = { source: 'seller', conversationId: null };
+
 const required = (message: string): FieldError[] => [{ code: 'REQUIRED', message, params: {} }];
 
 @Injectable()
@@ -116,69 +122,86 @@ export class OrdersService {
    * as with one the assistant drafts. With an idempotency key, a repeat of the
    * same request returns the order the first one created.
    */
-  create(
+  async create(
     scope: TenantScope,
     actor: OrderActor,
     input: CreateOrder,
     idempotencyKey?: string,
   ): Promise<OrderDetail> {
-    return withMerchant(this.db, scope.merchantId, async (tx) => {
-      // The shop's settings row lock serializes order creation: it guards the
-      // next number, the idempotency check, and the currency, which a settings
-      // save may change only while the shop has no orders.
-      const settings = await this.settings.lockOrCreate(tx, scope, defaultMerchantSettings());
-      if (idempotencyKey) {
-        const replay = await this.orders.findByIdempotencyKey(tx, scope, idempotencyKey);
-        if (replay) return this.detail(tx, scope, replay);
-      }
+    const { order } = await withMerchant(this.db, scope.merchantId, (tx) =>
+      this.createInTransaction(tx, scope, actor.id, input, idempotencyKey, SELLER_ORIGIN),
+    );
+    return order;
+  }
 
-      const customer = await this.orders.findCustomer(tx, scope, input.customerId);
-      if (!customer) throw customerNotFound(input.customerId);
-      const customerName = input.customerName ?? customer.name;
-      const phone = input.phone ?? customer.phone;
-      const deliveryAddress = input.deliveryAddress ?? customer.deliveryAddress;
-      const missing: Record<string, FieldError[]> = {};
-      if (!customerName) missing.customerName = required('The customer has no name on file');
-      if (!phone) missing.phone = required('The customer has no phone on file');
-      if (!deliveryAddress)
-        missing.deliveryAddress = required('The customer has no address on file');
-      if (!customerName || !phone || !deliveryAddress) throw new CodedValidationException(missing);
+  /**
+   * The body of `create`, inside the caller's transaction: the assistant's
+   * Confirm creates its order under the conversation lock it already holds.
+   * `actorId` is null for the assistant. `created` is false when the key
+   * found the order an earlier call made.
+   */
+  async createInTransaction(
+    tx: Executor,
+    scope: TenantScope,
+    actorId: string | null,
+    input: CreateOrder,
+    idempotencyKey: string | undefined,
+    origin: OrderOrigin,
+  ): Promise<{ order: OrderDetail; created: boolean }> {
+    // The shop's settings row lock serializes order creation: it guards the
+    // next number, the idempotency check, and the currency, which a settings
+    // save may change only while the shop has no orders.
+    const settings = await this.settings.lockOrCreate(tx, scope, defaultMerchantSettings());
+    if (idempotencyKey) {
+      const replay = await this.orders.findByIdempotencyKey(tx, scope, idempotencyKey);
+      if (replay) return { order: await this.detail(tx, scope, replay), created: false };
+    }
 
-      const variants = await this.catalog.findVariants(
-        tx,
-        scope,
-        input.items.map((item) => item.variantId),
-      );
-      const lines = buildLines(input.items, [], variants);
-      const subtotal = subtotalOf(lines);
-      const placedAt = new Date();
-      const row = await this.orders.insert(tx, scope, {
-        ...(await this.numberFor(tx, scope, placedAt, settings.timeZone)),
-        customerId: customer.id,
-        conversationId: null,
-        source: 'seller',
-        status: 'new',
-        paymentMethod: input.paymentMethod,
-        subtotal,
-        deliveryFee: input.deliveryFee,
-        total: subtotal + input.deliveryFee,
-        currency: settings.currency,
-        customerName,
-        phone,
-        deliveryAddress,
-        ...(input.deliveryChargeId !== undefined
-          ? await this.deliveryColumns(tx, scope, input.deliveryChargeId, input.deliveryArea)
-          : { deliveryArea: input.deliveryArea ?? null }),
-        notes: input.note ?? null,
-        idempotencyKey: idempotencyKey ?? null,
-        placedAt,
-      });
-      await this.orders.replaceItems(tx, scope, row.id, lines);
-      await this.events.insert(tx, scope, row.id, actor.id, [
-        { type: 'created', source: 'seller' },
-      ]);
-      return this.detail(tx, scope, row);
+    const customer = await this.orders.findCustomer(tx, scope, input.customerId);
+    if (!customer) throw customerNotFound(input.customerId);
+    const customerName = input.customerName ?? customer.name;
+    const phone = input.phone ?? customer.phone;
+    const deliveryAddress = input.deliveryAddress ?? customer.deliveryAddress;
+    const missing: Record<string, FieldError[]> = {};
+    if (!customerName) missing.customerName = required('The customer has no name on file');
+    if (!phone) missing.phone = required('The customer has no phone on file');
+    if (!deliveryAddress) missing.deliveryAddress = required('The customer has no address on file');
+    if (!customerName || !phone || !deliveryAddress) throw new CodedValidationException(missing);
+
+    const variants = await this.catalog.findVariants(
+      tx,
+      scope,
+      input.items.map((item) => item.variantId),
+    );
+    const lines = buildLines(input.items, [], variants);
+    const subtotal = subtotalOf(lines);
+    const placedAt = new Date();
+    const row = await this.orders.insert(tx, scope, {
+      ...(await this.numberFor(tx, scope, placedAt, settings.timeZone)),
+      customerId: customer.id,
+      conversationId: origin.conversationId,
+      source: origin.source,
+      status: 'new',
+      paymentMethod: input.paymentMethod,
+      subtotal,
+      deliveryFee: input.deliveryFee,
+      total: subtotal + input.deliveryFee,
+      currency: settings.currency,
+      customerName,
+      phone,
+      deliveryAddress,
+      ...(input.deliveryChargeId !== undefined
+        ? await this.deliveryColumns(tx, scope, input.deliveryChargeId, input.deliveryArea)
+        : { deliveryArea: input.deliveryArea ?? null }),
+      notes: input.note ?? null,
+      idempotencyKey: idempotencyKey ?? null,
+      placedAt,
     });
+    await this.orders.replaceItems(tx, scope, row.id, lines);
+    await this.events.insert(tx, scope, row.id, actorId, [
+      { type: 'created', source: origin.source },
+    ]);
+    return { order: await this.detail(tx, scope, row), created: true };
   }
 
   /**
