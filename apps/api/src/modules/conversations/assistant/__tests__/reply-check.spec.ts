@@ -40,11 +40,9 @@ describe('checkReply', () => {
 
   it('rejects a price one unit off the catalog, and passes the formatted price and total', () => {
     const priced: ReplyFacts = {
-      items: [
-        { productName: 'Red saree', quantity: 2, unitPrice: '৳1,600.00', lineTotal: '৳3,200.00' },
-      ],
-      deliveryFee: '৳60.00',
-      total: '৳3,260.00',
+      items: [{ productName: 'Red saree', quantity: 2, unitPrice: '৳1,600', lineTotal: '৳3,200' }],
+      deliveryFee: '৳60',
+      total: '৳3,260',
     };
     expect(checkReply('Red saree is ৳1,600 each, ৳3,260 in total with delivery.', priced)).toEqual({
       ok: true,
@@ -58,6 +56,14 @@ describe('checkReply', () => {
       ok: false,
       reason: 'number',
     });
+  });
+
+  it('holds a price with paisa to its paisa, as the card shows it', () => {
+    const priced: ReplyFacts = {
+      items: [{ productName: 'Red saree', quantity: 1, unitPrice: '১,৬০০.৫০৳' }],
+    };
+    expect(checkReply('রেড শাড়ি ১,৬০০.৫০৳।', priced)).toEqual({ ok: true });
+    expect(checkReply('রেড শাড়ি ১,৬০০৳।', priced)).toEqual({ ok: false, reason: 'number' });
   });
 
   it('rejects links', () => {

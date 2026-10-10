@@ -6,7 +6,7 @@ const line = (n: number): LineFacts => ({
   productName: `Jamdani Saree ${n}`,
   variantName: 'Red',
   quantity: 2,
-  lineTotal: '৳2,200.00',
+  lineTotal: '৳2,200',
 });
 const facts = (items: LineFacts[]): ReplyFacts => ({
   items,
@@ -14,9 +14,9 @@ const facts = (items: LineFacts[]): ReplyFacts => ({
   phone: '+8801812000000',
   deliveryAddress: 'House 12, Road 5, Dhanmondi, Dhaka',
   areaName: 'Dhaka',
-  subtotal: '৳4,400.00',
-  deliveryFee: '৳60.00',
-  total: '৳4,460.00',
+  subtotal: '৳4,400',
+  deliveryFee: '৳60',
+  total: '৳4,460',
 });
 const length = (text: string) => Array.from(text).length;
 
@@ -27,12 +27,12 @@ describe('summaryMessages', () => {
     expect(card).toBe(
       [
         'Your order:',
-        '2 × Jamdani Saree 1, Red  ৳2,200.00',
-        '2 × Jamdani Saree 2, Red  ৳2,200.00',
+        '2 × Jamdani Saree 1, Red  ৳2,200',
+        '2 × Jamdani Saree 2, Red  ৳2,200',
         '',
-        'Subtotal: ৳4,400.00',
-        'Delivery (Dhaka): ৳60.00',
-        'Total: ৳4,460.00',
+        'Subtotal: ৳4,400',
+        'Delivery (Dhaka): ৳60',
+        'Total: ৳4,460',
         '',
         'Name: Rahim',
         'Phone: +880 1812 000000',
@@ -46,8 +46,8 @@ describe('summaryMessages', () => {
 
   it('has the same parts in Bangla', () => {
     const { card, buttons } = summaryMessages(facts([line(1)]), 'bn');
-    expect(card).toContain('ডেলিভারি চার্জ (Dhaka): ৳60.00');
-    expect(card).toContain('সর্বমোট: ৳4,460.00');
+    expect(card).toContain('ডেলিভারি চার্জ (Dhaka): ৳60');
+    expect(card).toContain('সর্বমোট: ৳4,460');
     expect(buttons.confirm).toBe('নিশ্চিত করুন');
   });
 

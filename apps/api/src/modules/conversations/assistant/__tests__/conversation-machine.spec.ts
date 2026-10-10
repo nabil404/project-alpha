@@ -244,7 +244,7 @@ describe('decideTurn: products and variants', () => {
       slot: 'quantity',
       item: 0,
       facts: {
-        items: [{ productName: 'Check Lungi', unitPrice: expect.stringContaining('1,600') }],
+        items: [{ productName: 'Check Lungi', unitPrice: 'BDT\u00a01,600' }],
       },
     });
   });
@@ -754,7 +754,12 @@ describe('decideTurn: the summary', () => {
     expect(decision.reply).toMatchObject({
       kind: 'summary',
       quote,
-      facts: { areaName: 'Dhaka', total: expect.stringContaining('5,360') },
+      facts: {
+        areaName: 'Dhaka',
+        subtotal: 'BDT\u00a05,300',
+        deliveryFee: 'BDT\u00a060',
+        total: 'BDT\u00a05,360',
+      },
     });
   });
 
