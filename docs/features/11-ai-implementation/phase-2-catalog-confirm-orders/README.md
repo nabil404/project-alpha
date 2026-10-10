@@ -294,6 +294,11 @@ covered in `messenger/__tests__/webhook-payload.spec.ts` and
 - A tap on a Confirm more than seven days after its order was made queues
   `orderDrafted` again once the first job has aged out, and emails the seller
   a second time.
+- No `conversations.service` spec covers the inbox echo that pauses the
+  assistant before a hand-back retires the card.
+- A Confirm retry redelivers a reference left `sending`. If BullMQ reruns a
+  stalled job whose first worker is slow rather than dead, the customer can
+  get the reference twice.
 - A deleted delivery area under a shown card sends the stale sentence and
   re-matches on the next message; it could send a fresh card at once.
 - Showing the product photo in the dashboard thread.
