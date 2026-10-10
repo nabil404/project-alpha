@@ -1,10 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  collectedSlotsSchema,
-  DEFAULT_COUNTRY,
-  emptySlots,
-  type CollectedSlots,
-} from '@app/shared';
+import { collectedSlotsSchema, parsePayload, emptySlots, type CollectedSlots } from '@app/shared';
 import { ProductsService } from '../../products/products.service';
 import {
   DeliveryChargesRepository,
@@ -29,7 +24,8 @@ import { MerchantSettingsRepository } from '../../settings/merchant-settings.rep
 import { ConversationRepository } from '../conversation.repository';
 import { isReplyWindowOpen } from '../conversation-rules';
 import { MessageRepository } from '../message.repository';
-import { OutboundMessageSender } from '../outbound-message.sender';
+import { OutboundMessageSender, type OutboundContent } from '../outbound-message.sender';
+import type { MessageRow } from '../../database/schema/index';
 import { fallbackText, languageFor, type ReplyLanguage } from './assistant-fallbacks';
 import { toChatLines } from './assistant-history';
 import type { CatalogView } from './catalog-match';
@@ -37,13 +33,16 @@ import {
   decideTurn,
   isActiveState,
   shouldExtract,
+  validPick,
   type DeliveryView,
+  type ItemPick,
   type TurnInput,
   type TurnDecision,
 } from './conversation-machine';
 import { LlmCallRepository } from './llm-call.repository';
 import { checkReply } from './reply-check';
 import type { ReplyIntent } from './reply-intent';
+import { outgoingFor } from './outgoing';
 import { phraseRequestFor } from './reply-phrasing';
 import { turnGate, type TurnGate } from './turn-gate';
 
@@ -89,10 +88,7 @@ export class AssistantTurnService {
     const read = await withMerchant(this.db, merchantId, async (tx) => {
       const found = await this.conversations.findById(tx, scope, conversationId);
       if (!found) return null;
-      const settings = (await this.settings.find(tx, scope)) ?? {
-        ...defaultMerchantSettings(),
-        country: DEFAULT_COUNTRY,
-      };
+      const settings = (await this.settings.find(tx, scope)) ?? defaultMerchantSettings();
       return {
         ...found,
         recent: await this.messages.listPage(tx, scope, conversationId, { limit: HISTORY_LIMIT }),
@@ -112,24 +108,27 @@ export class AssistantTurnService {
     const page = read.page;
     if (!page || page.pageId !== read.conversation.facebookPageId) return 'no_page';
 
-    // 2. Think, with no transaction open.
+    // 2. Think, with no transaction open. A tapped candidate needs no LLM.
     const catalog = await this.products.findSellableCatalog(merchantId);
     const calls: LlmCallRecord[] = [];
     const history = toChatLines(read.recent);
     const language = languageFor(read.country);
-    const decision = await this.decide(
-      {
-        state,
-        slots: readSlots(read.conversation.collectedSlots),
-        country: read.country,
-        language,
-        catalog,
-        delivery: read.delivery,
-      },
-      history,
-      calls,
-    );
-    const text = await this.words(decision.reply, history, language, calls);
+    const turn = {
+      state,
+      slots: readSlots(read.conversation.collectedSlots),
+      country: read.country,
+      language,
+      catalog,
+      delivery: read.delivery,
+    };
+    const pick = pickIn(read.recent, triggerMessageId, turn.slots);
+    const decision = pick
+      ? decideTurn({ ...turn, trigger: { kind: 'pick', pick } })
+      : await this.decide(turn, history, calls);
+    const text = pick
+      ? fallbackText(decision.reply, language)
+      : await this.words(decision.reply, history, language, calls);
+    const outgoing = outgoingFor(decision.reply, text, { language, conversationId });
 
     // 3. Re-check under the lock and write.
     const staged = await withMerchant(this.db, merchantId, async (tx) => {
@@ -154,25 +153,57 @@ export class AssistantTurnService {
         ...(handedOffAt ? { handedOffAt } : {}),
       });
       if (!updated) return { outcome: 'stale' as const };
-      const row = await this.outbound.stage(tx, scope, updated, { sender: 'assistant', text, now });
-      return { outcome: 'go' as const, row, psid: locked.customer.psid, handedOffAt, now };
+      const rows = [];
+      for (const [index, message] of outgoing.entries()) {
+        const sentAt = new Date(now.getTime() + index);
+        rows.push(
+          await this.outbound.stage(tx, scope, updated, {
+            sender: 'assistant',
+            text: message.text,
+            now: sentAt,
+          }),
+        );
+      }
+      return { outcome: 'go' as const, rows, psid: locked.customer.psid, handedOffAt, now };
     });
     if (staged.outcome !== 'go') return staged.outcome;
 
-    // 4. Send after commit.
-    const final = await this.outbound.deliver(scope, {
-      row: staged.row,
-      psid: staged.psid,
-      encryptedToken: page.accessToken,
-      content: { kind: 'text' },
-    });
+    // 4. Send after commit: the photo first, best effort, then each message in order.
+    if (decision.image && decision.reply.kind !== 'handoff') {
+      await this.outbound.deliverImage(staged.psid, page.accessToken, decision.image);
+    }
+    const delivered = await this.deliverInOrder(
+      scope,
+      staged.rows.map((row, index) => ({ row, content: outgoing[index]!.content })),
+      staged.psid,
+      page.accessToken,
+    );
     let handedOffAt = staged.handedOffAt;
-    if (final.status === 'failed' && !handedOffAt) {
+    if (!delivered && !handedOffAt) {
       handedOffAt = await this.handOffAfterFailedSend(scope, conversationId, staged.now);
     }
     if (handedOffAt) await this.notifications.handedOff(merchantId, conversationId, handedOffAt);
-    if (final.status === 'failed') return 'send_failed';
+    if (!delivered) return 'send_failed';
     return handedOffAt ? 'handed_off' : 'replied';
+  }
+
+  /** Sends each staged row in turn; after a refused one the rest are marked failed unsent. */
+  private async deliverInOrder(
+    scope: TenantScope,
+    messages: { row: MessageRow; content: OutboundContent }[],
+    psid: string,
+    encryptedToken: string,
+  ): Promise<boolean> {
+    let ok = true;
+    for (const { row, content } of messages) {
+      if (!ok) {
+        await this.outbound.abandon(scope, row);
+        continue;
+      }
+      const final = await this.outbound.deliver(scope, { row, psid, encryptedToken, content });
+      ok = final.status !== 'failed';
+    }
+    return ok;
   }
 
   /**
@@ -274,6 +305,17 @@ export class AssistantTurnService {
     );
     return phrased !== 'failed' && checkReply(phrased, reply.facts).ok ? phrased.trim() : fallback;
   }
+}
+
+/** The trigger's tap as a pick of an offered candidate, or null for anything else. */
+function pickIn(
+  recent: MessageRow[],
+  triggerMessageId: string,
+  slots: CollectedSlots,
+): ItemPick | null {
+  const payload = recent.find((message) => message.id === triggerMessageId)?.payload;
+  const tap = payload ? parsePayload(payload) : null;
+  return tap?.kind === 'pick' ? validPick(slots, tap) : null;
 }
 
 function record<T>(result: LlmResult<T>, calls: LlmCallRecord[]): T | 'failed' {

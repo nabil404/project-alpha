@@ -100,6 +100,19 @@ export class OutboundMessageSender {
     return final;
   }
 
+  /** After commit: a staged row that will not be sent, because one before it failed. */
+  async abandon(scope: TenantScope, row: MessageRow): Promise<MessageRow> {
+    const final = await withMerchant(this.db, scope.merchantId, (tx) =>
+      this.messages.markFailed(tx, scope, row.id),
+    );
+    await this.events.publish({
+      merchantId: scope.merchantId,
+      conversationId: row.conversationId,
+      kind: 'message',
+    });
+    return final;
+  }
+
   /**
    * A product photo before the turn's text. Best effort and unstored: the
    * text that follows carries the turn, and the echo is skipped as our own.

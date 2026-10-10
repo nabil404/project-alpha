@@ -8,6 +8,9 @@ import {
   describeDb,
   openCatalogTestDb,
   openRuntimeDb,
+  seedImage,
+  seedProduct,
+  seedVariant,
   type CatalogTestDb,
 } from '../../../database/__tests__/catalog-test-db';
 import {
@@ -18,7 +21,11 @@ import {
 } from '../../../database/__tests__/conversation-seeds';
 import type { LlmClient, LlmPurpose, LlmResult } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
-import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-graph.client';
+import {
+  GraphError,
+  type GraphOption,
+  type MetaGraphClient,
+} from '../../../messenger/page/meta-graph.client';
 import type { NotificationsService } from '../../../notifications/notifications.service';
 import { productsService } from '../../../products/__tests__/products-service.fixture';
 import { DeliveryChargesRepository } from '../../../settings/delivery-charges.repository';
@@ -90,16 +97,33 @@ describeDb('AssistantTurnService (app_runtime)', () => {
   let pageB: string;
   let llm: FakeLlm;
   let sent: { psid: string; text: string }[];
+  let rich: {
+    kind: 'image' | 'quick_replies' | 'card' | 'text';
+    text: string;
+    payloads: string[];
+  }[];
   let graphFails: boolean;
   let notifyFailures: number;
   let handoffs: { merchantId: string; conversationId: string; at: Date }[];
 
+  const send = (
+    kind: (typeof rich)[number]['kind'],
+    psid: string,
+    text: string,
+    options: GraphOption[] = [],
+  ) => {
+    if (graphFails) throw new GraphError(400, 10, 'outside window');
+    rich.push({ kind, text, payloads: options.map((option) => option.payload) });
+    if (kind !== 'image') sent.push({ psid, text });
+    return Promise.resolve({ messageId: `mid-turn-${nextMid++}` });
+  };
   const graph = {
-    sendText: async (_token: string, psid: string, text: string) => {
-      if (graphFails) throw new GraphError(400, 10, 'outside window');
-      sent.push({ psid, text });
-      return { messageId: `mid-turn-${nextMid++}` };
-    },
+    sendText: (_token: string, psid: string, text: string) => send('text', psid, text),
+    sendQuickReplies: (_token: string, psid: string, text: string, options: GraphOption[]) =>
+      send('quick_replies', psid, text, options),
+    sendButtonTemplate: (_token: string, psid: string, text: string, buttons: GraphOption[]) =>
+      send('card', psid, text, buttons),
+    sendImage: (_token: string, psid: string, url: string) => send('image', psid, url),
   } as unknown as MetaGraphClient;
 
   const service = (client: LlmClient | null = llm) => {
@@ -182,6 +206,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
   beforeEach(() => {
     llm = new FakeLlm();
     sent = [];
+    rich = [];
     graphFails = false;
     handoffs = [];
     notifyFailures = 0;
@@ -515,5 +540,122 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     expect(reply?.sentAt.getTime()).toBeGreaterThan(trigger.sentAt.getTime());
     await expect(service().run(job)).resolves.toBe('answered');
     expect(sent).toHaveLength(1);
+  });
+
+  describe('with a catalog', () => {
+    const item = (productQuery: string, quantity: number | null = null) => ({
+      ref: null,
+      productQuery,
+      productQueryAlt: null,
+      variantQuery: null,
+      variantQueryAlt: null,
+      quantity,
+    });
+    const product = async (name: string, price = 160_000) => {
+      const row = await seedProduct(t.db, t.merchantA, { name, status: 'active' });
+      const variant = await seedVariant(t.db, t.merchantA, row.id, {
+        name: null,
+        isDefault: true,
+        price,
+        stock: 5,
+      });
+      return { product: row, variant };
+    };
+    const tapped = async (convoId: string, payload: string) =>
+      seedMessage(t.db, t.merchantA, convoId, { sentAt: new Date(), text: 'tap', payload });
+
+    it("sends the matched product's cover before asking how many", async () => {
+      const { product: lungi } = await product('Turnservice Lungi');
+      const cover = await seedImage(t.db, t.merchantA, lungi.id);
+      await t.db
+        .update(schema.product)
+        .set({ coverImageId: cover.id })
+        .where(eq(schema.product.id, lungi.id));
+      llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
+      llm.extraction = ok({ ...NOTHING, items: [item('turnservice lungi')] }, 'extract');
+      const { convo, job } = await thread();
+
+      await expect(service().run(job)).resolves.toBe('replied');
+
+      expect(rich.map((entry) => entry.kind)).toEqual(['image', 'text']);
+      expect(rich[0]?.text).toMatch(/^https?:\/\//);
+      expect((await conversationRow(convo.id))?.collectedSlots).toMatchObject({
+        items: [{ productId: lungi.id }],
+        lastAsked: { slot: 'quantity', item: 0 },
+      });
+    });
+
+    it('offers close candidates as quick replies, and a tap fills the item with no LLM call', async () => {
+      const { product: red } = await product('Turnservice Saree Red');
+      const { product: blue } = await product('Turnservice Saree Blue');
+      llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
+      llm.extraction = ok({ ...NOTHING, items: [item('turnservice saree', 1)] }, 'extract');
+      const { convo, job } = await thread();
+
+      await service().run(job);
+
+      const offer = rich.find((entry) => entry.kind === 'quick_replies');
+      expect(offer?.payloads).toEqual(
+        expect.arrayContaining([`pick:product:${red.id}`, `pick:product:${blue.id}`]),
+      );
+
+      llm.calls = [];
+      const tap = await tapped(convo.id, `pick:product:${blue.id}`);
+      await expect(service().run({ ...job, triggerMessageId: tap.id })).resolves.toBe('replied');
+
+      expect(llm.calls).toEqual([]);
+      const slots = (await conversationRow(convo.id))?.collectedSlots;
+      expect(slots).toMatchObject({ items: [{ productId: blue.id, quantity: 1 }] });
+      expect(slots).not.toHaveProperty('offered');
+    });
+
+    it('reads a tap on a candidate that was never offered as an ordinary message', async () => {
+      const { product: other } = await product('Turnservice Kajal');
+      const { convo, job } = await thread();
+      const tap = await tapped(convo.id, `pick:product:${other.id}`);
+
+      await service().run({ ...job, triggerMessageId: tap.id });
+
+      expect(llm.calls).toContain('classify');
+      expect((await conversationRow(convo.id))?.collectedSlots).toMatchObject({ items: [] });
+    });
+
+    it('sends the summary as a card whose buttons carry its revision, never phrased', async () => {
+      const { product: hijab, variant } = await product('Turnservice Hijab', 50_000);
+      await t.db.insert(schema.deliveryCharge).values({
+        merchantId: t.merchantA,
+        areaName: null,
+        isFallback: true,
+        charge: 12_000,
+        position: 0,
+      });
+      llm.intent = ok({ intent: 'other', confidence: 0.9 }, 'classify');
+      const { convo, job } = await thread(t.merchantA, {
+        state: 'collecting_details',
+        collectedSlots: {
+          items: [
+            { productQuery: 'hijab', productId: hijab.id, variantId: variant.id, quantity: 2 },
+          ],
+          customerName: 'Rahim',
+          phone: '+8801812000000',
+          deliveryAddress: 'Zindabazar, Sylhet',
+          revision: 3,
+        },
+      });
+
+      await expect(service().run(job)).resolves.toBe('replied');
+
+      expect(llm.calls).toEqual(['classify', 'extract']);
+      const card = rich.find((entry) => entry.kind === 'card');
+      expect(card?.payloads).toEqual([`confirm:${convo.id}:4`, `change:${convo.id}:4`]);
+      expect(card?.text).toContain('Turnservice Hijab');
+      expect(await conversationRow(convo.id)).toMatchObject({
+        state: 'awaiting_confirmation',
+        collectedSlots: {
+          revision: 4,
+          quote: { revision: 4, subtotal: 100_000, deliveryFee: 12_000, total: 112_000 },
+        },
+      });
+    });
   });
 });
