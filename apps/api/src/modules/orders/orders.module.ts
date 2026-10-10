@@ -12,7 +12,7 @@ import { OrdersService } from './orders.service';
 /**
  * The seller-facing Orders API: the list and its stats, an order's detail and
  * activity, status changes with their stock moves, edits, and orders added by
- * hand. Orders the assistant drafts are written by the conversation flow.
+ * hand. The assistant's Confirm creates its orders through OrdersService too.
  */
 @Module({
   controllers: [OrdersController],
@@ -28,5 +28,6 @@ import { OrdersService } from './orders.service';
     OrdersService,
     DeliveryQuoteService,
   ],
+  exports: [OrdersService, DeliveryQuoteService, OrderCatalogRepository, OrdersRepository],
 })
 export class OrdersModule {}

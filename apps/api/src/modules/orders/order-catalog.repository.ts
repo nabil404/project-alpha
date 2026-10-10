@@ -15,6 +15,8 @@ export interface OrderableVariant {
   stock: number;
   /** Not archived, and neither is its product. */
   live: boolean;
+  /** The product is active: still in the catalog the assistant sells from. */
+  productActive: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export class OrderCatalogRepository {
         price: productVariant.price,
         stock: productVariant.stock,
         live: sql<boolean>`${productVariant.archivedAt} is null and ${product.status} <> 'archived'`,
+        productActive: sql<boolean>`${product.status} = 'active'`,
       })
       .from(productVariant)
       .innerJoin(

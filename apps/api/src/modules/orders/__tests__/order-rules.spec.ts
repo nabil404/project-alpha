@@ -81,6 +81,7 @@ describe('buildLines', () => {
     price: 170000,
     stock: 3,
     live: true,
+    productActive: true,
     ...overrides,
   });
   const current = [
