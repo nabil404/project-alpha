@@ -22,6 +22,7 @@ import type { ReplyLanguage } from './assistant-fallbacks';
 import {
   matchArea,
   matchProduct,
+  onlyNames,
   matchVariant,
   type CatalogView,
   type DeliveryArea,
@@ -598,12 +599,15 @@ export function mergeExtraction(
 ): { slots: CollectedSlots; invalidPhone: boolean } {
   const next: CollectedSlots = { ...slots };
   if (extraction.items !== null) {
-    const { items, origins, refs } = mergeItems(slots.items, extraction.items, (id, queries) => {
-      const match = matchProduct(queries, catalog);
-      return match.kind === 'one'
-        ? match.productId === id
-        : match.kind === 'some' && match.productIds.includes(id);
-    });
+    const { items, origins, refs } = mergeItems(
+      slots.items,
+      extraction.items,
+      (productId, variantId, queries) => {
+        const product = catalog.products.find((row) => row.id === productId);
+        const variant = product?.variants.find((row) => row.id === variantId);
+        return product !== undefined && onlyNames(queries, product, variant);
+      },
+    );
     next.items = items;
     const offered = slots.offered;
     const at = offered ? origins.indexOf(offered.item) : -1;
