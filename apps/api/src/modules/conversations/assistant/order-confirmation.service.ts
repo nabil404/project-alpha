@@ -53,6 +53,8 @@ interface Decided {
   slots?: CollectedSlots;
   state?: 'collecting_details' | 'awaiting_confirmation' | 'confirmed';
   outgoing: Outgoing[];
+  /** Replies an earlier run of this job stored but never got out, sent again as they are. */
+  redeliver?: MessageRow[];
   /** The card's order, made by this run or found from an earlier one. */
   orderId?: string;
 }
@@ -99,9 +101,7 @@ export class OrderConfirmationService {
       const slots = readSlots(locked.conversation.collectedSlots);
       const recent = await this.messages.listPage(tx, scope, conversationId, { limit: 20 });
       const trigger = recent.find((message) => message.id === triggerMessageId);
-      const answered =
-        trigger !== undefined &&
-        recent.some((message) => message.sender !== 'customer' && message.sentAt > trigger.sentAt);
+      const replies = trigger ? repliesTo(recent, trigger) : [];
 
       const decided =
         tap.kind === 'change'
@@ -109,7 +109,7 @@ export class OrderConfirmationService {
           : await this.confirm(tx, scope, locked.conversation, slots, tap, {
               language,
               currency: settings.currency,
-              answered,
+              replies,
             });
 
       // The reply must sort after its tap even when Meta's clock runs ahead of ours.
@@ -132,12 +132,16 @@ export class OrderConfirmationService {
           }),
         );
       }
-      return { decided, rows, psid: locked.customer.psid, token: page.accessToken };
+      const sends = [
+        ...(decided.redeliver ?? []).map((row) => ({ row, content: TEXT })),
+        ...rows.map((row, index) => ({ row, content: decided.outgoing[index]!.content })),
+      ];
+      return { decided, sends, psid: locked.customer.psid, token: page.accessToken };
     });
     if (!staged) return 'ignored';
 
     let delivered = true;
-    for (const [index, row] of staged.rows.entries()) {
+    for (const { row, content } of staged.sends) {
       if (!delivered) {
         await this.outbound.abandon(scope, row);
         continue;
@@ -146,7 +150,7 @@ export class OrderConfirmationService {
         row,
         psid: staged.psid,
         encryptedToken: staged.token,
-        content: staged.decided.outgoing[index]!.content,
+        content,
       });
       delivered = final.status !== 'failed';
     }
@@ -185,20 +189,27 @@ export class OrderConfirmationService {
     {
       language,
       currency,
-      answered,
-    }: { language: ReplyLanguage; currency: string; answered: boolean },
+      replies,
+    }: { language: ReplyLanguage; currency: string; replies: MessageRow[] },
   ): Promise<Decided> {
     const key = confirmKey(conversation.id, tap.revision);
     const existing = await this.orders.findByIdempotencyKey(tx, scope, key);
     if (existing) {
-      // A retry of the run that made it finds its reply already stored; a
-      // second tap is a new trigger and gets the reference again.
+      // A retry of the run that made it finds its reply already stored: done
+      // once sent, else sent again from the stored row. A second tap is a new
+      // trigger and gets the reference again.
+      if (replies.some((reply) => reply.status === 'sent')) {
+        return { outcome: 'replayed', orderId: existing.id, outgoing: [] };
+      }
+      if (replies.length > 0) {
+        return { outcome: 'replayed', orderId: existing.id, outgoing: [], redeliver: replies };
+      }
       return {
         outcome: 'replayed',
         orderId: existing.id,
-        outgoing: answered
-          ? []
-          : [text(confirmText({ kind: 'reference', reference: existing.reference }, language))],
+        outgoing: [
+          text(confirmText({ kind: 'reference', reference: existing.reference }, language)),
+        ],
       };
     }
     const quote = slots.quote;
@@ -316,7 +327,18 @@ export class OrderConfirmationService {
   }
 }
 
-const text = (value: string): Outgoing => ({ text: value, content: { kind: 'text' } });
+const TEXT = { kind: 'text' } as const;
+const text = (value: string): Outgoing => ({ text: value, content: TEXT });
+
+/** The assistant's replies to a tap: after it, up to the customer's next message, oldest first. */
+function repliesTo(newestFirst: MessageRow[], trigger: MessageRow): MessageRow[] {
+  const replies: MessageRow[] = [];
+  for (const message of newestFirst.filter((row) => row.sentAt > trigger.sentAt).reverse()) {
+    if (message.sender === 'customer') break;
+    if (message.sender === 'assistant') replies.push(message);
+  }
+  return replies;
+}
 
 function stale(language: ReplyLanguage): Decided {
   return { outcome: 'stale_card', outgoing: [text(confirmText({ kind: 'stale' }, language))] };
