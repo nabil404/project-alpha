@@ -66,12 +66,26 @@ describe('matchProduct', () => {
     });
   });
 
-  it('keeps a clear winner when only one script lands on another product word', () => {
-    expect(matchProduct(['কাতান শাড়ি', 'katan shari'], EVAL_CATALOG)).toEqual({
-      kind: 'one',
-      productId: id('katan'),
-    });
-  });
+  it.each([
+    [['katan na jamdni dao']],
+    [['katan na, jamdni']],
+    [['কাতান না জামদানী', 'katan na jamdani']],
+    [['katan na kuti']],
+  ])(
+    'asks rather than pick the winner when another product is misspelt beside it: %j',
+    (queries) => {
+      const match = matchProduct(queries, EVAL_CATALOG);
+      expect(match.kind).toBe('some');
+      expect(match.kind === 'some' && match.productIds).toContain(id('katan'));
+    },
+  );
+
+  it.each([[['কাতান শাড়ি', 'katan shari']], [['শার্ট', 'shart']]])(
+    'keeps a clear winner whose other-script twin is its own word: %j',
+    (queries) => {
+      expect(matchProduct(queries, EVAL_CATALOG).kind).toBe('one');
+    },
+  );
 
   it('finds nothing for what the shop does not sell, or for no words', () => {
     expect(matchProduct(['iphone 15', 'আইফোন ১৫'], EVAL_CATALOG)).toEqual({ kind: 'none' });

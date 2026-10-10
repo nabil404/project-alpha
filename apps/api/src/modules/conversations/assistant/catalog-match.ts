@@ -208,9 +208,9 @@ export function matchProduct(
 }
 
 /**
- * `decide` over product scores, except that a clear winner is only offered
- * alongside any product whose own word the customer also wrote: "not katan,
- * jamdani" names the Katan Saree in full, but "jamdani" is the Jamdani's.
+ * `decide` over product scores, except that a clear winner becomes a choice
+ * beside every product the customer's words also name: "katan jamdni" scores
+ * the Katan Saree clear, but "jamdni" is the Jamdani's word misspelt.
  */
 export function decideProduct(
   scored: { id: string; score: number }[],
@@ -221,40 +221,59 @@ export function decideProduct(
   const result = decide(scored, t);
   if (result === null) return { kind: 'none' };
   if (typeof result !== 'string') return { kind: 'some', productIds: result };
-  const rivals = namedRivals(queries, catalog, result);
+  const rivals = namedRivals(queries, catalog, result, t);
   if (rivals.length === 0) return { kind: 'one', productId: result };
   const score = new Map(scored.map((entry) => [entry.id, entry.score]));
   rivals.sort((a, b) => (score.get(b) ?? 0) - (score.get(a) ?? 0));
   return { kind: 'some', productIds: [result, ...rivals].slice(0, MAX_CANDIDATES) };
 }
 
-const ownWords = (product: Product) => new Set([product.name, ...product.aliases].flatMap(wordsOf));
+const ownWords = (product: Product) => [product.name, ...product.aliases].flatMap(wordsOf);
 
 /**
- * Other products owning a word of the customer's that the winner's name and
- * aliases lack, in every script they wrote: a transliteration can land on
- * another product's spelling ("shari" is only the Jamdani's alias).
+ * Other products owning a word that the customer wrote in any script and the
+ * winner's own words do not cover. Any script is enough: a misspelling can
+ * miss in one script and land in the other. Words count as alike down to the
+ * candidate floor, not `t.word`: "kuti" is 0.375 like "kurti", and a missed
+ * rival here keeps a product the customer may have turned down.
  */
 function namedRivals(
   queries: readonly (string | undefined)[],
   catalog: CatalogView,
   winnerId: string,
+  t: MatchThresholds,
 ): string[] {
+  const loose = { ...t, word: t.some };
   const mine = ownWords(catalog.products.find((product) => product.id === winnerId)!);
-  const others = catalog.products
-    .filter((product) => product.id !== winnerId)
-    .map((product) => ({ id: product.id, words: ownWords(product) }));
-  const perForm = forms(queries).map(
-    (words) =>
-      new Set(
-        others
-          .filter((other) => words.some((word) => !mine.has(word) && other.words.has(word)))
-          .map((other) => other.id),
-      ),
-  );
-  return others
-    .map((other) => other.id)
-    .filter((id) => perForm.length > 0 && perForm.every((named) => named.has(id)));
+  const foreign = uncovered(forms(queries), mine, loose);
+  if (foreign.length === 0) return [];
+  return catalog.products
+    .filter(
+      (product) =>
+        product.id !== winnerId &&
+        foreign.some((word) => strength(word, ownWords(product), loose) > 0),
+    )
+    .map((product) => product.id);
+}
+
+/**
+ * The words no own word covers. When every script has as many words, the
+ * forms are one text transliterated word by word, so a word whose twin is
+ * covered is covered too: "katan shari" for "কাতান শাড়ি", though "shari" is
+ * only the Jamdani's alias. Forms of different lengths are judged word by word.
+ */
+function uncovered(
+  written: readonly (readonly string[])[],
+  own: readonly string[],
+  t: MatchThresholds,
+): string[] {
+  const covered = (word: string) => strength(word, own, t) > 0;
+  const aligned = written.every((words) => words.length === written[0]!.length);
+  if (!aligned) return written.flat().filter((word) => !covered(word));
+  return written[0]!.flatMap((_, i) => {
+    const twins = written.map((words) => words[i]!);
+    return twins.some(covered) ? [] : twins;
+  });
 }
 
 /** A variant's option values ("40", "White"), or its own name's parts when it has none. */

@@ -112,12 +112,17 @@ the score is the better of pg_trgm's similarity and (share of the name the
 customer wrote) × (share of what they wrote that is the name), each word
 allowed a misspelling at trigram similarity 0.4 or more. Words that name one
 of the product's own option values ("red jamdani") are set aside first.
-A clear winner is offered as a candidate beside any other product whose own
-name or alias word the customer also wrote, in every script they wrote it:
-"not katan, jamdani" names the Katan Saree in full and still asks, Katan or
-Jamdani. Requiring every script keeps "কাতান শাড়ি" with its transliteration
-"katan shari" on the Katan, though "shari" is only the Jamdani's alias. The
-sweep applies the same rule.
+A clear winner becomes a choice beside every other product whose own name or
+alias word the customer also wrote, misspelt or not, in any script, unless
+the winner's own words cover that word too: "katan jamdni" and "কাতান না
+জামদানী" ask, Katan or Jamdani. Words count as alike down to the candidate
+floor (0.3), not the word threshold, because a one-letter slip in a short
+name ("kuti" for "kurti") scores 0.375; a missed rival keeps a product the
+customer may have turned down, an extra one only asks. When every script has
+as many words, the forms are one text transliterated word by word, so a word
+whose twin in the other script is the winner's is the winner's too: "কাতান
+শাড়ি" with "katan shari" stays on the Katan, though "shari" is only the
+Jamdani's alias. The sweep applies the same rule.
 Variants score by the share of their option values the customer named.
 Areas match the area the customer named, then an area named inside the
 address, then everywhere else.
@@ -249,7 +254,7 @@ Colocated in `apps/api/src/modules/conversations/assistant/__tests__/`.
 
 | Spec                                 | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `catalog-match.spec.ts`              | pg_trgm's documented similarity; exact name, alias, misspelling, Banglish, Bangla; at most three candidates; another product's word beside a full name asks, unless only one script carries it; none for what is not sold; only the given catalog matches; variants by value, out of stock still matched; area, address and fallback                                                                                                                                                                                                                                                                  |
+| `catalog-match.spec.ts`              | pg_trgm's documented similarity; exact name, alias, misspelling, Banglish, Bangla; at most three candidates; another product's word beside a full name asks, misspelt or in either script ("katan na jamdni", "কাতান না জামদানী", "katan na kuti"), unless its twin in the other script is the winner's; none for what is not sold; only the given catalog matches; variants by value, out of stock still matched; area, address and fallback                                                                                                                                                         |
 | `catalog-match.eval.spec.ts`         | At least 90% on the eval set for products and variants, and no wrong product as a clear winner; prints the misses                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `catalog-match.live-eval.spec.ts`    | The same messages through the live extraction model (skipped unless `LLM_EVAL=1`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `catalog-match.sweep.spec.ts`        | Not a check: the threshold sweep, printed (skipped unless `MATCH_SWEEP=1`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
