@@ -39,6 +39,18 @@ import { confirmText } from '../assistant-fallbacks';
 import { quoteFor, readSlots, type DeliveryView } from '../conversation-machine';
 import { OrderConfirmationService, type CardTap } from '../order-confirmation.service';
 
+/** A worker that dies between commit and the Graph send, `crashes` times. */
+let crashes = 0;
+class CrashingSender extends OutboundMessageSender {
+  override deliver(...args: Parameters<OutboundMessageSender['deliver']>) {
+    if (crashes > 0) {
+      crashes -= 1;
+      return Promise.reject(new Error('worker died'));
+    }
+    return super.deliver(...args);
+  }
+}
+
 const crypto = new CryptoService({
   get: () => Buffer.alloc(32, 7).toString('base64'),
 } as unknown as AppConfig);
@@ -52,10 +64,15 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
   let sent: { kind: string; text: string; payloads: string[] }[];
   let drafted: { orderId: string; committed: boolean }[];
   let notifyFailures: number;
+  let sendFailures: number;
 
   const send =
     (kind: string) =>
     async (_token: string, _psid: string, text: string, options: GraphOption[] = []) => {
+      if (sendFailures > 0) {
+        sendFailures -= 1;
+        throw new Error('graph down');
+      }
       sent.push({ kind, text, payloads: options.map((option) => option.payload) });
       return { messageId: `mid-confirm-${nextMid++}` };
     };
@@ -98,7 +115,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
         catalog,
         settings,
       ),
-      new OutboundMessageSender(
+      new CrashingSender(
         runtime.db,
         new ConversationRepository(),
         new MessageRepository(),
@@ -214,6 +231,8 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     sent = [];
     drafted = [];
     notifyFailures = 0;
+    sendFailures = 0;
+    crashes = 0;
   });
   afterAll(async () => {
     await runtime.close();
@@ -303,6 +322,51 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     ]);
     expect(drafted).toEqual([{ orderId: orders[0]!.id, committed: true }]);
   });
+
+  it.each([
+    ['refused by Graph', 'failed'],
+    ['lost to a crash before the send', 'sending'],
+  ] as const)(
+    'redelivers the stored reference when the first reply was %s',
+    async (_case, leftAs) => {
+      const lungi = await product(`Redeliver Lungi ${leftAs}`, 160_000);
+      const convo = await shown([{ ...lungi, quantity: 1 }]);
+      const message = await seedMessage(t.db, t.merchantA, convo.id, {
+        text: 'Confirm',
+        payload: `confirm:${convo.id}:1`,
+      });
+      const job = {
+        merchantId: t.merchantA,
+        conversationId: convo.id,
+        triggerMessageId: message.id,
+      };
+      const replies = () =>
+        t.db
+          .select()
+          .from(schema.message)
+          .where(eq(schema.message.conversationId, convo.id))
+          .then((rows) => rows.filter((row) => row.sender === 'assistant'));
+
+      if (leftAs === 'failed') sendFailures = 1;
+      else crashes = 1;
+      await service()
+        .run(job, confirm(convo.id))
+        .catch(() => undefined);
+      expect((await replies()).map((row) => row.status)).toEqual([leftAs]);
+      expect(sent).toEqual([]);
+
+      await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
+
+      const orders = await ordersFor(convo.id);
+      expect(orders).toHaveLength(1);
+      const reference = confirmText({ kind: 'reference', reference: orders[0]!.reference }, 'bn');
+      expect(sent.map((entry) => entry.text)).toEqual([reference]);
+      expect((await replies()).map((row) => [row.text, row.status])).toEqual([[reference, 'sent']]);
+
+      await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
+      expect(sent).toHaveLength(1);
+    },
+  );
 
   it('creates one order when two taps race', async () => {
     const lungi = await product('Race Lungi', 160_000);
