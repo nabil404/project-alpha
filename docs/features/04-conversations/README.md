@@ -182,8 +182,10 @@ or removes it (`DELETE /:id/messages/:messageId`).
   `state = handed_off` is the assistant giving up, and is what "Needs you" shows.
   Handing back clears the first and, if the conversation was `handed_off`,
   resumes it at `collecting_details` when any detail was collected, otherwise
-  `browsing`, and clears `handed_off_at`. The assistant resumes only on Hand
-  back.
+  `browsing`, and clears `handed_off_at`. A paused conversation
+  `awaiting_confirmation` goes back to `collecting_details` and its summary
+  card is retired (`revision + 1`, no quote). The assistant resumes only on
+  Hand back.
 - **24-hour window.** A reply is allowed while
   `now − last_inbound_at < 24 h` (API clock), and refused with
   `409 MESSENGER_WINDOW_CLOSED` from then on; no `HUMAN_AGENT` tag.
