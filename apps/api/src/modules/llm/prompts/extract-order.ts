@@ -7,7 +7,7 @@ Items:
 - items is the customer's whole list of items after their latest message, in order. Return null when the latest message says nothing about items (only a name, phone or address, a greeting, a question).
 - Each item has ref: the index of the already-collected item it continues (as listed in "Already collected"), or null for an item the customer newly asks for.
 - To change an item, return the list with that item changed ("make it 2" changes the quantity of the item being discussed). To remove an item, return the list without it. Keep every other item as it is, with its ref.
-- productQuery and variantQuery: the customer's own words for the product and for its variant (colour, size), copied as written. Do not translate, correct or guess a catalog name. Use null when the customer gave none for that item; an unchanged item may repeat its earlier words or use null.
+- productQuery and variantQuery: the customer's own words for the product and for its variant (colour, size), copied as written. Do not translate, correct or guess a catalog name. Use null when the customer gave none for that item. "Already collected" shows each item's catalog name (product, variant) and the customer's earlier words (customerWords, customerVariantWords); an unchanged item may repeat either, or use null.
 - productQueryAlt and variantQueryAlt: the same words transliterated into the other script: Bangla script into Latin letters, or Latin letters (English or Banglish) into Bangla script. Spell the sounds, never translate the meaning. Null when the query is null.
 - quantity: a whole number, only when the customer said how many of that item.
 

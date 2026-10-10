@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import type { ExtractedOrder, IntentResult } from '@app/shared';
+import { emptySlots, type ExtractedOrder, type IntentResult } from '@app/shared';
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../../common/crypto.service';
 import type { AppConfig } from '../../../config/app.config';
@@ -36,8 +36,9 @@ import type { ConversationEventsPublisher } from '../../events/conversation-even
 import { MessageRepository } from '../../message.repository';
 import { OutboundMessageSender } from '../../outbound-message.sender';
 import { fallbackText } from '../assistant-fallbacks';
-import { AssistantTurnService } from '../assistant-turn.service';
+import { AssistantTurnService, extractionContext } from '../assistant-turn.service';
 import { LlmCallRepository } from '../llm-call.repository';
+import { EVAL_CATALOG, productByKey } from './fixtures/match-eval';
 import type { CardTap, OrderConfirmationService } from '../order-confirmation.service';
 
 const crypto = new CryptoService({
@@ -680,5 +681,32 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         },
       });
     });
+  });
+});
+
+describe('extractionContext', () => {
+  it("shows the customer's words beside the catalog names of a matched item", () => {
+    const katan = productByKey('katan');
+    const red = katan.variants.find((variant) => variant.name === 'Red')!;
+    const context = extractionContext(
+      {
+        ...emptySlots(),
+        items: [
+          { productQuery: 'saree', productId: katan.id, variantQuery: 'lal', variantId: red.id },
+          { productQuery: 'kajol', quantity: 2 },
+        ],
+      },
+      EVAL_CATALOG,
+    );
+    expect(context.items).toEqual([
+      {
+        ref: 0,
+        product: 'Katan Silk Saree',
+        customerWords: 'saree',
+        variant: 'Red',
+        customerVariantWords: 'lal',
+      },
+      { ref: 1, product: 'kajol', customerWords: 'kajol', quantity: 2 },
+    ]);
   });
 });

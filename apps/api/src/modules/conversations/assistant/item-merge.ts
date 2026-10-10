@@ -23,13 +23,16 @@ const sameWords = (a: string | undefined, b: string | undefined) =>
  * The customer's item list after extraction. A null list leaves the items as
  * they are. Otherwise the returned list replaces them: an entry whose `ref`
  * names a collected item continues it and keeps its matched ids unless its
- * words changed; an item left out is removed. A `ref` that does not exist,
+ * words changed; words equal to the matched product's catalog name
+ * (`productName`) are not a change, since extraction is shown that name. An
+ * item left out is removed. A `ref` that does not exist,
  * or that an earlier entry already used, starts a new item. An entry with no
  * product words and nothing to continue is dropped.
  */
 export function mergeItems(
   current: readonly OrderItemSlot[],
   extracted: readonly ExtractedItem[] | null,
+  productName: (productId: string) => string | undefined = () => undefined,
 ): MergedItems {
   if (extracted === null) return { items: [...current], origins: current.map((_, index) => index) };
   const used = new Set<number>();
@@ -44,7 +47,10 @@ export function mergeItems(
     if (product === undefined && kept === undefined) continue;
 
     const sameProduct =
-      kept !== undefined && (product === undefined || sameWords(product, kept.productQuery));
+      kept !== undefined &&
+      (product === undefined ||
+        sameWords(product, kept.productQuery) ||
+        (kept.productId !== undefined && sameWords(product, productName(kept.productId))));
     const next: OrderItemSlot = sameProduct
       ? { ...kept }
       : { productQuery: product, ...optional('productQueryAlt', words(entry.productQueryAlt)) };

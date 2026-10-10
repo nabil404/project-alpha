@@ -149,7 +149,7 @@ export function decideTurn(input: TurnInput): TurnDecision {
       return handOff(slots, 'low_confidence');
     }
     if (extracted !== 'skipped') {
-      const merged = mergeExtraction(slots, extracted, input.country);
+      const merged = mergeExtraction(slots, extracted, input.country, catalog);
       slots = merged.slots;
       invalidPhone = merged.invalidPhone;
     }
@@ -575,10 +575,15 @@ export function mergeExtraction(
   slots: CollectedSlots,
   extraction: ExtractedOrder,
   country: string,
+  catalog: CatalogView,
 ): { slots: CollectedSlots; invalidPhone: boolean } {
   const next: CollectedSlots = { ...slots };
   if (extraction.items !== null) {
-    const { items, origins } = mergeItems(slots.items, extraction.items);
+    const { items, origins } = mergeItems(
+      slots.items,
+      extraction.items,
+      (id) => findProduct(catalog, id)?.name,
+    );
     next.items = items;
     const offered = slots.offered;
     const at = offered ? origins.indexOf(offered.item) : -1;
