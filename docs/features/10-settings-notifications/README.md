@@ -5,8 +5,9 @@ the assistant drafted, a customer waiting for them, and a daily summary.
 The screens are the Settings – Notifications artboards in the design canvas.
 
 **Status (Oct 2026):** the API stores and serves the switches, and the worker
-sends all three emails. The daily summary goes out today; the other two
-wait for the AI work to report their events (see [Follow-ups](#follow-ups)).
+sends all three emails. The assistant reports both of its events: a
+hand-off since [phase 11.1](../11-ai-implementation/phase-1-foundation/README.md),
+a drafted order since [phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#confirm).
 The page at `/settings/notifications` is built.
 
 ## Routes (session + TenantGuard)
@@ -124,12 +125,6 @@ Web: `apps/web/src/features/settings/components/NotificationsCard.tsx`,
 
 ## Follow-ups
 
-- **Reporting the two events**, part of the AI work:
-  - call `NotificationsService.orderDrafted` after the transaction that
-    writes a `source = assistant` order commits;
-  - set `conversation.handed_off_at` in the write that moves a conversation
-    into `handed_off`, and call `NotificationsService.handedOff` with that
-    same moment after it commits.
 - **Emails in the reader's language**, once the dashboard speaks more than
   English.
 - **The daily summary** is outside MVP 01's scope; it is built because the

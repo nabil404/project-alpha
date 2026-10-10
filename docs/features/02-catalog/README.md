@@ -528,8 +528,10 @@ DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products cat
   out on purpose; the only free delivery is the shop's threshold.
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
-- **AI prompt wiring.** `findSellableCatalog` returns what the prompt needs,
-  including options and categories. The LLM work consumes it.
+- **Categories in the assistant.** `findSellableCatalog` returns them, but
+  the assistant's matching ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#matching))
+  uses only names, aliases and option values; browsing by category is
+  phase 3.
 - **Bulk object removal on account deletion.** The `m/{merchantId}/` prefix
   makes it one prefix delete.
 

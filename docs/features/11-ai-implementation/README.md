@@ -6,9 +6,11 @@ bound by its [rules](../../mvp/01-messenger-to-order/rules.md). This page is the
 index; each phase has its own page with goal, scope, tests and a definition of
 done.
 
-**Status (Oct 2026):** phase 1 is built: a customer's text message gets an
-assistant reply, or a hand-off with a fixed reply. The other phases are not
-started.
+**Status (Oct 2026):** phases 1 and 2 are built: a customer's message gets
+an assistant reply or a hand-off with a fixed reply, products and variants
+are matched in code, and the summary card's Confirm button creates one
+`source = assistant` order per card. The live run of phase 2 on the dev Page
+is still to be done by the maintainer. The other phases are not started.
 
 ## Phases
 
