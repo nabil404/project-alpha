@@ -244,6 +244,23 @@ Colocated in `apps/api/src/modules/conversations/assistant/__tests__/`.
 | `assistant-turn.service.spec.ts`     | (DB) The photo before the reply; candidates as quick replies and a tap filling the item with no LLM call; a tap never offered read as a message; the card's buttons carry its revision; a card tap routed to Confirm                                                                                                                                                                                                                                                                     |
 | `order-confirmation.service.spec.ts` | (DB) One order with the card's numbers, the reference, `orderDrafted` after commit; double and racing taps; a fee-only change (area charge, free-delivery threshold); a retry after `orderDrafted` threw sends one reference and emails; stale card; paused; another conversation or merchant; one of three lines archived; product drafted; short stock; price changed; currency changed; Change; fee parity with `POST /orders/delivery-quote`; the old card refused after a hand-back |
 
+**Conversation simulator** (`conversation-simulator.spec.ts`, harness in
+`__tests__/simulator/`): plays a scripted Messenger conversation through the
+worker's own code against the local database. Each step is a signed webhook
+body for `MessengerController`; its jobs run in process through
+`InboundMessageProcessor` and `AssistantTurnProcessor` (Confirm included),
+with no Redis and no HTTP server, and every Graph send lands in a fake client
+whose echoes come back as Meta sends them. It prints, per step, the
+customer's input, each message sent, the state, the slots and any order
+created. Scenarios: the golden path ("I want the red saree and 2 blue
+kurtis", a quick-reply pick, quantity, name, phone, address, the card,
+Confirm twice: one order, the same reference) and "make the saree 3" after
+the card (a new card; the old one refused). Run it with the scripted model:
+`pnpm --filter api test conversation-simulator` (env loaded). With the live
+model: `LLM_EVAL=1` and `LLM_API_KEY` set; the script's model answers are then
+ignored, phrasing is live, and a turn may legitimately differ from the
+script, so read the transcript when an assertion fails.
+
 Webhook postbacks and quick-reply payloads, and the three new Graph sends, are
 covered in `messenger/__tests__/webhook-payload.spec.ts` and
 `messenger/page/__tests__/meta-graph.client.spec.ts`.
