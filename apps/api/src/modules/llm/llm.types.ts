@@ -45,7 +45,7 @@ export interface PhraseRequest {
  * customer's words until then).
  */
 export interface ExtractionContext {
-  /** Always the customer's own words, so extraction can repeat either form for an unchanged item. */
+  /** The customer's earlier words beside the catalog's names, to tell which item a message means; never to be returned. */
   items: {
     ref: number;
     product: string;

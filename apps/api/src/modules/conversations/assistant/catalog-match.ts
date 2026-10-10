@@ -161,25 +161,6 @@ function withoutValueWords(
   return rest.length > 0 ? rest : query;
 }
 
-/**
- * Whether the customer's words, in one of their scripts, are all the
- * product's own name or alias words or the variant's values: "red saree" for
- * the red Katan Silk Saree, but not "jamdani instead of katan". One script is
- * enough because the other is a transliteration the catalog may not carry.
- */
-export function onlyNames(
-  queries: readonly string[],
-  product: Product,
-  variant: Variant | undefined,
-): boolean {
-  const own = new Set(
-    [product.name, ...product.aliases, ...(variant ? variantValues(product, variant) : [])].flatMap(
-      wordsOf,
-    ),
-  );
-  return queries.some((query) => wordsOf(query).every((word) => own.has(word)));
-}
-
 /** Each product's score for the customer's words; only `t.word` matters here. */
 export function productScores(
   queries: readonly (string | undefined)[],
