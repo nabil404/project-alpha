@@ -126,7 +126,7 @@ function best(
 }
 
 /** `one` for a clear winner, up to three candidates when it is close, nothing below the floor. */
-function decide(
+export function decide(
   scored: { id: string; score: number }[],
   t: MatchThresholds,
 ): string[] | string | null {
@@ -161,25 +161,31 @@ function withoutValueWords(
   return rest.length > 0 ? rest : query;
 }
 
+/** Each product's score for the customer's words; only `t.word` matters here. */
+export function productScores(
+  queries: readonly (string | undefined)[],
+  catalog: CatalogView,
+  t: MatchThresholds,
+): { id: string; score: number }[] {
+  const written = forms(queries);
+  if (written.length === 0) return [];
+  return catalog.products.map((product) => ({
+    id: product.id,
+    score: best(
+      written.map((query) => withoutValueWords(query, product, t)),
+      [product.name, ...product.aliases],
+      t,
+    ),
+  }));
+}
+
 /** Scores each product by its name and aliases against every form of the customer's words. */
 export function matchProduct(
   queries: readonly (string | undefined)[],
   catalog: CatalogView,
   t: MatchThresholds = MATCH_THRESHOLDS,
 ): ProductMatch {
-  const written = forms(queries);
-  if (written.length === 0) return { kind: 'none' };
-  const result = decide(
-    catalog.products.map((product) => ({
-      id: product.id,
-      score: best(
-        written.map((query) => withoutValueWords(query, product, t)),
-        [product.name, ...product.aliases],
-        t,
-      ),
-    })),
-    t,
-  );
+  const result = decide(productScores(queries, catalog, t), t);
   if (result === null) return { kind: 'none' };
   return typeof result === 'string'
     ? { kind: 'one', productId: result }
@@ -218,6 +224,20 @@ function variantScore(
   return top;
 }
 
+/** Each variant's score for the customer's words; only `t.word` matters here. */
+export function variantScores(
+  queries: readonly (string | undefined)[],
+  product: Product,
+  t: MatchThresholds,
+): { id: string; score: number }[] {
+  const written = forms(queries);
+  if (written.length === 0) return [];
+  return product.variants.map((variant) => ({
+    id: variant.id,
+    score: variantScore(written, product, variant, t),
+  }));
+}
+
 /**
  * Matches the customer's words for a variant ("black 42") against the
  * product's live variants. An out-of-stock variant can match, so the
@@ -228,15 +248,7 @@ export function matchVariant(
   product: Product,
   t: MatchThresholds = MATCH_THRESHOLDS,
 ): VariantMatch {
-  const written = forms(queries);
-  if (written.length === 0) return { kind: 'none' };
-  const result = decide(
-    product.variants.map((variant) => ({
-      id: variant.id,
-      score: variantScore(written, product, variant, t),
-    })),
-    t,
-  );
+  const result = decide(variantScores(queries, product, t), t);
   if (result === null) return { kind: 'none' };
   return typeof result === 'string'
     ? { kind: 'one', variantId: result }
