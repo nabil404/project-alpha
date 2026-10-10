@@ -41,6 +41,23 @@ export function formatMinorUnits(
 }
 
 /**
+ * With the currency, its decimals dropped when they are zero: "৪,৫০০৳",
+ * "১,৬০০.৫০৳". For text a customer reads, where "৪,৫০০.০০৳" is noise.
+ */
+export function formatMinorUnitsTrimmed(
+  amount: MinorUnits,
+  currency: string,
+  locale = 'en-US',
+  unitsPerMajor = minorUnitsPerMajor(currency),
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    trailingZeroDisplay: 'stripIfInteger',
+  }).format(amount / unitsPerMajor);
+}
+
+/**
  * The amount alone, for a column whose header carries the currency: the
  * currency's own decimals, dropped when they are zero ("1,600", "1,600.50").
  */

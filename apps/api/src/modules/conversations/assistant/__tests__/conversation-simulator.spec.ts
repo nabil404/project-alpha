@@ -1,5 +1,4 @@
 import { Logger } from '@nestjs/common';
-import { formatMinorUnits } from '@app/shared';
 import {
   describeDb,
   openCatalogTestDb,
@@ -104,8 +103,9 @@ describeDb('conversation simulator', () => {
         total: 696_000,
         currency: 'BDT',
       });
-      expect(sentCard?.text).toContain(formatMinorUnits(696_000, 'BDT', 'bn-BD'));
-      expect(sentCard?.text).toContain(formatMinorUnits(6_000, 'BDT', 'bn-BD'));
+      expect(sentCard?.text).toContain('1 × Katan Saree, Red  ৪,৫০০৳');
+      expect(sentCard?.text).toContain('ডেলিভারি চার্জ (Dhaka): ৬০৳');
+      expect(sentCard?.text).toContain('সর্বমোট: ৬,৯৬০৳');
       const revision = card.slots.revision;
       expect(sentCard?.options.map((option) => option.payload)).toEqual([
         expect.stringMatching(new RegExp(`^confirm:.+:${revision}$`)),

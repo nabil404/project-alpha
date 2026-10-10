@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  formatMinorUnits,
+  formatMinorUnitsTrimmed,
   type AssistantPayload,
   type CollectedSlots,
   type Quote,
@@ -390,7 +390,8 @@ function cardFacts(
   areaName: string | null,
   language: ReplyLanguage,
 ): ReplyFacts {
-  const money = (amount: number) => formatMinorUnits(amount, quote.currency, LOCALES[language]);
+  const money = (amount: number) =>
+    formatMinorUnitsTrimmed(amount, quote.currency, LOCALES[language]);
   return {
     items: quote.lines.map((line) => {
       const variant = variants.get(line.variantId)!;

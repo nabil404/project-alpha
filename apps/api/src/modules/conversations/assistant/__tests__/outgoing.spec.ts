@@ -8,13 +8,13 @@ const options = { language: 'en' as const, conversationId: CONVERSATION };
 
 const summary = (names: string[]): ReplyIntent => {
   const facts: ReplyFacts = {
-    items: names.map((productName) => ({ productName, quantity: 1, lineTotal: '৳1,000.00' })),
+    items: names.map((productName) => ({ productName, quantity: 1, lineTotal: '৳1,000' })),
     customerName: 'Rahim',
     phone: '+8801812000000',
     deliveryAddress: 'Dhanmondi, Dhaka',
-    subtotal: '৳1,000.00',
-    deliveryFee: '৳60.00',
-    total: '৳1,060.00',
+    subtotal: '৳1,000',
+    deliveryFee: '৳60',
+    total: '৳1,060',
   };
   return {
     kind: 'summary',

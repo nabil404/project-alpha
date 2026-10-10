@@ -2,7 +2,7 @@ import {
   collectedSlotsSchema,
   deliveryFeeFor,
   emptySlots,
-  formatMinorUnits,
+  formatMinorUnitsTrimmed,
   hasCollectedAnything,
   MAX_QUICK_REPLIES,
   nextMissingSlot,
@@ -545,7 +545,8 @@ export function factsOf(
   { catalog, delivery, language }: Pick<TurnInput, 'catalog' | 'delivery' | 'language'>,
   extra: { quote?: Quote; problem?: Problem } = {},
 ): ReplyFacts {
-  const money = (amount: number) => formatMinorUnits(amount, delivery.currency, LOCALES[language]);
+  const money = (amount: number) =>
+    formatMinorUnitsTrimmed(amount, delivery.currency, LOCALES[language]);
   const items = slots.items.map((item, index): LineFacts => {
     const product = findProduct(catalog, item.productId);
     const variant = product?.variants.find((entry) => entry.id === item.variantId);

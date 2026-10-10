@@ -511,7 +511,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     const convo = await shown([{ ...lungi, quantity: 2 }]);
     await t.db
       .update(schema.productVariant)
-      .set({ price: 170_000 })
+      .set({ price: 170_025 })
       .where(eq(schema.productVariant.id, lungi.variantId));
 
     await expect(tap(convo.id, confirm(convo.id))).resolves.toBe('price_changed');
@@ -521,15 +521,19 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     expect(row.state).toBe('awaiting_confirmation');
     expect(readSlots(row.collectedSlots)).toMatchObject({
       revision: 2,
-      quote: { revision: 2, subtotal: 340_000, total: 352_000 },
+      quote: { revision: 2, subtotal: 340_050, total: 352_050 },
     });
     const [card] = sent;
     expect(card?.kind).toBe('card');
+    // Paisa show only when there are some.
+    expect(card?.text).toContain('৩,৪০০.৫০৳');
+    expect(card?.text).toContain('১২০৳');
+    expect(card?.text).toContain('৩,৫২০.৫০৳');
     expect(card?.text.startsWith(confirmText({ kind: 'price_changed' }, 'bn'))).toBe(true);
     expect(card?.payloads).toEqual([`confirm:${convo.id}:2`, `change:${convo.id}:2`]);
 
     await expect(tap(convo.id, confirm(convo.id, 2))).resolves.toBe('ordered');
-    expect((await ordersFor(convo.id))[0]).toMatchObject({ subtotal: 340_000 });
+    expect((await ordersFor(convo.id))[0]).toMatchObject({ subtotal: 340_050 });
   });
 
   it('makes no order when the shop changed its currency, and sends a fresh card in the new one', async () => {
