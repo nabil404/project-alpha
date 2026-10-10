@@ -9,6 +9,8 @@ export interface MergedItems {
    * words changed.
    */
   origins: (number | null)[];
+  /** For each merged item, the collected item its `ref` continued, its words changed or not. */
+  refs: (number | null)[];
 }
 
 const words = (value: string | null | undefined): string | undefined => {
@@ -34,10 +36,14 @@ export function mergeItems(
   extracted: readonly ExtractedItem[] | null,
   productName: (productId: string) => string | undefined = () => undefined,
 ): MergedItems {
-  if (extracted === null) return { items: [...current], origins: current.map((_, index) => index) };
+  if (extracted === null) {
+    const same = current.map((_, index) => index);
+    return { items: [...current], origins: same, refs: same };
+  }
   const used = new Set<number>();
   const items: OrderItemSlot[] = [];
   const origins: (number | null)[] = [];
+  const refs: (number | null)[] = [];
   for (const entry of extracted) {
     const ref =
       entry.ref !== null && entry.ref < current.length && !used.has(entry.ref) ? entry.ref : null;
@@ -69,8 +75,9 @@ export function mergeItems(
 
     items.push(next);
     origins.push(sameProduct ? ref : null);
+    refs.push(ref);
   }
-  return { items, origins };
+  return { items, origins, refs };
 }
 
 function optional<K extends string>(key: K, value: string | undefined): Partial<Record<K, string>> {

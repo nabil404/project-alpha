@@ -32,7 +32,7 @@ so the verify token and the signature are its authentication.
   work: no raw body is `400 WEBHOOK_MISSING_RAW_BODY`, a bad signature
   `401 WEBHOOK_INVALID_SIGNATURE`, a body that isn't a JSON object
   `400 WEBHOOK_MALFORMED_PAYLOAD`. It then queues one job per text message
-  or button tap (`jobId = mid`) and answers `200 EVENT_RECEIVED` at once. `@SkipThrottle()`:
+  or button tap (`jobId` = the mid, `:` escaped) and answers `200 EVENT_RECEIVED` at once. `@SkipThrottle()`:
   Meta delivers every Page's events from a few addresses, so a per-IP limit
   would throttle all shops together.
 - The raw body survives because the auth module keeps `rawBody: true` on its
@@ -47,7 +47,7 @@ so the verify token and the signature are its authentication.
 ## Flow
 
 ```
-Meta  POST /api/v1/webhooks/messenger        → verified, one BullMQ job per text message or tap (jobId = mid)
+Meta  POST /api/v1/webhooks/messenger        → verified, one BullMQ job per text message or tap (jobId = mid, : escaped)
                                                 customer-message | customer-postback | page-echo (is_echo; customer = recipient)
 Worker InboundMessageIngest                   → echo carrying our META_APP_ID → skipped (own-echo)
                                               → app_page_merchant(pageId) → merchant, or dropped (unknown-page)

@@ -14,6 +14,7 @@ import {
   type AssistantTurnJob,
   type InboundMessageJob,
 } from '../../queue/queue.constants';
+import { customJobId } from '../../queue/job-id';
 import { ConversationRepository } from '../conversation.repository';
 import { needsProfile } from '../conversation-rules';
 import { CustomerRepository } from '../customer.repository';
@@ -130,7 +131,7 @@ export class InboundMessageIngest {
         triggerMessageId: written.messageId,
       };
       await this.assistantTurns.add(ASSISTANT_TURN_JOB, data, {
-        jobId: `turn-${job.messageId}`,
+        jobId: customJobId('turn-', job.messageId),
         // A tapped button is a decision, not part of a burst still being typed.
         delay: job.kind === 'customer-postback' ? 0 : ASSISTANT_TURN_DELAY_MS,
       });
