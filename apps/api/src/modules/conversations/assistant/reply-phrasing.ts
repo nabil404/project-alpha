@@ -1,15 +1,31 @@
 import { formatPhoneInternational, type SlotName } from '@app/shared';
 import type { PhraseRequest } from '../../llm/llm.types';
 import type { ReplyLanguage } from './assistant-fallbacks';
-import type { ReplyFacts, ReplyIntent } from './reply-intent';
+import type { AskReason, ReplyFacts, ReplyIntent } from './reply-intent';
 
 const ASK: Record<SlotName, string> = {
   product: 'Ask which product the customer would like to order.',
-  variant: 'Ask which variant (colour, size) they would like.',
-  quantity: 'Ask how many they would like.',
+  variant:
+    'Ask which option (colour, size) of {item} they would like; the options are shown as buttons under your message.',
+  quantity: 'Ask how many of {item} they would like.',
   customerName: 'Ask for the name to put on the order.',
   phone: 'Ask for their mobile number.',
-  deliveryAddress: 'Ask for the full delivery address.',
+  deliveryAddress: 'Ask for the full delivery address, with the area and district.',
+};
+
+const BECAUSE: Record<AskReason, string> = {
+  invalid_phone: 'Say the phone number they gave looks incomplete or wrong, and ask for it again.',
+  not_found:
+    'Say the shop could not find what they asked for, and ask them to name it again. Do not suggest products.',
+  choose:
+    'Say there are a few close matches, shown as buttons under your message, and ask which one they mean.',
+  unavailable: 'Say "{unavailable}" is no longer available and ask what they would like instead.',
+  out_of_stock:
+    'Say "{unavailable}" is out of stock, and ask which other option of {item} they would like; the in-stock options are shown as buttons.',
+  product_out_of_stock:
+    'Say "{unavailable}" is out of stock, and ask if they would like another product.',
+  too_many:
+    'Say only the available number of {item} is in stock, and ask how many they would like.',
 };
 
 /** The facts as the phrasing call sees them; the phone in its readable international form. */
@@ -19,26 +35,24 @@ function factValues(facts: ReplyFacts): Record<string, unknown> {
     : { ...facts, phone: formatPhoneInternational(facts.phone) };
 }
 
-/** What code decided, as an instruction. Hand-offs are never phrased. */
+/** What code decided, as an instruction. Hand-offs and the summary card are never phrased. */
 export function phraseRequestFor(
-  reply: Exclude<ReplyIntent, { kind: 'handoff' }>,
+  reply: Extract<ReplyIntent, { kind: 'ask_slot' }>,
   language: ReplyLanguage,
 ): PhraseRequest {
-  if (reply.kind === 'summary') {
-    return {
-      instruction:
-        'Summarise the order using every fact, then ask the customer to check it and say if anything should change.',
-      facts: factValues(reply.facts),
-      language,
-    };
-  }
+  // The item by name, never by number: a number the facts lack would fail checkReply.
+  const item =
+    reply.item === undefined ? '' : `"${reply.facts.items[reply.item]?.productName ?? ''}"`;
   const parts = [
     reply.intent === 'browse' || reply.intent === 'other'
       ? 'Briefly acknowledge their last message first.'
       : '',
-    reply.reason === 'invalid_phone'
-      ? 'Say the phone number they gave looks incomplete or wrong, and ask for it again.'
-      : ASK[reply.slot],
+    reply.reason === undefined ? ASK[reply.slot] : BECAUSE[reply.reason],
   ];
-  return { instruction: parts.filter(Boolean).join(' '), facts: factValues(reply.facts), language };
+  const instruction = parts
+    .filter(Boolean)
+    .join(' ')
+    .replaceAll('{item}', item)
+    .replaceAll('{unavailable}', reply.facts.unavailable ?? '');
+  return { instruction, facts: factValues(reply.facts), language };
 }

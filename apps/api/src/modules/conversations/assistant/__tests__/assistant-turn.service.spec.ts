@@ -20,6 +20,8 @@ import type { LlmClient, LlmPurpose, LlmResult } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-graph.client';
 import type { NotificationsService } from '../../../notifications/notifications.service';
+import { productsService } from '../../../products/__tests__/products-service.fixture';
+import { DeliveryChargesRepository } from '../../../settings/delivery-charges.repository';
 import { MerchantSettingsRepository } from '../../../settings/merchant-settings.repository';
 import { ConversationRepository } from '../../conversation.repository';
 import { ConversationsService } from '../../conversations.service';
@@ -108,6 +110,8 @@ describeDb('AssistantTurnService (app_runtime)', () => {
       new MessageRepository(),
       new FacebookPageRepository(),
       new MerchantSettingsRepository(),
+      new DeliveryChargesRepository(),
+      productsService(runtime.db),
       new LlmCallRepository(),
       client,
       new OutboundMessageSender(

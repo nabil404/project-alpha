@@ -38,6 +38,28 @@ describe('checkReply', () => {
     });
   });
 
+  it('rejects a price one unit off the catalog, and passes the formatted price and total', () => {
+    const priced: ReplyFacts = {
+      items: [
+        { productName: 'Red saree', quantity: 2, unitPrice: '৳1,600.00', lineTotal: '৳3,200.00' },
+      ],
+      deliveryFee: '৳60.00',
+      total: '৳3,260.00',
+    };
+    expect(checkReply('Red saree is ৳1,600 each, ৳3,260 in total with delivery.', priced)).toEqual({
+      ok: true,
+    });
+    expect(checkReply('রেড শাড়ি ১,৬০০.০০৳, ডেলিভারি ৬০৳।', priced)).toEqual({ ok: true });
+    expect(checkReply('Red saree is ৳1,601 each.', priced)).toEqual({
+      ok: false,
+      reason: 'number',
+    });
+    expect(checkReply('Red saree is ৳1,599 each.', priced)).toEqual({
+      ok: false,
+      reason: 'number',
+    });
+  });
+
   it('rejects links', () => {
     expect(checkReply('Order at https://example.org/x', facts)).toEqual({
       ok: false,
