@@ -68,6 +68,17 @@ interface Decided {
  * revision makes a second tap find the first order and resend its reference.
  */
 @Injectable()
+/**
+ * A stored reply another run is sending, or was until it died: the job
+ * retries until that run marks it sent or its lease ends and this one claims it.
+ */
+export class ReplyInFlightError extends Error {
+  constructor(messageId: string) {
+    super(`Reply ${messageId} is under another run's send lease`);
+    this.name = 'ReplyInFlightError';
+  }
+}
+
 export class OrderConfirmationService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
@@ -197,7 +208,8 @@ export class OrderConfirmationService {
     if (existing) {
       // A retry of the run that made it finds its reply already stored: done
       // once sent, else sent again from the stored row by the one run that
-      // claims it. A second tap is a new trigger and gets the reference again.
+      // claims it; a run that cannot claim it retries until it can. A second
+      // tap is a new trigger and gets the reference again.
       if (replies.some((reply) => reply.status === 'sent')) {
         return { outcome: 'replayed', orderId: existing.id, outgoing: [] };
       }
@@ -205,7 +217,8 @@ export class OrderConfirmationService {
         const redeliver: MessageRow[] = [];
         for (const reply of replies) {
           const claimed = await this.messages.claimForResend(tx, scope, reply.id);
-          if (claimed) redeliver.push(claimed);
+          if (!claimed) throw new ReplyInFlightError(reply.id);
+          redeliver.push(claimed);
         }
         return { outcome: 'replayed', orderId: existing.id, outgoing: [], redeliver };
       }

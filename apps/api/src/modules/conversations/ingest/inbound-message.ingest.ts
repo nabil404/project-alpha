@@ -11,6 +11,7 @@ import {
   ASSISTANT_QUEUE,
   ASSISTANT_TURN_DELAY_MS,
   ASSISTANT_TURN_JOB,
+  ASSISTANT_TURN_RETRY,
   type AssistantTurnJob,
   type InboundMessageJob,
 } from '../../queue/queue.constants';
@@ -134,6 +135,7 @@ export class InboundMessageIngest {
         jobId: customJobId('turn-', job.messageId),
         // A tapped button is a decision, not part of a burst still being typed.
         delay: job.kind === 'customer-postback' ? 0 : ASSISTANT_TURN_DELAY_MS,
+        ...ASSISTANT_TURN_RETRY,
       });
     }
     return 'stored';

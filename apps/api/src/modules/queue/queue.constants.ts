@@ -103,6 +103,16 @@ export const ASSISTANT_QUEUE = 'assistant-turns';
 export const ASSISTANT_TURN_JOB = 'assistant-turn';
 export const ASSISTANT_TURN_DELAY_MS = 2_500;
 /**
+ * A Confirm retry that finds its reference under another run's send lease
+ * throws to wait the lease out, so the backoff after every attempt but the
+ * last must outlast SEND_LEASE_SECONDS (20 s). The queue default, 1 s doubling
+ * over 5 attempts, spends only 15 s in all; from 3 s the last gap alone is 24 s.
+ */
+export const ASSISTANT_TURN_RETRY = {
+  attempts: 5,
+  backoff: { type: 'exponential', delay: 3_000 },
+} as const;
+/**
  * Turns spend most of their time waiting on the LLM and hold a connection only
  * in their short transactions, so 4 stays well under DATABASE_POOL_MAX (10)
  * next to the other processors. Raise it only after measuring.

@@ -12,10 +12,11 @@ import {
   type CatalogTestDb,
 } from '../../../database/__tests__/catalog-test-db';
 import { randomPageId, seedFacebookPage } from '../../../database/__tests__/conversation-seeds';
-import type {
-  CustomerMessageJob,
-  CustomerPostbackJob,
-  PageEchoJob,
+import {
+  ASSISTANT_TURN_RETRY,
+  type CustomerMessageJob,
+  type CustomerPostbackJob,
+  type PageEchoJob,
 } from '../../../queue/queue.constants';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-graph.client';
@@ -363,7 +364,7 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
           conversationId: thread!.conversation.id,
           triggerMessageId: stored!.id,
         },
-        opts: { jobId: `turn-${job.messageId}`, delay: 2_500 },
+        opts: { jobId: `turn-${job.messageId}`, delay: 2_500, ...ASSISTANT_TURN_RETRY },
       },
     ]);
   });

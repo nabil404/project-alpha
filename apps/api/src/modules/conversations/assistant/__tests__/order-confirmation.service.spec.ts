@@ -37,7 +37,11 @@ import { MessageRepository, SEND_LEASE_SECONDS } from '../../message.repository'
 import { OutboundMessageSender } from '../../outbound-message.sender';
 import { confirmText } from '../assistant-fallbacks';
 import { quoteFor, readSlots, type DeliveryView } from '../conversation-machine';
-import { OrderConfirmationService, type CardTap } from '../order-confirmation.service';
+import {
+  OrderConfirmationService,
+  ReplyInFlightError,
+  type CardTap,
+} from '../order-confirmation.service';
 
 /** A worker that dies between commit and the Graph send, `crashes` times. */
 let crashes = 0;
@@ -411,7 +415,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     },
   );
 
-  it('leaves a reference still being sent to the run sending it', async () => {
+  it('retries, sending nothing, while another run holds the reference, then sends it once the lease ends', async () => {
     const lungi = await product('In Flight Lungi', 160_000);
     const convo = await shown([{ ...lungi, quantity: 1 }]);
     const message = await seedMessage(t.db, t.merchantA, convo.id, {
@@ -422,12 +426,15 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     crashes = 1;
     await expect(service().run(job, confirm(convo.id))).rejects.toThrow('worker died');
 
-    await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
+    await expect(service().run(job, confirm(convo.id))).rejects.toThrow(ReplyInFlightError);
     expect(sent).toEqual([]);
 
     await outlived(convo.id);
     await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
-    expect(sent).toHaveLength(1);
+    const [order] = await ordersFor(convo.id);
+    expect(sent.map((entry) => entry.text)).toEqual([
+      confirmText({ kind: 'reference', reference: order!.reference }, 'bn'),
+    ]);
   });
 
   it('sends a stored reference once when two retries redeliver it at the same time', async () => {
@@ -450,9 +457,10 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     for (const run of runs) void run.finally(() => (settled += 1)).catch(() => undefined);
     while (held.waiting + settled < 2) await new Promise((resolve) => setTimeout(resolve, 10));
     open();
-    const outcomes = await Promise.all(runs);
+    const outcomes = await Promise.allSettled(runs);
 
-    expect(outcomes).toEqual(['replayed', 'replayed']);
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual(['fulfilled', 'rejected']);
+    await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
     const [order] = await ordersFor(convo.id);
     expect(sent.map((entry) => entry.text)).toEqual([
       confirmText({ kind: 'reference', reference: order!.reference }, 'bn'),
