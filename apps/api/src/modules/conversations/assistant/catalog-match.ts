@@ -216,7 +216,11 @@ const ownWords = (product: Product) => [product.name, ...product.aliases].flatMa
  * winner's own words do not cover. Any script is enough: a misspelling can
  * miss in one script and land in the other. Words count as alike down to the
  * candidate floor, not `t.word`: "kuti" is 0.375 like "kurti", and a missed
- * rival here keeps a product the customer may have turned down.
+ * rival here keeps a product the customer may have turned down. Trigrams miss
+ * swapped and dropped letters in short words ("lugni", "sat" for "set") and
+ * can call a rival's word the winner's ("katha" is 0.33 like "katan"), so a
+ * word a few edits from a rival's word and more than one from every winner's
+ * word names that rival too.
  */
 function namedRivals(
   queries: readonly (string | undefined)[],
@@ -226,29 +230,66 @@ function namedRivals(
 ): string[] {
   const loose = { ...t, word: t.some };
   const mine = ownWords(catalog.products.find((product) => product.id === winnerId)!);
-  const foreign = uncovered(forms(queries), mine, loose);
-  if (foreign.length === 0) return [];
+  const written = forms(queries);
+  const foreign = uncovered(written, (word) => strength(word, mine, loose) > 0);
+  const misspelt = uncovered(written, (word) => mine.some((own) => editDistance(word, own) <= 1));
+  if (foreign.length === 0 && misspelt.length === 0) return [];
   return catalog.products
-    .filter(
-      (product) =>
-        product.id !== winnerId &&
-        foreign.some((word) => strength(word, ownWords(product), loose) > 0),
-    )
+    .filter((product) => {
+      if (product.id === winnerId) return false;
+      const theirs = ownWords(product);
+      return (
+        foreign.some((word) => strength(word, theirs, loose) > 0) ||
+        misspelt.some((word) => misspells(word, theirs))
+      );
+    })
     .map((product) => product.id);
 }
 
 /**
- * The words no own word covers. When every script has as many words, the
+ * Whether `word` is one of `among` misspelt, by Elasticsearch's AUTO
+ * fuzziness: no edits under 3 letters, one up to 5, two beyond. Letters are
+ * code points, so a Bangla vowel sign is one.
+ */
+function misspells(word: string, among: readonly string[]): boolean {
+  const length = Array.from(word).length;
+  const allowed = length < 3 ? 0 : length <= 5 ? 1 : 2;
+  return allowed > 0 && among.some((own) => editDistance(word, own) <= allowed);
+}
+
+/** Optimal string alignment distance: insertions, deletions, substitutions and adjacent swaps. */
+function editDistance(a: string, b: string): number {
+  const x = Array.from(a);
+  const y = Array.from(b);
+  let before: number[] = [];
+  let previous = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= y.length; j += 1) {
+      current[j] = Math.min(
+        previous[j]! + 1,
+        current[j - 1]! + 1,
+        previous[j - 1]! + (x[i - 1] === y[j - 1] ? 0 : 1),
+      );
+      if (i > 1 && j > 1 && x[i - 1] === y[j - 2] && x[i - 2] === y[j - 1])
+        current[j] = Math.min(current[j]!, before[j - 2]! + 1);
+    }
+    before = previous;
+    previous = current;
+  }
+  return previous[y.length]!;
+}
+
+/**
+ * The words `covered` leaves. When every script has as many words, the
  * forms are one text transliterated word by word, so a word whose twin is
  * covered is covered too: "katan shari" for "কাতান শাড়ি", though "shari" is
  * only the Jamdani's alias. Forms of different lengths are judged word by word.
  */
 function uncovered(
   written: readonly (readonly string[])[],
-  own: readonly string[],
-  t: MatchThresholds,
+  covered: (word: string) => boolean,
 ): string[] {
-  const covered = (word: string) => strength(word, own, t) > 0;
   const aligned = written.every((words) => words.length === written[0]!.length);
   if (!aligned) return written.flat().filter((word) => !covered(word));
   return written[0]!.flatMap((_, i) => {
