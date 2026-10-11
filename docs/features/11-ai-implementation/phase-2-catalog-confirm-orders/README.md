@@ -262,7 +262,18 @@ settings row; a seller-made order takes no conversation lock, so no cycle.
   (`ASSISTANT_TURN_RETRY`, five attempts): at least 24 s follow any attempt
   but the last. The queue's default, 1 s over the same five, spends 15 s in
   all and would give up inside the lease.
-- **Matching is in memory**; `pg_trgm` in Postgres stays unneeded for the MVP.
+- **Matching runs in memory, not in Postgres `pg_trgm`.** Unmeasured; a
+  judgement. `catalog-match.ts` already computes pg_trgm's trigram
+  similarity in TypeScript, and most of the matcher is per-word logic
+  pg_trgm does not give: which product owns each word, the edit-distance
+  rivals, Bangla and Latin twins, and the one, some or none decision. The
+  turn already holds the shop's sellable catalog in memory for prices and
+  stock. A pure matcher lets the typo and pairwise tests run tens of
+  thousands of queries without a database. pg_trgm would also need
+  `CREATE EXTENSION` through `db:custom`. Open risk, unchecked: pg_trgm
+  splits words by the database locale, which may mishandle Bangla. If a
+  shop reaches thousands of products, fetch about 20 candidates with
+  pg_trgm over a GIN index and keep this code for the decision.
 - **Matching is hand-written, not Fuse.js.** Measured by the lead on
   2026-10-11 against the same 80 product cases: Fuse 7.1.0 (keys name and
   aliases, `ignoreLocation`, the best score over both query forms) swept
