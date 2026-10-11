@@ -33,6 +33,9 @@ function editDistance(a: string, b: string): number {
 const withinEdits = (a: string, b: string) => editDistance(a, b) <= 1;
 
 const id = (key: string) => productByKey(key).id;
+const productById = (productId: string) => EVAL_PRODUCTS.find((p) => p.id === productId)!;
+const own = (product: Product) =>
+  [product.name, ...product.aliases].flatMap((text) => normalize(text).split(' '));
 const variantNamed = (key: string, name: string) =>
   productByKey(key).variants.find((variant) => variant.name === name)!.id;
 
@@ -126,8 +129,6 @@ describe('matchProduct', () => {
       expect(matchProduct(queries, catalog).kind).toBe('some');
     });
 
-    const own = (product: Product) =>
-      [product.name, ...product.aliases].flatMap((text) => normalize(text).split(' '));
     const filler = (char: string) => (/\p{Script=Bengali}/u.test(char) ? 'ঝ' : 'q');
     const garbles = (word: string) => {
       const chars = Array.from(word);
@@ -157,6 +158,57 @@ describe('matchProduct', () => {
         }
       }
       expect(kept).toEqual([]);
+    });
+  });
+
+  describe('a typo as near to two products', () => {
+    it.each([[['kajan']], [['kajan', 'কাজন']], [['katal']]])(
+      'offers both rather than pick one: %j',
+      (queries) => {
+        const match = matchProduct(queries, EVAL_CATALOG);
+        expect(match.kind).toBe('some');
+        expect(match.kind === 'some' && match.productIds).toEqual(
+          expect.arrayContaining([id('katan'), id('kajal')]),
+        );
+      },
+    );
+
+    const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+    const typos = (word: string) => {
+      const out = new Set<string>();
+      for (let i = 0; i <= word.length; i += 1) {
+        const [head, tail] = [word.slice(0, i), word.slice(i)];
+        for (const letter of LETTERS) out.add(head + letter + tail);
+        if (i === word.length) continue;
+        out.add(head + tail.slice(1));
+        for (const letter of LETTERS) out.add(head + letter + tail.slice(1));
+        if (i + 1 < word.length) out.add(head + tail[1] + tail[0] + tail.slice(2));
+      }
+      out.delete(word);
+      return out;
+    };
+
+    it('never names a product other than the one a Latin word was typed for', () => {
+      const ownWords = new Set(EVAL_PRODUCTS.flatMap(own));
+      const queries: { source: string; forms: string[] }[] = [];
+      for (const product of EVAL_PRODUCTS) {
+        const bangla = product.aliases.filter((alias) => /\p{Script=Bengali}/u.test(alias));
+        const latin = new Set(own(product).filter((word) => /^[a-z]+$/.test(word)));
+        for (const word of latin)
+          for (const typo of typos(word)) {
+            if (ownWords.has(typo)) continue;
+            queries.push({ source: product.id, forms: [typo] });
+            for (const form of bangla) queries.push({ source: product.id, forms: [typo, form] });
+          }
+      }
+      const wrong = queries.flatMap(({ source, forms }) => {
+        const match = matchProduct(forms, EVAL_CATALOG);
+        return match.kind === 'one' && match.productId !== source
+          ? [`${forms.join(' | ')} -> ${productById(match.productId).name}`]
+          : [];
+      });
+      expect(wrong).toEqual([]);
+      expect(queries.length).toBeGreaterThan(25_000);
     });
   });
 
