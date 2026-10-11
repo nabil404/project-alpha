@@ -177,7 +177,6 @@ function decide(input: TurnInput): TurnDecision {
     {
       ...slots,
       items: resolved.items,
-      offered: remapOffered(slots.offered, resolved.moved),
       lastAsked: remapLastAsked(slots.lastAsked, resolved.moved),
     },
     input.delivery,
@@ -434,15 +433,6 @@ function remapLastAsked(
   return item === undefined ? undefined : { ...last, item };
 }
 
-function remapOffered(
-  offered: CollectedSlots['offered'],
-  moved: number[],
-): CollectedSlots['offered'] {
-  if (!offered) return undefined;
-  const item = moved[offered.item];
-  return item === undefined ? undefined : { ...offered, item };
-}
-
 function applyPick(slots: CollectedSlots, pick: ItemPick): CollectedSlots {
   const items = slots.items.map((item, index) => {
     if (index !== pick.item) return item;
@@ -600,8 +590,7 @@ function isEmptyExtraction(extraction: ExtractedOrder): boolean {
  * Extraction merged into the slots. The item list goes through mergeItems; a
  * detail replaces its slot when given, and null never does. A phone is kept
  * only if it is a real number. A new address or area clears the matched
- * delivery row. Candidates offered for an item stay only while that item is
- * unchanged.
+ * delivery row.
  */
 export function mergeExtraction(
   slots: CollectedSlots,
@@ -610,14 +599,8 @@ export function mergeExtraction(
 ): { slots: CollectedSlots; invalidPhone: boolean } {
   const next: CollectedSlots = { ...slots };
   if (extraction.items !== null) {
-    const { items, origins, refs } = mergeItems(slots.items, extraction.items);
+    const { items, refs } = mergeItems(slots.items, extraction.items);
     next.items = items;
-    const offered = slots.offered;
-    const at = offered ? origins.indexOf(offered.item) : -1;
-    next.offered =
-      offered && at >= 0 && items[at]!.variantQuery === slots.items[offered.item]?.variantQuery
-        ? { ...offered, item: at }
-        : undefined;
     next.lastAsked = remapLastAsked(
       slots.lastAsked,
       slots.items.map((_, old) => {
