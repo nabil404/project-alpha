@@ -28,6 +28,19 @@ describeDb('MessageRepository.claimForResend', () => {
     await t.close();
   });
 
+  it("never claims another merchant's reply, though the connection could see it", async () => {
+    const row = await reply('failed');
+
+    await expect(
+      messages.claimForResend(t.db, { merchantId: t.merchantB }, row.id),
+    ).resolves.toBeNull();
+    const [after] = await t.db.select().from(schema.message).where(eq(schema.message.id, row.id));
+    expect(after?.status).toBe('failed');
+    await expect(
+      messages.claimForResend(t.db, { merchantId: t.merchantA }, row.id),
+    ).resolves.toMatchObject({ id: row.id, status: 'sending' });
+  });
+
   it('starts the lease when the claim runs, not when its transaction began', async () => {
     const row = await reply('failed');
     const claimed = await t.db.transaction(async (tx) => {

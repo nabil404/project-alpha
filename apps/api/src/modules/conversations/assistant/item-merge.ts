@@ -2,12 +2,6 @@ import type { ExtractedItem, OrderItemSlot } from '@app/shared';
 
 export interface MergedItems {
   items: OrderItemSlot[];
-  /**
-   * For each merged item, the index of the collected item it continues with
-   * its matched product kept, or null for a new item or one given product
-   * words.
-   */
-  origins: (number | null)[];
   /** For each merged item, the collected item its `ref` continued, its words changed or not. */
   refs: (number | null)[];
 }
@@ -35,11 +29,10 @@ export function mergeItems(
 ): MergedItems {
   if (extracted === null) {
     const same = current.map((_, index) => index);
-    return { items: [...current], origins: same, refs: same };
+    return { items: [...current], refs: same };
   }
   const used = new Set<number>();
   const items: OrderItemSlot[] = [];
-  const origins: (number | null)[] = [];
   const refs: (number | null)[] = [];
   for (const entry of extracted) {
     const ref =
@@ -67,10 +60,9 @@ export function mergeItems(
     else next.quantity = quantity;
 
     items.push(next);
-    origins.push(product === undefined ? ref : null);
     refs.push(ref);
   }
-  return { items, origins, refs };
+  return { items, refs };
 }
 
 function optional<K extends string>(key: K, value: string | undefined): Partial<Record<K, string>> {
