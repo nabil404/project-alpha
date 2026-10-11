@@ -315,6 +315,35 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     expect(drafted.map((entry) => entry.orderId)).toEqual([orders[0]!.id, orders[0]!.id]);
   });
 
+  it('sends a second tap the reference though the chat moved on before its turn ran', async () => {
+    const lungi = await product('Moved On Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    await tap(convo.id, confirm(convo.id));
+    const later = (seconds: number) => new Date(Date.now() + seconds * 1000);
+    const second = await seedMessage(t.db, t.merchantA, convo.id, {
+      text: 'Confirm',
+      payload: `confirm:${convo.id}:1`,
+      sentAt: later(1),
+    });
+    await seedMessage(t.db, t.merchantA, convo.id, { text: 'kobe pabo?', sentAt: later(2) });
+    await seedMessage(t.db, t.merchantA, convo.id, {
+      sender: 'assistant',
+      text: 'Shop will call you soon.',
+      sentAt: later(3),
+    });
+
+    await expect(
+      service().run(
+        { merchantId: t.merchantA, conversationId: convo.id, triggerMessageId: second.id },
+        confirm(convo.id),
+      ),
+    ).resolves.toBe('replayed');
+
+    const [order] = await ordersFor(convo.id);
+    const reference = confirmText({ kind: 'reference', reference: order!.reference }, 'bn');
+    expect(sent.map((entry) => entry.text)).toEqual([reference, reference]);
+  });
+
   it('finishes a run whose email failed after commit: no second reference, the email queued', async () => {
     const lungi = await product('Retry Lungi', 160_000);
     const convo = await shown([{ ...lungi, quantity: 1 }]);
