@@ -48,22 +48,44 @@ export function normalize(text: string): string {
     .trim();
 }
 
-function wordsOf(text: string): string[] {
-  const normalized = normalize(text);
-  return normalized === '' ? [] : normalized.split(' ');
+/**
+ * Memoizes a pure function of one string: a match compares every catalog
+ * word with every word the customer wrote, thousands of times in a sweep.
+ * Cleared past a bound, since customers' words pass through too.
+ */
+function memoized<T>(compute: (key: string) => T): (key: string) => T {
+  const cache = new Map<string, T>();
+  return (key) => {
+    let value = cache.get(key);
+    if (value === undefined) {
+      if (cache.size >= 10_000) cache.clear();
+      value = compute(key);
+      cache.set(key, value);
+    }
+    return value;
+  };
 }
 
-/** pg_trgm's trigrams of each word: padded with two spaces before and one after. */
+const wordsOf = memoized((text): readonly string[] => {
+  const normalized = normalize(text);
+  return normalized === '' ? [] : normalized.split(' ');
+});
+
+/** pg_trgm's trigrams of one word: padded with two spaces before and one after. */
+const wordTrigrams = memoized((word): ReadonlySet<string> => {
+  const chars = Array.from(`  ${word} `);
+  const set = new Set<string>();
+  for (let i = 0; i + 3 <= chars.length; i += 1) set.add(chars[i]! + chars[i + 1]! + chars[i + 2]!);
+  return set;
+});
+
 function trigrams(words: readonly string[]): Set<string> {
   const set = new Set<string>();
-  for (const word of words) {
-    const chars = Array.from(`  ${word} `);
-    for (let i = 0; i + 3 <= chars.length; i += 1) set.add(chars.slice(i, i + 3).join(''));
-  }
+  for (const word of words) for (const gram of wordTrigrams(word)) set.add(gram);
   return set;
 }
 
-function jaccard(a: Set<string>, b: Set<string>): number {
+function jaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
   let shared = 0;
   for (const gram of a) if (b.has(gram)) shared += 1;
@@ -85,7 +107,7 @@ function strength(word: string, among: readonly string[], t: MatchThresholds): n
   for (const candidate of among) {
     if (word === candidate) return 1;
     if (/^\d+\p{L}+$/u.test(word) && word.replace(/\p{L}+$/u, '') === candidate) return 1;
-    const similar = jaccard(trigrams([word]), trigrams([candidate]));
+    const similar = jaccard(wordTrigrams(word), wordTrigrams(candidate));
     if (similar >= t.word) top = Math.max(top, similar);
   }
   return top;
@@ -137,7 +159,7 @@ export function decide(
   return ranked.slice(0, MAX_CANDIDATES).map((entry) => entry.id);
 }
 
-function forms(queries: readonly (string | undefined)[]): string[][] {
+function forms(queries: readonly (string | undefined)[]): (readonly string[])[] {
   return queries
     .map((query) => (query === undefined ? [] : wordsOf(query)))
     .filter((words) => words.length > 0);
