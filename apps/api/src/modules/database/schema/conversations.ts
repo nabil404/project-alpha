@@ -113,6 +113,8 @@ export const message = pgTable(
     status: text('status', { enum: MESSAGE_STATUSES }).notNull(),
     sentAt: instant('sent_at').notNull(),
     createdAt: createdAt(),
+    /** A reply's last claim to be sent: when staged, then each redelivery's. */
+    updatedAt: updatedAt(),
   },
   (t) => [
     foreignKey({

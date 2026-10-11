@@ -196,13 +196,18 @@ export class OrderConfirmationService {
     const existing = await this.orders.findByIdempotencyKey(tx, scope, key);
     if (existing) {
       // A retry of the run that made it finds its reply already stored: done
-      // once sent, else sent again from the stored row. A second tap is a new
-      // trigger and gets the reference again.
+      // once sent, else sent again from the stored row by the one run that
+      // claims it. A second tap is a new trigger and gets the reference again.
       if (replies.some((reply) => reply.status === 'sent')) {
         return { outcome: 'replayed', orderId: existing.id, outgoing: [] };
       }
       if (replies.length > 0) {
-        return { outcome: 'replayed', orderId: existing.id, outgoing: [], redeliver: replies };
+        const redeliver: MessageRow[] = [];
+        for (const reply of replies) {
+          const claimed = await this.messages.claimForResend(tx, scope, reply.id);
+          if (claimed) redeliver.push(claimed);
+        }
+        return { outcome: 'replayed', orderId: existing.id, outgoing: [], redeliver };
       }
       return {
         outcome: 'replayed',

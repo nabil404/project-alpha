@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import type { MessageSender } from '@app/shared';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { one } from '../database/rows';
 import { message, type MessageRow } from '../database/schema/index';
 import type { CursorKey } from './cursor';
+
+/**
+ * How long a staged send may be in flight before a retry may send it again:
+ * past the Graph call's 10 s timeout, and short of the 30 s after which
+ * BullMQ reruns a job whose worker died.
+ */
+export const SEND_LEASE_SECONDS = 20;
 
 @Injectable()
 export class MessageRepository {
@@ -146,6 +153,38 @@ export class MessageRepository {
       )
       .returning({ id: message.id });
     return rows.length > 0;
+  }
+
+  /**
+   * Takes a stored reply for one more send: a failed one, or one still
+   * `sending` after `SEND_LEASE_SECONDS`, whose sender died before recording
+   * the outcome. The update is the compare-and-set: of two runs that read
+   * the same row, only one gets it back. Null when it went out, or another
+   * run's send of it is still in flight.
+   */
+  async claimForResend(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+  ): Promise<MessageRow | null> {
+    const [row] = await executor
+      .update(message)
+      .set({ status: 'sending', updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(message.merchantId, merchantId),
+          eq(message.id, id),
+          or(
+            eq(message.status, 'failed'),
+            and(
+              eq(message.status, 'sending'),
+              sql`${message.updatedAt} < now() - make_interval(secs => ${SEND_LEASE_SECONDS})`,
+            ),
+          ),
+        ),
+      )
+      .returning();
+    return row ?? null;
   }
 
   async markFailed(

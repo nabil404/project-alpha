@@ -33,7 +33,7 @@ import { MerchantSettingsRepository } from '../../../settings/merchant-settings.
 import { ConversationRepository } from '../../conversation.repository';
 import { ConversationsService } from '../../conversations.service';
 import type { ConversationEventsPublisher } from '../../events/conversation-events.publisher';
-import { MessageRepository } from '../../message.repository';
+import { MessageRepository, SEND_LEASE_SECONDS } from '../../message.repository';
 import { OutboundMessageSender } from '../../outbound-message.sender';
 import { confirmText } from '../assistant-fallbacks';
 import { quoteFor, readSlots, type DeliveryView } from '../conversation-machine';
@@ -65,6 +65,8 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
   let drafted: { orderId: string; committed: boolean }[];
   let notifyFailures: number;
   let sendFailures: number;
+  /** Holds every Graph send until opened, counting the sends that wait. */
+  let gate: { waiting: number; open: Promise<void> } | null;
 
   const send =
     (kind: string) =>
@@ -72,6 +74,10 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
       if (sendFailures > 0) {
         sendFailures -= 1;
         throw new Error('graph down');
+      }
+      if (gate) {
+        gate.waiting += 1;
+        await gate.open;
       }
       sent.push({ kind, text, payloads: options.map((option) => option.payload) });
       return { messageId: `mid-confirm-${nextMid++}` };
@@ -206,6 +212,12 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     conversationId,
     revision,
   });
+  /** Ages the conversation's in-flight replies past the send lease, as if their sender died. */
+  const outlived = (conversationId: string) =>
+    t.db
+      .update(schema.message)
+      .set({ updatedAt: new Date(Date.now() - (SEND_LEASE_SECONDS + 1) * 1000) })
+      .where(eq(schema.message.conversationId, conversationId));
   const conversationRow = async (id: string) =>
     (await t.db.select().from(schema.conversation).where(eq(schema.conversation.id, id)))[0]!;
 
@@ -233,6 +245,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     notifyFailures = 0;
     sendFailures = 0;
     crashes = 0;
+    gate = null;
   });
   afterAll(async () => {
     await runtime.close();
@@ -354,6 +367,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
         .catch(() => undefined);
       expect((await replies()).map((row) => row.status)).toEqual([leftAs]);
       expect(sent).toEqual([]);
+      if (leftAs === 'sending') await outlived(convo.id);
 
       await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
 
@@ -367,6 +381,54 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
       expect(sent).toHaveLength(1);
     },
   );
+
+  it('leaves a reference still being sent to the run sending it', async () => {
+    const lungi = await product('In Flight Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    const message = await seedMessage(t.db, t.merchantA, convo.id, {
+      text: 'Confirm',
+      payload: `confirm:${convo.id}:1`,
+    });
+    const job = { merchantId: t.merchantA, conversationId: convo.id, triggerMessageId: message.id };
+    crashes = 1;
+    await expect(service().run(job, confirm(convo.id))).rejects.toThrow('worker died');
+
+    await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
+    expect(sent).toEqual([]);
+
+    await outlived(convo.id);
+    await expect(service().run(job, confirm(convo.id))).resolves.toBe('replayed');
+    expect(sent).toHaveLength(1);
+  });
+
+  it('sends a stored reference once when two retries redeliver it at the same time', async () => {
+    const lungi = await product('Redeliver Race Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    const message = await seedMessage(t.db, t.merchantA, convo.id, {
+      text: 'Confirm',
+      payload: `confirm:${convo.id}:1`,
+    });
+    const job = { merchantId: t.merchantA, conversationId: convo.id, triggerMessageId: message.id };
+    sendFailures = 1;
+    await expect(service().run(job, confirm(convo.id))).resolves.toBe('send_failed');
+    expect(sent).toEqual([]);
+
+    let open!: () => void;
+    const held = { waiting: 0, open: new Promise<void>((resolve) => (open = resolve)) };
+    gate = held;
+    const runs = [service().run(job, confirm(convo.id)), service().run(job, confirm(convo.id))];
+    let settled = 0;
+    for (const run of runs) void run.finally(() => (settled += 1)).catch(() => undefined);
+    while (held.waiting + settled < 2) await new Promise((resolve) => setTimeout(resolve, 10));
+    open();
+    const outcomes = await Promise.all(runs);
+
+    expect(outcomes).toEqual(['replayed', 'replayed']);
+    const [order] = await ordersFor(convo.id);
+    expect(sent.map((entry) => entry.text)).toEqual([
+      confirmText({ kind: 'reference', reference: order!.reference }, 'bn'),
+    ]);
+  });
 
   it('creates one order when two taps race', async () => {
     const lungi = await product('Race Lungi', 160_000);

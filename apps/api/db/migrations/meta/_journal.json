@@ -239,6 +239,13 @@
       "when": 1791577780936,
       "tag": "0033_message_payload",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791732499173,
+      "tag": "0034_message_updated_at",
+      "breakpoints": true
     }
   ]
 }
