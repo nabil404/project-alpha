@@ -494,6 +494,35 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     expect(drafted).toEqual([]);
   });
 
+  it('refuses a card whose quote is still stored once the chat left awaiting confirmation', async () => {
+    const lungi = await product('Asked Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }], { state: 'collecting_details' });
+
+    await expect(tap(convo.id, confirm(convo.id, 1))).resolves.toBe('stale_card');
+
+    expect(await ordersFor(convo.id)).toEqual([]);
+    expect(drafted).toEqual([]);
+  });
+
+  it('refuses a Confirm at the current revision when the stored quote is older', async () => {
+    const lungi = await product('Unquoted Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    await t.db
+      .update(schema.conversation)
+      .set({
+        collectedSlots: {
+          ...readSlots((await conversationRow(convo.id)).collectedSlots),
+          revision: 2,
+        },
+      })
+      .where(eq(schema.conversation.id, convo.id));
+
+    await expect(tap(convo.id, confirm(convo.id, 2))).resolves.toBe('stale_card');
+
+    expect(await ordersFor(convo.id)).toEqual([]);
+    expect(drafted).toEqual([]);
+  });
+
   it('does nothing while the seller holds the chat', async () => {
     const lungi = await product('Paused Lungi', 160_000);
     const convo = await shown([{ ...lungi, quantity: 1 }], { botPaused: true });

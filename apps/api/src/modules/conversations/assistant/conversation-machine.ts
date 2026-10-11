@@ -128,6 +128,18 @@ export function readSlots(value: unknown): CollectedSlots {
  * missing.
  */
 export function decideTurn(input: TurnInput): TurnDecision {
+  const decision = decide(input);
+  if (input.state !== 'awaiting_confirmation' || decision.state === 'awaiting_confirmation') {
+    return decision;
+  }
+  // Leaving the card without a new one retires it, as Change does.
+  return {
+    ...decision,
+    slots: { ...decision.slots, quote: undefined, revision: input.slots.revision + 1 },
+  };
+}
+
+function decide(input: TurnInput): TurnDecision {
   const { trigger, catalog } = input;
   let slots = input.slots;
   let intent: CustomerIntent = 'order';
