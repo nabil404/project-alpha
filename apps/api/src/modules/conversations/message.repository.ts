@@ -169,7 +169,7 @@ export class MessageRepository {
   ): Promise<MessageRow | null> {
     const [row] = await executor
       .update(message)
-      .set({ status: 'sending', updatedAt: sql`now()` })
+      .set({ status: 'sending', updatedAt: sql`clock_timestamp()` })
       .where(
         and(
           eq(message.merchantId, merchantId),
@@ -178,7 +178,7 @@ export class MessageRepository {
             eq(message.status, 'failed'),
             and(
               eq(message.status, 'sending'),
-              sql`${message.updatedAt} < now() - make_interval(secs => ${SEND_LEASE_SECONDS})`,
+              sql`${message.updatedAt} < clock_timestamp() - make_interval(secs => ${SEND_LEASE_SECONDS})`,
             ),
           ),
         ),
