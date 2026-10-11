@@ -5,6 +5,7 @@ import * as schema from '../schema/index';
 let nextNumber = 1;
 
 export interface SeedItem {
+  variantId?: string;
   productName?: string;
   variantName?: string | null;
   quantity?: number;
@@ -26,6 +27,7 @@ export async function seedOrder(
   }: Partial<typeof schema.order.$inferInsert> & { items?: SeedItem[] } = {},
 ) {
   const lines = items.map((item, position) => ({
+    variantId: item.variantId ?? null,
     productName: item.productName ?? 'Blue kurti',
     variantName: item.variantName === undefined ? 'M' : item.variantName,
     quantity: item.quantity ?? 1,
