@@ -440,6 +440,16 @@ or the API typechecks against the stale build.
   touches business data.
 - Assert on the real failure, not just that something threw — the signature spec
   checks a wrong secret and a tampered body separately, and that is the standard.
+- **Spec files run in parallel against one Postgres and one machine.** Two
+  rules keep them independent, both enforced by lint:
+  - An HTTP spec starts its app with `listenOnLoopback(app)` from
+    `src/__tests__/listen-on-loopback.ts`, never `app.init()`. On an unstarted
+    app supertest listens on `::` and dials 127.0.0.1, and on macOS any process
+    that binds 127.0.0.1 on that port (an editor extension did) answers instead,
+    as a random 401 or 404.
+  - No `CREATE`, `DROP` or `ALTER TABLE` in a spec. A scratch table with a
+    foreign key to a shared table deadlocks other files' writes to it when it
+    is dropped; seed rows into the real tables instead.
 
 ## Related skills
 
