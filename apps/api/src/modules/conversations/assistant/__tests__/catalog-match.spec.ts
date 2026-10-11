@@ -6,7 +6,31 @@ import {
   similarity,
   type DeliveryArea,
 } from '../catalog-match';
-import { EVAL_CATALOG, productByKey } from './fixtures/match-eval';
+import type { Product } from '@app/shared';
+import { EVAL_CATALOG, EVAL_PRODUCTS, productByKey } from './fixtures/match-eval';
+
+/** Optimal string alignment distance: insertions, deletions, substitutions, adjacent swaps. */
+function editDistance(a: string, b: string): number {
+  const x = Array.from(a);
+  const y = Array.from(b);
+  const d = x.map(() => new Array<number>(y.length + 1).fill(0));
+  d.push(new Array<number>(y.length + 1).fill(0));
+  for (let i = 0; i <= x.length; i += 1) d[i]![0] = i;
+  for (let j = 0; j <= y.length; j += 1) d[0]![j] = j;
+  for (let i = 1; i <= x.length; i += 1)
+    for (let j = 1; j <= y.length; j += 1) {
+      d[i]![j] = Math.min(
+        d[i - 1]![j]! + 1,
+        d[i]![j - 1]! + 1,
+        d[i - 1]![j - 1]! + (x[i - 1] === y[j - 1] ? 0 : 1),
+      );
+      if (i > 1 && j > 1 && x[i - 1] === y[j - 2] && x[i - 2] === y[j - 1])
+        d[i]![j] = Math.min(d[i]![j]!, d[i - 2]![j - 2]! + 1);
+    }
+  return d[x.length]![y.length]!;
+}
+
+const withinEdits = (a: string, b: string) => editDistance(a, b) <= 1;
 
 const id = (key: string) => productByKey(key).id;
 const variantNamed = (key: string, name: string) =>
@@ -79,6 +103,62 @@ describe('matchProduct', () => {
       expect(match.kind === 'some' && match.productIds).toContain(id('katan'));
     },
   );
+
+  describe('a garbled word naming another product', () => {
+    const kurtiSet = {
+      products: [
+        productByKey('kurti'),
+        {
+          ...productByKey('lungi'),
+          id: '00000000-0000-4000-8999-000000000009',
+          name: 'Kurti Set',
+          aliases: [],
+        },
+      ],
+    };
+
+    it.each([
+      ['a rival with a swap and a dropped letter', ['katan jmadni'], EVAL_CATALOG],
+      ['the same in both scripts', ['katan jmadni', 'কাতান জমাদনি'], EVAL_CATALOG],
+      ['a rival with two letters swapped', ['kurti lugni'], EVAL_CATALOG],
+      ['a one-letter slip in a short word', ['kurti sat'], kurtiSet],
+    ])('asks rather than pick the winner: %s', (_label, queries, catalog) => {
+      expect(matchProduct(queries, catalog).kind).toBe('some');
+    });
+
+    const own = (product: Product) =>
+      [product.name, ...product.aliases].flatMap((text) => normalize(text).split(' '));
+    const filler = (char: string) => (/\p{Script=Bengali}/u.test(char) ? 'ঝ' : 'q');
+    const garbles = (word: string) => {
+      const chars = Array.from(word);
+      const edit = (i: number, drop: number, ...insert: string[]) =>
+        [...chars.slice(0, i), ...insert, ...chars.slice(i + drop)].join('');
+      const out = chars.flatMap((char, i) => [
+        edit(i, 1),
+        edit(i, 0, filler(char)),
+        edit(i, 1, filler(char)),
+        ...(i + 1 < chars.length ? [edit(i, 2, chars[i + 1]!, char)] : []),
+      ]);
+      return out.filter((garbled) => garbled !== word && Array.from(garbled).length >= 3);
+    };
+
+    it("never keeps A clear when B's own word is written one edit off", () => {
+      const owner = new Map<string, string>();
+      for (const b of EVAL_PRODUCTS)
+        for (const word of new Set(own(b)))
+          for (const garbled of garbles(word)) owner.set(garbled, b.id);
+      const kept: string[] = [];
+      for (const a of EVAL_PRODUCTS) {
+        const mine = own(a);
+        for (const [garbled, b] of owner) {
+          if (b === a.id || mine.some((ownWord) => withinEdits(garbled, ownWord))) continue;
+          const match = matchProduct([`${a.name} ${garbled}`], EVAL_CATALOG);
+          if (match.kind === 'one' && match.productId === a.id) kept.push(`${a.name} + ${garbled}`);
+        }
+      }
+      expect(kept).toEqual([]);
+    });
+  });
 
   it.each([[['কাতান শাড়ি', 'katan shari']], [['শার্ট', 'shart']]])(
     'keeps a clear winner whose other-script twin is its own word: %j',
