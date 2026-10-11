@@ -229,7 +229,9 @@ into another shop.
   order and partial ones for `handed_off` and `awaiting_confirmation`.
 - `message`: `sender`, `text`, `meta_message_id` (null while `sending`),
   `payload` (a tapped quick reply's or button's payload, else null; migration
-  `0033_message_payload`), `status`, `sent_at`. `UNIQUE (merchant_id, meta_message_id)`; cascades with
+  `0033_message_payload`), `status`, `sent_at`, `updated_at` (a reply's last
+  claim to be sent, which the assistant's Confirm redelivery leases; migration
+  `0034_message_updated_at`). `UNIQUE (merchant_id, meta_message_id)`; cascades with
   its conversation; trigram index on `text`. The assistant writes `assistant` rows through `OutboundMessageSender`.
 
 **The Page resolver.** The worker must find a Page's merchant before any
