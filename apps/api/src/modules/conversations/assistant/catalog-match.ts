@@ -219,8 +219,10 @@ const ownWords = (product: Product) => [product.name, ...product.aliases].flatMa
  * rival here keeps a product the customer may have turned down. Trigrams miss
  * swapped and dropped letters in short words ("lugni", "sat" for "set") and
  * can call a rival's word the winner's ("katha" is 0.33 like "katan"), so a
- * word a few edits from a rival's word and more than one from every winner's
- * word names that rival too.
+ * word a few edits from a rival's word names that rival too, unless it is the
+ * winner's own word or one edit from it and nearer the winner than any word
+ * the winner does not share: "kajan" is one edit from both "katan" and
+ * "kajal", so it is a choice, but "sharee" is "saree" whichever saree it is.
  */
 function namedRivals(
   queries: readonly (string | undefined)[],
@@ -230,9 +232,20 @@ function namedRivals(
 ): string[] {
   const loose = { ...t, word: t.some };
   const mine = ownWords(catalog.products.find((product) => product.id === winnerId)!);
+  const rest = catalog.products
+    .filter((product) => product.id !== winnerId)
+    .flatMap(ownWords)
+    .filter((word) => !mine.includes(word));
   const written = forms(queries);
   const foreign = uncovered(written, (word) => strength(word, mine, loose) > 0);
-  const misspelt = uncovered(written, (word) => mine.some((own) => editDistance(word, own) <= 1));
+  const misspelt = uncovered(
+    written,
+    (word) => {
+      const distance = nearest(word, mine);
+      return distance === 0 || (distance <= 1 && distance < nearest(word, rest));
+    },
+    (word) => mine.includes(word),
+  );
   if (foreign.length === 0 && misspelt.length === 0) return [];
   return catalog.products
     .filter((product) => {
@@ -245,6 +258,9 @@ function namedRivals(
     })
     .map((product) => product.id);
 }
+
+const nearest = (word: string, among: readonly string[]) =>
+  among.reduce((top, own) => Math.min(top, editDistance(word, own)), Infinity);
 
 /**
  * Whether `word` is one of `among` misspelt, by Elasticsearch's AUTO
@@ -282,19 +298,22 @@ function editDistance(a: string, b: string): number {
 
 /**
  * The words `covered` leaves. When every script has as many words, the
- * forms are one text transliterated word by word, so a word whose twin is
- * covered is covered too: "katan shari" for "কাতান শাড়ি", though "shari" is
- * only the Jamdani's alias. Forms of different lengths are judged word by word.
+ * forms are one text transliterated word by word, so a word whose twin
+ * `vouches` for it is covered too: "katan shari" for "কাতান শাড়ি", though
+ * "shari" is only the Jamdani's alias. A misspelt twin cannot vouch for a word
+ * the winner does not cover, since extraction transliterated the misspelling.
+ * Forms of different lengths are judged word by word.
  */
 function uncovered(
   written: readonly (readonly string[])[],
   covered: (word: string) => boolean,
+  vouches: (word: string) => boolean = covered,
 ): string[] {
   const aligned = written.every((words) => words.length === written[0]!.length);
   if (!aligned) return written.flat().filter((word) => !covered(word));
   return written[0]!.flatMap((_, i) => {
     const twins = written.map((words) => words[i]!);
-    return twins.some(covered) ? [] : twins;
+    return twins.some(vouches) ? [] : twins.filter((word) => !covered(word));
   });
 }
 
