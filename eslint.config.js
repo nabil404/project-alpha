@@ -61,6 +61,14 @@ export default tseslint.config(
           message:
             'Start a spec app with listenOnLoopback(app) from src/__tests__/listen-on-loopback.',
         },
+        {
+          // Spec files run in parallel on one database. A table a spec creates
+          // or drops beside shared tables (a foreign key to product_variant)
+          // deadlocks other files' writes to them.
+          selector: 'TemplateElement[value.raw=/\\b(create|drop|alter)\\s+table\\b/i]',
+          message:
+            'No DDL in code or specs: schema changes go through drizzle-kit, and a spec seeds rows into the real tables.',
+        },
       ],
     },
   },
