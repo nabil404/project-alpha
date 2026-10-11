@@ -226,8 +226,13 @@ describeDb('conversation simulator', () => {
       expect(echoed.state).toBe('collecting_details');
       expect(echoed.slots.items[0]).not.toHaveProperty('productId');
       expect(echoed.slots.items[0]).toMatchObject({ productQuery: 'saree', quantity: 3 });
+      expect(echoed.slots.quote).toBeUndefined();
+
+      const old = await sim.step({ button: 'confirm', card: 0 });
+      expect(old.sends.map((sent) => sent.text)).toEqual([confirmText({ kind: 'stale' }, 'bn')]);
+      expect(old.ordersCreated).toEqual([]);
     } finally {
-      sim.print('echoed "saree" on a picked item: asks again');
+      sim.print('echoed "saree" on a picked item: asks again, and the old card is refused');
     }
   }, 60_000);
 });

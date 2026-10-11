@@ -851,6 +851,29 @@ describe('decideTurn: the summary', () => {
       }),
     );
     expect(decision.reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
+    expect(decision.slots.quote).toBeUndefined();
+    expect(decision.slots.revision).toBe(2);
+  });
+
+  it('retires the card when a message after the summary leads to a question', () => {
+    const shown = complete();
+    const decision = decideTurn(
+      turn({
+        state: 'awaiting_confirmation',
+        slots: shown.slots,
+        trigger: message(
+          {
+            ...nothing,
+            items: [said({ ref: 0 }), said({ ref: 1 }), said({ productQuery: 'gamcha' })],
+          },
+          asked('edit_order'),
+        ),
+      }),
+    );
+    expect(decision.state).toBe('collecting_details');
+    expect(decision.reply.kind).toBe('ask_slot');
+    expect(decision.slots.quote).toBeUndefined();
+    expect(decision.slots.revision).toBe(2);
   });
 });
 
