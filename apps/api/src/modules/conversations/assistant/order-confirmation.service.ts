@@ -60,15 +60,6 @@ interface Decided {
 }
 
 /**
- * The summary card's buttons (P10: no LLM on this path). One short
- * transaction locks the conversation, re-reads every line's variant and the
- * delivery fee, and either creates the order with the card's numbers or says
- * why not; the reply is staged in it and sent after commit, and the seller is
- * emailed only when this run created the order. The idempotency key per card
- * revision makes a second tap find the first order and resend its reference.
- */
-@Injectable()
-/**
  * A stored reply another run is sending, or was until it died: the job
  * retries until that run marks it sent or its lease ends and this one claims it.
  */
@@ -79,6 +70,15 @@ export class ReplyInFlightError extends Error {
   }
 }
 
+/**
+ * The summary card's buttons (P10: no LLM on this path). One short
+ * transaction locks the conversation, re-reads every line's variant and the
+ * delivery fee, and either creates the order with the card's numbers or says
+ * why not; the reply is staged in it and sent after commit, and the seller is
+ * emailed only when this run created the order. The idempotency key per card
+ * revision makes a second tap find the first order and resend its reference.
+ */
+@Injectable()
 export class OrderConfirmationService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,

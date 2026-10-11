@@ -43,6 +43,21 @@ export default tseslint.config(
     },
   },
   {
+    // A decorator binds to the next class, so an error class written between
+    // `@Injectable()` and its service takes the decorator instead.
+    files: ['apps/api/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ClassDeclaration[superClass.name=/Error$/] > Decorator',
+          message:
+            'An error class is never a provider. Move it above the decorator, which belongs to the class below.',
+        },
+      ],
+    },
+  },
+  {
     // The browser's own dropdown ignores the design system; use Select (short
     // lists) or Combobox (long, searchable ones) from components/ui.
     files: ['apps/web/src/**/*.tsx'],
