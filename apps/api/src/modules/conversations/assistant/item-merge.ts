@@ -17,8 +17,8 @@ const words = (value: string | null | undefined): string | undefined => {
  * names a collected item continues it. Extraction returns product words on
  * such an entry only when the customer changed which product it is, so null
  * words keep its matched ids and any words drop them and match again; the
- * variant likewise. A re-mention echoed anyway costs one question, never a
- * kept product the customer turned down. An item left out is removed. A
+ * variant likewise. A re-mention echoed anyway asks again rather than keep
+ * a product the customer turned down. An item left out is removed. A
  * `ref` that does not exist, or that an earlier entry already used, starts a
  * new item. An entry with no product words and nothing to continue is
  * dropped.
