@@ -578,6 +578,23 @@ describe('decideTurn: several items', () => {
       expect(after(picked(katan, 'katan'), words).productId).not.toBe(katan.id);
     });
 
+    it.each([
+      ['jamdani', undefined],
+      ['জামদানী', 'jamdani'],
+    ])(
+      'picks the Jamdani Saree when extraction gives only the wanted product: %s',
+      (productQuery, productQueryAlt) => {
+        const decision = afterWords(picked(katan, 'katan'), productQuery, productQueryAlt);
+        expect(decision.slots.items[0]!.productId).toBe(jamdani.id);
+      },
+    );
+
+    it('offers the Jamdani Saree when extraction gives the wanted product misspelt', () => {
+      const decision = afterWords(picked(katan, 'katan'), 'jamdni');
+      expect(decision.slots.items[0]!.productId).toBeUndefined();
+      expect(decision.slots.offered).toEqual({ slot: 'product', item: 0, ids: [jamdani.id] });
+    });
+
     it('lets go of the lungi for a check shirt', () => {
       expect(after(picked(lungi, 'lungi'), 'check shirt').productId).not.toBe(lungi.id);
     });
