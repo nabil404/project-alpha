@@ -28,6 +28,7 @@ import type { RawBodyRequest } from '../../messenger/raw-body';
 import { AuthModule } from '../auth.module';
 import { SessionGuard } from '../session.guard';
 import { CapturingMailer } from './capturing-mailer';
+import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
 
 // Needs a real Postgres: Better Auth, the organization bootstrap and the token
 // tables are all server behaviour. CI sets DATABASE_ADMIN_URL; locally, export
@@ -128,7 +129,7 @@ describeDb('email/password auth over HTTP', () => {
       logger: false,
     });
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   afterAll(async () => {

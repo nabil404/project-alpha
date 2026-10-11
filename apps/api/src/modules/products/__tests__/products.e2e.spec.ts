@@ -26,6 +26,7 @@ import { MailService } from '../../mail/mail.service';
 import { ObjectStorage } from '../../storage/object-storage';
 import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
 import { ProductsModule } from '../products.module';
+import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
 
 const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
 
@@ -91,7 +92,7 @@ describeDb('product routes over HTTP', () => {
       logger: false,
     });
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   beforeEach(() => {

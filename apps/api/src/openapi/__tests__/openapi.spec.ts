@@ -14,6 +14,7 @@ import { ERROR_RESPONSE_SCHEMA } from '../api-coded-error';
 import { SESSION_COOKIE_SCHEME } from '../merge-auth-document';
 import { OPENAPI_JSON_PATH, OPENAPI_UI_PATH, setupOpenApi } from '../openapi';
 import { STUB_APP_URL, stubAuth } from './stub-auth';
+import { listenOnLoopback } from '../../__tests__/listen-on-loopback';
 
 const silentLogger = { error: () => {} } as unknown as LoggerService;
 
@@ -52,7 +53,7 @@ describe('OpenAPI document', () => {
     app = moduleRef.createNestApplication();
     configureApp(app, silentLogger);
     await setupOpenApi(app, stubAuth());
-    await app.init();
+    await listenOnLoopback(app);
 
     const response = await request(app.getHttpServer()).get(`/${OPENAPI_JSON_PATH}`).expect(200);
     document = response.body as OpenAPIObject;
