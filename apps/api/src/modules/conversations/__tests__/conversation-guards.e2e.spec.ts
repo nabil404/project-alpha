@@ -19,6 +19,7 @@ import { META_GRAPH } from '../../messenger/page/facebook-page.service';
 import { ConversationsModule } from '../conversations.module';
 import { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { CONVERSATION_EVENTS_SUBSCRIBE } from '../events/redis-connections';
+import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
 
 const APP_URL = 'http://localhost:5173';
 const EMAIL_DOMAIN = `${randomUUID()}.example.test`;
@@ -99,7 +100,7 @@ describeDb('conversations routes behind the real guards', () => {
       logger: false,
     });
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   afterAll(async () => {

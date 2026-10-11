@@ -10,6 +10,7 @@ import { DATABASE } from '../modules/database/database.module';
 import { HealthController } from '../modules/health/health.module';
 import { MessengerController } from '../modules/messenger/messenger.controller';
 import { MESSENGER_QUEUE } from '../modules/queue/queue.constants';
+import { listenOnLoopback } from './listen-on-loopback';
 
 const VERIFY_TOKEN = 'verify-me';
 
@@ -53,7 +54,7 @@ describe('API versioning', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   afterAll(async () => {

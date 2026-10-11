@@ -32,6 +32,7 @@ import { seedConversation, seedCustomer } from '../../database/__tests__/convers
 import { seedOrder } from '../../database/__tests__/order-seeds';
 import { MailService } from '../../mail/mail.service';
 import { CustomersModule } from '../customers.module';
+import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
 
 const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
 
@@ -91,7 +92,7 @@ describeDb('customer routes over HTTP', () => {
       logger: false,
     });
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
 
     await t.db.insert(schema.user).values({ ...seller, email: `${seller.id}@example.com` });
     const nusrat = await seedCustomer(t.db, t.merchantA, {

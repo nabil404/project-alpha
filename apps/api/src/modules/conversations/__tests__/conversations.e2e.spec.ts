@@ -41,6 +41,7 @@ import type { ConversationEvent } from '../events/conversation-event';
 import { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { CONVERSATION_EVENTS_SUBSCRIBE } from '../events/redis-connections';
 import { ConversationsModule } from '../conversations.module';
+import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
 
 const silentLogger = { error: () => {}, log: () => {}, warn: () => {} } as unknown as LoggerService;
 
@@ -149,7 +150,7 @@ describeDb('conversation routes over HTTP', () => {
       logger: false,
     });
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   beforeEach(() => {

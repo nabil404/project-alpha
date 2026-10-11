@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { configureApp } from '../bootstrap';
 import { CodedUnauthorizedException } from '../common/errors/coded-exceptions';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { listenOnLoopback } from './listen-on-loopback';
 
 const querySchema = z.object({ quantity: z.coerce.number().int().positive() });
 
@@ -42,7 +43,7 @@ describe('error envelope over HTTP', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   afterAll(async () => {

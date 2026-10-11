@@ -54,6 +54,13 @@ export default tseslint.config(
           message:
             'An error class is never a provider. Move it above the decorator, which belongs to the class below.',
         },
+        {
+          // supertest on an unstarted app listens on `::` and dials 127.0.0.1,
+          // which another local process can answer (src/__tests__/listen-on-loopback.ts).
+          selector: "CallExpression[callee.object.name='app'][callee.property.name='init']",
+          message:
+            'Start a spec app with listenOnLoopback(app) from src/__tests__/listen-on-loopback.',
+        },
       ],
     },
   },

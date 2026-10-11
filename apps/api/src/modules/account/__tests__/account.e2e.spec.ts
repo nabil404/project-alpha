@@ -22,6 +22,7 @@ import {
   TEST_PUBLIC_BASE_URL,
 } from '../../storage/__tests__/in-memory-object-storage';
 import { AccountModule } from '../account.module';
+import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
 
 // Needs a real Postgres: sessions, password hashing and the hooks are Better
 // Auth server behaviour. CI sets DATABASE_ADMIN_URL; locally, export it.
@@ -122,7 +123,7 @@ describeDb('Settings > Account over HTTP', () => {
       logger: false,
     });
     configureApp(app, silentLogger);
-    await app.init();
+    await listenOnLoopback(app);
   });
 
   afterAll(async () => {
