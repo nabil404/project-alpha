@@ -161,8 +161,10 @@ enabled and forced with a `*_merchant_isolation` policy, and composite
   `0027`),
   `tracking_number`, `notes` (internal), `revision`, `idempotency_key`
   (`UNIQUE (merchant_id, idempotency_key)`), `placed_at`. Indexed on
-  `(merchant_id, placed_at DESC, id)`, `(merchant_id, status, placed_at DESC, id)`
-  and `(merchant_id, customer_id, placed_at DESC, id)`.
+  `(merchant_id, placed_at DESC, id)`, `(merchant_id, status, placed_at DESC, id)`,
+  `(merchant_id, customer_id, placed_at DESC, id)` and
+  `(merchant_id, conversation_id, placed_at DESC, id)` (migration `0035`, for
+  a chat's latest order).
 - `order_item`: `order_id` (cascades), `product_id` → `product` and
   `variant_id` → `product_variant` with no ON DELETE action (null only on
   lines written before the keys), snapshots `product_name`, `variant_name`,

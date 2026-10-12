@@ -218,6 +218,7 @@ describeDb('conversation routes over HTTP', () => {
       botPaused: false,
     });
     expect(detail.replyWindowClosesAt).not.toBeNull();
+    expect(detail.latestOrderId).toBeNull();
 
     const thread = messagePageSchema.parse(
       (await request(server()).get(`/api/v1/conversations/${handedOff}/messages`).expect(200)).body,

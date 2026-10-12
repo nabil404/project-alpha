@@ -1,0 +1,1 @@
+CREATE INDEX "order_conversation_placed_idx" ON "order" USING btree ("merchant_id","conversation_id","placed_at" DESC NULLS LAST,"id");
