@@ -3,9 +3,9 @@ import { createServer, type AddressInfo } from 'node:net';
 import { Logger } from '@nestjs/common';
 import { CONVERSATION_EVENTS_CHANNEL } from '../conversation-event';
 import { publisherConnection, redisSubscribe } from '../redis-connections';
+import { describeRedis, testRedisUrl } from '../../../../__tests__/test-env';
 
-const url = process.env.REDIS_URL;
-const describeRedis = url ? describe : describe.skip;
+const url = testRedisUrl;
 
 async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;

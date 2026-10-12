@@ -491,15 +491,16 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 | [`products/images/__tests__/`](../../../apps/api/src/modules/products/images/__tests__/)                                                               | Normalization, keys, interceptor, repository, service, cover, sweep, and a multipart e2e through the Nest app |
 | [`storage/__tests__/s3-object-storage.spec.ts`](../../../apps/api/src/modules/storage/__tests__/s3-object-storage.spec.ts)                             | The S3 adapter and its error mapping                                                                          |
 
-The database-backed specs are **skipped** unless `DATABASE_ADMIN_URL` is set.
-CI sets it. No test contacts R2. Locally:
+The database-backed specs are **skipped** unless `TEST_DATABASE_ADMIN_URL` is
+set (see `environments/.env.example`); the Jest run creates and migrates that
+database itself. CI sets it. No test contacts R2. Locally:
 
 ```bash
 pnpm dev:up
 ```
 
 ```bash
-DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- catalog products categories
+pnpm --filter api test -- catalog products categories
 ```
 
 ## Dashboard

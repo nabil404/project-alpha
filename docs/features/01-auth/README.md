@@ -331,14 +331,15 @@ http://localhost:8025.
 | [`database/__tests__/ensure-organization.spec.ts`](../../../apps/api/src/modules/database/__tests__/ensure-organization.spec.ts) | Organization bootstrap and its idempotency                                                                  |
 
 The e2e spec needs a real Postgres and is **skipped** unless
-`DATABASE_ADMIN_URL` is set. CI sets it. Locally:
+`TEST_DATABASE_ADMIN_URL` is set (see `environments/.env.example`); the Jest run
+creates and migrates that database itself. CI sets it. Locally:
 
 ```bash
 pnpm dev:up
 ```
 
 ```bash
-DATABASE_ADMIN_URL=postgres://… pnpm --filter api test -- auth
+pnpm --filter api test -- auth
 ```
 
 ## Not yet built

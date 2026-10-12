@@ -4,6 +4,8 @@ export default {
   testEnvironment: 'node',
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
+  // Loads the TEST_* variables and migrates the test database.
+  globalSetup: '<rootDir>/jest.global-setup.mjs',
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     // CommonJS that require()s ESM; see the stub for why.

@@ -85,6 +85,14 @@ environments/.env -f docker/compose.local.yml …`, wrapped as `pnpm dev:up` /
 - **Test runners.** `apps/web` and `packages/shared` have none yet; `apps/api`
   Jest runs as ESM (`--experimental-vm-modules`), configured in
   `apps/api/jest.config.mjs`.
+- **Test database.** Specs never use `DATABASE_URL`, `DATABASE_ADMIN_URL` or
+  `REDIS_URL`. They read `TEST_DATABASE_ADMIN_URL` and `TEST_REDIS_URL` through
+  `apps/api/src/__tests__/test-env.ts` (`describeDb`, `testDatabaseUrl`, …).
+  `apps/api/jest.global-setup.mjs` copies only those keys from
+  `environments/.env`, refuses a database whose name does not end in `_test`,
+  creates it if it is missing and migrates it before every run. When they are
+  unset, the database- and Redis-backed specs are skipped, and a skipped suite
+  is not a pass.
 
 ## Conventions for Claude Code
 

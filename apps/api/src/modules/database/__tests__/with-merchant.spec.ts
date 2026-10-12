@@ -5,6 +5,7 @@ import type { Database } from '../database.module';
 import type { Executor } from '../base.repository';
 import * as schema from '../schema/index';
 import { withMerchant } from '../with-merchant';
+import { describeDb, testDatabaseUrl } from '../../../__tests__/test-env';
 
 // Better Auth's Organization plugin generates organization.id as TEXT, a
 // random string rather than a uuid, and merchant_id references it. Shaped like the
@@ -46,10 +47,8 @@ describe('withMerchant (no database)', () => {
 });
 
 // The rest needs a real Postgres: transaction-locality is a server behaviour,
-// not something a fake can demonstrate. CI sets DATABASE_ADMIN_URL; locally,
-// export it (pointing at docker/compose.local.yml) to run these.
-const url = process.env.DATABASE_ADMIN_URL;
-const describeDb = url ? describe : describe.skip;
+// not something a fake can demonstrate.
+const url = testDatabaseUrl;
 
 describeDb('withMerchant (against Postgres)', () => {
   let db: Database;

@@ -29,12 +29,11 @@ import { AuthModule } from '../auth.module';
 import { SessionGuard } from '../session.guard';
 import { CapturingMailer } from './capturing-mailer';
 import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
+import { describeDb, testDatabaseUrl } from '../../../__tests__/test-env';
 
 // Needs a real Postgres: Better Auth, the organization bootstrap and the token
-// tables are all server behaviour. CI sets DATABASE_ADMIN_URL; locally, export
-// it (pointing at docker/compose.local.yml) to run these.
-const url = process.env.DATABASE_ADMIN_URL;
-const describeDb = url ? describe : describe.skip;
+// tables are all server behaviour.
+const url = testDatabaseUrl;
 
 const APP_URL = 'http://localhost:5173';
 const EMAIL_DOMAIN = `${randomUUID()}.example.test`;
