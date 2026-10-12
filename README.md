@@ -18,7 +18,7 @@ static/          Privacy policy, terms, data deletion (Meta App Review)
 
 ```bash
 pnpm install
-cp apps/api/.env.example apps/api/.env      # then fill in the secrets
+cp environments/.env.example environments/.env      # then fill in the secrets
 pnpm dev:up                                 # Postgres and Redis
 pnpm --filter @app/shared build
 pnpm --filter api db:migrate                # apply migrations
@@ -28,17 +28,17 @@ pnpm dev                                    # api on :3000, web on :5173
 The api and worker validate their environment at startup and refuse to run
 without the `STORAGE_*` object-storage variables. Use the development R2
 bucket and its own bucket-scoped API token (see the Object storage block in
-`apps/api/.env.example`); nothing contacts the bucket at boot, but the values
+`environments/.env.example`); nothing contacts the bucket at boot, but the values
 must be present and well-formed.
 
-`apps/api/.env` is the only env file in the repo: the api and worker read it
+`environments/.env` is the only env file in the repo: the api and worker read it
 through `@nestjs/config`, the schema tooling loads it for `DATABASE_ADMIN_URL`,
 and the compose stacks interpolate it for `DOMAIN` and the Postgres
 credentials. Compose has to be pointed at it, since it would otherwise look for
 `docker/.env` — that is all `pnpm dev:up` / `pnpm dev:down` do:
 
 ```bash
-docker compose --env-file apps/api/.env -f docker/compose.local.yml up -d
+docker compose --env-file environments/.env -f docker/compose.local.yml up -d
 ```
 
 The file is written for host development. `docker/compose.yml` overrides

@@ -17,7 +17,7 @@ log() { echo "deploy[$APP_ENV ${sha:0:7}]: $*"; }
 # The whole env file is one SecureString, written as it is. Compose validates
 # what the stack needs; the app validates the rest at boot.
 log "writing env file"
-mkdir -p /opt/app/apps/api
+mkdir -p /opt/app/environments
 (
   umask 077
   aws ssm get-parameter --name "/social-glider/$APP_ENV/env" --with-decryption \

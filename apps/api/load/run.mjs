@@ -6,7 +6,7 @@
 //
 // <test> is a name under load/tests or a path to a k6 script. After k6 passes,
 // the test's `<name>.verify.mjs`, if any, checks what the run left behind.
-// apps/api/.env reaches k6 as __ENV, keeping secrets off the command line.
+// environments/.env reaches k6 as __ENV, keeping secrets off the command line.
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
@@ -68,12 +68,12 @@ if (!testArg) usage('No load test given.');
 const testFile = resolveTest(testArg);
 if (!testFile) usage(`Unknown load test "${testArg}".`);
 
-// apps/api/.env is the repo's only env file. Absent is fine: the shell may
+// environments/.env is the repo's only env file. Absent is fine: the shell may
 // already carry what the test needs.
 try {
-  process.loadEnvFile(join(API_DIR, '.env'));
+  process.loadEnvFile(join(API_DIR, '../../environments/.env'));
 } catch {
-  // no .env here
+  // no environments/.env here
 }
 
 if (process.env.NODE_ENV === 'production') {

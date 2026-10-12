@@ -1,5 +1,5 @@
 # Overlay for the stage server, a smaller prod rehearsal, on top of compose.yml:
-#   docker compose --env-file apps/api/.env -f docker/compose.yml -f docker/compose.stage.yml …
+#   docker compose --env-file environments/.env -f docker/compose.yml -f docker/compose.stage.yml …
 #
 # Container sizing only, matched to infra/cloudformation/environments/stage.params
 # (t3.small, 2 GiB); change the two together. App settings come from Parameter Store

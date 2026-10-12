@@ -14,7 +14,7 @@ pnpm --filter api load messenger-webhook -e RATE=10 -e DURATION=10s -e SCENARIOS
 
 `load/run.mjs` takes the test as its argument and does the following:
 
-- loads `apps/api/.env` into k6's environment, so a test reads
+- loads `environments/.env` into k6's environment, so a test reads
   `META_APP_SECRET` and the rest as `__ENV` without a secret on the command line.
   Variables already set in the shell win.
 - sets `RUN_ID`, `TEST_NAME` and `BASE_URL` (`http://localhost:$PORT` unless set).

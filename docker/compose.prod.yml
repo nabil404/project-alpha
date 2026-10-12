@@ -1,5 +1,5 @@
 # Overlay for the production server, on top of compose.yml:
-#   docker compose --env-file apps/api/.env -f docker/compose.yml -f docker/compose.prod.yml …
+#   docker compose --env-file environments/.env -f docker/compose.yml -f docker/compose.prod.yml …
 #
 # Container sizing only, matched to infra/cloudformation/environments/prod.params
 # (t3.medium, 4 GiB); change the two together. App settings come from Parameter Store

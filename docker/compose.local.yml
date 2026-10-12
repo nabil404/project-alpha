@@ -1,9 +1,9 @@
 # Local dependencies only. The api, worker and SPA run on the host with
 # `pnpm dev`. Servers use compose.yml plus their overlay.
 #
-# Interpolated from apps/api/.env so Postgres and the app share credentials.
+# Interpolated from environments/.env so Postgres and the app share credentials.
 # Use `pnpm dev:up` / `pnpm dev:down`, or:
-#   docker compose --env-file apps/api/.env -f docker/compose.local.yml up -d
+#   docker compose --env-file environments/.env -f docker/compose.local.yml up -d
 #
 # The project keeps the name app-dev so existing local volumes survive.
 name: app-dev
@@ -22,7 +22,7 @@ services:
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
       # Runs only on a fresh volume. After a `docker compose down -v` the role is
-      # recreated automatically; on an existing volume, see apps/api/.env.example.
+      # recreated automatically; on an existing volume, see environments/.env.example.
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app}']

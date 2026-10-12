@@ -2,7 +2,7 @@
 # Creates the restricted login role the api and worker connect as. Postgres
 # runs this only on a fresh data directory. On an older cluster, the
 # rls_runtime_role migration creates the role NOLOGIN and an operator sets its
-# password by hand (see apps/api/.env.example). Grants belong to the migration.
+# password by hand (see environments/.env.example). Grants belong to the migration.
 set -eu
 
 if [ -z "${APP_RUNTIME_PASSWORD:-}" ]; then

@@ -9,7 +9,7 @@ import { productImageKeys } from '../../products/images/product-image-keys';
 import * as schema from '../schema/index';
 
 // Needs a real Postgres: constraints, locks and policies are server behaviour.
-// CI sets DATABASE_ADMIN_URL; locally, load apps/api/.env first. The admin role
+// CI sets DATABASE_ADMIN_URL; locally, load environments/.env first. The admin role
 // is a superuser, so RLS does not apply here. catalog-rls.spec.ts switches to
 // app_runtime explicitly to test policies.
 const url = process.env.DATABASE_ADMIN_URL;

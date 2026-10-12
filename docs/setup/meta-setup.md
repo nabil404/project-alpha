@@ -196,7 +196,7 @@ when you subscribe the webhook, and the API compares it to
 openssl rand -hex 32
 ```
 
-Put the output in `apps/api/.env` **before** subscribing the webhook, and
+Put the output in `environments/.env` **before** subscribing the webhook, and
 restart the API.
 
 ### 7. Choose `META_GRAPH_VERSION`
@@ -301,7 +301,7 @@ In each app, open **App roles → Roles** and add them as **Administrator**,
 
 ### 10. Fill the env file
 
-In `apps/api/.env`:
+In `environments/.env`:
 
 ```dotenv
 # ---- Auth ----
@@ -347,7 +347,7 @@ one HTTPS host, so the redirect URI can be a real `https://` entry.
    `cloudflared tunnel --url http://localhost:5173` (or `ngrok http 5173`).
    `vite.config.ts` already allows `*.trycloudflare.com` and
    `*.ngrok-free.app` hosts.
-2. In `apps/api/.env`, set `APP_URL=https://<tunnel-host>` and restart the API.
+2. In `environments/.env`, set `APP_URL=https://<tunnel-host>` and restart the API.
    Better Auth trusts only `APP_URL`, and the Page connection derives its
    redirect URI from it.
 3. Add `https://<tunnel-host>/api/v1/auth/callback/facebook` to the sign-in

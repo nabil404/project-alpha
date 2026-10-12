@@ -9,12 +9,12 @@
 
 import { Pool } from 'pg';
 
-// apps/api/.env is the repo's only env file and cwd here is apps/api. It is
+// environments/.env is the repo's only env file and cwd here is apps/api. It is
 // absent in CI and in the image, where the environment is already set.
 try {
-  process.loadEnvFile('.env');
+  process.loadEnvFile('../../environments/.env');
 } catch {
-  // no .env here
+  // no environments/.env here
 }
 
 const connectionString = process.env.DATABASE_ADMIN_URL;

@@ -105,7 +105,7 @@ JSON routes, in the error envelope with the status shown.
 ## Configuration
 
 From [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts),
-set in `apps/api/.env`. Setting up the Meta app:
+set in `environments/.env`. Setting up the Meta app:
 [meta setup](../../setup/meta-setup.md).
 
 | Variable               | Required | Notes                                                                                          |

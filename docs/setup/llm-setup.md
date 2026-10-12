@@ -13,7 +13,7 @@ LLM_API_KEY=
 
 All five are optional and have defaults in
 [`env.schema.ts`](../../apps/api/src/modules/config/env.schema.ts) (the
-defaults are also in [`.env.example`](../../apps/api/.env.example)). The worker
+defaults are also in [`.env.example`](../../environments/.env.example)). The worker
 reads them for every assistant turn
 ([phase 11.1](../features/11-ai-implementation/phase-1-foundation/README.md)).
 Without `LLM_API_KEY` the API and worker still boot and store messages, but no
@@ -62,7 +62,7 @@ does not show it again.
 
 ### 4. Fill the env file
 
-In `apps/api/.env`:
+In `environments/.env`:
 
 ```dotenv
 LLM_PROVIDER=openai

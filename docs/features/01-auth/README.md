@@ -294,7 +294,7 @@ lock out sign-in itself.
 ## Configuration
 
 From [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts),
-set in `apps/api/.env`:
+set in `environments/.env`:
 
 | Variable                                       | Required | Notes                                                                  |
 | ---------------------------------------------- | -------- | ---------------------------------------------------------------------- |

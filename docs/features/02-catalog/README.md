@@ -439,7 +439,7 @@ After changing it, run `pnpm --filter @app/shared build`: `apps/api` resolves
 ## Configuration
 
 From [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts), all
-required, set in `apps/api/.env`:
+required, set in `environments/.env`:
 
 | Variable                    | Notes                                                                       |
 | --------------------------- | --------------------------------------------------------------------------- |

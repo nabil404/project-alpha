@@ -101,7 +101,7 @@ Changes to origins and redirect URIs can take a few minutes to apply.
 
 ### 4. Fill the env file
 
-In `apps/api/.env`:
+In `environments/.env`:
 
 ```dotenv
 GOOGLE_CLIENT_ID=1234567890-abc123.apps.googleusercontent.com
@@ -110,7 +110,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 
 Restart the API (`pnpm dev`). The values are read once at boot.
 
-Never commit `apps/api/.env`, and never paste the secret into logs, issues or
+Never commit `environments/.env`, and never paste the secret into logs, issues or
 chat.
 
 ### 5. Verify
