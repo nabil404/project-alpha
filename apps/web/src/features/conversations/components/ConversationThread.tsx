@@ -1,18 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Bot, ChevronLeft } from 'lucide-react';
+import { Bot, ChevronLeft, ChevronRight, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ConversationDetail } from '@app/shared';
 
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
-import { useFormatters } from '@/lib/format';
 import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 import { useConversation, useMarkRead, useUpdateConversation } from '../queries';
-import { ConversationStateBadge } from './ConversationStateBadge';
 import { CustomerAvatar } from './CustomerAvatar';
 import { useCustomerName } from './customer-name';
 import { MessageComposer } from './MessageComposer';
@@ -30,8 +28,17 @@ function isReplyWindowOpen(conversation: ConversationDetail): boolean {
   );
 }
 
-/** One chat: who it is with, who is answering, the messages and the reply box. */
-export function ConversationThread({ conversationId }: { conversationId: string }) {
+/**
+ * One chat: who it is with, who is answering, the messages and the reply box.
+ * `beforeComposer` sits between the messages and the reply box.
+ */
+export function ConversationThread({
+  conversationId,
+  beforeComposer,
+}: {
+  conversationId: string;
+  beforeComposer?: ReactNode;
+}) {
   const { t } = useTranslation('conversations');
   const { forError } = useErrorMessages();
   const conversation = useConversation(conversationId);
@@ -60,18 +67,16 @@ export function ConversationThread({ conversationId }: { conversationId: string 
   const assistantActive = isAssistantActive(detail);
 
   return (
-    <div className="flex min-h-0 min-w-0 grow">
-      <div className="flex min-h-0 min-w-0 grow flex-col">
-        <ThreadHeader conversation={detail} assistantActive={assistantActive} />
-        <MessageList conversationId={conversationId} />
-        <MessageComposer
-          conversationId={conversationId}
-          customerName={detail.customer.name ?? t('customer.unknownName')}
-          assistantActive={assistantActive}
-          windowOpen={isReplyWindowOpen(detail)}
-        />
-      </div>
-      <CustomerPanel conversation={detail} />
+    <div className="flex min-h-0 min-w-0 grow flex-col">
+      <ThreadHeader conversation={detail} assistantActive={assistantActive} />
+      <MessageList conversationId={conversationId} />
+      {beforeComposer}
+      <MessageComposer
+        conversationId={conversationId}
+        customerName={detail.customer.name ?? t('customer.unknownName')}
+        assistantActive={assistantActive}
+        windowOpen={isReplyWindowOpen(detail)}
+      />
     </div>
   );
 }
@@ -127,6 +132,17 @@ function ThreadHeader({
           <ModePill assistantActive={assistantActive} label={modeLabel} />
           {toggle}
         </span>
+        {/* From `xl` up the details sit beside the thread instead. */}
+        <Button asChild variant="ghost" size="icon" className="size-11 xl:hidden">
+          <Link
+            to="/conversations/$conversationId/details"
+            params={{ conversationId: conversation.id }}
+            search={(prev) => prev}
+            aria-label={t('thread.details')}
+          >
+            <UserRound aria-hidden className="size-6" strokeWidth={1.5} />
+          </Link>
+        </Button>
       </header>
 
       {/* Below `sm` the mode and its switch get a row of their own, as in Messenger. */}
@@ -158,38 +174,59 @@ function ModePill({ assistantActive, label }: { assistantActive: boolean; label:
   );
 }
 
-/** Who the seller is talking to, beside the thread on wide screens. */
-function CustomerPanel({ conversation }: { conversation: ConversationDetail }) {
+/** The Details screen's header: back to the chat, and where it sits. */
+export function ConversationDetailsHeader({ conversationId }: { conversationId: string }) {
   const { t } = useTranslation('conversations');
-  const { formatDate } = useFormatters();
   const customerName = useCustomerName();
-  const windowOpen = isReplyWindowOpen(conversation);
+  const conversation = useConversation(conversationId);
+  const name = conversation.data ? customerName(conversation.data.customer.name) : '';
 
   return (
-    <aside
-      aria-label={t('customer.title')}
-      className="hidden w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l border-border bg-surface p-6 xl:flex"
-    >
-      <h2 className="text-heading">{t('customer.title')}</h2>
-      <div className="flex items-center gap-3">
-        <CustomerAvatar
-          name={conversation.customer.name}
-          pictureUrl={conversation.customer.pictureUrl}
-        />
-        <span className="min-w-0 truncate text-body font-medium">
-          {customerName(conversation.customer.name)}
-        </span>
-      </div>
-      <div className="flex">
-        <ConversationStateBadge state={conversation.state} />
-      </div>
-      <p className="text-small text-ink-muted">
-        {windowOpen && conversation.replyWindowClosesAt
-          ? t('customer.replyUntil', {
-              time: formatDate(conversation.replyWindowClosesAt, 'dateTime'),
-            })
-          : t('customer.replyWindowClosed')}
-      </p>
-    </aside>
+    <>
+      <header className="flex h-14 shrink-0 items-center gap-1 border-b border-border bg-surface px-2">
+        <Button asChild variant="ghost" size="icon" className="size-11">
+          <Link
+            to="/conversations/$conversationId"
+            params={{ conversationId }}
+            search={(prev) => prev}
+            aria-label={t('details.back')}
+          >
+            <ChevronLeft aria-hidden className="size-6" strokeWidth={1.5} />
+          </Link>
+        </Button>
+        <h1 className="min-w-0 grow truncate text-heading">{t('details.title')}</h1>
+      </header>
+      <nav
+        aria-label={t('details.breadcrumb')}
+        className="shrink-0 border-b border-border bg-surface px-4 py-2"
+      >
+        <ol className="flex min-w-0 items-center gap-1 text-small text-ink-muted">
+          <li className="shrink-0">
+            <Link to="/conversations" search={(prev) => prev} className="hover:text-ink">
+              {t('list.title')}
+            </Link>
+          </li>
+          <li aria-hidden className="flex">
+            <ChevronRight strokeWidth={1.5} className="size-3.5" />
+          </li>
+          <li className="min-w-0 truncate">
+            <Link
+              to="/conversations/$conversationId"
+              params={{ conversationId }}
+              search={(prev) => prev}
+              className="hover:text-ink"
+            >
+              {name}
+            </Link>
+          </li>
+          <li aria-hidden className="flex">
+            <ChevronRight strokeWidth={1.5} className="size-3.5" />
+          </li>
+          <li aria-current="page" className="shrink-0 font-medium text-ink">
+            {t('details.title')}
+          </li>
+        </ol>
+      </nav>
+    </>
   );
 }

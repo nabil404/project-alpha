@@ -34,6 +34,7 @@ import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings
 import { Route as AppSettingsNotificationsRouteImport } from './routes/_app/settings/notifications'
 import { Route as AppCatalogProductsProductIdRouteImport } from './routes/_app/catalog/products/$productId'
 import { Route as AppCatalogProductsNewRouteImport } from './routes/_app/catalog/products/new'
+import { Route as AppConversationsConversationIdDetailsRouteImport } from './routes/_app/conversations/$conversationId_.details'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -161,6 +162,12 @@ const AppCatalogProductsNewRoute = AppCatalogProductsNewRouteImport.update({
   path: '/catalog/products/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConversationsConversationIdDetailsRoute =
+  AppConversationsConversationIdDetailsRouteImport.update({
+    id: '/$conversationId_/details',
+    path: '/$conversationId/details',
+    getParentRoute: () => AppConversationsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AppSettingsIndexRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
+  '/conversations/$conversationId/details': typeof AppConversationsConversationIdDetailsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -209,6 +217,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsIndexRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
+  '/conversations/$conversationId/details': typeof AppConversationsConversationIdDetailsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -237,6 +246,7 @@ export interface FileRoutesById {
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/_app/catalog/products/new': typeof AppCatalogProductsNewRoute
+  '/_app/conversations/$conversationId_/details': typeof AppConversationsConversationIdDetailsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -264,6 +274,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
+    | '/conversations/$conversationId/details'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
+    | '/conversations/$conversationId/details'
   id:
     | '__root__'
     | '/_app'
@@ -314,6 +326,7 @@ export interface FileRouteTypes {
     | '/_app/settings/'
     | '/_app/catalog/products/$productId'
     | '/_app/catalog/products/new'
+    | '/_app/conversations/$conversationId_/details'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -498,17 +511,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCatalogProductsNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/conversations/$conversationId_/details': {
+      id: '/_app/conversations/$conversationId_/details'
+      path: '/$conversationId/details'
+      fullPath: '/conversations/$conversationId/details'
+      preLoaderRoute: typeof AppConversationsConversationIdDetailsRouteImport
+      parentRoute: typeof AppConversationsRoute
+    }
   }
 }
 
 interface AppConversationsRouteChildren {
   AppConversationsConversationIdRoute: typeof AppConversationsConversationIdRoute
   AppConversationsIndexRoute: typeof AppConversationsIndexRoute
+  AppConversationsConversationIdDetailsRoute: typeof AppConversationsConversationIdDetailsRoute
 }
 
 const AppConversationsRouteChildren: AppConversationsRouteChildren = {
   AppConversationsConversationIdRoute: AppConversationsConversationIdRoute,
   AppConversationsIndexRoute: AppConversationsIndexRoute,
+  AppConversationsConversationIdDetailsRoute:
+    AppConversationsConversationIdDetailsRoute,
 }
 
 const AppConversationsRouteWithChildren =

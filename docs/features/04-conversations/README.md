@@ -13,8 +13,10 @@ and streams changes over SSE. The dashboard has the inbox at
 ([phase 11.1](../11-ai-implementation/phase-1-foundation/README.md)), with
 quick replies, product photos and a summary card whose Confirm button creates
 the order ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md));
-taps on them come back as customer messages carrying their payload. Not built
-yet: the drafted-order panel and order history in the thread. See
+taps on them come back as customer messages carrying their payload. The
+customer's details and the chat's latest order, which the seller can confirm,
+sit beside the thread on wide screens and on a Details screen below that.
+Not built yet: the customer's order list beside the thread. See
 [Follow-ups](#follow-ups).
 
 ## Webhook
@@ -126,7 +128,9 @@ Shapes are the Zod schemas in
   trailing `…`.
 - `ConversationDetail`: the same without `lastMessage`, plus
   `replyWindowClosesAt` (`lastInboundAt` + 24 h, null if the customer never
-  wrote; it stays set after the window closes, so compare it with the clock).
+  wrote; it stays set after the window closes, so compare it with the clock)
+  and `latestOrderId`: the order placed from this chat most recently,
+  whatever its status, or null. `PATCH /:id` answers it too.
 - `Message`: `{ id, sender (customer | assistant | seller), text, status (sending | sent | failed), sentAt }`.
   A dashboard reply and an inbox reply are both `seller`.
 
@@ -262,6 +266,20 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
   go out one at a time, in order. A failed one shows Retry and Remove under
   it. The box is closed outside the 24-hour window, which the API enforces
   anyway.
+- **Beside the thread** from `xl` up: the customer (name, phone, delivery
+  address, how many orders and what they spent, from `GET /customers/:id`)
+  and the chat's latest order (`GET /orders/:id`): its lines, delivery,
+  total and payment method. A drafted (`new`) order offers Confirm order,
+  the seller's second confirmation, and Edit order, which opens
+  `/orders/:id`; a later one offers View order. The route composes the
+  panel from `ChatCustomerDetails` (customers) and `ChatOrderSummary`
+  (orders), so the conversations feature imports neither.
+- **Below `xl`** the same two sections are a screen of their own,
+  **`/conversations/:id/details`**, opened from the person icon in the chat's
+  header. It takes the chat's place rather than nesting inside it, with a
+  back link and a breadcrumb to the chat. While the chat's order is drafted,
+  a card above the reply box ("Order drafted · ৳3,260 / Tap to review and
+  confirm", `ChatOrderBanner`) opens it too.
 - **Days** split at the shop's midnight, in its time zone
   ([Settings – General](../06-settings-general/README.md#dashboard)).
 - Code: `apps/web/src/features/conversations/`, routes under
@@ -269,9 +287,8 @@ and owned by the `NOLOGIN` role `app_page_resolver`, which may only `SELECT`
 
 ## Follow-ups
 
-- The drafted-order panel and the customer's order history beside the thread.
-  The seller's own "Confirm" is settled: it is the second confirmation of an
-  order the customer already confirmed ([Orders](../07-orders/README.md#rules)).
+- The customer's order list beside the thread: the panel and the Details
+  screen show only the chat's latest order.
 - Per-shop auto-resume after a takeover (Never / 1 h / 24 h) in Settings ›
   Assistant. The settings API now exists ([06](../06-settings-general/README.md));
   this needs its own settings and the job that resumes.

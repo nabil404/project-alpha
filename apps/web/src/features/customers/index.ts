@@ -1,3 +1,4 @@
+export { ChatCustomerDetails } from './components/ChatCustomerDetails';
 export { CustomerList, type CustomerListChange } from './components/CustomerList';
 export { CustomerProfile } from './components/CustomerProfile';
 export {
