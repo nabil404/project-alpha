@@ -45,7 +45,7 @@ export default tseslint.config(
   {
     // A decorator binds to the next class, so an error class written between
     // `@Injectable()` and its service takes the decorator instead.
-    files: ['apps/api/src/**/*.ts'],
+    files: ['apps/api/src/**/*.ts', 'apps/api/db/seed/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -92,6 +92,11 @@ export default tseslint.config(
     // to stdout is their purpose, and they never touch a token.
     files: ['apps/api/scripts/**/*.mjs'],
     languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    rules: { 'no-console': 'off' },
+  },
+  {
+    // The dev seed's command prints shop names and counts, never a secret.
+    files: ['apps/api/db/seed/seed-products.ts'],
     rules: { 'no-console': 'off' },
   },
   {
