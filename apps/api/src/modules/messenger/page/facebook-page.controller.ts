@@ -168,7 +168,7 @@ export class FacebookPageController {
     description: 'The Pages granted on Facebook in this connection flow. Needs the flow cookie.',
   })
   @ApiOkResponse({ schema: schemaOf(facebookPageCandidatesResponseSchema) })
-  @ApiCodedError(400, ['FACEBOOK_AUTH_EXPIRED'])
+  @ApiCodedError(400, ['FACEBOOK_AUTH_EXPIRED', 'FACEBOOK_AUTH_FAILED'])
   @ApiCodedError(503, ['MESSENGER_NOT_CONFIGURED', 'FACEBOOK_UNAVAILABLE'])
   async candidates(@Req() request: TenantRequest): Promise<FacebookPageCandidatesResponse> {
     const pages = await this.pages.listCandidates(
