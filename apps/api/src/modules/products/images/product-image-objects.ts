@@ -13,7 +13,7 @@ export function objectKeysFor(rows: ProductImageRow[]): string[] {
 
 /**
  * Best effort, and only ever after the rows are committed away: a failure is
- * logged and left to the orphan sweep, never surfaced to the seller.
+ * logged and left to the orphan sweep, never shown to the seller.
  */
 export async function deleteObjectsQuietly(
   storage: ObjectStorage,

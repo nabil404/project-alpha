@@ -35,13 +35,11 @@ const invalid: NormalizeResult = { ok: false, reason: 'invalid' };
 const unsupported: NormalizeResult = { ok: false, reason: 'unsupported' };
 
 /**
- * Turns a seller's upload into the two JPEGs we publish. The output is public
- * and goes to customers through Meta, so nothing of the input survives but the
- * pixels: EXIF (GPS location included), XMP and ICC are all dropped - sharp
- * writes no metadata unless asked to. Orientation is applied first, or phone
- * photos would come out sideways once the tag is gone.
- *
- * The format comes from sharp's own detection, never the client's MIME type.
+ * Turns a seller's upload into the two public JPEGs we send through Meta. Only
+ * the pixels survive, because sharp writes no EXIF (GPS included), XMP or ICC
+ * unless asked. Orientation is applied first so phone photos don't turn
+ * sideways. The format comes from sharp's detection, never the client's MIME
+ * type.
  */
 export async function normalizeProductImage(
   input: Buffer,

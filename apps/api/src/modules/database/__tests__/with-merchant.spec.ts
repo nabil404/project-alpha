@@ -6,15 +6,15 @@ import type { Executor } from '../base.repository';
 import * as schema from '../schema/index';
 import { withMerchant } from '../with-merchant';
 
-// Better Auth's Organization plugin generates organization.id as TEXT - a
-// random string, not a uuid - and merchant_id references it. Shaped like the
+// Better Auth's Organization plugin generates organization.id as TEXT, a
+// random string rather than a uuid, and merchant_id references it. Shaped like the
 // real thing so the fixtures do not imply a uuid column.
 const merchantA = 'Xk3nQ8vB2mLp9wRtYs4dFgHj6cZa1eNu';
 const merchantB = 'Pq7wE2rT9yUi4oAs6dFg1hJk3lZx5cVb';
 
 /** Mirrors app_current_merchant() inline rather than calling it: these tests run
  *  before migrations are applied in CI, so the function may not exist yet. The
- *  NULLIF is the same one the migration uses, and it matters - see the
+ *  NULLIF is the same one the migration uses, and it matters. See the
  *  'reverts to an empty string' test below. */
 const readContext = async (executor: Executor) => {
   const result = await executor.execute<{ value: string | null }>(
@@ -74,7 +74,7 @@ describeDb('withMerchant (against Postgres)', () => {
 
   it('hands the callback a transaction, not the pool', async () => {
     // A rollback inside the callback must undo the callback's writes, which is
-    // only true if it really received a transaction.
+    // only true if it received a transaction.
     await expect(
       withMerchant(db, merchantA, async (tx) => {
         await tx.execute(sql`create temp table tx_probe (id int)`);

@@ -6,14 +6,10 @@ import {
 import { z } from 'zod';
 
 /**
- * A phone number in E.164 (`+8801812000000`), checked against the number's
- * own country's numbering plan - length and prefixes, not just digit count.
- * The `max` metadata is what makes that check real; the smaller builds only
- * check length.
- *
- * Input may carry spaces, dashes and brackets as people type them; the output
- * is always the normalized E.164 string, so the database never holds two
- * spellings of one number.
+ * A phone number checked against its country's numbering plan, length and
+ * prefixes, using the `max` metadata (smaller builds check only length). Input
+ * may contain spaces, dashes and brackets. The output is always E.164
+ * (`+8801812000000`), so the database holds one spelling per number.
  */
 export const e164PhoneSchema = z
   .string()

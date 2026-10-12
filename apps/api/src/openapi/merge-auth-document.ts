@@ -13,18 +13,15 @@ const TAG_RENAMES: Record<string, string> = { Default: 'Auth' };
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 /**
- * Folds Better Auth's generated document (the openAPI() plugin) into ours, so
- * one spec covers every route the server answers. Returns a new document.
- *
- * Better Auth describes itself, not this app, so four things are corrected:
- *   - its paths are relative to its basePath and get the /api/v1/auth prefix;
- *   - it marks every operation, sign-up included, as needing a bearer token,
- *     and the bearer plugin is not enabled here. Each endpoint decides for
- *     itself whether it needs a session, and its metadata does not say, so the
- *     session cookie is documented as optional rather than guessed at;
- *   - its error bodies are `{ message }`, but the after-hook in auth.config.ts
- *     rewrites every auth error into the coded envelope;
- *   - its tags become an "Auth" family beside our own.
+ * Merges Better Auth's generated document into ours and returns a new one,
+ * correcting four things:
+ *   - its paths get the /api/v1/auth prefix;
+ *   - its bearer-token requirement becomes an optional session cookie, since
+ *     the bearer plugin is off and its metadata does not say which endpoints
+ *     need a session;
+ *   - its errors are the coded envelope the after-hook in auth.config.ts
+ *     produces, not `{ message }`;
+ *   - its tags are grouped under "Auth".
  */
 export function mergeAuthDocument(
   document: OpenAPIObject,

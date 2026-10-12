@@ -14,7 +14,7 @@ export interface SeedItem {
 
 /**
  * An order with its items; totals follow from them. Bypasses everything the
- * orders work will enforce on creation - it is a fixture for the read side.
+ * orders work will enforce on creation. It is a fixture for the read side.
  */
 export async function seedOrder(
   db: Database,

@@ -3,7 +3,7 @@ import type { PutOptions } from '../../storage/object-storage';
 /** Every product image object lives under this prefix; the cleanup job lists only it. */
 export const PRODUCT_IMAGE_KEY_ROOT = 'm/';
 
-/** Objects are never overwritten - a new photo is a new key - so caches may keep them forever. */
+/** A new photo is a new key and objects are never overwritten, so caches may keep them forever. */
 export const PRODUCT_IMAGE_OBJECT_OPTIONS: PutOptions = {
   contentType: 'image/jpeg',
   cacheControl: 'public, max-age=31536000, immutable',
@@ -16,7 +16,7 @@ const KEY =
 
 /**
  * Keys are built only here, from the session's merchant id and a server-made
- * uuid - never from anything in a request. The merchant prefix is what lets the
+ * uuid, never from anything in a request. The merchant prefix is what lets the
  * cleanup job recover whose object it is looking at.
  */
 export function productImageKeys(

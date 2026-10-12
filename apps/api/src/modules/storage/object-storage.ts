@@ -15,7 +15,7 @@ export interface ObjectPage {
 }
 
 /**
- * The only object-storage surface the rest of the API sees, and its DI token.
+ * The only object-storage interface the rest of the API sees, and its DI token.
  * S3ObjectStorage backs it in the app; InMemoryObjectStorage in tests. Nothing
  * outside modules/storage imports @aws-sdk/*.
  *

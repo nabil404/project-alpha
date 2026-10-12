@@ -10,15 +10,12 @@ import { MESSENGER_QUEUE, PROFILE_QUEUE, STORAGE_QUEUE } from './queue.constants
 export const QUEUE_BOARD_PATH = '/api/queues';
 
 /**
- * Serves Bull Board at /api/queues: every queue, its jobs and their payloads,
- * with retry, promote and clean. main.ts calls this in development only, and
- * through a dynamic import, so the production image never loads @bull-board
- * (a devDependency).
+ * Serves Bull Board at /api/queues in development only. main.ts imports it
+ * dynamically, so production never loads @bull-board, a devDependency.
  *
- * Mounted straight on Express, not through Nest routing, so SessionGuard never
- * sees it - which is exactly why it must stay out of production: job payloads
- * hold every seller's customer messages. Open it through the Vite proxy
- * (http://localhost:5173/api/queues) like the Swagger page.
+ * It mounts on Express, so SessionGuard never sees it, and job payloads hold
+ * every seller's customer messages. It must never run in production. Open it
+ * through the Vite proxy at http://localhost:5173/api/queues.
  */
 export function setupQueueBoard(app: INestApplication): void {
   const serverAdapter = new ExpressAdapter().setBasePath(QUEUE_BOARD_PATH);

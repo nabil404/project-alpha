@@ -1,16 +1,13 @@
 import mjml2html from 'mjml';
 
 /**
- * The MJML layout every email renders through: the Social Glider header, a
- * white card on a warm grey ground, and a centered footer, matching the
- * dashboard's design. MJML turns it into the table markup Outlook and Gmail
- * need.
+ * The MJML layout every email uses: header, a white card on warm grey, and a
+ * centered footer. MJML outputs the table markup Outlook and Gmail need.
  *
- * Every email is compiled once, when the module loads: MJML is far too slow to
- * run per message, and an auth endpoint must answer in the same time whether
- * or not it sends mail. What differs per message - a link, a customer's name,
- * a total - is a named slot in the copy, written `{name}`, compiled to a marker
- * and filled with the escaped value at send time.
+ * Each email compiles once at module load, because MJML is too slow to run per
+ * message and auth endpoints must take the same time whether or not they send
+ * mail. Per-message values are `{name}` slots, filled with escaped values at
+ * send time.
  */
 
 const color = {

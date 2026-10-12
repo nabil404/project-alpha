@@ -20,7 +20,7 @@ const PHONE_MIN_DIGITS = 7;
 const PHONE_MAX_DIGITS = 15;
 
 /**
- * Digits with the separators people actually type - `01712-345678`,
+ * Digits with the separators people type, such as `01712-345678`,
  * `+880 1712 345678`, `(017) 1234 5678`, stored as typed. Only for numbers
  * whose country is unknown (a customer's, read from a chat); the seller's own
  * is checked against its country with e164PhoneSchema.

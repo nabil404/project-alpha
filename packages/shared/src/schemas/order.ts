@@ -353,12 +353,11 @@ export const replaceOrderItemsSchema = z
 export type ReplaceOrderItems = z.infer<typeof replaceOrderItemsSchema>;
 
 /**
- * PATCH /orders/:id. Omit a field to leave it. The delivery fields change only
- * until the order ships; payment, tracking and the note at any time.
- * `deliveryChargeId` links a Settings delivery charge (an area or everywhere
- * else) and snapshots its name, everywhere-else flag and estimate; a sent
- * `deliveryArea` overrides the name, and `null` unlinks and clears them. The
- * fee is never recomputed.
+ * PATCH /orders/:id. Omit a field to leave it. Delivery fields change only
+ * until the order ships; payment, tracking and the note change any time.
+ * `deliveryChargeId` links a delivery charge and snapshots its name,
+ * everywhere-else flag and estimate. A sent `deliveryArea` overrides the name,
+ * `null` unlinks and clears them, and the fee is never recomputed.
  */
 export const updateOrderSchema = z
   .object({

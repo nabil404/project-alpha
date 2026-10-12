@@ -31,12 +31,10 @@ export const MESSAGE_META_ID_UQ = 'message_merchant_meta_message_id_uq';
 /**
  * One long-lived Messenger thread per customer per Page.
  *
- * `facebook_page_id` is Facebook's Page id, deliberately not a foreign key to
- * facebook_page: disconnecting deletes that row and reconnecting creates a new
- * one, so history keyed on it would cascade away or split in two.
- *
- * `bot_paused` is the seller's takeover; `state = handed_off` is the assistant
- * giving up. The `last_*` columns are denormalized for the list and its cursor.
+ * `facebook_page_id` is Facebook's id, not a foreign key, because reconnecting
+ * a Page creates a new facebook_page row and history must survive that.
+ * `bot_paused` means the seller took over; `state = handed_off` means the
+ * assistant gave up. The `last_*` columns feed the list and its cursor.
  */
 export const conversation = pgTable(
   'conversation',

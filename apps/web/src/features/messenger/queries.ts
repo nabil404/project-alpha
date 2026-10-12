@@ -10,12 +10,10 @@ import type {
 import { apiFetch } from '@/lib/api';
 
 /**
- * The shop's Facebook Page, under /api/v1/messenger/page. Connecting is a
- * round trip through Facebook: useStartPageConnect leaves for Facebook's
- * dialog, the API's callback sends the browser back to
- * /settings/messenger?step=choose-page, and the candidates query plus
- * useConnectPage finish it there. The flow's state rides in an httpOnly
- * cookie the SPA never sees.
+ * The shop's Facebook Page, under /api/v1/messenger/page. useStartPageConnect
+ * goes to Facebook's dialog, the API's callback returns the browser to
+ * /settings/messenger?step=choose-page, and the candidates query and
+ * useConnectPage finish there. The flow's state is in an httpOnly cookie.
  */
 export const messengerKeys = {
   all: ['messenger'] as const,

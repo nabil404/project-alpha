@@ -14,7 +14,7 @@ import { CardSkeleton } from './CardSkeleton';
 
 /**
  * Settings > Account: every device signed in to this account. Signing one out
- * isn't confirmed - it is undone by signing in again - and one that was
+ * isn't confirmed, since signing in again undoes it, and one that was
  * already signed out elsewhere just drops off the list.
  */
 export function DevicesCard() {

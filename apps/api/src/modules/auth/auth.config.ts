@@ -69,26 +69,18 @@ export interface AuthDependencies {
 export const VERIFICATION_TOKEN_TTL = 24 * 60 * 60;
 
 /**
- * Sessions and users live in our own Postgres. Better Auth shares the API's
- * Drizzle instance, so it queries as the restricted runtime role and needs
- * GRANTs on its own tables (see db/migrations, the rls_runtime_role migration).
+ * Better Auth on the API's Drizzle instance, so it queries as the restricted
+ * runtime role (grants are in the rls_runtime_role migration). Its tables have
+ * no merchantId and must never get an RLS policy, because the session lookup
+ * runs before any merchant context exists. `pnpm --filter api db:auth-schema`
+ * generates their schema into schema/auth.ts.
  *
- * Its tables carry no merchantId and must never get an RLS policy: the session
- * lookup runs before any merchant context exists, so a policy there would lock
- * out login itself.
- *
- * Their schema is generated into src/modules/database/schema/auth.ts by
- * `pnpm --filter api db:auth-schema` and flows through drizzle-kit like any
- * other table, so auth changes are versioned and reviewed rather than applied
- * out of band.
- *
- * The HTTP surface is mounted at /api/v1/auth by AuthModule (auth.module.ts).
- * The SPA drives the email flows with these callback paths:
- *   - sign-up sends `callbackURL: '/'`; the emailed link verifies, signs the
- *     seller in and redirects there, or to `/?error=INVALID_TOKEN|TOKEN_EXPIRED`;
- *   - forgot-password sends `redirectTo: '/reset-password'`; the emailed link
- *     lands on `/reset-password?token=...` (or `?error=INVALID_TOKEN`), and that
- *     page POSTs /api/v1/auth/reset-password with the token and new password.
+ * Callback paths the SPA sends for the email flows:
+ *   - sign-up sends `callbackURL: '/'`. The link verifies, signs in and
+ *     redirects there, or to `/?error=INVALID_TOKEN|TOKEN_EXPIRED`.
+ *   - forgot-password sends `redirectTo: '/reset-password'`. The link lands on
+ *     `/reset-password?token=...` or `?error=INVALID_TOKEN`, and that page
+ *     POSTs /api/v1/auth/reset-password.
  */
 export function createAuth({ db, settings, mailer }: AuthDependencies) {
   const logger = new Logger('BetterAuth');
@@ -192,7 +184,7 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
         // requested later, in the separate Page connection flow.
         scopes: ['public_profile', 'email'],
         // Graph's /me has no email_verified, so Better Auth reads every Facebook
-        // email as unverified - and its link callback refuses an unverified
+        // email as unverified. Its link callback refuses an unverified
         // email from an untrusted provider, which would make linking from
         // account settings impossible. `link` is set server-side, from the
         // session, only by /link-social: there the seller is signed in to both
@@ -210,16 +202,14 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
         trustedProviders: ['google'],
       },
     },
-    // openAPI() supplies auth.api.generateOpenAPISchema(), which setupOpenApi
-    // (src/openapi/openapi.ts) merges into our own document in development.
-    // Its HTTP surface stays shut in every environment: the Scalar page is
-    // off, and the schema endpoint is disabled below - disabledPaths is
-    // enforced by the router only, so the in-process call still works.
-    // Organization deletion is off: every catalog table references
-    // organization(id) with ON DELETE NO ACTION, so the delete would fail on
-    // the first seller with products. It comes back with account deletion,
-    // which must also delete every product image object under m/{merchantId}/
-    // and every avatar under u/{userId}/avatar/ (outside the product sweep's prefix).
+    // openAPI() feeds setupOpenApi in development. Its own HTTP routes stay off
+    // everywhere: no Scalar page, and the schema endpoint is in disabledPaths,
+    // which only the router enforces, so the in-process call still works.
+    //
+    // Organization deletion is off because catalog tables reference
+    // organization(id) with ON DELETE NO ACTION. It returns with account
+    // deletion, which must also delete the shop's images under m/{merchantId}/
+    // and the avatars under u/{userId}/avatar/.
     plugins: [
       organization({ disableOrganizationDeletion: true }),
       openAPI({ disableDefaultReference: true }),
@@ -277,18 +267,13 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
     databaseHooks: {
       user: {
         create: {
-          // Every seller gets a shop the moment they have an account. This
-          // fires on user *creation* only, so a Google sign-in that links to an
-          // existing account under the trustedProviders rule above reuses that
-          // seller's organization instead of opening a second one.
+          // Every new user gets a shop. This fires on creation only, so a
+          // Google sign-in that links to an existing account reuses its
+          // organization. A social sign-up has no shop name, so the shop starts
+          // under the seller's name.
           //
-          // An email sign-up names the shop; a social one has no shop name
-          // to give, so its organization starts out under the seller's name.
-          //
-          // The sign-up phone's country also sets the shop's region, so a
-          // seller outside Bangladesh doesn't start in taka and Dhaka time.
-          // That is a convenience, not part of having an account: if it
-          // fails, the shop keeps the default region and sign-up succeeds.
+          // The sign-up phone also sets the shop's region. If that fails, the
+          // shop keeps the default region and sign-up still succeeds.
           after: async (createdUser, ctx) => {
             const merchantId = await ensureOrganizationForUser(db, createdUser, shopNameFrom(ctx));
             const { phone } = createdUser as { phone?: string | null };
@@ -305,7 +290,7 @@ export function createAuth({ db, settings, mailer }: AuthDependencies) {
       session: {
         create: {
           // activeOrganizationId is what TenantGuard reads, and the plugin
-          // declares it input: false, so a client cannot supply it - it has to
+          // declares it input: false, so a client cannot supply it. It has to
           // be resolved here or it stays null and every request is rejected.
           //
           // ensureOrganizationForUserId also repairs a seller whose signup hook

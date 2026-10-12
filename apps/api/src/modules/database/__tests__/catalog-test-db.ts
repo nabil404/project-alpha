@@ -10,7 +10,7 @@ import * as schema from '../schema/index';
 
 // Needs a real Postgres: constraints, locks and policies are server behaviour.
 // CI sets DATABASE_ADMIN_URL; locally, load apps/api/.env first. The admin role
-// is a superuser, so RLS does not apply here - catalog-rls.spec.ts switches to
+// is a superuser, so RLS does not apply here. catalog-rls.spec.ts switches to
 // app_runtime explicitly to test policies.
 const url = process.env.DATABASE_ADMIN_URL;
 export const describeDb = url ? describe : describe.skip;
@@ -169,7 +169,7 @@ export async function seedOptionValue(
   return row;
 }
 
-/** A row only - nothing in object storage. */
+/** A row only, with nothing in object storage. */
 export async function seedImage(
   db: Database,
   merchantId: string,

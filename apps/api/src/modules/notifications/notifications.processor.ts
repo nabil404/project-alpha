@@ -36,12 +36,10 @@ export interface NotificationJobResult {
 }
 
 /**
- * Registered only in WorkerModule: the API boots AppModule too, and a processor
- * there would consume jobs in the HTTP process.
- *
- * An event job writes its emails and queues one SEND_EMAIL_JOB each, named
- * after the event and the person, so a retried event never mails anyone twice
- * and a failed send retries alone.
+ * Registered only in WorkerModule, since the API also boots AppModule and would
+ * otherwise consume jobs in the HTTP process. An event job queues one
+ * SEND_EMAIL_JOB per recipient, with an id from the event and person, so a
+ * retried event mails nobody twice and a failed send retries alone.
  */
 @Processor(NOTIFICATIONS_QUEUE)
 export class NotificationsProcessor extends WorkerHost implements OnApplicationBootstrap {

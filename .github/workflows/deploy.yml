@@ -2,7 +2,7 @@ name: Deploy
 
 # The one deploy procedure, called by deploy-dev.yml, deploy-stage.yml and
 # deploy-prod.yml. Gets the commit's images into this environment's ECR
-# repositories - by building them, or for prod by copying the ones stage ran -
+# repositories, by building them or, for prod, by copying the ones stage ran. It
 # uploads the bundle, runs the deploy on the environment's server over SSM, and checks
 # /health. The AWS side is infra/cloudformation/; see
 # docs/architecture/deployment.md.

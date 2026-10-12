@@ -234,17 +234,16 @@ export function decideProduct(
 const ownWords = (product: Product) => [product.name, ...product.aliases].flatMap(wordsOf);
 
 /**
- * Other products owning a word that the customer wrote in any script and the
- * winner's own words do not cover. Any script is enough: a misspelling can
- * miss in one script and land in the other. Words count as alike down to the
- * candidate floor, not `t.word`: "kuti" is 0.375 like "kurti", and a missed
- * rival here keeps a product the customer may have turned down. Trigrams miss
- * swapped and dropped letters in short words ("lugni", "sat" for "set") and
- * can call a rival's word the winner's ("katha" is 0.33 like "katan"), so a
- * word a few edits from a rival's word names that rival too, unless it is the
- * winner's own word or one edit from it and nearer the winner than any word
- * the winner does not share: "kajan" is one edit from both "katan" and
- * "kajal", so it is a choice, but "sharee" is "saree" whichever saree it is.
+ * Other products that own a word the customer wrote, in either script, that
+ * the winner's words do not cover. Words match down to the candidate floor,
+ * not `t.word`, because a missed rival keeps a product the customer may have
+ * turned down ("kuti" scores 0.375 against "kurti").
+ *
+ * Trigrams miss swapped or dropped letters in short words ("lugni", "sat" for
+ * "set"), so a word a few edits from a rival's word also names that rival.
+ * The exception is the winner's own word, or one a single edit from it and
+ * nearer the winner than any word the winner lacks. "sharee" is "saree", but
+ * "kajan", one edit from both "katan" and "kajal", is a choice.
  */
 function namedRivals(
   queries: readonly (string | undefined)[],

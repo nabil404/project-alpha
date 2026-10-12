@@ -1,13 +1,8 @@
 #!/usr/bin/env node
-// Applies pending migrations as the schema owner.
-//
-// Uses drizzle-orm's programmatic migrator rather than `drizzle-kit migrate` so
-// that the same command works in the production image, which carries drizzle-orm
-// (a runtime dependency) and db/migrations, but not drizzle-kit or its TS config.
-// Both read the same journal and __drizzle_migrations table, so local and deploy
-// stay interchangeable.
-//
-// drizzle-kit is still what *generates* migrations; this only applies them.
+// Applies pending migrations as the schema owner. It uses drizzle-orm's
+// migrator because the production image has drizzle-orm and db/migrations but
+// not drizzle-kit. Both read the same journal and __drizzle_migrations table.
+// drizzle-kit still generates migrations.
 
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';

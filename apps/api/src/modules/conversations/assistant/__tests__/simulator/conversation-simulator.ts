@@ -216,12 +216,11 @@ export interface SimProduct {
 }
 
 /**
- * Plays a scripted Messenger conversation through the worker's own code, in
- * process and against the real local database: each step becomes a signed
- * webhook body for MessengerController, its queued jobs run through
- * InboundMessageProcessor and then AssistantTurnProcessor (Confirm included),
- * and every Graph send lands in a fake client. Our own sends come back as
- * echoes, as Meta delivers them. No Redis, no HTTP server.
+ * Plays a scripted Messenger conversation through the worker's code against
+ * the real local database, with no Redis or HTTP server. Each step becomes a
+ * signed webhook for MessengerController, its jobs run through the inbound and
+ * assistant processors, and Graph sends go to a fake client that echoes them
+ * back as Meta does.
  */
 export class ConversationSimulator {
   readonly psid = `sim-psid-${randomUUID()}`;

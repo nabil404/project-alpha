@@ -32,12 +32,10 @@ function split(value: string, fallback: string): { country: string; national: st
 }
 
 /**
- * A calling code picker and the number, emitting one E.164 string
- * ("+8801812000000"). A number that does not parse is passed on as typed,
- * prefixed with its code, so the shared schema reports it.
- *
- * The input takes the id and aria attributes a FormControl gives, so the
- * field's label and error point at the number.
+ * A calling-code picker and number field that emits one E.164 string
+ * ("+8801812000000"). An unparseable number is passed on as typed, with its
+ * code, so the shared schema reports it. The input takes FormControl's id and
+ * aria attributes, so the label and error point at it.
  */
 export function PhoneField({
   value,

@@ -18,8 +18,8 @@ import { CardSkeleton } from './CardSkeleton';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 
 /**
- * Settings > Account: change the password, or - for a seller who signed up
- * with Google or Facebook - add one. Adding goes through the emailed reset
+ * Settings > Account: change the password, or add one for a seller who
+ * signed up with Google or Facebook. Adding goes through the emailed reset
  * link, which proves the seller controls the mailbox; Better Auth creates the
  * password sign-in when none exists, then signs every session out.
  */

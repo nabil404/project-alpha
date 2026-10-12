@@ -1,17 +1,11 @@
 #!/usr/bin/env node
-// Drift backstop for row-level security.
+// Fails if a table carrying merchant_id lacks RLS enabled, forced, or a policy.
+// drizzle-kit generates ENABLE and CREATE POLICY but not FORCE, so without
+// this check a table's owner could bypass its policy unnoticed. It does not
+// check that a policy is correct; the two-merchant repository tests do.
 //
-// drizzle-kit generates ENABLE ROW LEVEL SECURITY and CREATE POLICY from
-// pgPolicy in the schema, but it does not model FORCE. So a table can carry a
-// policy, look protected, and still be bypassable by its owner, with nothing in
-// the generate/migrate loop to notice. This closes that gap: every table
-// carrying merchant_id must have RLS enabled, forced, and at least one policy.
-//
-// It catches a forgotten migration. It does not check that a policy is
-// *correct* - that is what the two-merchant repository tests are for.
-//
-// Runs as the owner (DATABASE_ADMIN_URL): pg_policies only shows policies on
-// tables the connected role can see.
+// Runs as the owner (DATABASE_ADMIN_URL), because pg_policies only shows
+// policies on tables the connected role can see.
 
 import { Pool } from 'pg';
 

@@ -60,13 +60,10 @@ function toGeneralSettings(
 }
 
 /**
- * Settings > General. A shop has no settings row until its first save and
- * reads as the default region until then.
- *
- * The currency is what every price and order of the shop is stored in, so it
- * may change only until the first order. A change before then keeps each
- * price's number, rescaling the stored minor units when the two currencies
- * have different decimals; nothing is converted at an exchange rate.
+ * Settings > General. Until its first save, a shop has no row and uses the
+ * default region. The currency may change only before the first order. A change
+ * keeps each price's number, rescaling minor units if the decimals differ, and
+ * converts nothing at an exchange rate.
  */
 @Injectable()
 export class GeneralSettingsService {

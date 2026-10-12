@@ -1,13 +1,8 @@
 #!/bin/sh
-# Creates the restricted role the api and worker connect as.
-#
-# Postgres runs this only on a fresh data directory, so the role cannot already
-# exist here and no guard is needed. On a cluster that predates this script, the
-# rls_runtime_role migration creates the role NOLOGIN instead and an operator
-# sets the password once by hand - see docker/.env.example.
-#
-# Only the login is set up here. Grants and the RLS context helper belong to the
-# migration, so that drizzle-kit stays the single owner of schema state.
+# Creates the restricted login role the api and worker connect as. Postgres
+# runs this only on a fresh data directory. On an older cluster, the
+# rls_runtime_role migration creates the role NOLOGIN and an operator sets its
+# password by hand (see apps/api/.env.example). Grants belong to the migration.
 set -eu
 
 if [ -z "${APP_RUNTIME_PASSWORD:-}" ]; then

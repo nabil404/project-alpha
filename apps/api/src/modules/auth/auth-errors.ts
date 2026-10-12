@@ -8,12 +8,9 @@ import {
 } from '@app/shared';
 
 /**
- * Better Auth writes its own `{ code, message }` JSON straight to the response,
- * past AllExceptionsFilter. This turns that into the API's coded envelope, so
- * the SPA reads /api/v1/auth/* errors exactly as it reads every other endpoint's.
- *
- * Pure on purpose: the after-hook in auth.config.ts is the only caller, and
- * the mapping can be tested without booting Better Auth.
+ * Converts Better Auth's `{ code, message }` responses, which bypass
+ * AllExceptionsFilter, into the coded envelope. The after-hook in
+ * auth.config.ts calls it. It is pure so it can be tested without Better Auth.
  */
 
 /** The parts of a Better Auth APIError this reads. */
@@ -43,8 +40,8 @@ function validation(fields: Record<string, FieldError[]>): ErrorBody {
 
 /**
  * better-call drops the schema issues from a VALIDATION_ERROR and keeps only a
- * message built from them - `[body.email] Invalid email address; [body.name]
- * Required` - so the field paths are read back out of that. Anything that
+ * message built from them, such as `[body.email] Invalid email address; [body.name]
+ * Required`, so the field paths are read back out of that. Anything that
  * doesn't parse lands on the body as a whole.
  */
 const ISSUE = /^\[(?:body|query)(?:\.([^\]]+))?\]\s*(.*)$/;
@@ -135,7 +132,7 @@ const RELATIVE_BASE = 'http://relative.invalid';
  * The OAuth callback's redirect Location with its `error` rewritten to an
  * ErrorCode and `error_description` dropped, so the SPA reads it through
  * `errorCodeSchema` like every other redirect the API sends. Undefined when
- * the Location carries no error - a successful sign-in or link.
+ * the Location carries no error, as after a successful sign-in or link.
  */
 export function toOAuthErrorLocation(location: string): string | undefined {
   const url = new URL(location, RELATIVE_BASE);

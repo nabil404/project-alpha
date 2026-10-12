@@ -3,14 +3,12 @@ import { countries, type TCountryCode } from 'countries-list';
 import { getCountries, getCountryCallingCode, type CountryCode } from 'libphonenumber-js/max';
 
 /**
- * Where a shop trades: which countries, currencies and time zones the API
- * accepts, and the defaults picking a country suggests. Names are never
- * stored or sent - the dashboard localizes codes with Intl.DisplayNames - so
- * everything here is ISO codes and IANA ids, the same in every runtime.
+ * The countries, currencies and time zones the API accepts, and the defaults a
+ * country implies. Everything is ISO codes and IANA ids; the dashboard
+ * localizes names with Intl.DisplayNames.
  *
- * Sources: countries-list (country -> currency, languages, search aliases),
- * countries-and-timezones (country -> IANA zones), libphonenumber-js (calling
- * codes). Each fills the gaps the others leave; see each function.
+ * Data comes from countries-list, countries-and-timezones and
+ * libphonenumber-js, each filling gaps in the others.
  */
 
 /**
@@ -142,7 +140,7 @@ export type DateFormat = (typeof DATE_FORMATS)[number];
 
 /**
  * Which way round the country writes a date, read from CLDR through Intl in
- * the country's own main language - `en-BD` would fall back to US order.
+ * the country's own main language. `en-BD` would fall back to US order.
  */
 function defaultDateFormat(country: string): DateFormat {
   const language = languagesOf(country)[0] ?? 'en';
@@ -188,7 +186,7 @@ export function regionDefaults(country: string): RegionDefaults {
 
 /**
  * The country a time zone belongs to, for a first guess where nothing better
- * is known - the browser's zone at sign-up. Aliases resolve (`Asia/Calcutta`
+ * is known, such as the browser's zone at sign-up. Aliases resolve (`Asia/Calcutta`
  * is India); a zone several countries share (`Europe/Zurich` also covers
  * Liechtenstein) gives its first. Null for `UTC` and anything unknown.
  */

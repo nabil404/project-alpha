@@ -16,12 +16,9 @@ import type {
 } from '@app/shared';
 
 /**
- * Every member of every shared enum must name a key in common.json.
- *
- * `satisfies Record<Enum, ParseKeys<'common'>>` fails the typecheck twice over:
- * once if an enum member in packages/shared has no entry here, and once if an
- * entry points at a key that doesn't exist in locales/en/common.json. A status
- * badge can't silently render blank.
+ * Maps every member of every shared enum to a key in common.json. The
+ * `satisfies` fails the typecheck if a member has no entry or an entry names a
+ * missing key, so a status badge can't render blank.
  */
 export const orderStatusKeys = {
   new: 'status.order.new',

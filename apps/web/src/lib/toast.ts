@@ -4,14 +4,10 @@ import { useErrorMessages } from '@/i18n/error-keys';
 
 /**
  * Feedback for a finished action. Every successful save, upload or removal
- * confirms with a `success` toast, so the seller gets the same signal
- * everywhere. `error` is for an action whose own screen can't carry it: a
- * dialog that closes, a page the seller is sent away from, a row that
- * disappears. Errors that belong to a form or a card stay inline in an
- * ErrorBanner.
- *
- * `error` resolves through the message catalog, so the API's English fallback
- * never reaches the seller.
+ * shows a `success` toast. Use `error` only when the screen can't show it, such
+ * as a closing dialog, a page the seller leaves, or a removed row. Form and card
+ * errors stay inline in an ErrorBanner. `error` text comes from the message
+ * catalog, never the API's English fallback.
  */
 export function useToast() {
   const { forError } = useErrorMessages();

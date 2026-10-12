@@ -1,16 +1,12 @@
 #!/usr/bin/env node
-// Runs one k6 load test, picked by argument:
+// Runs one k6 load test:
 //
 //   pnpm --filter api load <test> [--no-verify] [k6 run args…]
 //   pnpm --filter api load messenger-webhook -e RATE=10 -e DURATION=10s
-//   pnpm --filter api load ./load/tests/messenger-webhook.k6.js
 //
-// <test> is a name under load/tests (`<name>.k6.js`) or a path to a k6 script.
-// After k6 passes, a sibling `<name>.verify.mjs`, if the test has one, checks
-// what the run left behind; --no-verify skips it.
-//
-// apps/api/.env is loaded into k6's environment, so META_APP_SECRET and the
-// like reach the test as __ENV without appearing on a command line.
+// <test> is a name under load/tests or a path to a k6 script. After k6 passes,
+// the test's `<name>.verify.mjs`, if any, checks what the run left behind.
+// apps/api/.env reaches k6 as __ENV, keeping secrets off the command line.
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';

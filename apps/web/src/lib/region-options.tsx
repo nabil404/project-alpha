@@ -14,7 +14,7 @@ import { useFormatters } from '@/lib/format';
 
 /**
  * Picker options for Settings > General. Names come from Intl in the
- * dashboard's language - nothing here is translated by hand - and each option
+ * dashboard's language, so nothing here is translated by hand, and each option
  * keeps its code as the value the API takes.
  */
 

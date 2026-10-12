@@ -30,7 +30,7 @@ class DemoController {
 }
 
 /**
- * The envelope as a client actually receives it — every branch of the filter
+ * The envelope as a client receives it. Covers every branch of the filter
  * over real HTTP, through the same configureApp() wiring main.ts uses.
  */
 describe('error envelope over HTTP', () => {

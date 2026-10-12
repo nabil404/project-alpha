@@ -3,17 +3,12 @@ import { z } from 'zod';
 import type { CryptoService } from '../../../common/crypto.service';
 
 /**
- * The Page connection flow spans three requests - start, Facebook's callback,
- * and the seller picking a Page - so its state rides in one short-lived
- * cookie, encrypted with CryptoService (AES-256-GCM): tamper-proof, and
- * unreadable to the browser holding it.
- *
- *   authorizing - after start: the OAuth `state` nonce the callback must echo.
- *   authorized  - after the callback: the seller's long-lived user token,
- *                 read again when listing and connecting Pages.
- *
- * It is bound to the seller and shop that started it, so a cookie from another
- * session is ignored rather than trusted.
+ * State for the three-request Page connection flow (start, Facebook's
+ * callback, picking a Page), kept in one short-lived cookie that CryptoService
+ * encrypts so the browser can neither read nor change it.
+ *   authorizing: the OAuth `state` nonce the callback must echo.
+ *   authorized: the seller's long-lived user token.
+ * A cookie from another seller or shop is ignored.
  */
 export const PAGE_CONNECT_COOKIE = 'page_connect';
 

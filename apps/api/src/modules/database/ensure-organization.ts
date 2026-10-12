@@ -11,27 +11,16 @@ export interface OrganizationOwner {
 }
 
 /**
- * Returns the seller's organization id, creating it on first call.
+ * Returns the seller's organization id, creating it on first call. Without
+ * one, TenantGuard rejects every request with TENANT_NO_ACTIVE_MERCHANT.
  *
- * Every business table's merchantId references organization.id, and
- * TenantGuard reads it off the session as activeOrganizationId. A seller with
- * no organization therefore has no merchant, and the guard answers every one of
- * their requests with TENANT_NO_ACTIVE_MERCHANT - locked out of their own
- * account. This is what stops that happening.
+ * It must be idempotent. Better Auth's user.create.after hook runs after the
+ * user row commits, so if it fails, the session hook calls this again at the
+ * next login and repairs the account.
  *
- * **Idempotent by design, not as a nicety.** Better Auth's user.create.after
- * hook runs *after* the user row is committed, so a failure there would
- * otherwise strand a user with no organization and no way back. Because this
- * re-checks membership first, the session hook can call it again at next login
- * and repair the account rather than 403 forever.
- *
- * `organizationName` is the shop name an email sign-up gives. Without one - a
- * social sign-up, or the session hook repairing an account - the shop is named
- * after the seller, and can be renamed once there is a settings screen.
- *
- * One organization per seller today - nothing creates a second - but the model
- * permits many: membership is a table, not a column, so a switcher later needs
- * no migration. Hence "the earliest membership" rather than "the membership".
+ * `organizationName` is the shop name from an email sign-up. Without it, the
+ * shop is named after the seller. Membership is a table, so a seller could
+ * later have several organizations; this picks the earliest.
  */
 export async function ensureOrganizationForUser(
   db: Database,
@@ -44,14 +33,10 @@ export async function ensureOrganizationForUser(
   }
 
   return db.transaction(async (tx) => {
-    // Lock the seller's user row for the rest of the transaction.
-    //
-    // Re-reading membership is not enough on its own: at READ COMMITTED two
-    // concurrent callers cannot see each other's uncommitted member row, so
-    // both would find nothing and both would open a shop. Nor can a unique
-    // constraint on member.userId save it - that would forbid the second
-    // organization this model exists to allow. Serialising on the parent row
-    // is what makes the re-check below meaningful.
+    // Lock the seller's user row so concurrent callers serialize. At READ
+    // COMMITTED they can't see each other's uncommitted member row and would
+    // both open a shop. A unique constraint on member.userId would stop that
+    // too, but would forbid a second organization.
     await tx
       .select({ id: userTable.id })
       .from(userTable)
@@ -71,11 +56,11 @@ export async function ensureOrganizationForUser(
       name: organizationName,
       // slug is NOT NULL and uniquely indexed. Deriving it from the seller's
       // name would collide on the second seller trading as "Shop", and that
-      // collision would surface as a failed signup. The id is unique by
+      // collision would show up as a failed signup. The id is unique by
       // construction; nothing shows it to a seller yet, and it can be changed
       // once there is a settings screen to change it from.
       slug: organizationId,
-      // Neither createdAt carries a database default - see schema/auth.ts.
+      // Neither createdAt carries a database default. See schema/auth.ts.
       createdAt: new Date(),
     });
 
@@ -93,13 +78,9 @@ export async function ensureOrganizationForUser(
 }
 
 /**
- * The same guarantee, for a caller holding only a user id.
- *
- * The session hook is that caller: a session row carries userId but not the
- * name organization.name needs, so the user is read back here rather than
- * making every caller do it. Returns null only when the user row is gone, which
- * leaves the session without an active organization and the guard rejecting it
- * - the correct outcome for a user that no longer exists.
+ * The same, for the session hook, which has only a user id. It reads the user
+ * for the shop name. Returns null when the user row is gone, which leaves the
+ * session with no organization for the guard to reject.
  */
 export async function ensureOrganizationForUserId(
   db: Database,

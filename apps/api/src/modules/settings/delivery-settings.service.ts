@@ -11,8 +11,8 @@ import { MerchantSettingsRepository } from './merchant-settings.repository';
 
 /**
  * Settings > Delivery charges, saved as one page under the shop's settings
- * row lock, so two saves - or a save and a currency change - cannot
- * interleave. The last save wins, as on Settings > General.
+ * row lock, so neither two saves nor a save and a currency
+ * change can interleave. The last save wins, as on Settings > General.
  */
 @Injectable()
 export class DeliverySettingsService {

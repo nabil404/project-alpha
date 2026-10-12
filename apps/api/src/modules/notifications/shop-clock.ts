@@ -31,8 +31,8 @@ export function shopClock(now: Date, timeZone: string): ShopClock {
 }
 
 /**
- * The day to summarise if this scan is the shop's 9:00 one - yesterday,
- * shop time - else null. A scan runs every DAILY_SUMMARY_SCAN_MINUTES, so
+ * The day to summarise, yesterday in shop time, if this scan is the shop's
+ * 9:00 one. Otherwise null. A scan runs every DAILY_SUMMARY_SCAN_MINUTES, so
  * exactly one a day falls in [9:00, 9:15).
  */
 export function dailySummaryDayDue(now: Date, timeZone: string): string | null {

@@ -16,7 +16,7 @@ export const THEME_PREFERENCES = [
 
 /**
  * Stable contract: this key ships to sellers' browsers, and the inline script in
- * index.html reads it before first paint — rename both or neither.
+ * index.html reads it before first paint. Rename both or neither.
  */
 export const THEME_STORAGE_KEY = 'app.theme';
 

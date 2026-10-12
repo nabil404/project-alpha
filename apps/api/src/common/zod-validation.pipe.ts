@@ -4,14 +4,12 @@ import { CodedValidationException } from './errors/coded-exceptions';
 import { zodIssuesToFields } from './errors/validation-fields';
 
 /**
- * Validation is Zod everywhere: the same schemas from @app/shared back API
- * input, the forms in the SPA, and LLM output.
+ * Validates with a Zod schema from @app/shared, the same one the SPA's forms use:
  *
  *   @Post()
  *   create(@Body(new ZodValidationPipe(createProductSchema)) body: CreateProduct) {}
  *
- * A failure becomes VALIDATION_FAILED with a `fields` map, so the SPA can put
- * each message on the form control it belongs to.
+ * A failure becomes VALIDATION_FAILED with a `fields` map for the form controls.
  */
 export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
   constructor(private readonly schema: ZodType<T>) {}

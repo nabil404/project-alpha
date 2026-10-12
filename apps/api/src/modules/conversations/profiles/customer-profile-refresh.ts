@@ -27,12 +27,10 @@ export interface ProfileRefreshReport extends MerchantRefreshReport {
 }
 
 /**
- * Re-reads the Messenger profiles of recently active customers whose picture
- * link may have expired, or whose name Facebook has not shared yet. The daily
- * job's first run is also the backfill for customers stored before pictures.
- *
- * Order per shop follows backend invariant #1: list under merchant context,
- * then each Graph call outside any transaction, then a short one to write it.
+ * Re-reads Messenger profiles of recently active customers whose picture link
+ * may have expired or whose name Facebook hasn't shared yet. Its first daily
+ * run also backfills older customers. Graph calls run outside transactions
+ * (invariant #1).
  */
 @Injectable()
 export class CustomerProfileRefresh {

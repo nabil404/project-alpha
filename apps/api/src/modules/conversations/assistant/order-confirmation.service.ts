@@ -71,12 +71,11 @@ export class ReplyInFlightError extends Error {
 }
 
 /**
- * The summary card's buttons (P10: no LLM on this path). One short
- * transaction locks the conversation, re-reads every line's variant and the
- * delivery fee, and either creates the order with the card's numbers or says
- * why not; the reply is staged in it and sent after commit, and the seller is
- * emailed only when this run created the order. The idempotency key per card
- * revision makes a second tap find the first order and resend its reference.
+ * The summary card's buttons, with no LLM (P10). One short transaction locks
+ * the conversation, re-reads variants and the delivery fee, and creates the
+ * order or explains why not. The reply goes after commit, and the seller is
+ * emailed only if this run created the order. A second tap on the same card
+ * revision finds the first order and resends its reference.
  */
 @Injectable()
 export class OrderConfirmationService {

@@ -13,20 +13,15 @@ export const OPENAPI_JSON_PATH = 'api/docs/openapi.json';
 const SESSION_COOKIE = 'better-auth.session_token';
 
 /**
- * Builds one OpenAPI document for every route the server answers - our Nest
- * controllers plus Better Auth - and serves it as Swagger UI at /api/docs and
- * JSON at /api/docs/openapi.json. main.ts calls this outside production only.
+ * Serves one OpenAPI document for our controllers and Better Auth, as Swagger
+ * UI at /api/docs and JSON at /api/docs/openapi.json. Development only.
  *
- * Both are mounted straight on the HTTP adapter, not through Nest routing, so
- * SessionGuard never sees them. The worker has no HTTP server and never calls
- * this.
+ * Both mount on the HTTP adapter, so SessionGuard never sees them.
+ * @AllowAnonymous() routes declare `security: []`; the rest need the session
+ * cookie.
  *
- * Every operation needs the session cookie unless it says otherwise, because
- * SessionGuard is global; @AllowAnonymous() routes declare `security: []`.
- *
- * The page only works from the SPA's origin (APP_URL - the Vite proxy in dev,
- * Caddy when deployed). Better Auth's origin check trusts nothing else, so
- * opened on the API's own port its "Try it out" calls get INVALID_ORIGIN.
+ * Open it from APP_URL, the Vite proxy in dev. Better Auth rejects "Try it
+ * out" calls from any other origin with INVALID_ORIGIN.
  */
 export async function setupOpenApi(app: INestApplication, auth: Auth): Promise<void> {
   const config = new DocumentBuilder()

@@ -12,17 +12,12 @@ import type { ErrorBody, ErrorResponseBody } from '@app/shared';
 import { isCodedErrorBody } from './coded-exceptions';
 
 /**
- * The only place a thrown error becomes a response body, so every error the
- * API returns has the same shape:
- *
- *   1. a Coded*Exception already carries {code, message, params};
- *   2. any other HttpException — Nest's own 404 for an unmatched route, say —
- *      gets a synthesized HTTP_<status>, so paths nobody retrofitted still fit
- *      the envelope;
- *   3. anything else is a bug: logged server-side, returned as a bare
- *      INTERNAL_SERVER_ERROR. The real message and stack never reach a client.
- *      A database error is logged by SQLSTATE and constraint only: Drizzle's
- *      message carries the query's parameters, which can be message text.
+ * Turns every thrown error into the coded envelope:
+ *   1. a Coded*Exception supplies {code, message, params};
+ *   2. any other HttpException, such as Nest's 404, gets HTTP_<status>;
+ *   3. anything else is a bug, returned as INTERNAL_SERVER_ERROR. Its message
+ *      and stack are only logged, and a database error only by SQLSTATE and
+ *      constraint, since Drizzle's message includes query parameters.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {

@@ -18,12 +18,10 @@ export const DELIVERY_CHARGE_AREA_UIDX = 'delivery_charge_merchant_area_uidx';
 export const DELIVERY_CHARGE_FALLBACK_UIDX = 'delivery_charge_merchant_fallback_uidx';
 
 /**
- * Settings > Delivery charges: what delivery to one area costs and how long
- * it takes, one row per area the shop names, plus one nameless fallback row,
- * "everywhere else", for an address that matches none. Names are stored
- * normalized (@app/shared normalizeAreaName). Orders link here through
- * `order.delivery_charge_id`; removing a row unlinks them (migration 0027)
- * and they keep its name and estimate.
+ * Settings > Delivery charges: cost and time to each named area, plus one
+ * nameless "everywhere else" row. Names are stored normalized
+ * (normalizeAreaName). Removing a row unlinks its orders (migration 0027),
+ * which keep its name and estimate.
  */
 export const deliveryCharge = pgTable(
   'delivery_charge',

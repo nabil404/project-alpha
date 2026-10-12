@@ -10,14 +10,10 @@ export const FACEBOOK_PAGE_MERCHANT_UQ = 'facebook_page_merchant_uq';
 /**
  * The seller's connected Facebook Page.
  *
- * `page_id` is unique globally, not per merchant - the one deliberate
- * exception to "every uniqueness rule includes merchant_id". The webhook
- * resolves Page -> merchant with no session to go on, so a Page two shops had
- * both claimed would have no resolvable owner.
- *
- * `merchant_id` is unique too: the MVP connects one Page per shop.
- *
- * `access_token` holds CryptoService ciphertext, never the token itself.
+ * `page_id` is globally unique, the one uniqueness rule without merchant_id.
+ * The webhook resolves Page to merchant with no session, so a Page can have
+ * only one owner. `merchant_id` is unique because the MVP connects one Page
+ * per shop. `access_token` holds CryptoService ciphertext.
  */
 export const facebookPage = pgTable(
   'facebook_page',

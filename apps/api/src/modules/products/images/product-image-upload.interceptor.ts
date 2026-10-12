@@ -17,7 +17,7 @@ import {
 
 /**
  * Memory storage (the default without `dest`), one file in the `file` field,
- * rejected by multer while streaming once it passes the limit - so an oversize
+ * rejected by multer while streaming once it passes the limit, so an oversize
  * upload is never fully buffered.
  */
 const MulterFileInterceptor = FileInterceptor('file', {
@@ -25,7 +25,7 @@ const MulterFileInterceptor = FileInterceptor('file', {
 });
 
 /**
- * Multer's rejections surface as bare PayloadTooLarge/BadRequest exceptions;
+ * Multer rejects with bare PayloadTooLarge/BadRequest exceptions;
  * this gives them codes so they leave the API in the envelope like everything
  * else.
  */

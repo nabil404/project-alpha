@@ -25,14 +25,12 @@ export const RETRY_MS = 5_000;
 const EVENTS_ENDED = Symbol('events ended');
 
 /**
- * One seller's SSE stream: a `ready` event carrying the reconnect delay, an
- * id-only `conversation.updated` per change, and a `ping` to keep proxies
- * from closing it. It ends when the session expires, so the browser's
- * reconnect then fails authentication rather than an old stream living on, and
- * when `events` completes (shutdown). A stream the hub evicts over the
- * per-merchant cap sends a last `evicted` event first, so the browser closes it
- * instead of reconnecting and evicting another tab. `events` is subscribed
- * once; any other error from it still propagates.
+ * One seller's SSE stream: `ready` with the reconnect delay, an id-only
+ * `conversation.updated` per change, and `ping` to keep proxies from closing
+ * it. It ends when the session expires, so a reconnect must authenticate again,
+ * or when `events` completes on shutdown. When the hub evicts it over the
+ * per-merchant cap, it sends `evicted` first so the browser doesn't reconnect
+ * and evict another tab. Other errors from `events` propagate.
  */
 export function conversationEventStream(
   events: Observable<ConversationEvent>,

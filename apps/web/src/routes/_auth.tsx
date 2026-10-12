@@ -7,7 +7,7 @@ import { sessionQueryOptions } from '@/features/auth';
 
 /**
  * Sign-in, sign-up and password reset. A seller who is already signed in is
- * sent to the dashboard - except from an emailed reset link, which has to work
+ * sent to the dashboard, except from an emailed reset link, which has to work
  * on a device that is still signed in: resetting is how a seller takes back an
  * account, and the reset ends every session anyway.
  */

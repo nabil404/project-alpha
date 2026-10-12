@@ -5,16 +5,10 @@ import { isErrorCode, type ErrorCode, type ParsedFieldError } from '@app/shared'
 import { ApiError } from '@/lib/api-error';
 
 /**
- * Every ErrorCode the API can send must name a key in errors.json.
- *
- * `satisfies Record<ErrorCode, ParseKeys<'errors'>>` fails the typecheck twice
- * over, the same way i18n/status-keys.ts does: once if a code added in
- * packages/shared has no entry here, and once if an entry points at a key that
- * doesn't exist in locales/en/errors.json. An error toast can't render blank.
- *
- * The WEBHOOK_* codes are server-to-Meta and won't surface in the dashboard.
- * They carry copy anyway because exhaustiveness is what makes the check work —
- * a partial map would stop catching the codes that do reach a seller.
+ * Maps every ErrorCode to a key in errors.json. Like status-keys.ts, the
+ * `satisfies` fails the typecheck if a code has no entry or an entry names a
+ * missing key. The WEBHOOK_* codes never reach the dashboard but need entries
+ * anyway, because a partial map would stop the check working.
  */
 export const errorCodeKeys = {
   INTERNAL_SERVER_ERROR: 'code.INTERNAL_SERVER_ERROR',
@@ -107,8 +101,8 @@ export const errorCodeKeys = {
 
 /**
  * Read error copy through this, never by hand-writing an error key at a call
- * site. Anything unrecognized — an ApiError from an API deployed ahead of this
- * bundle, or a plain network Error — resolves to one generic sentence instead
+ * site. Anything unrecognized, such as an ApiError from an API deployed ahead of
+ * this bundle or a plain network Error, resolves to one generic sentence instead
  * of leaking the API's English fallback into the UI.
  */
 export function useErrorMessages() {

@@ -8,21 +8,15 @@ import { authSettingsFrom, createAuth } from './auth.config';
 export type Auth = ReturnType<typeof createAuth>;
 
 /**
- * Mounts Better Auth at /api/v1/auth through @thallesp/nestjs-better-auth,
- * which also provides AuthService, the @Session() and @AllowAnonymous()
- * decorators, and the AuthGuard that SessionGuard extends.
+ * Mounts Better Auth at /api/v1/auth through @thallesp/nestjs-better-auth.
  *
- * Two things this changes app-wide:
- *   - Nest's own body parser is off (NEST_APP_OPTIONS in bootstrap.ts): Better
- *     Auth reads the raw request itself, and the module re-adds JSON and
- *     urlencoded parsing for every other route. `bodyParser.rawBody` below is
- *     what keeps req.rawBody - and so the Messenger webhook signature check -
- *     working; `rawBody: true` on NestFactory no longer has any effect.
- *   - The module's global guard is replaced by SessionGuard (see app.module.ts),
- *     so every route needs a session unless it is marked @AllowAnonymous().
- *
- * Better Auth's error responses bypass AllExceptionsFilter; the after-hook in
- * auth.config.ts maps them onto the coded envelope instead.
+ * - Nest's body parser is off (NEST_APP_OPTIONS in bootstrap.ts) because Better
+ *   Auth reads the raw request. This module re-adds JSON and urlencoded parsing
+ *   for other routes, and `bodyParser.rawBody` keeps req.rawBody for the
+ *   Messenger signature check.
+ * - SessionGuard replaces the module's global guard (see app.module.ts).
+ * - Better Auth's errors bypass AllExceptionsFilter. The after-hook in
+ *   auth.config.ts maps them to the coded envelope.
  */
 export const AuthModule = BetterAuthModule.forRootAsync({
   imports: [MailModule],

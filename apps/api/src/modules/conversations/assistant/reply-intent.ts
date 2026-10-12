@@ -41,7 +41,7 @@ export type HandoffReason =
   | 'awaiting_seller'
   | 'no_delivery_charge';
 
-/** Why a slot is asked for again, when it is not simply missing. */
+/** Why a slot is asked for again, when it is not just missing. */
 export type AskReason =
   | 'invalid_phone'
   | 'not_found'

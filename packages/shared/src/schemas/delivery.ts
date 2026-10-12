@@ -70,8 +70,8 @@ export type DeliverySettings = z.infer<typeof deliverySettingsSchema>;
 
 /**
  * PUT /settings/delivery: the whole page. A row with an id is updated, one
- * without is added, and a named row left out is removed - with its product
- * overrides; orders delivered there keep its name and estimate.
+ * without is added, and a named row left out is removed along with its
+ * product overrides. Orders delivered there keep its name and estimate.
  */
 export const saveDeliverySettingsSchema = z
   .object({
@@ -112,12 +112,11 @@ export type SaveDeliverySettings = z.infer<typeof saveDeliverySettingsSchema>;
 export type SaveDeliverySettingsInput = z.input<typeof saveDeliverySettingsSchema>;
 
 /**
- * The delivery fee for an order to one area (or everywhere else). Each
- * product costs its own charge for the area if it sets one (`productCharges`,
- * one entry per product, null for "use the shop charge"), else the shop's;
- * the order pays the highest, not the sum, and nothing once the subtotal
- * reaches the shop's threshold. The dashboard's prefill and the assistant's
- * quote both come from here.
+ * The delivery fee for an order to one area or everywhere else. Each product
+ * costs its own charge for the area (`productCharges`, null for the shop
+ * charge) or else the shop's. The order pays the highest, not the sum, and
+ * nothing once the subtotal reaches the free-delivery threshold. The
+ * dashboard's prefill and the assistant's quote both use this.
  */
 export function deliveryFeeFor({
   shopCharge,

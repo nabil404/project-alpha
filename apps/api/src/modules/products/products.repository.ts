@@ -233,7 +233,7 @@ export class ProductsRepository {
   }
 
   /**
-   * A seller's SKU inserts plainly, so a collision surfaces as a unique
+   * A seller's SKU inserts plainly, so a collision raises a unique
    * violation for the service to map to SKU_TAKEN. A generated SKU inserts with
    * ON CONFLICT DO NOTHING on the live-SKU index instead: a violation would
    * abort the surrounding transaction and leave nothing to retry in.

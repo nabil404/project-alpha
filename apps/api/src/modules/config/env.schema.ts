@@ -64,7 +64,7 @@ const envObject = z.object({
 
 /**
  * The values .env.example ships, or once shipped, in place of a real secret.
- * They pass every shape check - the example auth secret is long enough - so a
+ * They pass every shape check, since the example auth secret is long enough, so a
  * copied file would otherwise boot production signing sessions with a key
  * anyone can read in this repository. Development may keep them.
  */

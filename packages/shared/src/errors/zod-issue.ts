@@ -3,16 +3,11 @@ import { isErrorCode, type ErrorCode } from './codes';
 import type { ErrorParams } from './envelope';
 
 /**
- * Turns one Zod issue into the code and params the envelope carries.
- *
- * Shared because both sides need the same answer: the API puts it on the wire
- * in a VALIDATION_FAILED `fields` map, and the SPA's forms run the same shared
- * schemas client-side and must show the same sentence for the same failure.
- *
- * Zod issues already carry the raw constraint argument - `too_small` has
- * `minimum`, `invalid_format` has `format` - so the code and its interpolation
- * params come straight off the issue. Takes a raw issue too, which is what an
- * error map is handed during a parse.
+ * Turns one Zod issue into the envelope's code and params. The API sends it in
+ * VALIDATION_FAILED `fields`, and the SPA's forms use it, so both show the same
+ * sentence for the same failure. Params come from the issue's constraint
+ * argument, such as `minimum` on `too_small`. Accepts raw issues too, which is
+ * what an error map gets during a parse.
  */
 export function describeZodIssue(issue: core.$ZodIssue | core.$ZodRawIssue): {
   code: ErrorCode;
