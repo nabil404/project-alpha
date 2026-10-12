@@ -4,7 +4,7 @@
 // worker drops them as unknown-page and never calls Meta. Message ids start
 // with `lt-<run>-`, which messenger-webhook.verify.mjs uses to find the run's jobs.
 //
-// The runner loads apps/api/.env and sets RUN_ID:
+// The runner loads environments/.env and sets RUN_ID:
 //   pnpm --filter api load messenger-webhook
 //
 // Environment (k6 -e or the shell):

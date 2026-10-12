@@ -42,7 +42,7 @@ the one Parameter Store entry `/social-glider/<env>/env`. `docker/compose.local.
 | DNS       | Namecheap. Each stack outputs an Elastic IP and you add one A record by hand. Caddy gets the TLS certificate itself.                                                                                                                                                                                                                       |
 | CI → AWS  | GitHub OIDC. No AWS keys are stored in GitHub. Each environment's deploy role trusts only the GitHub environment of the same name in this repository.                                                                                                                                                                                      |
 | Deploy    | Images are built once, by dev or stage, and pushed to ECR tagged with the commit SHA; prod copies them into its own repositories rather than rebuilding. The server never builds and never clones; it pulls images and a small bundle (`docker/`, `static/`, `infra/server/`). The deploy runs over SSM Run Command, so port 22 is closed. |
-| Secrets   | One SSM Parameter Store `SecureString` per environment, `/social-glider/<env>/env`, holding the whole env file. On each deploy the server writes it to `apps/api/.env` (mode 600), so that stays the only env file.                                                                                                                        |
+| Secrets   | One SSM Parameter Store `SecureString` per environment, `/social-glider/<env>/env`, holding the whole env file. On each deploy the server writes it to `environments/.env` (mode 600), so that stays the only env file.                                                                                                                    |
 | Unchanged | Cloudflare R2, the SMTP provider and the LLM provider are reached through env vars as today. Each environment gets its own R2 bucket and its own Meta app.                                                                                                                                                                                 |
 
 ```
@@ -113,7 +113,7 @@ code.
 calls go through `app_compose` in `lib.sh`, which adds the overlay for the
 server's environment.
 
-1. Write `apps/api/.env` from the one SecureString `/social-glider/<env>/env`, adding the commit's image tags.
+1. Write `environments/.env` from the one SecureString `/social-glider/<env>/env`, adding the commit's image tags.
 2. Log in to ECR and `docker compose pull`.
 3. `compose run --rm migrate` applies migrations as the owner while the old release is still serving. `migrate` is a compose service behind a profile, and it is the only one that gets the admin URL.
 4. `compose up --wait` starts the release. Compose itself waits up to 3 minutes for every healthcheck to pass and every container to be running.
@@ -264,7 +264,7 @@ certificate until this resolves, but the deploy itself doesn't wait for it.
 
 All of an environment's settings live in **one** `SecureString`,
 `/social-glider/<env>/env`. It holds a normal `.env` file in the same format as
-`apps/api/.env`, and the deploy writes it to the server as it is. Write it
+`environments/.env`, and the deploy writes it to the server as it is. Write it
 locally, outside the repo, and upload it:
 
 ```sh
@@ -293,7 +293,7 @@ aws ssm put-parameter --name /social-glider/dev/env --type SecureString \
   --value file://$HOME/dev.env --overwrite
 ```
 
-Optional keys are the same as in `apps/api/.env.example`: `META_APP_ID`,
+Optional keys are the same as in `environments/.env.example`: `META_APP_ID`,
 `GOOGLE_*`, `FACEBOOK_*`, `LOG_LEVEL`, `WORKER_CONCURRENCY` and `SENTRY_DSN`.
 You don't need `DATABASE_URL`, `REDIS_URL` or `APP_URL`; `docker/compose.yml`
 derives them.

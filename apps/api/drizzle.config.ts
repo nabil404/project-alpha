@@ -1,11 +1,11 @@
 import { defineConfig } from 'drizzle-kit';
 
-// apps/api/.env is the repo's only env file and cwd here is apps/api. drizzle-kit
+// environments/.env is the repo's only env file and cwd here is apps/api. drizzle-kit
 // does not load it on its own, and DATABASE_ADMIN_URL lives only there.
 try {
-  process.loadEnvFile('.env');
+  process.loadEnvFile('../../environments/.env');
 } catch {
-  // no .env here
+  // no environments/.env here
 }
 
 export default defineConfig({

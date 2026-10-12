@@ -36,7 +36,7 @@ _None yet._
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pnpm dev`                                                         | api + web in parallel. The api's `dev` and `dev:worker` build `@app/shared` first, so a fresh start picks up shared changes.                                                                                                                                                                                                                           |
 | `pnpm --filter api dev:worker`                                     | The worker, which `pnpm dev` does not start.                                                                                                                                                                                                                                                                                                           |
-| `pnpm dev:up` / `pnpm dev:down`                                    | Local Postgres, Redis and Mailpit, via compose pointed at `apps/api/.env`.                                                                                                                                                                                                                                                                             |
+| `pnpm dev:up` / `pnpm dev:down`                                    | Local Postgres, Redis and Mailpit, via compose pointed at `environments/.env`.                                                                                                                                                                                                                                                                         |
 | `pnpm test` / `pnpm typecheck` / `pnpm lint` / `pnpm format:check` | From the root, recursive.                                                                                                                                                                                                                                                                                                                              |
 | `pnpm --filter @app/shared build`                                  | Run after changing a shared schema while the api is already running, or before `apps/api` tests and typecheck — they resolve `@app/shared` through its built `dist`, and CI builds it before lint, typecheck and test.                                                                                                                                 |
 | `pnpm --filter api db:generate`                                    | Generate a migration from edits to `apps/api/src/modules/database/schema/`. **Review the generated SQL by hand.**                                                                                                                                                                                                                                      |
@@ -66,10 +66,10 @@ the SQL by hand → `db:migrate` → `db:verify-rls`. Migrations land in
 - **Object storage.** Product images live in Cloudflare R2, reached only
   through the S3 API with the `STORAGE_*` variables. Development uses its own
   bucket and token; never point a local `.env` at the production bucket.
-- **One env file.** `apps/api/.env` is the only one, for the app and every
+- **One env file.** `environments/.env` is the only one, for the app and every
   compose file alike; on a server, `infra/server/deploy.sh` renders it from
   Parameter Store. Compose must be pointed at it — `docker compose --env-file
-apps/api/.env -f docker/compose.local.yml …`, wrapped as `pnpm dev:up` /
+environments/.env -f docker/compose.local.yml …`, wrapped as `pnpm dev:up` /
   `pnpm dev:down` — because on its own it would look for `docker/.env`, which
   no longer exists.
 - **Compose files.** `docker/compose.local.yml` is local dependencies only.

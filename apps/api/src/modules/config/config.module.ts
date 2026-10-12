@@ -11,6 +11,8 @@ export { AppConfig } from './app.config';
     NestConfigModule.forRoot({
       isGlobal: true,
       cache: true,
+      // cwd is apps/api. Containers have no such file and get their env from compose.
+      envFilePath: '../../environments/.env',
       validate: validateEnv,
     }),
   ],

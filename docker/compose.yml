@@ -1,12 +1,12 @@
 # The server stack for every deployed environment: Caddy, api, worker,
 # Postgres, Redis. Never run alone. infra/server/deploy.sh adds the
 # environment's sizing overlay and the env file it renders from Parameter Store:
-#   docker compose --env-file apps/api/.env \
+#   docker compose --env-file environments/.env \
 #     -f docker/compose.yml -f docker/compose.<dev|stage|prod>.yml up -d
 # Local development uses compose.local.yml.
 name: app
 
-# apps/api/.env is authored for the host, where localhost is Postgres and Redis;
+# environments/.env is authored for the host, where localhost is Postgres and Redis;
 # in here localhost is the container itself. It also carries stack secrets the
 # app must never see. Both are corrected below, because environment wins over env_file.
 x-app-env: &app-env
@@ -55,7 +55,7 @@ services:
       context: ..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
-    env_file: [../apps/api/.env]
+    env_file: [../environments/.env]
     environment: *app-env
     command: ['node', 'dist/main.js']
     depends_on:
@@ -82,7 +82,7 @@ services:
     # Docker's default 10 s would kill an in-flight LLM extraction on every
     # deploy; enableShutdownHooks() in worker.ts needs time to finish the job.
     stop_grace_period: 60s
-    env_file: [../apps/api/.env]
+    env_file: [../environments/.env]
     environment: *app-env
     command: ['node', 'dist/worker.js']
     depends_on:
@@ -110,7 +110,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-app}
       # Restricted role for the api and worker. Unset on an already-provisioned
       # server, where the role is created by migration and given a password by
-      # hand instead. See apps/api/.env.example.
+      # hand instead. See environments/.env.example.
       APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-}
     volumes:
       - postgres_data:/var/lib/postgresql/data
