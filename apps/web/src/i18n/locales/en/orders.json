@@ -58,6 +58,16 @@
     "trackingRemoved": "{{who}} removed the tracking number",
     "trackingSet": "{{who}} added the tracking number"
   },
+  "chat": {
+    "banner": "Order drafted · {{total}}",
+    "bannerHint": "Tap to review and confirm",
+    "customerConfirmed": "The customer confirmed this order in Messenger.",
+    "drafted": "Drafted order",
+    "edit": "Edit order",
+    "latest": "Latest order",
+    "payment": "Payment",
+    "view": "View order"
+  },
   "conversation": {
     "open": "Open chat",
     "title": "Conversation",

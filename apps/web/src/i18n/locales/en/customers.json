@@ -1,4 +1,10 @@
 {
+  "chat": {
+    "name": "Name",
+    "orders_one": "{{count}} order · {{spent}} spent",
+    "orders_other": "{{count}} orders · {{spent}} spent",
+    "title": "Customer"
+  },
   "contact": {
     "area": "Area",
     "deliveryAddress": "Delivery address",

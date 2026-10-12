@@ -1,4 +1,5 @@
 export { AwaitingOrdersBadge } from './components/AwaitingOrdersBadge';
+export { ChatOrderBanner, ChatOrderSummary } from './components/ChatOrderSummary';
 export { OrderDetailView } from './components/OrderDetailView';
 export { OrderList, type OrderListChange, type OrderListView } from './components/OrderList';
 export { OrderStatusBadge } from './components/OrderStatusBadge';

@@ -8,10 +8,13 @@
     "windowClosed": "Messenger only allows replies within 24 hours of the customer's last message. You can reply again after they write to you."
   },
   "customer": {
-    "replyUntil": "You can reply until {{time}}",
-    "replyWindowClosed": "Reply window closed",
-    "title": "Customer",
     "unknownName": "Facebook user"
+  },
+  "details": {
+    "back": "Back to chat",
+    "breadcrumb": "Breadcrumb",
+    "label": "Customer and order",
+    "title": "Details"
   },
   "empty": {
     "description": "Pick a chat to read it and reply.",
@@ -37,6 +40,7 @@
   },
   "thread": {
     "back": "Back to conversations",
+    "details": "Customer and order details",
     "empty": "No messages yet.",
     "handBack": "Hand back to assistant",
     "loadOlder": "Load earlier messages",
