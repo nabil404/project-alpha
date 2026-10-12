@@ -14,7 +14,7 @@ export class UserImageRepository {
   /**
    * Sets the photo and returns the one it replaced. The row is locked first,
    * so of two concurrent uploads each learns exactly what it replaced and can
-   * delete that object - neither is orphaned. Nothing but these two statements
+   * delete that object, and neither is orphaned. Nothing but these two statements
    * runs inside the transaction.
    */
   swapImage(userId: string, image: string | null): Promise<string | null> {

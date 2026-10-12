@@ -67,13 +67,11 @@ function ownerOf(request: TenantRequest): PageConnectOwner {
 }
 
 /**
- * The shop's Facebook Page: read it, connect it through Facebook's Login
- * dialog, disconnect it. The merchant always comes from the session via
- * TenantGuard, never the request.
- *
- * Connecting takes four calls: POST /authorizations (sets the flow cookie,
- * answers Facebook's URL), Facebook's redirect to GET /oauth/callback (sends
- * the browser back to the SPA), GET /candidates, then PUT with the chosen Page.
+ * Reads, connects and disconnects the shop's Facebook Page. The merchant comes
+ * from the session via TenantGuard. Connecting takes four calls: POST
+ * /authorizations sets the flow cookie and returns Facebook's URL, Facebook
+ * redirects to GET /oauth/callback, which sends the browser back to the SPA,
+ * then GET /candidates and PUT with the chosen Page.
  */
 @ApiTags('Facebook Page')
 @UseGuards(TenantGuard)

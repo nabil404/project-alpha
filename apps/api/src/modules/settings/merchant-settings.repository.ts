@@ -87,12 +87,11 @@ export class MerchantSettingsRepository {
   }
 
   /**
-   * Multiplies every stored amount - variant prices (archived ones too),
-   * delivery charges, products' own delivery charges and the free-delivery
-   * threshold - by `factor`, rounding half away from zero, so
-   * a price keeps its number when the currency's decimals change (৳1,600.00
-   * stays 1,600 as ¥1,600). Bumps each product's revision, as every write to
-   * its variants must.
+   * Multiplies every stored amount by `factor`: variant prices, archived ones
+   * too, delivery charges, products' own delivery charges and the free-delivery
+   * threshold. It rounds half away from zero, so a price keeps its number when
+   * the currency's decimals change (৳1,600.00 stays 1,600 as ¥1,600). Bumps each
+   * product's revision, as every write to its variants must.
    */
   async rescaleAmounts(
     executor: Executor,

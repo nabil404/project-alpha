@@ -23,12 +23,11 @@ export const intentResultSchema = z.object({
 export type IntentResult = z.infer<typeof intentResultSchema>;
 
 /**
- * One item as the customer currently wants it. `ref` is the index of the
- * collected item it continues, or null for a new one. The words are the
- * customer's own; `*Alt` is the same words transliterated into the other
- * script (Bangla ⇄ Latin), never a translation or a catalog name. On an
- * entry with a `ref` they are null unless the customer changed that item's
- * product (or variant), and then name only the one they want now.
+ * One item as the customer now wants it. `ref` is the index of the collected
+ * item it continues, or null for a new one. Words are the customer's own, and
+ * `*Alt` holds them transliterated into the other script (Bangla ⇄ Latin), not
+ * translated. With a `ref`, words are null unless the customer changed that
+ * item's product or variant, and then name only the new choice.
  */
 export const extractedItemSchema = z.object({
   ref: z.number().int().nonnegative().nullable(),

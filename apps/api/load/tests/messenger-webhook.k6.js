@@ -1,11 +1,10 @@
-// Load test: POST /api/v1/webhooks/messenger, the HTTP + enqueue layer only.
+// Load test for POST /api/v1/webhooks/messenger, covering HTTP and enqueue only.
 //
-// Every request is a correctly signed Page webhook for fake Pages (`lt-page-*`)
-// unknown to the database, so a running worker drops the jobs as unknown-page
-// and never calls Meta. Message ids carry the run id (`lt-<run>-…`), which is
-// how messenger-webhook.verify.mjs finds this run's jobs in the queue.
+// Requests are signed webhooks for fake Pages (`lt-page-*`), so a running
+// worker drops them as unknown-page and never calls Meta. Message ids start
+// with `lt-<run>-`, which messenger-webhook.verify.mjs uses to find the run's jobs.
 //
-// Run through the runner, which loads apps/api/.env and passes RUN_ID:
+// The runner loads apps/api/.env and sets RUN_ID:
 //   pnpm --filter api load messenger-webhook
 //
 // Environment (k6 -e or the shell):
@@ -14,8 +13,7 @@
 //   RATE             steady requests/s, default 50
 //   DURATION         steady duration, default 2m
 //   SPIKE_RATE       spike peak requests/s, default 300
-//   SCENARIOS        comma list to run a subset, default all:
-//                    steady,spike,redelivery,bad_signature
+//   SCENARIOS        comma list, default steady,spike,redelivery,bad_signature
 
 import http from 'k6/http';
 import exec from 'k6/execution';

@@ -80,8 +80,8 @@ export function useConversation(id: string) {
 }
 
 /**
- * Pages run newest first — the first page is the latest messages and each
- * next page is older — so a refetch after an event starts from the newest
+ * Pages run newest first. The first page is the latest messages and each
+ * next page is older, so a refetch after an event starts from the newest
  * page. Callers reverse the pages to read the thread oldest first.
  */
 export const messagesQueryOptions = (id: string) =>
@@ -154,13 +154,11 @@ function appendMessage(
 }
 
 /**
- * A seller reply. The API pauses the assistant in this chat as it sends.
- *
- * Sends are eager: the composer fires and clears at once, and the reply shows
- * in the thread from useLocalMessages until the API answers. One chat's
- * replies share a scope, so they go out one at a time, in the order written.
- * `gcTime: Infinity` keeps a failed reply on screen until the seller retries
- * or removes it; useLocalMessages prunes the delivered ones.
+ * Sends a seller reply; the API pauses the assistant in this chat. The composer
+ * clears at once and useLocalMessages shows the reply until the API answers.
+ * Replies in one chat share a mutation scope, so they send in order.
+ * `gcTime: Infinity` keeps a failed reply on screen until the seller retries or
+ * removes it.
  */
 export function useSendMessage(id: string) {
   const queryClient = useQueryClient();
@@ -301,7 +299,7 @@ export function useFailedMessageActions(id: string) {
  * Keeps every conversation query fresh while mounted, from the API's
  * Server-Sent Events. Each event carries only an id, so it invalidates and
  * lets the queries refetch; a reconnect may have missed events, so it
- * invalidates everything. An `evicted` stream is closed for good — reconnecting
+ * invalidates everything. An `evicted` stream is closed for good. Reconnecting
  * would evict another of the seller's tabs in turn.
  */
 export function useConversationEvents() {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ErrorCode, WireErrorCode } from './codes';
 
-/** Interpolation values for a code's message — `{ min: 12 }` for MIN_LENGTH. */
+/** Interpolation values for a code's message, such as `{ min: 12 }` for MIN_LENGTH. */
 export type ErrorParams = Record<string, string | number | boolean>;
 
 /**

@@ -14,14 +14,11 @@ const DATE_FORMATS = [
 ] as const;
 
 /**
- * Settings > General, one row per shop, written on the first save: until then
- * the shop reads as its default region. The shop's name and logo stay on
- * Better Auth's organization row.
- *
- * Codes are checked for shape only; which countries, currencies and zones
- * exist is @app/shared's to say, and changes with its data. `currency` is the
- * one every price and order of the shop is in - see SettingsService for when
- * it may change.
+ * Settings > General, one row per shop, created on first save. Until then the
+ * shop uses its default region. Name and logo are on Better Auth's organization
+ * row. Codes are checked for shape only, since @app/shared holds the lists.
+ * Every price and order is in `currency`; SettingsService decides when it may
+ * change.
  */
 export const merchantSettings = pgTable(
   'merchant_settings',

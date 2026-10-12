@@ -37,14 +37,10 @@ export function isCodedErrorBody(body: unknown): body is CodedErrorBody {
 }
 
 /**
- * Throw one of these instead of the bare NestJS exception, so the response
- * carries a code the SPA can translate rather than an English sentence it
- * would have to parse.
+ * Use these instead of bare NestJS exceptions, so the response carries a code
+ * the SPA can translate:
  *
- *   throw new CodedUnauthorizedException(
- *     'AUTH_INVALID_CREDENTIALS',
- *     'Invalid email or password',
- *   );
+ *   throw new CodedUnauthorizedException('AUTH_INVALID_CREDENTIALS', 'Invalid email or password');
  */
 export class CodedBadRequestException extends BadRequestException {
   constructor(code: ErrorCode, message: string, params: ErrorParams = {}) {

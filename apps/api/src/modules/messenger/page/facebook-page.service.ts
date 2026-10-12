@@ -53,14 +53,10 @@ export interface CallbackParams {
 }
 
 /**
- * Connecting a shop's Facebook Page: an OAuth round trip for the Page
- * permissions, a pick among the Pages the seller granted, then storing that
- * Page's token encrypted and subscribing our app to its webhooks.
- *
- * Every Graph call runs outside a transaction (backend invariant #1): read,
- * call Facebook, then open a short transaction that locks, re-checks and
- * writes. The Page access token is encrypted before it reaches a repository
- * and is never logged.
+ * Connects a shop's Facebook Page: OAuth for the Page permissions, the seller
+ * picks a granted Page, then we store its token encrypted and subscribe our app
+ * to its webhooks. Graph calls run outside transactions (invariant #1). The
+ * Page token is encrypted before any repository sees it and is never logged.
  */
 @Injectable()
 export class FacebookPageService {
@@ -232,7 +228,7 @@ export class FacebookPageService {
   /**
    * Facebook's answer as a coded error: an expired or revoked user token
    * (Graph code 190) means start again, another refusal is `rejected`, and
-   * anything else - 5xx, timeouts - is Facebook being unavailable.
+   * anything else, such as a 5xx or a timeout, is Facebook being unavailable.
    */
   private async callGraph<T>(
     call: () => Promise<T>,

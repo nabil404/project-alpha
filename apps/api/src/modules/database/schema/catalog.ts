@@ -18,7 +18,7 @@ import { createdAt, id, merchantId, merchantIsolation, updatedAt } from './colum
  * The catalog: products, their options and variants, a flat category list, and
  * product↔category links. Every child points at its parent through a composite
  * (merchant_id, id) foreign key, so no row can reference another merchant's
- * row - RLS filters reads but does not validate the ids a row points at.
+ * row. RLS filters reads but does not validate the ids a row points at.
  */
 
 /** Index names the services map unique violations from. */
@@ -223,8 +223,9 @@ export const productVariantOptionValue = pgTable(
 /**
  * A product's photo gallery. The objects live in object storage at keys built
  * from (merchant_id, id); storage_key is the full image's, and the thumbnail's
- * is derived. position is dense (0..n-1) and is only the gallery order - product.cover_image_id names the cover; it is deliberately
- * not unique, so a reorder rewrites positions without deferral.
+ * is derived. position is dense (0..n-1) and is only the gallery order.
+ * product.cover_image_id names the cover. position is deliberately not unique,
+ * so a reorder rewrites positions without deferral.
  */
 export const productImage = pgTable(
   'product_image',

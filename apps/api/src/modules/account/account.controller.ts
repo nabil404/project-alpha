@@ -64,7 +64,7 @@ function signedIn(request: SignedInRequest): { userId: string; sessionId: string
 
 /**
  * The signed-in seller's own account: their photo, language and devices. No
- * TenantGuard - this belongs to the user, not the shop - and every id comes
+ * TenantGuard, because this belongs to the user and not the shop. Every id comes
  * from the session, never the request.
  */
 @ApiTags('Account')

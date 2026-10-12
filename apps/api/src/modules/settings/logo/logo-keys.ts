@@ -1,6 +1,6 @@
 import type { PutOptions } from '../../storage/object-storage';
 
-/** Objects are never overwritten - a new logo is a new key - so caches may keep them forever. */
+/** A new logo is a new key and objects are never overwritten, so caches may keep them forever. */
 export const LOGO_OBJECT_OPTIONS: PutOptions = {
   contentType: 'image/jpeg',
   cacheControl: 'public, max-age=31536000, immutable',

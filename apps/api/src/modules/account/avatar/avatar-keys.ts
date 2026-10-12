@@ -1,6 +1,6 @@
 import type { PutOptions } from '../../storage/object-storage';
 
-/** Objects are never overwritten - a new photo is a new key - so caches may keep them forever. */
+/** A new photo is a new key and objects are never overwritten, so caches may keep them forever. */
 export const AVATAR_OBJECT_OPTIONS: PutOptions = {
   contentType: 'image/jpeg',
   cacheControl: 'public, max-age=31536000, immutable',
@@ -18,7 +18,7 @@ function avatarPrefix(userId: string): string {
 }
 
 /**
- * Built only here, from the session's user id and a server-made uuid - never
+ * Built only here, from the session's user id and a server-made uuid, never
  * from anything in a request. Lives outside `m/`, which the product image
  * sweep lists and would otherwise treat as orphans.
  */

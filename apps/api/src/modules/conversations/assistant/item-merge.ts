@@ -12,16 +12,13 @@ const words = (value: string | null | undefined): string | undefined => {
 };
 
 /**
- * The customer's item list after extraction. A null list leaves the items as
- * they are. Otherwise the returned list replaces them: an entry whose `ref`
- * names a collected item continues it. Extraction returns product words on
- * such an entry only when the customer changed which product it is, so null
- * words keep its matched ids and any words drop them and match again; the
- * variant likewise. A re-mention echoed anyway asks again rather than keep
- * a product the customer turned down. An item left out is removed. A
- * `ref` that does not exist, or that an earlier entry already used, starts a
- * new item. An entry with no product words and nothing to continue is
- * dropped.
+ * Applies extracted items to the customer's list; a null list changes nothing.
+ * An entry whose `ref` names a collected item continues it. Product words on
+ * it mean the product changed, so it matches again, as does an echoed
+ * re-mention rather than keep a product the customer turned down. Null words
+ * keep its ids, and variants work the same way. A missing or reused `ref`
+ * starts a new item, an entry with no product words and nothing to continue is
+ * dropped, and a collected item left out is removed.
  */
 export function mergeItems(
   current: readonly OrderItemSlot[],

@@ -5,7 +5,7 @@ import { DATABASE, type Database } from '../../database/database.module';
 import { user } from '../../database/schema/index';
 
 /**
- * The signed-in person's own choices, on Better Auth's `user` row - not the
+ * The signed-in person's own choices, on Better Auth's `user` row and not the
  * shop's, so each teammate keeps theirs. The user id comes from the session.
  */
 @Injectable()

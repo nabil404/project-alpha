@@ -12,13 +12,10 @@ import {
 } from '../queue/queue.constants';
 
 /**
- * Where the rest of the app reports the events seller emails are about. Each
- * call only enqueues; the worker decides, when the job runs, whether anyone
- * still wants the email. Call these after the transaction that made the event
- * has committed - a job that runs first would find nothing to tell.
- *
- * Job ids come from the event, so calling twice for the same one is a no-op
- * for as long as EVENT_JOB_RETENTION keeps the first job.
+ * Enqueues the events seller emails are about; the worker decides at run time
+ * whether anyone still wants the email. Call these only after the event's
+ * transaction commits, or the job finds nothing. Job ids come from the event,
+ * so a repeat call is a no-op while EVENT_JOB_RETENTION keeps the first job.
  */
 @Injectable()
 export class NotificationsService {

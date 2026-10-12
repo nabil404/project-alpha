@@ -36,8 +36,8 @@ export function ShopRegionProvider({ children }: { children: ReactNode }) {
   const language = chosen ?? (settings.data ? defaultDashboardLocale(settings.data.country) : null);
 
   useEffect(() => {
-    // Compared on the base language, so a browser's 'en-GB' - which Intl uses
-    // for date and number conventions - is not flattened to 'en'.
+    // Compared on the base language, so a browser's 'en-GB', which Intl uses
+    // for date and number conventions, is not flattened to 'en'.
     if (language && i18n.resolvedLanguage !== language) {
       void i18n.changeLanguage(language);
     }

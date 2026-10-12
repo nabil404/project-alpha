@@ -3,15 +3,11 @@ import { AuthGuard } from '@thallesp/nestjs-better-auth';
 import { CodedUnauthorizedException } from '../../common/errors/coded-exceptions';
 
 /**
- * The library's AuthGuard, registered globally in AppModule: every route needs
- * a session unless it is marked @AllowAnonymous() or @OptionalAuth().
- *
- * It exists only to give the rejection a code. The base guard throws a bare
- * UnauthorizedException, which AllExceptionsFilter would send as HTTP_401; the
- * SPA needs AUTH_UNAUTHENTICATED to know to send the seller to sign-in.
- *
- * On success it leaves `request.session` as Better Auth's `{ session, user }`,
- * which TenantGuard reads the active organization from.
+ * The global session guard: every route needs a session unless marked
+ * @AllowAnonymous() or @OptionalAuth(). It extends the library's AuthGuard only
+ * to reject with AUTH_UNAUTHENTICATED instead of a bare HTTP_401, which the SPA
+ * uses to send the seller to sign-in. On success, `request.session` holds
+ * Better Auth's `{ session, user }` for TenantGuard.
  */
 @Injectable()
 export class SessionGuard extends AuthGuard {

@@ -12,18 +12,13 @@ import {
 } from './layout';
 
 /**
- * Transactional email bodies: plain text alongside the MJML-built HTML, so the
- * message still reads in clients that strip markup. Copy and layout follow the
- * email designs on the dashboard's design canvas.
+ * Email bodies, as plain text and MJML-built HTML.
  *
- * Auth emails carry a single-use token in their link. The token lives only in
- * the body; subjects and anything a caller might log stay generic.
+ * An auth email's single-use token appears only in the body, never in the
+ * subject or anything a caller might log.
  *
- * Notification emails take display strings for money and dates, already
- * formatted for the shop (`formatMinorUnits`, `formatShopDate` from
- * `@app/shared`), because the shop's currency, locale and time zone are the
- * caller's to know; `notifications/notification-emails.ts` supplies them.
- * Every value is escaped into the HTML.
+ * Notification emails take money and dates already formatted for the shop by
+ * `notifications/notification-emails.ts`. Every value is escaped into the HTML.
  */
 export interface MailContent {
   subject: string;

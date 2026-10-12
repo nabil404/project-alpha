@@ -71,7 +71,7 @@ export class S3ObjectStorage extends ObjectStorage {
 
   /**
    * SDK errors can carry request details, so only the operation, the error
-   * name, the HTTP status and an error code are logged - never
+   * name, the HTTP status and an error code are logged, never
    * `error.message`, which can echo back request content such as a key.
    */
   private async run<T>(operation: string, call: () => Promise<T>): Promise<T> {

@@ -11,8 +11,8 @@ export interface ShopProfileRow {
 
 /**
  * The shop's name and logo, on Better Auth's organization row. The table has
- * no merchant_id and no policy - Better Auth reads it before any merchant
- * context exists - so the id filter here is the whole tenant boundary.
+ * no merchant_id and no policy, because Better Auth reads it before any merchant
+ * context exists. The id filter here is the whole tenant boundary.
  */
 @Injectable()
 export class ShopProfileRepository {

@@ -13,12 +13,10 @@ export interface SerializedRequest {
 }
 
 /**
- * The request fields that reach the logs, listed rather than spread: pino-http
- * also passes `query` and `params`, which carry the same credentials redactUrl
- * masks in the URL - an OAuth `code` and `state`, Meta's `hub.verify_token` -
- * but parsed, where no redact path reaches them. A new field stays out until
- * someone adds it here on purpose. Headers are kept; the `redact` list in
- * app.module.ts masks the secret-bearing ones.
+ * The request fields that reach the logs, listed explicitly. pino-http's
+ * `query` and `params` hold the same credentials redactUrl masks in the URL,
+ * but parsed, where no redact path reaches them, so they stay out. Headers are
+ * kept, and the `redact` list in app.module.ts masks the secret ones.
  */
 export function serializeRequest(req: SerializedRequest) {
   return {

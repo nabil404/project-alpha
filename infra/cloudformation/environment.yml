@@ -305,7 +305,7 @@ Resources:
       SecurityGroupIds: [!Ref WebSecurityGroup]
       DisableApiTermination: !If [IsProduction, true, false]
       # IMDSv2 with one hop: the host (dockerd, the AWS CLI) can read the
-      # instance role, but containers - one bridge hop further - cannot.
+      # instance role, but containers, one bridge hop further, cannot.
       MetadataOptions:
         HttpTokens: required
         HttpPutResponseHopLimit: 1

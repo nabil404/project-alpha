@@ -5,7 +5,7 @@ import { sessionQueryOptions } from '@/features/auth';
 
 /**
  * Every dashboard page needs a signed-in seller. Without a session the seller
- * is sent to sign-in and brought back afterwards - except when they arrive from
+ * is sent to sign-in and brought back afterwards, except when they arrive from
  * an emailed link that failed (`/?error=INVALID_TOKEN`), where the error goes
  * with them so sign-in can say what happened.
  */

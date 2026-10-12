@@ -1,19 +1,14 @@
-# The server stack, shared by every deployed environment: Caddy, api, worker,
-# Postgres, Redis. Never run on its own - each environment layers its overlay,
-# which sizes the stack to that environment's instance:
+# The server stack for every deployed environment: Caddy, api, worker,
+# Postgres, Redis. Never run alone. infra/server/deploy.sh adds the
+# environment's sizing overlay and the env file it renders from Parameter Store:
 #   docker compose --env-file apps/api/.env \
 #     -f docker/compose.yml -f docker/compose.<dev|stage|prod>.yml up -d
-# infra/server/deploy.sh does exactly that on the server. Local development uses
-# compose.local.yml instead.
-#
-# apps/api/.env is the repo's only env file, and compose needs it passed
-# explicitly - without --env-file it would look for docker/.env instead. On a
-# server, deploy.sh renders it from Parameter Store.
+# Local development uses compose.local.yml.
 name: app
 
 # apps/api/.env is authored for the host, where localhost is Postgres and Redis;
 # in here localhost is the container itself. It also carries stack secrets the
-# app must never see. Both are corrected below - environment wins over env_file.
+# app must never see. Both are corrected below, because environment wins over env_file.
 x-app-env: &app-env
   # The env file says development, for the host. The Dockerfile's ENV would
   # lose to it, and development mounts Swagger and relaxes logging.
@@ -96,7 +91,7 @@ services:
 
   # Applies migrations as the owner; the deploy runs it before starting a
   # release (`compose run --rm migrate`). The profile keeps `up` from starting
-  # it. It alone receives the admin URL - the api and worker get it blanked.
+  # it. It alone receives the admin URL. The api and worker get it blanked.
   migrate:
     image: ${API_IMAGE:-app-api}
     profiles: [migrate]
@@ -115,7 +110,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-app}
       # Restricted role for the api and worker. Unset on an already-provisioned
       # server, where the role is created by migration and given a password by
-      # hand instead - see apps/api/.env.example.
+      # hand instead. See apps/api/.env.example.
       APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-}
     volumes:
       - postgres_data:/var/lib/postgresql/data

@@ -19,12 +19,12 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   const config = app.get(AppConfig);
-  // A map of the whole auth surface is a development aid, not something to
+  // A map of every auth route is a development aid, not something to
   // hand to anyone who asks. Opt-in by name, so a deploy that forgot NODE_ENV,
   // or runs as staging or test, does not publish it.
   if (config.get('NODE_ENV') === 'development') {
     await setupOpenApi(app, app.get<AuthService<Auth>>(AuthService).instance);
-    // Dynamic, so production never loads @bull-board - a devDependency.
+    // Dynamic, so production never loads @bull-board, a devDependency.
     const { setupQueueBoard } = await import('./modules/queue/queue-board');
     setupQueueBoard(app);
   }

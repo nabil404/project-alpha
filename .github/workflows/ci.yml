@@ -8,7 +8,7 @@ on:
   workflow_call:
 
 # A newer push cancels a pull request's run. A called run gets a group of its
-# own, so it never cancels - or waits on - anything else.
+# own, so it never cancels or waits on anything else.
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || github.run_id }}
   cancel-in-progress: true
@@ -68,7 +68,7 @@ jobs:
       - run: pnpm test
 
       # drizzle-kit generates ENABLE and CREATE POLICY from pgPolicy, but not
-      # FORCE, roles or grants - those are hand-authored, so nothing diffs them.
+      # FORCE, roles or grants. Those are hand-authored, so nothing diffs them.
       - name: Verify RLS coverage
         working-directory: apps/api
         run: pnpm db:verify-rls

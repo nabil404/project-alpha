@@ -98,7 +98,7 @@ describe('AllExceptionsFilter', () => {
       error: { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error', params: {} },
     });
     expect(JSON.stringify(sent.body)).not.toContain('hunter2');
-    // The detail is not lost — it goes to the server log instead.
+    // The detail is not lost. It goes to the server log instead.
     expect(logged.at(-1)?.[0]).toBe(bug.message);
   });
 

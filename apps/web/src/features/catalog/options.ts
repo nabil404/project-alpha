@@ -1,15 +1,13 @@
 import type { OptionDraft, VariantDraft } from './product-form';
 
 /**
- * How the option editor reshapes the variants. Every function here is pure and
- * returns the next `options` and `variants`; nothing reaches the API until the
- * page is saved, so Discard undoes all of it.
+ * Pure functions that reshape variants as the seller edits options. Nothing
+ * reaches the API until save, so Discard undoes all of it.
  *
- * A kept variant keeps its id, SKU and stock (orders and the assistant already
- * know it); a new one copies its price and image from the variant it grew
- * from, starts at zero stock and gets its SKU from the API. A name the seller
- * gave survives a value's rename but not a change of options, which changes
- * what the variant is.
+ * A kept variant keeps its id, SKU and stock. A new one copies price and image
+ * from the variant it grew from, starts at zero stock, and gets its SKU from
+ * the API. A custom variant name survives a value rename but not a change of
+ * options.
  */
 export interface OptionState {
   options: OptionDraft[];

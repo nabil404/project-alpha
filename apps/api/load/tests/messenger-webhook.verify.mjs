@@ -2,14 +2,11 @@
 // Post-run check for messenger-webhook.k6.js, run by load/run.mjs:
 //   node messenger-webhook.verify.mjs <summary.json> <runId>
 //
-// k6 only sees HTTP answers. This checks the other half of the webhook's job:
-// every unique text message the run sent is exactly one job on the inbound
-// queue - none lost under load, redeliveries collapsed by jobId = mid. It then
-// deletes the run's jobs (KEEP_JOBS=1 keeps them).
+// Checks that each unique text message the run sent is exactly one job on the
+// inbound queue, then deletes the run's jobs (KEEP_JOBS=1 keeps them).
 //
-// Run with the worker stopped. The queue keeps completed jobs for 1 h or 1000
-// jobs (queue.module.ts), so a worker draining a large run prunes jobs before
-// they are counted and the check under-counts.
+// Run with the worker stopped. The queue keeps completed jobs for only 1 h or
+// 1000 jobs, so a worker draining a large run makes the check under-count.
 
 import { readFileSync } from 'node:fs';
 import { Queue } from 'bullmq';

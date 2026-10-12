@@ -199,12 +199,11 @@ export type ProductOptionInput = z.infer<typeof productOptionInputSchema>;
 export const VARIANT_NAME_MAX_LENGTH = 128;
 
 /**
- * `optionValues` picks one value per option by its text, in the options'
- * order, so a variant can point at a value created in the same save. It is
- * empty exactly when the product has no options. `id` keeps an existing
- * variant; omit it to add one. `name` is what customers and the assistant call
- * it; blank or absent, it is the values joined, and the default variant of a
- * product without options stays unnamed whatever it says.
+ * `optionValues` picks one value per option by text, in option order, so a
+ * variant can use a value created in the same save. It is empty only when the
+ * product has no options. `id` keeps an existing variant; omit it to add one.
+ * `name` is what customers and the assistant call it. Blank, it defaults to the
+ * joined values, and a product without options keeps its variant unnamed.
  */
 export const productVariantInputSchema = z.object({
   id: z.string().uuid().optional(),

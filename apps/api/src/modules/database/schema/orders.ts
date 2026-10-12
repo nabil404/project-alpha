@@ -51,12 +51,11 @@ export const ORDER_REFERENCE_UQ = 'order_merchant_reference_uq';
 export const ORDER_IDEMPOTENCY_UQ = 'order_merchant_idempotency_key_uq';
 
 /**
- * `number` counts the shop's orders from 1 within `year`, the calendar year
- * the order was placed in the shop's time zone; `reference` (ORD-2026-00481)
- * is the two together, stored when the order is placed, shown to the seller
- * and sent to the customer. The delivery fields are a snapshot taken when the order is placed,
- * so editing the customer later never rewrites an order. Totals are minor
- * units of `currency`, copied from the shop's settings when the order is placed.
+ * `number` counts the shop's orders from 1 within `year`, the calendar year in
+ * the shop's time zone. `reference` (ORD-2026-00481) combines them and is what
+ * the seller and customer see. Delivery fields, totals and `currency` are
+ * snapshots taken when the order is placed, so later edits to the customer or
+ * settings never rewrite it.
  */
 export const order = pgTable(
   'order',

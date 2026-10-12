@@ -29,8 +29,8 @@ if (!i18n.isInitialized) {
         ns: [...namespaces],
         fallbackLng: 'en',
         supportedLngs: [...supportedLanguages],
-        // Keeps 'en-GB' as the active tag — Intl wants the region for money and
-        // dates — while translations still resolve to 'en'.
+        // Keeps 'en-GB' as the active tag, because Intl wants the region for
+        // money and dates, while translations still resolve to 'en'.
         nonExplicitSupportedLngs: true,
         detection: {
           // 'querystring' first is for QA: ?lng=xx exercises a new locale

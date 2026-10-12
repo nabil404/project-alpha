@@ -93,7 +93,7 @@ describeDb('ensureOrganizationForUser', () => {
   });
 
   // A slug derived from the seller's name would collide here, and the collision
-  // would surface as a failed signup for the second seller.
+  // would show up as a failed signup for the second seller.
   it('gives two sellers trading under the same name distinct organizations', async () => {
     const [a, b] = await Promise.all([insertUser('Shop'), insertUser('Shop')]);
     const [orgA, orgB] = await Promise.all([

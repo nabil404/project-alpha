@@ -58,7 +58,7 @@ export type GeneralSettings = z.infer<typeof generalSettingsSchema>;
 /**
  * PATCH /settings/general. Omit a field to leave it alone. Changing the
  * currency while unlocked keeps every price's number the same in the new
- * currency - nothing is converted.
+ * currency. Nothing is converted.
  */
 export const updateGeneralSettingsSchema = z
   .object({

@@ -33,18 +33,15 @@ import { resolvePageMerchant } from './page-merchant';
 export type IngestOutcome = 'stored' | 'duplicate' | 'own-echo' | 'unknown-page';
 
 /**
- * Stores one message Meta delivered: a customer's, or an echo of the seller's
- * reply from Facebook's inbox, which pauses the assistant.
+ * Stores one message from Meta: a customer's, including button and quick-reply
+ * taps with their payload, or an echo of the seller's reply from Facebook's
+ * inbox, which pauses the assistant.
  *
- * Order is load-bearing (backend invariant #1): read, call Graph for the
- * customer's profile outside any transaction, then one short transaction that
- * locks the conversation and writes, then publish after commit.
- *
- * A tapped button or quick reply is stored as a customer message carrying its
- * payload. A customer message on a confirmed chat, other than a tap on its
- * summary card, starts the next order. After a stored customer message it
- * queues the assistant's turn, unless the seller has taken over, the Page's
- * assistant is off, the chat is handed off, or no LLM or Graph is configured.
+ * Follows invariant #1: the Graph profile fetch runs outside any transaction,
+ * then one short locked write, then publish after commit. A customer message
+ * on a confirmed chat starts the next order unless it taps the summary card.
+ * It queues the assistant's turn unless the seller took over, the assistant is
+ * off, the chat is handed off, or no LLM or Graph is configured.
  */
 @Injectable()
 export class InboundMessageIngest {

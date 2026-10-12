@@ -11,12 +11,9 @@ export interface TenantRequest extends Request {
 }
 
 /**
- * Each seller can only ever see their own Pages, catalog, conversations, and
- * orders. The guard puts the active organization on the request; repositories
- * still take merchantId explicitly and filter by it.
- *
- * It runs after the global SessionGuard, so an anonymous request has already
- * been turned away with AUTH_UNAUTHENTICATED by the time it gets here.
+ * Puts the session's active organization on the request as the merchant.
+ * Repositories still take merchantId and filter by it. It runs after the
+ * global SessionGuard, so the request is already authenticated.
  */
 @Injectable()
 export class TenantGuard implements CanActivate {

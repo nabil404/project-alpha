@@ -1,15 +1,11 @@
-# Local development: dependencies only - the api, worker, and SPA run on the
-# host with `pnpm dev`. drizzle-kit diffs against snapshots, so it needs no
-# database. The servers (dev, stage, prod) use compose.yml plus their overlay.
+# Local dependencies only. The api, worker and SPA run on the host with
+# `pnpm dev`. Servers use compose.yml plus their overlay.
 #
-# Interpolated from apps/api/.env, the repo's only env file, so the credentials
-# Postgres is created with and the ones the app connects with cannot drift
-# apart. Compose has to be told where that file is - use `pnpm dev:up` /
-# `pnpm dev:down`, or:
+# Interpolated from apps/api/.env so Postgres and the app share credentials.
+# Use `pnpm dev:up` / `pnpm dev:down`, or:
 #   docker compose --env-file apps/api/.env -f docker/compose.local.yml up -d
 #
-# The project keeps its old name, app-dev, so existing local volumes survive the
-# rename from compose.dev.yml.
+# The project keeps the name app-dev so existing local volumes survive.
 name: app-dev
 
 services:
@@ -41,8 +37,8 @@ services:
     volumes:
       - redis_dev_data:/data
 
-  # Catches every email the api sends - verification and password-reset links
-  # included - so auth flows work locally without a real provider. Point
+  # Catches every email the api sends, verification and password-reset links
+  # included, so auth flows work locally without a real provider. Point
   # SMTP_URL at smtp://localhost:1025 and read the mail at http://localhost:8025.
   mailpit:
     image: axllent/mailpit:v1

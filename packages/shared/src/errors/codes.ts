@@ -1,12 +1,9 @@
 import { z } from 'zod';
 
 /**
- * Stable, machine-readable error codes. The API never sends translated prose:
- * the SPA resolves a code through its own catalog and interpolates `params`,
- * so a code is part of the contract and renaming one is a breaking change.
- *
- * Add a code when a call site actually throws it. An unused code is a catalog
- * entry the frontend carries forever for nothing.
+ * Stable error codes. The SPA translates a code through its own catalog and
+ * fills in `params`, so renaming a code is a breaking change. Add one only when
+ * a call site throws it.
  */
 export const errorCodes = [
   // Generic
@@ -132,8 +129,8 @@ export type ErrorCode = z.infer<typeof errorCodeSchema>;
 
 /**
  * What can appear as `error.code` on the wire. The global filter synthesizes
- * `HTTP_<status>` for framework-thrown exceptions nobody gave a code to —
- * Nest's own 404 for an unmatched route, say — so the envelope stays
+ * `HTTP_<status>` for framework-thrown exceptions nobody gave a code to,
+ * such as Nest's own 404 for an unmatched route, so the envelope stays
  * consistent even on paths this design never touched.
  */
 export type WireErrorCode = ErrorCode | `HTTP_${number}`;

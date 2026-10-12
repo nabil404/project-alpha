@@ -73,8 +73,8 @@ export class NotificationComposer {
   }
 
   /**
-   * Only if the chat is still on this handoff - not handed back, nor handed
-   * off again since - and nobody has replied since it was.
+   * Only if the chat is still on this handoff, neither handed back nor handed
+   * off again since, and nobody has replied since it was.
    */
   customerWaiting(
     merchantId: string,

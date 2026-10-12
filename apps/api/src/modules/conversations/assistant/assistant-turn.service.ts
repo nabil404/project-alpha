@@ -62,12 +62,11 @@ export type TurnOutcome =
   | ConfirmOutcome;
 
 /**
- * One assistant turn, in the order invariant #1 requires: read, call the LLM
- * with no transaction open, then one short transaction that locks the
- * conversation, re-checks the read, and writes; Graph after commit. LLM and
- * Graph failures never throw - they end in a hand-off with a fixed reply.
- * Only a database or Redis error throws, and BullMQ retries it; the gate's
- * "answered" check makes that retry safe.
+ * One assistant turn, per invariant #1: read, call the LLM with no transaction
+ * open, then lock, re-check and write in one short transaction, and call Graph
+ * after commit. LLM and Graph failures end in a hand-off with a fixed reply.
+ * Database and Redis errors throw for BullMQ to retry, which the gate's
+ * "answered" check makes safe.
  */
 @Injectable()
 export class AssistantTurnService {

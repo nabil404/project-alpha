@@ -89,7 +89,7 @@ function parseJson(text: string): unknown {
 /**
  * Never assume the envelope is there. A 502 from Caddy is an HTML page, and a
  * proxy can fail before the API is reached at all, so an unparseable body
- * still becomes an ApiError — just one carrying the HTTP_<status> fallback.
+ * still becomes an ApiError, one carrying the HTTP_<status> fallback.
  */
 function toApiError(status: number, statusText: string, body: unknown): ApiError {
   const parsed = errorResponseBodySchema.safeParse(body);

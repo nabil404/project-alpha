@@ -1,13 +1,10 @@
 #!/bin/bash
 # Deploys one commit on this server. CI runs /opt/app/bin/deploy <sha> over SSM
-# Run Command (see infra/cloudformation/environment.yml); that shim unpacks the
-# commit's bundle - docker/, static/ and infra/server/ - into /opt/app and runs
-# this.
+# Run Command, which unpacks the commit's bundle into /opt/app and runs this.
 #
-# Migrations run while the previous release still serves. If the new release
-# does not turn healthy, its images are swapped back for the previous ones;
-# the database is never rolled back, so every migration must be safe for the
-# previous release.
+# Migrations run while the previous release still serves. A release that fails
+# its health check gets the previous images back, but the database is never
+# rolled back, so every migration must work with the previous release.
 set -euo pipefail
 
 sha="$1"

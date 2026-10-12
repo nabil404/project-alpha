@@ -94,13 +94,10 @@ export function cutText(text: string, max: number): string {
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /**
- * The Graph API over `fetch`, at a pinned version. Tokens travel in the
- * Authorization header rather than the query string, and every call carries
- * `appsecret_proof`, so a leaked user or Page token is useless without our
- * app secret.
- *
- * Nothing here may be called inside a database transaction (backend
- * invariant #1): each call is a network round trip to Facebook.
+ * The Graph API over `fetch`, at a pinned version. Tokens go in the
+ * Authorization header and every call carries `appsecret_proof`, so a leaked
+ * token is useless without our app secret. Never call it inside a database
+ * transaction (invariant #1).
  */
 export class MetaGraphClient {
   private readonly graphBase: string;
@@ -169,7 +166,7 @@ export class MetaGraphClient {
     );
   }
 
-  /** The Pages the seller granted us, first 100 - more than any one seller in the MVP has. */
+  /** The first 100 Pages the seller granted us, more than any one seller in the MVP has. */
   async listPages(userToken: string): Promise<GraphPage[]> {
     const entries = await this.grantedPages(userToken, 'id,name,tasks');
     return entries.flatMap((entry) => {
@@ -224,7 +221,7 @@ export class MetaGraphClient {
 
   /**
    * A text reply inside the 24h window (`messaging_type: RESPONSE`). The caller
-   * enforces the window; Facebook refusing anyway surfaces as a GraphError.
+   * enforces the window; If Facebook refuses anyway, the call throws a GraphError.
    */
   async sendText(pageToken: string, psid: string, text: string): Promise<{ messageId: string }> {
     return this.sendMessage(pageToken, psid, { text });

@@ -50,12 +50,11 @@ export const PROFILE_QUEUE = 'customer-profiles';
 export const REFRESH_PROFILES_JOB = 'refresh-stale-profiles';
 
 /**
- * Seller notification emails. The API and the worker both enqueue the event
- * jobs; only the worker processes them, and each email goes out as its own
- * SEND_EMAIL_JOB so a retry re-sends one message, never the whole batch.
- * Event job ids are built from the event, and BullMQ ignores an add whose id
- * it still holds, so the same event never mails twice while its job is kept:
- * see EVENT_JOB_RETENTION.
+ * Seller notification emails. The API and worker enqueue event jobs; only the
+ * worker processes them. Each email is its own SEND_EMAIL_JOB, so a retry
+ * resends one message. Event job ids come from the event, and BullMQ ignores an
+ * add whose id it still holds, so an event never mails twice within
+ * EVENT_JOB_RETENTION.
  */
 export const NOTIFICATIONS_QUEUE = 'notifications';
 export const ORDER_DRAFTED_JOB = 'order-drafted';

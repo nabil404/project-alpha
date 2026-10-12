@@ -38,7 +38,7 @@ const serverFields = ['name', 'shopName', 'email', 'phone', 'password'] as const
 
 /**
  * There is no shop yet to take a country from, so the calling code starts at
- * the country of the browser's time zone - a better guess than its language,
+ * the country of the browser's time zone. That is a better guess than its language,
  * which is often English wherever the seller is.
  */
 function guessCountry(): string {
@@ -64,8 +64,8 @@ export function SignUpForm({
   const signUp = useSignUp();
   const defaultCountry = useMemo(guessCountry, []);
 
-  // Agreeing to the terms is the form's business alone - the API has nothing
-  // to store it in yet - so it is added here rather than to the shared schema.
+  // Agreeing to the terms is the form's business alone, since the API has
+  // nothing to store it in yet, so it is added here rather than to the shared schema.
   const schema = useMemo(
     () =>
       signUpSchema.extend({

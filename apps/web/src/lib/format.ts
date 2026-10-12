@@ -55,8 +55,8 @@ export function dateFnsLocale(tag: string): Locale {
 
 /**
  * The language tag as Intl will take it. A browser can report one Intl
- * rejects - a POSIX locale comes through as 'en-US@posix' - and every
- * formatter would throw on it; the part before '@' is tried, then English.
+ * rejects, such as a POSIX locale that comes through as 'en-US@posix', and
+ * every formatter would throw on it. The part before '@' is tried, then English.
  */
 export function intlLocale(tag: string): string {
   for (const candidate of [tag, tag.split('@')[0] ?? '']) {
@@ -83,18 +83,15 @@ function relativeTimeFormatter(locale: string): Intl.RelativeTimeFormat {
 }
 
 /**
- * The seam between i18next's active language, the shop's region and the
- * framework-agnostic helpers in @app/shared — which must never import i18next
- * themselves, so the locale crosses that boundary as a plain BCP-47 string.
- * Components use this so a language or region change re-renders every
- * formatted value.
- *
- * Money defaults to the shop's currency and dates to the shop's time zone and
- * format: the same order reads the same on a laptop in Dhaka and one abroad.
+ * Formatters bound to i18next's language and the shop's region. @app/shared
+ * must not import i18next, so the locale reaches it as a BCP-47 string. A
+ * language or region change re-renders every formatted value. Money uses the
+ * shop's currency and dates its time zone and format, so an order reads the
+ * same wherever the seller is.
  */
 export function useFormatters() {
   const { i18n: instance } = useTranslation();
-  // The full tag with region ('en-GB'), not resolvedLanguage — Intl wants the
+  // The full tag with region ('en-GB'), not resolvedLanguage. Intl wants the
   // region to pick currency and date conventions.
   const locale = intlLocale(instance.language);
   const { currency: shopCurrency, timeZone, dateFormat } = useShopRegion();
@@ -137,7 +134,7 @@ export function useFormatters() {
     [dayOffset],
   );
 
-  /** "today", "yesterday", "3 days ago" — for values only accurate to the day. */
+  /** "today", "yesterday", "3 days ago", for values only accurate to the day. */
   const formatRelativeDay = useCallback(
     (value: Date | string | number, now: Date = new Date()): string =>
       relativeTimeFormatter(locale).format(dayOffset(value, now), 'day'),
@@ -229,7 +226,7 @@ export function useFormatters() {
 
 /**
  * Escape hatch for non-React callers (CSV export row builders, sort
- * comparators). Components must use useFormatters() instead — this one does not
+ * comparators). Components must use useFormatters() instead. This one does not
  * re-render on a language change.
  */
 export function currentLocale(): string {

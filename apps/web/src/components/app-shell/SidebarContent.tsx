@@ -19,7 +19,7 @@ export function SidebarContent({
   brandAction,
   onNavigate,
 }: {
-  /** Sits at the end of the brand row - the drawer's close button. */
+  /** Sits at the end of the brand row. The drawer puts its close button here. */
   brandAction?: ReactNode;
   onNavigate?: () => void;
 }) {

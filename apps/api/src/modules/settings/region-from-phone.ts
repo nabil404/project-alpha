@@ -6,16 +6,11 @@ import { MerchantSettingsRepository } from './merchant-settings.repository';
 const settings = new MerchantSettingsRepository();
 
 /**
- * Starts a new shop in the region of the phone its seller signed up with: a
- * +1 212 number opens in US dollars, New York time and month-first dates,
- * not the default Bangladesh. A shop that already has settings keeps them,
- * and a number with no known country (or no number - a social sign-up)
- * leaves the shop on the default region.
- *
- * The contact phone is not filled in: the seller's own number is not
- * necessarily the one they want customers to see.
- *
- * Returns the country it set, or null.
+ * Sets a new shop's region from the seller's sign-up phone, so a +1 212 number
+ * opens in US dollars, New York time and month-first dates. A shop that already
+ * has settings keeps them. No phone, or one with no known country, leaves the
+ * default region. The contact phone stays empty, since the seller may want
+ * customers to use a different number. Returns the country it set, or null.
  */
 export async function seedRegionFromPhone(
   db: Database,
