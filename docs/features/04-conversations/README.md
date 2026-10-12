@@ -38,7 +38,7 @@ so the verify token and the signature are its authentication.
   Meta delivers every Page's events from a few addresses, so a per-IP limit
   would throttle all shops together.
 - The raw body survives because the auth module keeps `rawBody: true` on its
-  body parser ([Auth](../01-auth/README.md#http-surface)).
+  body parser ([Auth](../01-auth/README.md#http-endpoints)).
 
 | Variable             | Notes                                                                                        |
 | -------------------- | -------------------------------------------------------------------------------------------- |
