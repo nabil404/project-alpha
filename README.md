@@ -48,6 +48,24 @@ and worker never receive them.
 
 Webhooks need a public HTTPS URL: `cloudflared tunnel --url http://localhost:3000`.
 
+## Seed data
+
+Sign up in the dashboard first: the seed fills an existing shop. Then:
+
+```bash
+pnpm --filter api db:seed-products              # about 20 hand-written products
+pnpm --filter api db:seed-products --count 200  # plus 200 generated ones
+pnpm --filter api db:seed-products --reset      # clear the shop's products first
+```
+
+With more than one shop in the database, pick one with `--org <slug>`; a
+missing or wrong slug lists them. Re-running is safe: products and categories
+that already exist by name are skipped, and generated products continue their
+numbering. Products have no photos. The command refuses to run unless
+`NODE_ENV=development` and `DATABASE_URL` points at a local database. The seed
+lives in `apps/api/db/seed/`; what it creates is described in
+[docs/features/02-catalog](docs/features/02-catalog/README.md#dev-seed).
+
 ## Database changes
 
 drizzle-kit is the only tool that changes the schema. `drizzle-kit push` is never

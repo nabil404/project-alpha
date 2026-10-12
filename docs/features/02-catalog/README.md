@@ -489,6 +489,7 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 | [`products/__tests__/sellable-catalog.spec.ts`](../../../apps/api/src/modules/products/__tests__/sellable-catalog.spec.ts)                             | `findSellableCatalog` visibility                                                                              |
 | [`products/__tests__/sku.spec.ts`](../../../apps/api/src/modules/products/__tests__/sku.spec.ts)                                                       | SKU normalization and generation                                                                              |
 | [`products/images/__tests__/`](../../../apps/api/src/modules/products/images/__tests__/)                                                               | Normalization, keys, interceptor, repository, service, cover, sweep, and a multipart e2e through the Nest app |
+| [`db/seed/__tests__/`](../../../apps/api/db/seed/__tests__/)                                                                                           | The dev seed: catalog passes the product schema, re-runs, filler numbering, reset, two shops                  |
 | [`storage/__tests__/s3-object-storage.spec.ts`](../../../apps/api/src/modules/storage/__tests__/s3-object-storage.spec.ts)                             | The S3 adapter and its error mapping                                                                          |
 
 The database-backed specs are **skipped** unless `TEST_DATABASE_ADMIN_URL` is
@@ -502,6 +503,29 @@ pnpm dev:up
 ```bash
 pnpm --filter api test -- catalog products categories
 ```
+
+## Dev seed
+
+`pnpm --filter api db:seed-products [--org <slug>] [--count <n>] [--reset]`
+fills a shop's catalog for development:
+
+- **About 20 hand-written products** from a Dhaka clothing shop, across five
+  categories, covering what the dashboard and the assistant must handle: one
+  to three options, sold-out variants, Banglish aliases, drafts, an archived
+  product, and custom delivery charges (the shop's charges plus a surcharge,
+  so only areas the shop already has).
+- **`--count <n>`** adds generated products, numbered after the last run's
+  (`… #21`), from a fixed-seed generator. No photos, by design.
+- **`--reset`** deletes the shop's products first; one an order points at is
+  kept (`PRODUCT_IN_USE`).
+
+`--org` takes the shop's slug, which is its organization id; leave it out when
+the database has one shop, and a wrong one lists them. Everything goes through
+`ProductsService` and `CategoriesService` as `app_runtime`, so seeded rows pass
+the dashboard's validation and RLS. Re-running is safe: categories and
+hand-written products that exist by name are reused or skipped. The command
+refuses unless `NODE_ENV=development` and `DATABASE_URL` is local. It compiles
+with SWC into `dist/seed`, leaving the running dev server's `dist` alone.
 
 ## Dashboard
 
@@ -549,4 +573,5 @@ pnpm --filter api test -- catalog products categories
 - [`apps/api/src/modules/products/images/normalize-product-image.ts`](../../../apps/api/src/modules/products/images/normalize-product-image.ts): `sharp` pipeline
 - [`apps/api/src/modules/products/images/sweep-orphaned-images.ts`](../../../apps/api/src/modules/products/images/sweep-orphaned-images.ts): orphan sweep
 - [`apps/api/src/modules/storage/storage.module.ts`](../../../apps/api/src/modules/storage/storage.module.ts): R2 client
+- [`apps/api/db/seed/product-seeder.ts`](../../../apps/api/db/seed/product-seeder.ts): the dev seed; its catalog is [`seed-catalog.ts`](../../../apps/api/db/seed/seed-catalog.ts)
 - [`packages/shared/src/schemas/catalog.ts`](../../../packages/shared/src/schemas/catalog.ts): shared contract
