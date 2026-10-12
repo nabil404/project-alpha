@@ -463,29 +463,94 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
     expect(turns.added[0]).toMatchObject({ opts: { delay: 2_500 } });
   });
 
-  it('answers a Confirm tap on a confirmed chat, and nothing else there', async () => {
-    const first = customerMessage();
-    await ingest.handle(first);
-    const conversationId = (await threadOf(first.senderPsid))!.conversation.id;
-    await t.db
-      .update(schema.conversation)
-      .set({ state: 'confirmed' })
-      .where(eq(schema.conversation.id, conversationId));
-    const tap = (payload: string): CustomerPostbackJob => ({
+  describe('on a confirmed chat', () => {
+    const confirmedSlots = {
+      items: [{ productId: randomUUID(), variantId: randomUUID(), quantity: 2 }],
+      customerName: 'Rahim',
+      phone: '+8801812345678',
+      deliveryAddress: 'House 4, Road 2, Dhanmondi',
+      deliveryArea: 'Dhaka',
+      deliveryChargeId: randomUUID(),
+      revision: 3,
+      quote: {
+        revision: 3,
+        lines: [
+          {
+            productId: randomUUID(),
+            variantId: randomUUID(),
+            quantity: 2,
+            unitPrice: 80_000,
+            lineTotal: 160_000,
+          },
+        ],
+        subtotal: 160_000,
+        deliveryChargeId: randomUUID(),
+        deliveryFee: 6_000,
+        total: 166_000,
+        currency: 'BDT',
+      },
+    };
+    const confirmedChat = async () => {
+      const first = customerMessage();
+      await ingest.handle(first);
+      const conversationId = (await threadOf(first.senderPsid))!.conversation.id;
+      await t.db
+        .update(schema.conversation)
+        .set({ state: 'confirmed', collectedSlots: confirmedSlots })
+        .where(eq(schema.conversation.id, conversationId));
+      return { psid: first.senderPsid, conversationId };
+    };
+    const tap = (psid: string, payload: string): CustomerPostbackJob => ({
       kind: 'customer-postback',
       messageId: `mid-${randomUUID()}`,
       pageId: pageA,
-      senderPsid: first.senderPsid,
+      senderPsid: psid,
       text: 'Confirm',
       payload,
       sentAt: Date.parse('2026-09-29T10:06:00Z'),
     });
 
-    await ingest.handle(customerMessage({ senderPsid: first.senderPsid, text: 'thanks' }));
-    await ingest.handle(tap(`change:${conversationId}:1`));
-    await ingest.handle(tap(`confirm:${conversationId}:1`));
+    it('starts the next order from a new message, keeping the details', async () => {
+      const { psid, conversationId } = await confirmedChat();
 
-    expect(turns.added).toHaveLength(2);
-    expect(turns.added[1]).toMatchObject({ opts: { delay: 0 } });
+      await ingest.handle(customerMessage({ senderPsid: psid, text: 'I want one more' }));
+
+      const thread = await threadOf(psid);
+      expect(thread!.conversation.state).toBe('browsing');
+      expect(thread!.conversation.collectedSlots).toEqual({
+        items: [],
+        customerName: 'Rahim',
+        phone: '+8801812345678',
+        deliveryAddress: 'House 4, Road 2, Dhanmondi',
+        deliveryArea: 'Dhaka',
+        deliveryChargeId: confirmedSlots.deliveryChargeId,
+        revision: 4,
+      });
+      expect(turns.added).toHaveLength(2);
+      expect(turns.added[1]).toMatchObject({ data: { conversationId }, opts: { delay: 2_500 } });
+    });
+
+    it('stays confirmed for a tap on the summary card, and answers only Confirm', async () => {
+      const { psid, conversationId } = await confirmedChat();
+
+      await ingest.handle(tap(psid, `change:${conversationId}:3`));
+      await ingest.handle(tap(psid, `confirm:${conversationId}:3`));
+
+      const thread = await threadOf(psid);
+      expect(thread!.conversation.state).toBe('confirmed');
+      expect(thread!.conversation.collectedSlots).toEqual(confirmedSlots);
+      expect(turns.added).toHaveLength(2);
+      expect(turns.added[1]).toMatchObject({ opts: { delay: 0 } });
+    });
+
+    it('starts the next order even while the assistant is off', async () => {
+      const { psid } = await confirmedChat();
+      ingest = makeIngest({ get: () => undefined } as unknown as AppConfig);
+
+      await ingest.handle(customerMessage({ senderPsid: psid, text: 'another one please' }));
+
+      expect((await threadOf(psid))!.conversation.state).toBe('browsing');
+      expect(turns.added).toHaveLength(1);
+    });
   });
 });

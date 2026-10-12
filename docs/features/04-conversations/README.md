@@ -72,6 +72,13 @@ SPA    refetches over REST
   postback's assistant turn is queued with no delay, and a Confirm tap is
   still queued on a `confirmed` chat, so a second tap gets the order's
   reference again.
+- **The next order.** A customer message on a `confirmed` chat, other than a
+  Confirm or Change tap on a summary card, moves it back to `browsing` in the
+  ingest's transaction, whether or not the assistant is on.
+  `slotsForNextOrder` clears the items, the quote, the offered quick replies
+  and the ask counter. It keeps the name, phone, address and delivery row for
+  the next card, and bumps `revision`: every earlier card goes stale, and the
+  next card never reuses the confirmed one's idempotency key.
 - **Seller echoes.** An echo whose `app_id` is not ours (Facebook's own inbox,
   or another app on the Page) is stored as `sender = seller` and pauses the
   assistant. Our own sends are written by the sender, not the ingest.
