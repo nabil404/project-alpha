@@ -7,14 +7,18 @@ the MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
 describes what is actually built.
 
 **Status (Oct 2026):** built end to end, except CSV import (see
-[Not yet built](#not-yet-built)). That covers eight tables with composite
-tenant keys and forced row-level security; `CategoriesService` and
-`ProductsService` with every rule below, including the AI's
-`findSellableCatalog` read; the product routes, with options and variants
-saved as one versioned document; image upload, delete, reorder and cover;
-object storage on Cloudflare R2; a daily orphan sweep in the worker; and the
-dashboard's products list, add/edit page and Categories page. Stock moves
-with orders; see [Orders](../07-orders/README.md#rules).
+[Not yet built](#not-yet-built)). The build has these parts:
+
+- Eight tables with composite tenant keys and forced row-level security.
+- `CategoriesService` and `ProductsService`, with every rule below and the
+  AI's `findSellableCatalog` read.
+- The product routes, which save options and variants as one versioned
+  document.
+- Image upload, delete, reorder and cover, stored on Cloudflare R2.
+- A daily orphan sweep in the worker.
+- The dashboard's products list, add and edit page, and Categories page.
+
+Orders move stock. See [Orders](../07-orders/README.md#rules).
 
 ## At a glance
 
@@ -36,11 +40,12 @@ with orders; see [Orders](../07-orders/README.md#rules).
 
 Defined in
 [`database/schema/catalog.ts`](../../../apps/api/src/modules/database/schema/catalog.ts).
-Every table has a `text` UUID `id` (the two link tables have none), a
-`merchant_id` referencing `organization(id)`, `created_at`, and a
+Every table has a `merchant_id` referencing `organization(id)` and a
 `<table>_merchant_isolation` policy on `merchant_id = app_current_merchant()`.
-Every table also has `UNIQUE (merchant_id, id)`, which the composite foreign
-keys point at. RLS filters reads, but it does not check the ids a row points
+Every table except the two link tables has a `text` UUID `id`, `created_at`,
+and `UNIQUE (merchant_id, id)`, which the composite foreign keys point at.
+`product_category` has `created_at` too, and `product_variant_option_value`
+has no timestamps. RLS filters reads, but it does not check the ids a row points
 at. The composite keys do that, so a bug that writes another merchant's
 `product_id` or `category_id` fails in the database.
 
@@ -61,18 +66,18 @@ can't model the column list, and a plain composite `SET NULL` would also null
 `merchant_id` and fail its `NOT NULL`. So those keys live in custom migrations
 (`0006`, `0014`), not in `catalog.ts`.
 
-drizzle-kit generates the tables, `ENABLE ROW LEVEL SECURITY` and the policies;
-`FORCE ROW LEVEL SECURITY` and the two `SET NULL (column)` image keys are custom
-migrations.
+drizzle-kit generates the tables, `ENABLE ROW LEVEL SECURITY` and the policies.
+`FORCE ROW LEVEL SECURITY` is a custom migration too.
 
-The index names `VARIANT_SKU_LIVE_UIDX` and `CATEGORY_NAME_LIVE_UIDX` are
-exported from the schema, because the services map unique violations on them to
-coded errors.
+The schema exports the index names `VARIANT_SKU_LIVE_UIDX` and
+`CATEGORY_NAME_LIVE_UIDX`, because the services map unique violations on them
+to coded errors.
 
 ## Rules
 
-Two Nest modules, [`modules/categories/`](../../../apps/api/src/modules/categories/)
-and [`modules/products/`](../../../apps/api/src/modules/products/), each with a
+Two Nest modules hold the rules,
+[`modules/categories/`](../../../apps/api/src/modules/categories/) and
+[`modules/products/`](../../../apps/api/src/modules/products/). Each has a
 repository and a service. The dependency runs one way: `ProductsModule` imports
 `CategoriesModule` for `CategoriesRepository` (the category lock and liveness
 checks). Categories never import from products. Every repository method takes
@@ -81,7 +86,8 @@ method runs inside `withMerchant`.
 
 ### Categories
 
-A flat list: a category has a name and nothing else, and there is no nesting.
+A category has a name and nothing else. Categories form a flat list with no
+nesting.
 
 **Delete** is a soft delete. It takes
 `pg_advisory_xact_lock(hashtextextended('category:<merchantId>', 0))`
@@ -91,26 +97,27 @@ liveness check and the delete. It sets `deleted_at` and hard-deletes the
 category's `product_category` rows in the same transaction, so no junction join
 can surface a deleted category.
 
-**Names** are trimmed. A clash with another live category of the same merchant,
-ignoring case, → `CATEGORY_NAME_TAKEN`. That is mapped from the unique index
-rather than pre-checked, so two racing requests can't both take the name.
-Deleting a category releases its name. A rename takes no lock: if it loses a
-race to a delete it finds no live row and answers `CATEGORY_NOT_FOUND`.
+**Names** are trimmed. A name that matches another live category of the same
+merchant, ignoring case, answers `CATEGORY_NAME_TAKEN`. The service maps that
+error from the unique index instead of checking first, so two racing requests
+can't both take the name. Deleting a category releases its name. A rename takes
+no lock. If it loses a race to a delete, it finds no live row and answers
+`CATEGORY_NOT_FOUND`.
 
 ### The product document
 
-The edit page saves a product's fields, options, values and variants as **one
-document** (`PUT /products/:id`, `saveProductSchema`), planned without the
-database by
+The edit page saves a product's fields, options, values and variants as one
+document (`PUT /products/:id`, `saveProductSchema`). The save is planned without
+the database by
 [`product-document-plan.ts`](../../../apps/api/src/modules/products/options/product-document-plan.ts)
 and applied by `ProductWriter` in one transaction under the product row lock.
 Creation (`POST /products`) takes the same document without a `version`.
 
-- **Ids keep, absence removes.** An option, value or variant sent with its `id`
-  is kept (and may be renamed); one sent without is created. Options and values
-  left out are deleted; variants left out are **archived**, never deleted. An
-  id that isn't this product's → `PRODUCT_OPTION_NOT_FOUND` or
-  `VARIANT_NOT_FOUND`.
+- **What a save keeps.** An option, value or variant sent with its `id` is
+  kept, and may be renamed. One sent without an `id` is created. Options and
+  values left out are deleted. Variants left out are **archived**, never
+  deleted. An id that isn't this product's answers `PRODUCT_OPTION_NOT_FOUND`
+  or `VARIANT_NOT_FOUND`.
 - **Variants pick values by text.** `optionValues` names one value per option,
   in the options' order, so a variant can use a value created in the same save.
   The shared refinements (`refineProductDocument`, run by the form and again by
@@ -129,21 +136,24 @@ Creation (`POST /products`) takes the same document without a `version`.
   product's own charge per shop area, everywhere else included, stored in
   `product_delivery_charge`. An area it leaves out costs the shop charge.
   Every save replaces them, and saving with `customDelivery: false` drops
-  them. An id that isn't one of the shop's areas → `DELIVERY_CHARGE_NOT_FOUND`;
-  one listed twice → `DUPLICATE` at `deliveryCharges.<i>.deliveryChargeId`.
+  them. An id that isn't one of the shop's areas answers
+  `DELIVERY_CHARGE_NOT_FOUND`. An id listed twice answers `DUPLICATE` at
+  `deliveryCharges.<i>.deliveryChargeId`.
   Removing an area in Settings removes every product's charge for it.
 - **Version.** Every write to the product's fields, options or variants bumps
   `revision`, sent as an opaque `version`. A save whose `version` isn't the
-  current one → `409 PRODUCT_STALE`, so of two saves from one read the second
-  is refused rather than overwriting. Order stock moves bump it too. Gallery
-  changes don't: the edit page doesn't hold the gallery.
+  current one answers `409 PRODUCT_STALE`. Of two saves from one read, the
+  second is refused instead of overwriting the first. Order stock moves bump
+  `revision` too. Gallery changes don't, because the edit page doesn't hold the
+  gallery.
 
 ### Variants
 
-- **SKU.** Trimmed and upper-cased on write ([`sku.ts`](../../../apps/api/src/modules/products/sku.ts)).
-  A blank SKU is generated as `SKU-` plus 8 Crockford base32 characters (no I,
-  L, O or U), inserted with `ON CONFLICT DO NOTHING` and retried up to 5 times.
-  A SKU the seller typed that a live variant already uses → `SKU_TAKEN`.
+- **SKU.** The API trims and upper-cases a SKU on write
+  ([`sku.ts`](../../../apps/api/src/modules/products/sku.ts)). For a blank
+  SKU, it generates `SKU-` plus 8 Crockford base32 characters (no I, L, O or
+  U), inserts with `ON CONFLICT DO NOTHING`, and retries up to 5 times. A typed
+  SKU that a live variant already uses answers `SKU_TAKEN`.
   Archiving a variant releases its SKU.
 - **Archive, never delete.** Order lines reference variants, so a variant is
   archived. That also stops the AI from calling a discontinued option "out of
@@ -153,58 +163,64 @@ Creation (`POST /products`) takes the same document without a `version`.
   changes a live variant's SKU, price, stock or image outside the document (a
   quick stock change). Its option values change only through a save. It bumps
   the version, so an edit page still holding the old one can't overwrite it.
-- **Image.** `imageId` must be one of the same product's images, else
-  `PRODUCT_IMAGE_NOT_FOUND`. The composite key already keeps it inside the
-  merchant. `null` falls back to the product's cover.
-- **Stock** is written by the seller, and moved by orders. The derived
-  `stockStatus` (`in_stock` / `out_of_stock`) is computed on read.
+- **Image.** `imageId` must be one of the same product's images. The
+  composite key already keeps it inside the merchant. A variant update that
+  names another image answers `PRODUCT_IMAGE_NOT_FOUND`. A save treats such an
+  id as `null`, because the page may name a photo deleted since it read.
+  `null` falls back to the product's cover.
+- **Stock.** The seller sets it, and orders move it. The API computes the
+  derived `stockStatus` (`in_stock` or `out_of_stock`) on read.
 
 ### Products
 
 - `status` moves freely between `draft`, `active` and `archived`.
-  `PATCH /products/:id` changes only the fields sent (the status dropdown, say),
-  takes no `version`, and bumps it.
+  `PATCH /products/:id` changes only the fields sent (for example, from the
+  status dropdown). It takes no `version`, but it bumps the version.
 - `categoryIds` on create, save or update **replaces** the product's links. It
   is checked for liveness under the category lock, so a category can't be
   deleted between the check and the link (`CATEGORY_NOT_FOUND`).
 - **Cover.** `cover_image_id` is the photo the assistant sends when no variant
   is picked, and for variants without their own. It is null exactly when the
-  product has no photos: the first upload becomes it, deleting it promotes the
-  first remaining photo, and a save with `coverImageId: null` (or a photo
-  deleted since the page read) picks the first. Reordering the gallery never
-  changes it.
+  product has no photos. The first upload becomes the cover. Deleting the
+  cover promotes the first remaining photo. A save with `coverImageId: null`,
+  or with a photo deleted since the page read, picks the first photo.
+  Reordering the gallery never changes the cover.
 - **Hard delete** cascades to options, variants, category links and image rows.
   The image objects are deleted from storage after commit, best-effort. Once an
-  order line references one of its variants, the database refuses it and the
-  API answers `409 PRODUCT_IN_USE`; the seller archives instead.
+  order line references one of its variants, the database refuses the delete
+  and the API answers `409 PRODUCT_IN_USE`. The seller archives the product
+  instead.
 
 ### Products list
 
 The dashboard's Products page reads `GET /products` and `GET /products/counts`
 (`ProductsService.list` / `counts`).
 
-- **One row per product, its live variants summed up**: count, price range,
-  total stock, and how many variants are low or out. The variants themselves
-  are not in the list; expanding a row reads `GET /products/:id`, the edit
-  page's read, so the page opens from cache afterwards. A product with a single
-  live variant carries it inline as `variant`, so its row needs no second read.
-- **Stock levels**: a variant is low at `LOW_STOCK_THRESHOLD` (5) or fewer and
-  out at 0. A product is out when nothing is left, low when any variant is low
-  or out, in stock otherwise. The threshold is a shared constant until sellers
-  can set it.
-- **Filters**: `all` and the three stock filters leave archived products out;
-  `draft` and `archived` list those statuses. Every non-archived product counts
-  under exactly one stock chip. `q` matches the name, a tag or a live SKU;
-  `categoryId` keeps products in that category. Counts ignore search and category.
-- **Paging** is by page number (`page`, `limit` of 10, 25, 50 or 100), newest
-  first, with a total for "Showing 1–10 of 64". A seller's catalog is small
-  enough that offset paging stays cheap, and the page wants numbered pages.
+- **One row per product.** The row sums up its live variants: count, price
+  range, total stock, and how many variants are low or out. The variants
+  themselves are not in the list. Expanding a row reads `GET /products/:id`,
+  the edit page's read, so the edit page then opens from cache. A product with
+  a single live variant carries it inline as `variant`, so its row needs no
+  second read.
+- **Stock levels.** A variant is low at `LOW_STOCK_THRESHOLD` (5) or fewer, and
+  out at 0. A product is out when no variant has stock, low when any variant is
+  low or out, and in stock otherwise. The threshold is a shared constant until
+  sellers can set it.
+- **Filters.** `all` and the three stock filters leave archived products out.
+  `draft` and `archived` list products with that status. Every non-archived
+  product counts under exactly one stock chip. `q` matches the name, a tag or a
+  live SKU. `categoryId` keeps products in that category. Counts ignore search
+  and category.
+- **Paging.** The list pages by number (`page`, and a `limit` of 10, 25, 50 or
+  100), newest first, with a total for "Showing 1–10 of 64". A seller's catalog
+  is small enough that offset paging stays cheap, and the page shows numbered
+  pages.
 
 ### Categories page
 
 The dashboard's Categories page, at `/catalog/categories`, reads
-`GET /categories` once and searches, sorts (by name, or by product count) and
-pages that list in the browser: a seller has tens of categories, not
+`GET /categories` once. It searches, sorts (by name or by product count) and
+pages that list in the browser, because a seller has tens of categories, not
 thousands.
 
 - **Rename and add in the row.** Enter saves, Escape cancels. A taken name
@@ -247,16 +263,17 @@ invariant #1). [`ProductImagesService.upload`](../../../apps/api/src/modules/pro
 
 1. **Pre-check.** The product exists for this merchant (`PRODUCT_NOT_FOUND`)
    and has fewer than 8 images (`PRODUCT_IMAGE_LIMIT_REACHED`).
-2. **Receive.** Multer memory storage, one file in `file`, rejected while
-   streaming past 10 MB, so an oversize upload is never fully buffered. Multer's
-   bare exceptions are translated to coded ones by
-   [`ProductImageUploadInterceptor`](../../../apps/api/src/modules/products/images/product-image-upload.interceptor.ts).
+2. **Receive.** Multer reads one file from the `file` field into memory. It
+   rejects the upload while streaming once it passes 10 MB, so an oversize
+   upload is never fully buffered.
+   [`ProductImageUploadInterceptor`](../../../apps/api/src/modules/products/images/product-image-upload.interceptor.ts)
+   translates Multer's bare exceptions to coded ones.
 3. **Normalize** with [`normalizeProductImage`](../../../apps/api/src/modules/products/images/normalize-product-image.ts).
    The format comes from `sharp`'s detection, never the client's MIME type.
-   JPEG, PNG and WebP are accepted; anything else (HEIC, GIF) is unsupported.
-   Over 40 megapixels or undecodable is invalid. EXIF orientation is applied,
-   alpha is flattened onto white, and all metadata (GPS, XMP, ICC) is dropped.
-   The full image fits inside 2048×2048 at JPEG q82, the thumbnail inside
+   JPEG, PNG and WebP are accepted. Any other format, such as HEIC or GIF, is
+   unsupported. An image over 40 megapixels, or one that doesn't decode, is
+   invalid. The function applies EXIF orientation, flattens alpha onto white,
+   and drops all metadata (GPS, XMP and ICC). The full image fits inside 2048×2048 at JPEG q82, the thumbnail inside
    400×400 at q75, and neither is enlarged.
 4. **Store** the full image, then the thumbnail. If either put fails, whatever
    was written is deleted and the request answers `STORAGE_UNAVAILABLE`.
@@ -283,22 +300,24 @@ recover whose object it's looking at.
 
 ### Delete and reorder
 
-- **Delete:** one transaction locks the product, deletes the row, rewrites
-  the remaining positions to `0..n-1` and, if it was the cover, makes the first
-  remaining photo the cover. The objects are deleted after commit;
-  a failure is logged and left to the sweep. Another merchant's product answers
+- **Delete.** One transaction locks the product, deletes the row, and rewrites
+  the remaining positions to `0..n-1`. If the deleted photo was the cover, the
+  same transaction makes the first remaining photo the cover. The objects are
+  deleted after commit. A failure is logged and left to the sweep. Another merchant's product answers
   exactly like a missing image.
-- **Reorder:** one transaction locks the product and checks that `imageIds` is
+- **Reorder.** One transaction locks the product and checks that `imageIds` is
   a permutation of the current ids (`PRODUCT_IMAGE_ORDER_MISMATCH` otherwise).
-  It then rewrites positions. The order is the gallery's only; the cover is
-  set separately (see [Products](#products)).
+  It then rewrites positions. The order applies to the gallery only. The cover
+  is set separately (see [Products](#products)).
 
 ### Orphan sweep
 
 An object with no row appears only when a best-effort delete fails.
 [`StorageSweepProcessor`](../../../apps/api/src/modules/products/images/storage-sweep.processor.ts)
 runs [`sweepOrphanedImages`](../../../apps/api/src/modules/products/images/sweep-orphaned-images.ts)
-daily at 03:00 UTC, via the BullMQ job scheduler `sweep-orphaned-images-daily`.
+daily at 03:00, via the BullMQ job scheduler `sweep-orphaned-images-daily`
+(cron `0 3 * * *`). The pattern sets no time zone, so it runs in the worker's,
+which is UTC in the containers.
 The scheduler is upserted on every worker boot, so there is only ever one. The
 processor is registered only in the worker, never in the API process.
 
@@ -309,10 +328,10 @@ processor is registered only in the worker, never in the API process.
   every object as an orphan.
 - Objects younger than 24 hours are left alone, because their upload may not
   have committed yet.
-- **Circuit breaker:** if orphans exceed 20% of the objects examined _and_
+- **Circuit breaker.** If orphans exceed 20% of the objects examined _and_
   number more than 10, nothing is deleted and an error is logged.
 
-## HTTP surface
+## Routes
 
 The product routes are in
 [`products.controller.ts`](../../../apps/api/src/modules/products/products.controller.ts),
@@ -335,26 +354,27 @@ live `variants`, `categoryIds`, `images`, `coverImageId`, `customDelivery`,
 A non-UUID `:id` is `400 VALIDATION_FAILED` on every route.
 
 The image routes are in
-([`product-images.controller.ts`](../../../apps/api/src/modules/products/images/product-images.controller.ts)).
-They need a session and carry `TenantGuard`, so the merchant always comes from
-the session.
+[`product-images.controller.ts`](../../../apps/api/src/modules/products/images/product-images.controller.ts),
+behind the same session and `TenantGuard`.
 
-| Method | Path                                          | Body                     | Success                   | Errors                                                                                                                                             |
-| ------ | --------------------------------------------- | ------------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/v1/products/:productId/images`          | multipart, field `file`  | 201, the image            | 400 `VALIDATION_FAILED` / `PRODUCT_IMAGE_INVALID`, 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_IMAGE_LIMIT_REACHED`, 413, 415, 503 `STORAGE_UNAVAILABLE` |
-| DELETE | `/api/v1/products/:productId/images/:imageId` | —                        | 204                       | 404 `PRODUCT_IMAGE_NOT_FOUND`                                                                                                                      |
-| PUT    | `/api/v1/products/:productId/images/order`    | `{ imageIds: string[] }` | 200, the reordered images | 400 `PRODUCT_IMAGE_ORDER_MISMATCH`, 404 `PRODUCT_NOT_FOUND`                                                                                        |
+| Method | Path                                          | Body                     | Success                   | Errors                                                                                                                                                                                                        |
+| ------ | --------------------------------------------- | ------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/v1/products/:productId/images`          | multipart, field `file`  | 201, the image            | 400 `VALIDATION_FAILED` / `PRODUCT_IMAGE_INVALID`, 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_IMAGE_LIMIT_REACHED`, 413 `PRODUCT_IMAGE_TOO_LARGE`, 415 `PRODUCT_IMAGE_UNSUPPORTED_TYPE`, 503 `STORAGE_UNAVAILABLE` |
+| DELETE | `/api/v1/products/:productId/images/:imageId` | —                        | 204                       | 400 `VALIDATION_FAILED`, 404 `PRODUCT_IMAGE_NOT_FOUND`                                                                                                                                                        |
+| PUT    | `/api/v1/products/:productId/images/order`    | `{ imageIds: string[] }` | 200, the reordered images | 400 `VALIDATION_FAILED` / `PRODUCT_IMAGE_ORDER_MISMATCH`, 404 `PRODUCT_NOT_FOUND`                                                                                                                             |
 
 Upload has its own throttle: 30 requests per minute per client, on top of the
 global limit. The image resource is
 `{ id, url, thumbnailUrl, position, width, height }`. Products embed `images`
 in that shape, ordered by position, so there is no list endpoint. A variant's
-image is set through the variant update (`imageId`), not these routes.
+image is set through its `imageId`, in a save or a variant update, not through
+these routes.
 
 The products list takes the query `filter`, `q`, `categoryId`, `page` and
-`limit` (400 `VALIDATION_FAILED` on anything else). It names its page size
-`limit`, where the newer Customers and Orders lists say `pageSize`; the meaning
-is the same. See [Products list](#products-list).
+`limit`, and answers 400 `VALIDATION_FAILED` on an invalid value. It ignores
+any other parameter. Its page
+size is `limit`, where the newer Customers and Orders lists say `pageSize`.
+Both mean the same thing. See [Products list](#products-list).
 
 The category routes are in
 [`categories.controller.ts`](../../../apps/api/src/modules/categories/categories.controller.ts),
@@ -379,7 +399,8 @@ products out. The product picker reads the same list. The AI's
 All are thrown as `Coded*Exception`s from
 [`product-errors.ts`](../../../apps/api/src/modules/products/product-errors.ts),
 [`category-errors.ts`](../../../apps/api/src/modules/categories/category-errors.ts),
-the categories service, the upload interceptor, and
+[`delivery-errors.ts`](../../../apps/api/src/modules/settings/delivery-errors.ts),
+the upload interceptor, and
 [`s3-object-storage.ts`](../../../apps/api/src/modules/storage/s3-object-storage.ts).
 
 | Code                             | Status | Params           | When                                                         |
@@ -415,31 +436,31 @@ Each new code is a three-file change: `packages/shared/src/errors/codes.ts`,
 [`packages/shared/src/schemas/catalog.ts`](../../../packages/shared/src/schemas/catalog.ts)
 is used by both apps:
 
-- **Resources:** `productSchema` (with `options`, `variants`, `categoryIds`,
+- **Resources.** `productSchema` (with `options`, `variants`, `categoryIds`,
   `images`, `coverImageId`, `version`), `productOptionSchema`,
   `variantSchema` (with derived `stockStatus` and `optionValueIds`),
   `categorySchema`, `categoryWithCountSchema`, `productImageSchema`, and the
   list's `productListItemSchema` and `productCountsSchema`.
-- **Inputs:** `createProductSchema` and `saveProductSchema` (the document;
-  status defaults to `draft`; both run `refineProductDocument`),
+- **Inputs.** `createProductSchema` and `saveProductSchema` (the document,
+  whose status defaults to `draft`, both running `refineProductDocument`),
   `productOptionInputSchema`, `productVariantInputSchema`,
   `updateProductSchema`, `updateVariantSchema`, `listProductsQuerySchema`,
   `createCategorySchema`, `updateCategorySchema`, `reorderProductImagesSchema`,
   `productCsvRowSchema`.
-- **Constants:** `PRODUCT_IMAGE_MAX_BYTES` (10 MB),
+- **Constants.** `PRODUCT_IMAGE_MAX_BYTES` (10 MB),
   `PRODUCT_IMAGE_MAX_COUNT` (8), `PRODUCT_OPTION_MAX_COUNT` (3),
   `PRODUCT_OPTION_VALUE_MAX_COUNT` (30), `PRODUCT_VARIANT_MAX_COUNT` (100),
   `LOW_STOCK_THRESHOLD` (5).
-- **Enums:** `productStatusSchema` and `stockStatusSchema`. Each has an entry
+- **Enums.** `productStatusSchema` and `stockStatusSchema`. Each has an entry
   in `apps/web/src/i18n/status-keys.ts`.
 
-After changing it, run `pnpm --filter @app/shared build`: `apps/api` resolves
-`@app/shared` through its built `dist`.
+After changing it, run `pnpm --filter @app/shared build`, because `apps/api`
+resolves `@app/shared` through its built `dist`.
 
 ## Configuration
 
-From [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts), all
-required, set in `environments/.env`:
+From [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts),
+set in `environments/.env`. All are required except `STORAGE_REGION`:
 
 | Variable                    | Notes                                                                       |
 | --------------------------- | --------------------------------------------------------------------------- |
@@ -493,7 +514,7 @@ required, which R2 needs, and bounds each request (5 s connect, 30 s request).
 | [`storage/__tests__/s3-object-storage.spec.ts`](../../../apps/api/src/modules/storage/__tests__/s3-object-storage.spec.ts)                             | The S3 adapter and its error mapping                                                                          |
 
 The database-backed specs are **skipped** unless `TEST_DATABASE_ADMIN_URL` is
-set (see `environments/.env.example`); the Jest run creates and migrates that
+set (see `environments/.env.example`). The Jest run creates and migrates that
 database itself. CI sets it. No test contacts R2. Locally:
 
 ```bash
@@ -515,12 +536,13 @@ fills a shop's catalog for development:
   product, and custom delivery charges (the shop's charges plus a surcharge,
   so only areas the shop already has).
 - **`--count <n>`** adds generated products, numbered after the last run's
-  (`… #21`), from a fixed-seed generator. No photos, by design.
-- **`--reset`** deletes the shop's products first; one an order points at is
-  kept (`PRODUCT_IN_USE`).
+  (`… #21`), from a fixed-seed generator. Generated products have no photos.
+- **`--reset`** deletes the shop's products first. A product an order points
+  at is kept (`PRODUCT_IN_USE`).
 
-`--org` takes the shop's slug, which is its organization id; leave it out when
-the database has one shop, and a wrong one lists them. Everything goes through
+`--org` takes the shop's slug, which is its organization id. Leave it out when
+the database has one shop. A slug that matches no shop prints the list of
+shops. Everything goes through
 `ProductsService` and `CategoriesService` as `app_runtime`, so seeded rows pass
 the dashboard's validation and RLS. Re-running is safe: categories and
 hand-written products that exist by name are reused or skipped. The command
@@ -534,28 +556,32 @@ with SWC into `dist/seed`, leaving the running dev server's `dist` alone.
   details, the option editor and variant table, the variant image picker,
   status, categories and aliases (shown as Tags), the Delivery charge card
   (shop charges, or a custom charge per area with the shop charge beside it),
-  and the photo dialogs (Add
-  photos with per-file progress, All photos with delete and the default
-  choice, and a full-screen viewer). The default photo (the cover) is saved
-  with the page; uploads and deletes happen at once. A save sends the
-  product's `version`; a `PRODUCT_STALE` answer means someone (or an order)
-  changed it since the page read it.
+  and the photo dialogs. Those are Add photos with per-file progress, All
+  photos with delete and the default choice, and a full-screen viewer. The
+  default photo (the cover) is saved with the page, but uploads and deletes
+  happen at once. A save sends the product's `version`. A `PRODUCT_STALE`
+  answer means another save or an order changed the product since the page
+  read it.
 - **`/catalog/categories`**: the Categories page (see
   [Categories page](#categories-page)).
 
 ## Not yet built
 
-- **Dashboard extras.** Reordering photos; the Categories page's insights
-  panel (what customers ask for, categories they ask for that don't exist,
-  and the needs-attention list); and fields the design shows that the API
-  doesn't hold yet: the assistant notes, a per-seller low-stock threshold and
-  sales figures. The design's product-level "Free delivery" option was left
-  out on purpose; the only free delivery is the shop's threshold.
+- **Dashboard extras.** Three pieces are missing:
+  - Reordering photos.
+  - The Categories page's insights panel: what customers ask for, categories
+    they ask for that don't exist, and the needs-attention list.
+  - Fields the design shows that the API doesn't hold yet: the assistant
+    notes, a per-seller low-stock threshold, and sales figures.
+
+  The design's product-level "Free delivery" option was left out on purpose.
+  The only free delivery is the shop's threshold.
+
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
 - **Categories in the assistant.** `findSellableCatalog` returns them, but
   the assistant's matching ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#matching))
-  uses only names, aliases and option values; browsing by category is
+  uses only names, aliases and option values. Browsing by category is
   phase 3.
 - **Bulk object removal on account deletion.** The `m/{merchantId}/` prefix
   makes it one prefix delete.
@@ -573,5 +599,5 @@ with SWC into `dist/seed`, leaving the running dev server's `dist` alone.
 - [`apps/api/src/modules/products/images/normalize-product-image.ts`](../../../apps/api/src/modules/products/images/normalize-product-image.ts): `sharp` pipeline
 - [`apps/api/src/modules/products/images/sweep-orphaned-images.ts`](../../../apps/api/src/modules/products/images/sweep-orphaned-images.ts): orphan sweep
 - [`apps/api/src/modules/storage/storage.module.ts`](../../../apps/api/src/modules/storage/storage.module.ts): R2 client
-- [`apps/api/db/seed/product-seeder.ts`](../../../apps/api/db/seed/product-seeder.ts): the dev seed; its catalog is [`seed-catalog.ts`](../../../apps/api/db/seed/seed-catalog.ts)
+- [`apps/api/db/seed/product-seeder.ts`](../../../apps/api/db/seed/product-seeder.ts): the dev seed, whose catalog is in [`seed-catalog.ts`](../../../apps/api/db/seed/seed-catalog.ts)
 - [`packages/shared/src/schemas/catalog.ts`](../../../packages/shared/src/schemas/catalog.ts): shared contract
