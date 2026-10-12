@@ -23,11 +23,11 @@ import {
 } from '../../storage/__tests__/in-memory-object-storage';
 import { AccountModule } from '../account.module';
 import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
+import { describeDb, testDatabaseUrl } from '../../../__tests__/test-env';
 
 // Needs a real Postgres: sessions, password hashing and the hooks are Better
-// Auth server behaviour. CI sets DATABASE_ADMIN_URL; locally, export it.
-const url = process.env.DATABASE_ADMIN_URL;
-const describeDb = url ? describe : describe.skip;
+// Auth server behaviour.
+const url = testDatabaseUrl;
 
 const APP_URL = 'http://localhost:5173';
 const EMAIL_DOMAIN = `${randomUUID()}.example.test`;

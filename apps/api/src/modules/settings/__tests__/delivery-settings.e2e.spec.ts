@@ -20,11 +20,10 @@ import { ObjectStorage } from '../../storage/object-storage';
 import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
 import { SettingsModule } from '../settings.module';
 import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
+import { describeDb, testDatabaseUrl } from '../../../__tests__/test-env';
 
-// Needs a real Postgres: sessions come from Better Auth. CI sets
-// DATABASE_ADMIN_URL; locally, export it.
-const url = process.env.DATABASE_ADMIN_URL;
-const describeDb = url ? describe : describe.skip;
+// Needs a real Postgres: sessions come from Better Auth.
+const url = testDatabaseUrl;
 
 const APP_URL = 'http://localhost:5173';
 const EMAIL_DOMAIN = `${randomUUID()}.example.test`;

@@ -9,13 +9,12 @@ import {
   findEarliestOrganizationId,
 } from '../ensure-organization';
 import * as schema from '../schema/index';
+import { describeDb, testDatabaseUrl } from '../../../__tests__/test-env';
 
 // Needs a real Postgres: the uniqueness of organization.slug and the
 // transaction the helper opens are server behaviours, not something a fake can
-// demonstrate. CI sets DATABASE_ADMIN_URL; locally, export it (pointing at
-// docker/compose.local.yml) to run these.
-const url = process.env.DATABASE_ADMIN_URL;
-const describeDb = url ? describe : describe.skip;
+// demonstrate.
+const url = testDatabaseUrl;
 
 describeDb('ensureOrganizationForUser', () => {
   let db: Database;

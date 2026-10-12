@@ -45,6 +45,10 @@ jobs:
       # nothing in this job queries as it, and db:verify-rls uses the admin URL.
       DATABASE_URL: postgres://app:app@localhost:5432/app
       REDIS_URL: redis://localhost:6379
+      # The specs' own connections. Jest's global setup creates app_test on the
+      # service above and migrates it; nothing else reads these.
+      TEST_DATABASE_ADMIN_URL: postgres://app:app@localhost:5432/app_test
+      TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -60,7 +64,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
 
-      # Before the tests: the database-backed specs need the schema in place.
+      # db:verify-rls below needs the schema in place.
+      # The tests migrate their own database.
       - name: Apply migrations to a fresh database
         working-directory: apps/api
         run: pnpm db:migrate

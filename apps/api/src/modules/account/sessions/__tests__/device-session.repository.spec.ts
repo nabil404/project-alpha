@@ -5,9 +5,9 @@ import { Pool } from 'pg';
 import type { Database } from '../../../database/database.module';
 import * as schema from '../../../database/schema/index';
 import { DeviceSessionRepository } from '../device-session.repository';
+import { describeDb, testDatabaseUrl } from '../../../../__tests__/test-env';
 
-const url = process.env.DATABASE_ADMIN_URL;
-const describeDb = url ? describe : describe.skip;
+const url = testDatabaseUrl;
 
 const HOUR = 60 * 60 * 1000;
 

@@ -5,10 +5,10 @@ import { Pool } from 'pg';
 import type { Database } from '../../../database/database.module';
 import * as schema from '../../../database/schema/index';
 import { UserImageRepository } from '../user-image.repository';
+import { describeDb, testDatabaseUrl } from '../../../../__tests__/test-env';
 
 // Needs a real Postgres: the row lock is server behaviour.
-const url = process.env.DATABASE_ADMIN_URL;
-const describeDb = url ? describe : describe.skip;
+const url = testDatabaseUrl;
 
 describeDb('UserImageRepository', () => {
   let pool: Pool;

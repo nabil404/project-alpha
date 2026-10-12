@@ -20,6 +20,7 @@ import { ConversationsModule } from '../conversations.module';
 import { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { CONVERSATION_EVENTS_SUBSCRIBE } from '../events/redis-connections';
 import { listenOnLoopback } from '../../../__tests__/listen-on-loopback';
+import { testDatabaseUrl } from '../../../__tests__/test-env';
 
 const APP_URL = 'http://localhost:5173';
 const EMAIL_DOMAIN = `${randomUUID()}.example.test`;
@@ -61,7 +62,7 @@ describeDb('conversations routes behind the real guards', () => {
 
   beforeAll(async () => {
     runtime = openRuntimeDb();
-    admin = new Pool({ connectionString: process.env.DATABASE_ADMIN_URL, max: 1 });
+    admin = new Pool({ connectionString: testDatabaseUrl, max: 1 });
     const env: Record<string, string> = {
       NODE_ENV: 'test',
       APP_URL,
