@@ -5,8 +5,11 @@ This directory contains examples of generating Mermaid diagrams from Node.js/Exp
 ## Diagram Types
 
 ### 1. Architecture Diagram (from layered structure)
+
 ### 2. Middleware Chain (from Express middleware)
+
 ### 3. Deployment Diagram (from Docker/PM2 setup)
+
 ### 4. Sequence Diagram (from async request flow)
 
 ## Example Application Structure
@@ -173,15 +176,15 @@ const express = require('express');
 const app = express();
 
 // Global middleware (applied to all routes)
-app.use(helmet());                    // Security headers
-app.use(cors());                      // CORS policy
-app.use(morgan('combined'));          // HTTP logging
-app.use(express.json());              // Body parser
+app.use(helmet()); // Security headers
+app.use(cors()); // CORS policy
+app.use(morgan('combined')); // HTTP logging
+app.use(express.json()); // Body parser
 app.use(express.urlencoded({ extended: true }));
 
 // Custom middleware
-app.use(requestId());                 // Add request ID
-app.use(rateLimiter);                 // Rate limiting
+app.use(requestId()); // Add request ID
+app.use(rateLimiter); // Rate limiting
 
 // Routes with route-specific middleware
 app.use('/api/auth', authRoutes);
@@ -284,14 +287,14 @@ const userController = {
       // 4. Create user
       const user = await User.create({
         ...value,
-        password: hashedPassword
+        password: hashedPassword,
       });
 
       // 5. Cache user
       await cacheService.set(`user:${user.id}`, user, 3600);
 
       // 6. Send welcome email (async, non-blocking)
-      emailService.sendWelcome(user.email).catch(err => {
+      emailService.sendWelcome(user.email).catch((err) => {
         logger.error('Failed to send welcome email', err);
       });
 
@@ -299,12 +302,12 @@ const userController = {
       res.status(201).json({
         id: user.id,
         email: user.email,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
       });
     } catch (error) {
       next(error);
     }
-  }
+  },
 };
 ```
 
@@ -478,21 +481,21 @@ const errorHandler = (err, req, res, next) => {
       status: err.status,
       error: err,
       message: err.message,
-      stack: err.stack
+      stack: err.stack,
     });
   } else {
     // Production: don't leak error details
     if (err.isOperational) {
       res.status(err.statusCode).json({
         status: err.status,
-        message: err.message
+        message: err.message,
       });
     } else {
       // Programming errors: log and send generic message
       console.error('ERROR 💥', err);
       res.status(500).json({
         status: 'error',
-        message: 'Something went wrong'
+        message: 'Something went wrong',
       });
     }
   }
@@ -523,11 +526,14 @@ const asyncHandler = (fn) => {
 };
 
 // Usage - cleaner controllers
-app.get('/users', asyncHandler(async (req, res) => {
-  const users = await User.find();
-  res.json(users);
-  // No try-catch needed!
-}));
+app.get(
+  '/users',
+  asyncHandler(async (req, res) => {
+    const users = await User.find();
+    res.json(users);
+    // No try-catch needed!
+  }),
+);
 ```
 
 ### 3. Service Layer Pattern
@@ -551,7 +557,7 @@ class UserService {
 
     const user = await User.create({
       ...userData,
-      password: hashedPassword
+      password: hashedPassword,
     });
 
     // Cache user
@@ -604,7 +610,7 @@ container.register({
   redis: asFunction(createRedisClient).singleton(),
 
   // Config
-  config: asValue(require('./environment'))
+  config: asValue(require('./environment')),
 });
 
 // Usage in controller
@@ -630,22 +636,25 @@ module.exports = container.resolve('userController');
 const Queue = require('bull');
 
 const emailQueue = new Queue('email', {
-  redis: { host: 'localhost', port: 6379 }
+  redis: { host: 'localhost', port: 6379 },
 });
 
 // Producer: Add jobs to queue
 exports.sendEmail = async (to, subject, body) => {
-  await emailQueue.add({
-    to,
-    subject,
-    body
-  }, {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 2000
-    }
-  });
+  await emailQueue.add(
+    {
+      to,
+      subject,
+      body,
+    },
+    {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+    },
+  );
 };
 
 // Consumer: Process jobs
@@ -656,7 +665,7 @@ emailQueue.process(async (job) => {
     from: process.env.EMAIL_FROM,
     to,
     subject,
-    html: body
+    html: body,
   });
 
   job.progress(100);
@@ -687,11 +696,11 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 3000,
       },
       error_file: './logs/err.log',
       out_file: './logs/out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     },
     {
       name: 'worker',
@@ -700,10 +709,10 @@ module.exports = {
       exec_mode: 'cluster',
       watch: false,
       env: {
-        NODE_ENV: 'production'
-      }
-    }
-  ]
+        NODE_ENV: 'production',
+      },
+    },
+  ],
 };
 
 // Start: pm2 start ecosystem.config.js

@@ -17,16 +17,17 @@ Mermaid supports Unicode characters within node labels when enclosed in double q
 
 ### Infrastructure & Cloud (☁️ 🌐 🔌)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| ☁️ | Cloud Service | `[☁️ AWS Lambda]` |
-| 🌐 | Network/Internet/Load Balancer | `[🌐 API Gateway]` |
-| 🔌 | Network Connection | `[🔌 VPC Connector]` |
-| 📡 | Communication/Broadcast | `[📡 WebSocket Server]` |
-| 🛰️ | Satellite/Remote | `[🛰️ Edge Location]` |
-| 🗄️ | Server/Storage | `[🗄️ File Server]` |
+| Symbol | Meaning                        | Example Usage           |
+| ------ | ------------------------------ | ----------------------- |
+| ☁️     | Cloud Service                  | `[☁️ AWS Lambda]`       |
+| 🌐     | Network/Internet/Load Balancer | `[🌐 API Gateway]`      |
+| 🔌     | Network Connection             | `[🔌 VPC Connector]`    |
+| 📡     | Communication/Broadcast        | `[📡 WebSocket Server]` |
+| 🛰️     | Satellite/Remote               | `[🛰️ Edge Location]`    |
+| 🗄️     | Server/Storage                 | `[🗄️ File Server]`      |
 
 **Example:**
+
 ```mermaid
 graph LR
     Client[👤 User] --> CDN[☁️ CloudFront]
@@ -36,17 +37,18 @@ graph LR
 
 ### Compute & Processing (⚙️ ⚡ 🔄)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| ⚙️ | Process/Service/Configuration | `[⚙️ Worker Service]` |
-| ⚡ | Fast/Real-time/Cache | `[⚡ Redis Cache]` |
-| 🔄 | Sync/Retry/Circular Process | `[🔄 Sync Service]` |
-| ♻️ | Recycle/Reprocess | `[♻️ Retry Queue]` |
-| 🚀 | Launch/Start/Deploy | `[🚀 Startup Process]` |
-| 🔥 | Hot/Active/Critical | `[🔥 Hot Path]` |
-| 💨 | Fast/Lightweight | `[💨 Quick Response]` |
+| Symbol | Meaning                       | Example Usage          |
+| ------ | ----------------------------- | ---------------------- |
+| ⚙️     | Process/Service/Configuration | `[⚙️ Worker Service]`  |
+| ⚡     | Fast/Real-time/Cache          | `[⚡ Redis Cache]`     |
+| 🔄     | Sync/Retry/Circular Process   | `[🔄 Sync Service]`    |
+| ♻️     | Recycle/Reprocess             | `[♻️ Retry Queue]`     |
+| 🚀     | Launch/Start/Deploy           | `[🚀 Startup Process]` |
+| 🔥     | Hot/Active/Critical           | `[🔥 Hot Path]`        |
+| 💨     | Fast/Lightweight              | `[💨 Quick Response]`  |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     Start([🚀 Start]) --> Process[⚙️ Process Data]
@@ -57,18 +59,19 @@ flowchart TD
 
 ### Data & Storage (💾 📦 📊)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| 💾 | Database/Persistent Storage | `[(💾 PostgreSQL)]` |
-| 📦 | Object Storage/Package | `[📦 S3 Bucket]` |
-| 📊 | Data/Analytics/Metrics | `[📊 Analytics DB]` |
-| 📈 | Growth/Trending Up | `[📈 Metrics Dashboard]` |
-| 📉 | Decline/Trending Down | `[📉 Error Rate]` |
-| 🗃️ | Archive/Files | `[🗃️ Archive Storage]` |
-| 💿 | Disk/Volume | `[💿 EBS Volume]` |
-| 🧊 | Cold Storage | `[🧊 Glacier]` |
+| Symbol | Meaning                     | Example Usage            |
+| ------ | --------------------------- | ------------------------ |
+| 💾     | Database/Persistent Storage | `[(💾 PostgreSQL)]`      |
+| 📦     | Object Storage/Package      | `[📦 S3 Bucket]`         |
+| 📊     | Data/Analytics/Metrics      | `[📊 Analytics DB]`      |
+| 📈     | Growth/Trending Up          | `[📈 Metrics Dashboard]` |
+| 📉     | Decline/Trending Down       | `[📉 Error Rate]`        |
+| 🗃️     | Archive/Files               | `[🗃️ Archive Storage]`   |
+| 💿     | Disk/Volume                 | `[💿 EBS Volume]`        |
+| 🧊     | Cold Storage                | `[🧊 Glacier]`           |
 
 **Example:**
+
 ```mermaid
 graph TB
     App[⚙️ App] --> Hot[💾 Hot Database]
@@ -79,17 +82,18 @@ graph TB
 
 ### Messaging & Events (📨 📬 🐰)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| 📨 | Event/Message/Email | `[📨 Event Bus]` |
-| 📬 | Queue/Mailbox | `[📬 SQS Queue]` |
-| 📤 | Outbox/Send | `[📤 Outgoing Messages]` |
-| 📥 | Inbox/Receive | `[📥 Incoming Events]` |
-| 🐰 | RabbitMQ specifically | `[🐰 RabbitMQ]` |
-| 📢 | Broadcast/Notification | `[📢 Push Notifications]` |
-| 📲 | Mobile Push | `[📲 Mobile Alerts]` |
+| Symbol | Meaning                | Example Usage             |
+| ------ | ---------------------- | ------------------------- |
+| 📨     | Event/Message/Email    | `[📨 Event Bus]`          |
+| 📬     | Queue/Mailbox          | `[📬 SQS Queue]`          |
+| 📤     | Outbox/Send            | `[📤 Outgoing Messages]`  |
+| 📥     | Inbox/Receive          | `[📥 Incoming Events]`    |
+| 🐰     | RabbitMQ specifically  | `[🐰 RabbitMQ]`           |
+| 📢     | Broadcast/Notification | `[📢 Push Notifications]` |
+| 📲     | Mobile Push            | `[📲 Mobile Alerts]`      |
 
 **Example:**
+
 ```mermaid
 flowchart LR
     Producer[⚙️ Producer] --> Queue[📬 Message Queue]
@@ -101,18 +105,19 @@ flowchart LR
 
 ### Security & Authentication (🔐 🔑 🛡️)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| 🔐 | Security/Encryption/Auth | `[🔐 Auth Service]` |
-| 🔑 | Key/Secret/Credential | `[🔑 Secret Manager]` |
-| 🛡️ | Protection/Firewall/WAF | `[🛡️ Security Gateway]` |
-| 🚪 | Gateway/Entry Point | `[🚪 API Gateway]` |
-| 👤 | User/Person | `[👤 End User]` |
-| 👥 | Users/Group | `[👥 User Pool]` |
-| 🎫 | Token/Ticket | `[🎫 JWT Token]` |
-| 🔓 | Unlocked/Public | `[🔓 Public API]` |
+| Symbol | Meaning                  | Example Usage           |
+| ------ | ------------------------ | ----------------------- |
+| 🔐     | Security/Encryption/Auth | `[🔐 Auth Service]`     |
+| 🔑     | Key/Secret/Credential    | `[🔑 Secret Manager]`   |
+| 🛡️     | Protection/Firewall/WAF  | `[🛡️ Security Gateway]` |
+| 🚪     | Gateway/Entry Point      | `[🚪 API Gateway]`      |
+| 👤     | User/Person              | `[👤 End User]`         |
+| 👥     | Users/Group              | `[👥 User Pool]`        |
+| 🎫     | Token/Ticket             | `[🎫 JWT Token]`        |
+| 🔓     | Unlocked/Public          | `[🔓 Public API]`       |
 
 **Example:**
+
 ```mermaid
 sequenceDiagram
     participant U as 👤 User
@@ -130,19 +135,20 @@ sequenceDiagram
 
 ### Monitoring & Operations (📝 📊 🚨)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| 📝 | Logging/Writing | `[📝 Log Aggregator]` |
-| 📊 | Monitoring/Dashboard | `[📊 Grafana]` |
-| 🚨 | Alert/Critical | `[🚨 Alert Manager]` |
-| ⚠️ | Warning | `[⚠️ Rate Limit Warning]` |
-| ✅ | Success/OK | `[✅ Health Check Pass]` |
-| ❌ | Failure/Error | `[❌ Failed]` |
-| 🔍 | Search/Inspect | `[🔍 Log Search]` |
-| 🎯 | Target/Goal | `[🎯 SLA Target]` |
-| 🏷️ | Tag/Label | `[🏷️ Resource Tags]` |
+| Symbol | Meaning              | Example Usage             |
+| ------ | -------------------- | ------------------------- |
+| 📝     | Logging/Writing      | `[📝 Log Aggregator]`     |
+| 📊     | Monitoring/Dashboard | `[📊 Grafana]`            |
+| 🚨     | Alert/Critical       | `[🚨 Alert Manager]`      |
+| ⚠️     | Warning              | `[⚠️ Rate Limit Warning]` |
+| ✅     | Success/OK           | `[✅ Health Check Pass]`  |
+| ❌     | Failure/Error        | `[❌ Failed]`             |
+| 🔍     | Search/Inspect       | `[🔍 Log Search]`         |
+| 🎯     | Target/Goal          | `[🎯 SLA Target]`         |
+| 🏷️     | Tag/Label            | `[🏷️ Resource Tags]`      |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     App[⚙️ Application] --> Log[📝 Logger]
@@ -156,19 +162,20 @@ flowchart TD
 
 ### Status & State (✓ ❌ ⏸️)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| ✓ / ✅ | Success/Complete/Approved | `[✅ Approved]` |
-| ❌ / ✗ | Failed/Rejected/Error | `[❌ Failed]` |
-| ⏸️ | Paused/Suspended | `[⏸️ Paused]` |
-| ▶️ | Running/Active | `[▶️ Running]` |
-| ⏹️ | Stopped/Terminated | `[⏹️ Stopped]` |
-| 🔴 | Critical/Down | `[🔴 Service Down]` |
-| 🟢 | OK/Up/Green | `[🟢 Service Up]` |
-| 🟡 | Warning/Degraded | `[🟡 Degraded]` |
-| ⭕ | Pending/Waiting | `[⭕ Pending]` |
+| Symbol | Meaning                   | Example Usage       |
+| ------ | ------------------------- | ------------------- |
+| ✓ / ✅ | Success/Complete/Approved | `[✅ Approved]`     |
+| ❌ / ✗ | Failed/Rejected/Error     | `[❌ Failed]`       |
+| ⏸️     | Paused/Suspended          | `[⏸️ Paused]`       |
+| ▶️     | Running/Active            | `[▶️ Running]`      |
+| ⏹️     | Stopped/Terminated        | `[⏹️ Stopped]`      |
+| 🔴     | Critical/Down             | `[🔴 Service Down]` |
+| 🟢     | OK/Up/Green               | `[🟢 Service Up]`   |
+| 🟡     | Warning/Degraded          | `[🟡 Degraded]`     |
+| ⭕     | Pending/Waiting           | `[⭕ Pending]`      |
 
 **Example:**
+
 ```mermaid
 stateDiagram-v2
     [*] --> ⭕Pending
@@ -183,16 +190,17 @@ stateDiagram-v2
 
 ### Time & Scheduling (⏰ ⏱️ 📅)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| ⏰ | Scheduled/Cron Job | `[⏰ Nightly Batch]` |
-| ⏱️ | Timer/Timeout | `[⏱️ 30s Timeout]` |
-| 📅 | Calendar/Schedule | `[📅 Event Scheduler]` |
-| ⌛ | Hourglass/Waiting | `[⌛ Long Running]` |
-| ⏳ | Processing Time | `[⏳ Processing]` |
-| 🕐-🕛 | Specific Time | `[🕐 1:00 AM Job]` |
+| Symbol | Meaning            | Example Usage          |
+| ------ | ------------------ | ---------------------- |
+| ⏰     | Scheduled/Cron Job | `[⏰ Nightly Batch]`   |
+| ⏱️     | Timer/Timeout      | `[⏱️ 30s Timeout]`     |
+| 📅     | Calendar/Schedule  | `[📅 Event Scheduler]` |
+| ⌛     | Hourglass/Waiting  | `[⌛ Long Running]`    |
+| ⏳     | Processing Time    | `[⏳ Processing]`      |
+| 🕐-🕛  | Specific Time      | `[🕐 1:00 AM Job]`     |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     Cron[⏰ Cron: 0 2 * * *] --> Start[Start Backup]
@@ -203,18 +211,19 @@ flowchart TD
 
 ### Development & Code (💻 🔧 🐛)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| 💻 | Development/Code | `[💻 Dev Environment]` |
-| 🔧 | Tool/Build/Fix | `[🔧 Build Pipeline]` |
-| 🐛 | Bug/Debug | `[🐛 Bug Fix]` |
-| 🧪 | Test/Experiment | `[🧪 Test Suite]` |
-| 📦 | Package/Artifact | `[📦 Docker Image]` |
-| 🏗️ | Build/Construction | `[🏗️ CI/CD]` |
-| 🚢 | Ship/Deploy | `[🚢 Production Deploy]` |
-| 🔀 | Branch/Merge | `[🔀 Git Merge]` |
+| Symbol | Meaning            | Example Usage            |
+| ------ | ------------------ | ------------------------ |
+| 💻     | Development/Code   | `[💻 Dev Environment]`   |
+| 🔧     | Tool/Build/Fix     | `[🔧 Build Pipeline]`    |
+| 🐛     | Bug/Debug          | `[🐛 Bug Fix]`           |
+| 🧪     | Test/Experiment    | `[🧪 Test Suite]`        |
+| 📦     | Package/Artifact   | `[📦 Docker Image]`      |
+| 🏗️     | Build/Construction | `[🏗️ CI/CD]`             |
+| 🚢     | Ship/Deploy        | `[🚢 Production Deploy]` |
+| 🔀     | Branch/Merge       | `[🔀 Git Merge]`         |
 
 **Example:**
+
 ```mermaid
 flowchart LR
     Code[💻 Code] --> Build[🏗️ Build]
@@ -225,17 +234,18 @@ flowchart LR
 
 ### UI/UX & Frontend (⚛️ 🎨 📱)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| ⚛️ | React/Frontend Framework | `[⚛️ React App]` |
-| 🎨 | Design/Styling | `[🎨 CSS Engine]` |
-| 📱 | Mobile | `[📱 Mobile App]` |
-| 🖥️ | Desktop | `[🖥️ Desktop Client]` |
-| 🌐 | Browser/Web | `[🌐 Web Browser]` |
-| 🖱️ | User Interaction | `[🖱️ Click Handler]` |
-| 👁️ | View/Display | `[👁️ Render View]` |
+| Symbol | Meaning                  | Example Usage         |
+| ------ | ------------------------ | --------------------- |
+| ⚛️     | React/Frontend Framework | `[⚛️ React App]`      |
+| 🎨     | Design/Styling           | `[🎨 CSS Engine]`     |
+| 📱     | Mobile                   | `[📱 Mobile App]`     |
+| 🖥️     | Desktop                  | `[🖥️ Desktop Client]` |
+| 🌐     | Browser/Web              | `[🌐 Web Browser]`    |
+| 🖱️     | User Interaction         | `[🖱️ Click Handler]`  |
+| 👁️     | View/Display             | `[👁️ Render View]`    |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     User[👤 User] --> Browser[🌐 Browser]
@@ -246,18 +256,19 @@ flowchart TD
 
 ### Business & Domain (💰 🛒 📋)
 
-| Symbol | Meaning | Example Usage |
-|--------|---------|---------------|
-| 💰 | Payment/Money | `[💰 Payment Gateway]` |
-| 🛒 | Shopping/Cart | `[🛒 Shopping Cart]` |
-| 📋 | Order/List | `[📋 Order Management]` |
-| 📦 | Product/Package | `[📦 Product Catalog]` |
-| 🏢 | Enterprise/Organization | `[🏢 Company]` |
-| 🏦 | Financial/Bank | `[🏦 Bank Integration]` |
-| 📧 | Email/Communication | `[📧 Email Service]` |
-| 🎁 | Reward/Bonus | `[🎁 Loyalty Program]` |
+| Symbol | Meaning                 | Example Usage           |
+| ------ | ----------------------- | ----------------------- |
+| 💰     | Payment/Money           | `[💰 Payment Gateway]`  |
+| 🛒     | Shopping/Cart           | `[🛒 Shopping Cart]`    |
+| 📋     | Order/List              | `[📋 Order Management]` |
+| 📦     | Product/Package         | `[📦 Product Catalog]`  |
+| 🏢     | Enterprise/Organization | `[🏢 Company]`          |
+| 🏦     | Financial/Bank          | `[🏦 Bank Integration]` |
+| 📧     | Email/Communication     | `[📧 Email Service]`    |
+| 🎁     | Reward/Bonus            | `[🎁 Loyalty Program]`  |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     Cart[🛒 Cart] --> Checkout[💰 Checkout]
@@ -274,6 +285,7 @@ flowchart TD
 Use the same symbol for the same concept throughout all diagrams in a project:
 
 ✅ **Good - Consistent:**
+
 ```mermaid
 graph LR
     A[⚙️ Service A] --> B[💾 Database]
@@ -281,6 +293,7 @@ graph LR
 ```
 
 ❌ **Bad - Inconsistent:**
+
 ```mermaid
 graph LR
     A[⚙️ Service A] --> B[💾 Database]
@@ -292,6 +305,7 @@ graph LR
 One or two symbols per node is ideal:
 
 ✅ **Good - Clear:**
+
 ```mermaid
 graph LR
     A[🔐 Auth Service]
@@ -299,6 +313,7 @@ graph LR
 ```
 
 ❌ **Bad - Too Many:**
+
 ```mermaid
 graph LR
     A[🔐🔑🛡️👤 Auth Service]  %% Cluttered
@@ -309,12 +324,14 @@ graph LR
 Symbols should complement, not replace, descriptive text:
 
 ✅ **Good:**
+
 ```mermaid
 graph LR
     A[⚙️ Payment Processor<br/>Stripe Integration]
 ```
 
 ❌ **Bad:**
+
 ```mermaid
 graph LR
     A[💰💳🏦]  %% No context
@@ -337,12 +354,14 @@ Stick to well-established Unicode symbols (≤ Unicode 13.0) for maximum compati
 Remember that some users may use screen readers. The text should make sense without symbols:
 
 ✅ **Good:**
+
 ```mermaid
 graph LR
     A[🔐 Authentication Service]  %% "Authentication Service" is clear
 ```
 
 ❌ **Bad:**
+
 ```mermaid
 graph LR
     A[🔐]  %% Screen reader only says "lock"
@@ -353,6 +372,7 @@ graph LR
 ### Common Patterns
 
 **Cache with Database:**
+
 ```mermaid
 graph LR
     App[⚙️ App] --> Cache[⚡ Redis Cache]
@@ -360,6 +380,7 @@ graph LR
 ```
 
 **Event-Driven Architecture:**
+
 ```mermaid
 flowchart TD
     Producer[⚙️ Producer] --> Bus[📨 Event Bus]
@@ -370,6 +391,7 @@ flowchart TD
 ```
 
 **Security Flow:**
+
 ```mermaid
 sequenceDiagram
     participant U as 👤 User
@@ -388,6 +410,7 @@ sequenceDiagram
 ```
 
 **CI/CD Pipeline:**
+
 ```mermaid
 flowchart LR
     Code[💻 Code Push] --> Build[🏗️ Build]
@@ -400,6 +423,7 @@ flowchart LR
 ## Language-Specific Symbol Conventions
 
 ### Python
+
 ```mermaid
 graph LR
     Script[🐍 Python Script] --> Lib[📚 Library]
@@ -407,6 +431,7 @@ graph LR
 ```
 
 ### Java/Spring
+
 ```mermaid
 graph LR
     Spring[☕ Spring Boot] --> JPA[💾 JPA Repository]
@@ -414,6 +439,7 @@ graph LR
 ```
 
 ### JavaScript/Node
+
 ```mermaid
 graph LR
     Node[📗 Node.js] --> Express[⚙️ Express API]
@@ -421,6 +447,7 @@ graph LR
 ```
 
 ### React
+
 ```mermaid
 graph LR
     React[⚛️ React App] --> Redux[📦 Redux Store]
@@ -429,20 +456,20 @@ graph LR
 
 ## Complete Symbol Reference Table
 
-| Category | Symbols |
-|----------|---------|
-| Cloud/Network | ☁️ 🌐 🔌 📡 🛰️ 🗄️ |
-| Compute | ⚙️ ⚡ 🔄 ♻️ 🚀 🔥 💨 |
-| Data/Storage | 💾 📦 📊 📈 📉 🗃️ 💿 🧊 |
-| Messaging | 📨 📬 📤 📥 🐰 📢 📲 |
-| Security | 🔐 🔑 🛡️ 🚪 👤 👥 🎫 🔓 |
-| Monitoring | 📝 📊 🚨 ⚠️ ✅ ❌ 🔍 🎯 🏷️ |
-| Status | ✓ ✅ ❌ ⏸️ ▶️ ⏹️ 🔴 🟢 🟡 ⭕ |
-| Time | ⏰ ⏱️ 📅 ⌛ ⏳ 🕐-🕛 |
-| Development | 💻 🔧 🐛 🧪 📦 🏗️ 🚢 🔀 |
-| Frontend | ⚛️ 🎨 📱 🖥️ 🌐 🖱️ 👁️ |
-| Business | 💰 🛒 📋 📦 🏢 🏦 📧 🎁 |
-| Languages | 🐍 (Python) ☕ (Java) 📗 (Node) ⚛️ (React) |
+| Category      | Symbols                                    |
+| ------------- | ------------------------------------------ |
+| Cloud/Network | ☁️ 🌐 🔌 📡 🛰️ 🗄️                          |
+| Compute       | ⚙️ ⚡ 🔄 ♻️ 🚀 🔥 💨                       |
+| Data/Storage  | 💾 📦 📊 📈 📉 🗃️ 💿 🧊                    |
+| Messaging     | 📨 📬 📤 📥 🐰 📢 📲                       |
+| Security      | 🔐 🔑 🛡️ 🚪 👤 👥 🎫 🔓                    |
+| Monitoring    | 📝 📊 🚨 ⚠️ ✅ ❌ 🔍 🎯 🏷️                 |
+| Status        | ✓ ✅ ❌ ⏸️ ▶️ ⏹️ 🔴 🟢 🟡 ⭕               |
+| Time          | ⏰ ⏱️ 📅 ⌛ ⏳ 🕐-🕛                       |
+| Development   | 💻 🔧 🐛 🧪 📦 🏗️ 🚢 🔀                    |
+| Frontend      | ⚛️ 🎨 📱 🖥️ 🌐 🖱️ 👁️                       |
+| Business      | 💰 🛒 📋 📦 🏢 🏦 📧 🎁                    |
+| Languages     | 🐍 (Python) ☕ (Java) 📗 (Node) ⚛️ (React) |
 
 ## Advanced: Creating Symbol Legends
 
@@ -469,6 +496,7 @@ flowchart TD
 ---
 
 **Next Steps:**
+
 - See `activity-diagrams.md` for workflow symbols
 - See `deployment-diagrams.md` for infrastructure symbols
 - See language-specific examples for framework conventions

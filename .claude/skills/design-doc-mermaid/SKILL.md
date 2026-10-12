@@ -22,15 +22,15 @@ files, PNGs, SVGs or a `diagrams/` folder.
 
 ## Pick the type, then load one guide
 
-| What the diagram shows | Mermaid type | Guide |
-|---|---|---|
-| A request crossing services, a webhook, a queue job, an auth handshake | `sequenceDiagram` | `references/guides/diagrams/sequence-diagrams.md` |
-| A pipeline, decision path or process (guard chain, extraction flow) | `flowchart TD` | `references/guides/diagrams/activity-diagrams.md` |
-| Modules, containers and how they connect | `flowchart` with `subgraph`s | `references/guides/diagrams/architecture-diagrams.md` |
-| Servers, compose services, AWS stacks | `flowchart` with `subgraph`s | `references/guides/diagrams/deployment-diagrams.md` |
-| Order, conversation or stock lifecycle | `stateDiagram-v2` | `troubleshooting.md` (State Diagrams) |
-| Tables and relations | `erDiagram` | `troubleshooting.md` (ER Diagrams) |
-| Deriving any of the above from code | — | `references/guides/code-to-diagram/README.md`, plus `examples/node-webapp/` (API) or `examples/react/` (web) |
+| What the diagram shows                                                 | Mermaid type                 | Guide                                                                                                        |
+| ---------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| A request crossing services, a webhook, a queue job, an auth handshake | `sequenceDiagram`            | `references/guides/diagrams/sequence-diagrams.md`                                                            |
+| A pipeline, decision path or process (guard chain, extraction flow)    | `flowchart TD`               | `references/guides/diagrams/activity-diagrams.md`                                                            |
+| Modules, containers and how they connect                               | `flowchart` with `subgraph`s | `references/guides/diagrams/architecture-diagrams.md`                                                        |
+| Servers, compose services, AWS stacks                                  | `flowchart` with `subgraph`s | `references/guides/diagrams/deployment-diagrams.md`                                                          |
+| Order, conversation or stock lifecycle                                 | `stateDiagram-v2`            | `troubleshooting.md` (State Diagrams)                                                                        |
+| Tables and relations                                                   | `erDiagram`                  | `troubleshooting.md` (ER Diagrams)                                                                           |
+| Deriving any of the above from code                                    | —                            | `references/guides/code-to-diagram/README.md`, plus `examples/node-webapp/` (API) or `examples/react/` (web) |
 
 Read only the guide you need. `references/guides/unicode-symbols/guide.md`
 lists emoji by meaning if you want more than the set below.
