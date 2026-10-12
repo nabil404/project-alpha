@@ -12,6 +12,7 @@ import {
   seedCustomer,
   seedMessage,
 } from '../../database/__tests__/conversation-seeds';
+import { seedOrder } from '../../database/__tests__/order-seeds';
 import { isUnread } from '../conversation-rules';
 import { ConversationRepository } from '../conversation.repository';
 import { MessageRepository } from '../message.repository';
@@ -201,6 +202,28 @@ describeDb('read repositories (app_runtime, two merchants)', () => {
       conversations.update(tx, { merchantId: t.merchantA }, convo.id, { state: 'handed_off' }),
     );
     expect(updated?.state).toBe('handed_off');
+  });
+
+  it("finds the conversation's latest order, by this merchant's filter", async () => {
+    const convo = await seedConversation(t.db, t.merchantA);
+    const latest = (scope: { merchantId: string }) =>
+      as(t.merchantA, (tx) => conversations.latestOrderId(tx, scope, convo.id));
+    const scopeA = { merchantId: t.merchantA };
+    await expect(latest(scopeA)).resolves.toBeNull();
+
+    await seedOrder(t.db, t.merchantA, convo.customerId, {
+      conversationId: convo.id,
+      placedAt: minute(1),
+    });
+    const newer = await seedOrder(t.db, t.merchantA, convo.customerId, {
+      conversationId: convo.id,
+      placedAt: minute(2),
+    });
+    // The same customer's order from elsewhere is not this chat's.
+    await seedOrder(t.db, t.merchantA, convo.customerId, { placedAt: minute(3) });
+
+    await expect(latest(scopeA)).resolves.toBe(newer.id);
+    await expect(latest({ merchantId: t.merchantB })).resolves.toBeNull();
   });
 
   describe('markRead', () => {

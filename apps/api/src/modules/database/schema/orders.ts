@@ -137,6 +137,12 @@ export const order = pgTable(
     ),
     index('order_customer_placed_idx').on(t.merchantId, t.customerId, t.placedAt.desc(), t.id),
     index('order_merchant_placed_idx').on(t.merchantId, t.placedAt.desc(), t.id),
+    index('order_conversation_placed_idx').on(
+      t.merchantId,
+      t.conversationId,
+      t.placedAt.desc(),
+      t.id,
+    ),
     index('order_delivery_charge_idx').on(t.merchantId, t.deliveryChargeId),
     index('order_merchant_status_placed_idx').on(t.merchantId, t.status, t.placedAt.desc(), t.id),
     merchantIsolation('order_merchant_isolation', t.merchantId),

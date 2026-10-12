@@ -237,6 +237,8 @@ export const conversationDetailSchema = z.object({
   lastInboundAt: z.string().datetime().nullable(),
   /** When the seller can no longer reply; null if the customer has never written. */
   replyWindowClosesAt: z.string().datetime().nullable(),
+  /** The order placed from this chat most recently, whatever its status; null if none. */
+  latestOrderId: z.string().uuid().nullable(),
 });
 export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
 

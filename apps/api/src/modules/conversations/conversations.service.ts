@@ -83,11 +83,12 @@ export class ConversationsService {
   }
 
   async get(scope: TenantScope, id: string): Promise<ConversationDetail> {
-    const found = await withMerchant(this.db, scope.merchantId, (tx) =>
-      this.conversations.findById(tx, scope, id),
-    );
-    if (!found) throw conversationNotFound();
-    return toConversationDetail(found.conversation, found.customer);
+    return withMerchant(this.db, scope.merchantId, async (tx) => {
+      const found = await this.conversations.findById(tx, scope, id);
+      if (!found) throw conversationNotFound();
+      const latestOrderId = await this.conversations.latestOrderId(tx, scope, id);
+      return toConversationDetail(found.conversation, found.customer, latestOrderId);
+    });
   }
 
   async messages(scope: TenantScope, id: string, query: ListMessagesQuery): Promise<MessagePage> {
@@ -191,7 +192,8 @@ export class ConversationsService {
         ...(retireCard ? { state: 'collecting_details' as const } : {}),
       });
       if (!row) throw conversationNotFound();
-      return toConversationDetail(row, found.customer);
+      const latestOrderId = await this.conversations.latestOrderId(tx, scope, id);
+      return toConversationDetail(row, found.customer, latestOrderId);
     });
     await this.events.publish({
       merchantId: scope.merchantId,

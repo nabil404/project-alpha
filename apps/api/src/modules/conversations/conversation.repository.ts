@@ -13,6 +13,7 @@ import {
   conversation,
   customer,
   message,
+  order,
   type ConversationRow,
   type CustomerRow,
 } from '../database/schema/index';
@@ -236,6 +237,21 @@ export class ConversationRepository {
       .where(and(eq(conversation.merchantId, merchantId), eq(conversation.id, id)));
     const [row] = lock ? await query.for('update', { of: conversation }) : await query;
     return row ?? null;
+  }
+
+  /** The order placed from this conversation most recently, or null. */
+  async latestOrderId(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+  ): Promise<string | null> {
+    const [row] = await executor
+      .select({ id: order.id })
+      .from(order)
+      .where(and(eq(order.merchantId, merchantId), eq(order.conversationId, id)))
+      .orderBy(desc(order.placedAt), desc(order.id))
+      .limit(1);
+    return row?.id ?? null;
   }
 
   /** Null when the merchant has no such conversation. */

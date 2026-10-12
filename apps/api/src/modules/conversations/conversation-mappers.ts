@@ -24,6 +24,7 @@ export function toConversationListItem(
 export function toConversationDetail(
   row: ConversationRow,
   customer: CustomerRow,
+  latestOrderId: string | null,
 ): ConversationDetail {
   return {
     id: row.id,
@@ -33,6 +34,7 @@ export function toConversationDetail(
     unread: isUnread(row.lastInboundAt, row.sellerLastReadAt),
     lastInboundAt: row.lastInboundAt?.toISOString() ?? null,
     replyWindowClosesAt: replyWindowClosesAt(row.lastInboundAt)?.toISOString() ?? null,
+    latestOrderId,
   };
 }
 
