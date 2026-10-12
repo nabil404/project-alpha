@@ -34,6 +34,24 @@ export function stateAfterHandBack(slots: CollectedSlots): ConversationState {
   return hasCollectedAnything(slots) ? 'collecting_details' : 'browsing';
 }
 
+/**
+ * A confirmed chat the customer writes in again starts the next order: the
+ * customer's details carry over to its card, nothing else does. The revision
+ * moves on, so every earlier card stays stale and the next one never reuses
+ * the confirmed card's idempotency key.
+ */
+export function slotsForNextOrder(slots: CollectedSlots): CollectedSlots {
+  return {
+    items: [],
+    customerName: slots.customerName,
+    phone: slots.phone,
+    deliveryAddress: slots.deliveryAddress,
+    deliveryArea: slots.deliveryArea,
+    deliveryChargeId: slots.deliveryChargeId,
+    revision: slots.revision + 1,
+  };
+}
+
 /** Messenger's standard window: a seller may reply until 24h after the customer's last message. */
 export function isReplyWindowOpen(lastInboundAt: Date | null, now: Date): boolean {
   return lastInboundAt !== null && now.getTime() - lastInboundAt.getTime() < REPLY_WINDOW_MS;

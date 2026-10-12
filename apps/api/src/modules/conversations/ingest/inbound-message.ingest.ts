@@ -1,7 +1,12 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import { parsePayload, type ConversationState, type MessageSender } from '@app/shared';
+import {
+  parsePayload,
+  type AssistantPayload,
+  type ConversationState,
+  type MessageSender,
+} from '@app/shared';
 import { AppConfig } from '../../config/app.config';
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
@@ -17,7 +22,8 @@ import {
 } from '../../queue/queue.constants';
 import { customJobId } from '../../queue/job-id';
 import { ConversationRepository } from '../conversation.repository';
-import { needsProfile } from '../conversation-rules';
+import { needsProfile, slotsForNextOrder } from '../conversation-rules';
+import { readSlots } from '../assistant/conversation-machine';
 import { CustomerRepository } from '../customer.repository';
 import { ConversationEventsPublisher } from '../events/conversation-events.publisher';
 import { MessageRepository } from '../message.repository';
@@ -35,9 +41,10 @@ export type IngestOutcome = 'stored' | 'duplicate' | 'own-echo' | 'unknown-page'
  * locks the conversation and writes, then publish after commit.
  *
  * A tapped button or quick reply is stored as a customer message carrying its
- * payload. After a stored customer message it queues the assistant's turn, unless the
- * seller has taken over, the Page's assistant is off, the chat is handed off or
- * confirmed, or no LLM or Graph is configured.
+ * payload. A customer message on a confirmed chat, other than a tap on its
+ * summary card, starts the next order. After a stored customer message it
+ * queues the assistant's turn, unless the seller has taken over, the Page's
+ * assistant is off, the chat is handed off, or no LLM or Graph is configured.
  */
 @Injectable()
 export class InboundMessageIngest {
@@ -74,6 +81,8 @@ export class InboundMessageIngest {
     const psid = job.kind === 'page-echo' ? job.recipientPsid : job.senderPsid;
     const sender: MessageSender = job.kind === 'page-echo' ? 'seller' : 'customer';
     const payload = job.kind === 'page-echo' ? undefined : job.payload;
+    const tapped = payload === undefined ? null : parsePayload(payload);
+    const cardTap = tapped?.kind === 'confirm' || tapped?.kind === 'change';
     const sentAt = new Date(job.sentAt);
 
     const { existing, page } = await withMerchant(this.db, merchantId, async (tx) => ({
@@ -101,6 +110,13 @@ export class InboundMessageIngest {
         payload: payload ?? null,
       });
       if (!stored) return null;
+      const reopened =
+        sender === 'customer' && thread.state === 'confirmed' && !cardTap
+          ? await this.conversations.update(tx, scope, thread.id, {
+              state: 'browsing',
+              collectedSlots: slotsForNextOrder(readSlots(thread.collectedSlots)),
+            })
+          : null;
       await this.conversations.applyMessage(tx, scope, thread, {
         sender,
         text: job.text,
@@ -111,7 +127,7 @@ export class InboundMessageIngest {
         conversationId: thread.id,
         messageId: stored.id,
         botPaused: thread.botPaused,
-        state: thread.state,
+        state: (reopened ?? thread).state,
       };
     });
 
@@ -124,7 +140,7 @@ export class InboundMessageIngest {
     if (
       sender === 'customer' &&
       page?.botEnabled === true &&
-      this.assistantWanted(written, payload)
+      this.assistantWanted(written, tapped)
     ) {
       const data: AssistantTurnJob = {
         merchantId,
@@ -143,20 +159,19 @@ export class InboundMessageIngest {
 
   /**
    * Graph to send with and an LLM to think with; a chat the seller holds or
-   * the assistant left stays theirs. A confirmed chat still answers a tap on
-   * its summary card, so a second Confirm gets the order's reference again.
+   * the assistant left stays theirs. A chat still confirmed here was tapped on
+   * its summary card: Confirm gets the order's reference again, Change nothing.
    */
   private assistantWanted(
     { botPaused, state }: { botPaused: boolean; state: ConversationState },
-    payload: string | undefined,
+    tapped: AssistantPayload | null,
   ): boolean {
-    const summaryTap = payload !== undefined && parsePayload(payload)?.kind === 'confirm';
     return (
       Boolean(this.config.get('LLM_API_KEY')) &&
       Boolean(this.config.get('META_APP_ID')) &&
       !botPaused &&
       state !== 'handed_off' &&
-      (state !== 'confirmed' || summaryTap)
+      (state !== 'confirmed' || tapped?.kind === 'confirm')
     );
   }
 }

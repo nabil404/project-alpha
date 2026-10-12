@@ -22,7 +22,10 @@ exist ([04 · Conversations](../../04-conversations/README.md)).
 
 ```
 InboundMessageIngest (after commit, sender = customer, stored)
-  └─ if !botPaused && page.botEnabled && state ∉ {handed_off, confirmed} && LLM configured
+  ├─ (in its transaction) a customer message on a confirmed chat, not a card tap → browsing,
+  │  slotsForNextOrder (details kept, items and quote cleared, revision + 1)
+  └─ if !botPaused && page.botEnabled && state ≠ handed_off && LLM configured
+        && (state ≠ confirmed || a Confirm tap)
         && Graph configured (META_APP_ID set)
      → ASSISTANT_QUEUE add('assistant-turn', {merchantId, conversationId, triggerMessageId},
                            {jobId: `turn-${metaMessageId}`, delay: 2500 ms})   // one turn per burst
