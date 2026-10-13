@@ -61,8 +61,23 @@ describeDb('catalog schema constraints', () => {
         pgErrorOf(seedVariant(t.db, t.merchantA, product.id, { stock: -1 })),
       ).resolves.toEqual({
         code: '23514',
-        constraint: 'product_variant_stock_ck',
+        // A negative stock also breaks reserved <= stock, and Postgres reports
+        // the first failing check by name, so this one wins over
+        // product_variant_stock_ck, which stays as the backstop.
+        constraint: 'product_variant_reserved_stock_ck',
       });
+    });
+
+    it('keeps reserved between zero and the stock', async () => {
+      const product = await seedProduct(t.db, t.merchantA);
+      await expect(
+        pgErrorOf(seedVariant(t.db, t.merchantA, product.id, { stock: 5, reserved: -1 })),
+      ).resolves.toEqual({ code: '23514', constraint: 'product_variant_reserved_ck' });
+      await expect(
+        pgErrorOf(seedVariant(t.db, t.merchantA, product.id, { stock: 5, reserved: 6 })),
+      ).resolves.toEqual({ code: '23514', constraint: 'product_variant_reserved_stock_ck' });
+      const full = await seedVariant(t.db, t.merchantA, product.id, { stock: 5, reserved: 5 });
+      expect(full.reserved).toBe(5);
     });
 
     it('ties is_default to an unnamed variant, both ways', async () => {

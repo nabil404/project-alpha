@@ -253,6 +253,20 @@
       "when": 1791827285797,
       "tag": "0035_order_conversation_index",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791913751959,
+      "tag": "0036_variant_reserved",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791913755356,
+      "tag": "0037_backfill_variant_reserved",
+      "breakpoints": true
     }
   ]
 }
