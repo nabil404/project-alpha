@@ -146,13 +146,14 @@ export class OrdersController {
   @ApiOperation({
     summary: 'Add an order by hand',
     description:
-      'For a customer who has messaged the Page. It starts as `new`; stock moves when it is confirmed. Name, phone and address default to the customer’s details on file. `deliveryChargeId` links a Settings delivery charge and copies its area name, everywhere-else flag and estimate onto the order; `deliveryFee` is stored as sent (quote it with POST /orders/delivery-quote). Send an `Idempotency-Key` to make a retry safe: a repeat returns the order the first request created.',
+      'For a customer who has messaged the Page. It starts as `new` and reserves its items’ stock. Name, phone and address default to the customer’s details on file. `deliveryChargeId` links a Settings delivery charge and copies its area name, everywhere-else flag and estimate onto the order; `deliveryFee` is stored as sent (quote it with POST /orders/delivery-quote). Send an `Idempotency-Key` to make a retry safe: a repeat returns the order the first request created.',
   })
   @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Up to 200 characters.' })
   @ApiBody({ schema: openApi(createOrderSchema, 'input') })
   @ApiCreatedResponse({ description: 'The order.', schema: openApi(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CUSTOMER_NOT_FOUND', 'VARIANT_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
+  @ApiCodedError(409, ['ORDER_INSUFFICIENT_STOCK'])
   create(
     @Req() request: TenantRequest,
     @Headers('idempotency-key') header: string | undefined,
