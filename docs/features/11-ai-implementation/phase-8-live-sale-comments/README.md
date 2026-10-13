@@ -23,9 +23,9 @@ private replies and rate limits.
   digits; only unparseable comments reach the routing model, so most cost no
   LLM call.
 - **Private reply** with the matched variant and quantity and the next
-  missing detail (name, phone, address). Stock is checked, not reserved: as
-  for every order, it moves when the seller confirms the order
-  ([Orders](../../07-orders/README.md#rules)).
+  missing detail (name, phone, address). Stock is checked against what is
+  available; the customer's Confirm reserves it and the seller's confirm takes
+  it from stock ([Orders](../../07-orders/README.md#rules)).
 - **One conversation per buyer per Live.** Further comments add to it; a
   repeated comment does not double the quantity.
 - **Live session view.** A dashboard page for a running Live: comments,

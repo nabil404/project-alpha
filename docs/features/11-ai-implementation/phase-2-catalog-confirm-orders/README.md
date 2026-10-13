@@ -68,9 +68,9 @@ phrased replies.
   candidates become quick replies; not found, out of stock, sold out, or more
   than is available each ask again with a reason and count toward the
   three-ask hand-off. A variant with none available is never offered. With
-  nothing missing it quotes every line (`quoteFor`) and moves to `awaiting_confirmation` with
-  `revision + 1`. `factsOf` gives phrasing the catalog names and formatted
-  prices, so `checkReply` rejects a price one unit off.
+  nothing missing it quotes every line (`quoteFor`) and moves to
+  `awaiting_confirmation` with `revision + 1`. `factsOf` gives phrasing the
+  catalog names and formatted prices, so `checkReply` rejects a price one unit off.
 - **The summary card is built in code** (`summary-card.ts`), a fixed template
   per language. Money goes through `formatMinorUnitsTrimmed` with `bn-BD` or
   `en-US`, showing decimals only when not zero ("৪,৫০০৳", "১,৬০০.৫০৳"). It is
@@ -190,9 +190,9 @@ No LLM is called; every reply is a fixed sentence per language
 5. **Re-check every line** (`OrderCatalogRepository.findVariants`) and the fee
    (`DeliveryQuoteService.feeFor`).
    - A line archived, short of what is available, or whose product is no
-     longer active: no order. That item loses its variant (and its product if it left the
-     catalog), the others stay, the chat goes to `collecting_details` with
-     `revision + 1`, and a sentence names it.
+     longer active: no order. That item loses its variant (and its product if
+     it left the catalog), the others stay, the chat goes to
+     `collecting_details` with `revision + 1`, and a sentence names it.
    - A unit price, the fee or the shop's currency changed: no order, and a
      fresh card for `revision + 1` in the current currency, after a fixed
      "the price changed" line.
@@ -247,8 +247,8 @@ cycle.
 - **Matching runs in memory, not in Postgres `pg_trgm`**, by judgement, not
   measurement. Most of the matcher is per-word logic pg_trgm lacks (word
   ownership, edit-distance rivals, script twins, the one, some or none
-  decision); the turn already holds the catalog for prices and availability; and a pure
-  matcher lets tests run tens of thousands of queries without a
+  decision); the turn already holds the catalog for prices and availability;
+  and a pure matcher lets tests run tens of thousands of queries without a
   database. Unchecked risk: pg_trgm splits words by the database locale,
   which may mishandle Bangla. At thousands of products, fetch about 20
   candidates with pg_trgm over a GIN index and keep this code for the
@@ -339,9 +339,9 @@ In `apps/api/src/modules/conversations/assistant/__tests__/` unless noted.
   numbers and `orderDrafted` after commit; double and racing taps; resends
   under the lease, including two concurrent retries; a fee-only change; a
   retry after `orderDrafted` threw; stale, paused, other conversation or
-  merchant; an archived line, a drafted product, short stock, a lost race for the last unit, a
-  price or currency change; Change; fee parity with `POST /orders/delivery-quote`;
-  the old card refused after a hand-back.
+  merchant; an archived line, a drafted product, short stock, a lost race for the
+  last unit, a price or currency change; Change; fee parity with
+  `POST /orders/delivery-quote`; the old card refused after a hand-back.
 - **`conversation-simulator.spec.ts`** (harness in `simulator/`): plays a
   scripted conversation through the worker's code against the local
   database, from signed webhook bodies through `InboundMessageProcessor` and
