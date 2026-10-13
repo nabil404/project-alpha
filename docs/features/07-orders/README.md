@@ -71,11 +71,12 @@ strings.
   is `new`: the customer confirmed in Messenger and the seller confirms again
   on the dashboard. `canTransitionOrder` in `@app/shared` holds the moves;
   any other is `409 ORDER_INVALID_TRANSITION` with `from` and `to`.
-- **Stock** is held while the order is `confirmed`, `packed`, `shipped` or
-  `delivered` (`orderHoldsStock`). A status move or an item edit takes or
-  returns the difference per variant. Taking more than a variant has is
-  `409 ORDER_INSUFFICIENT_STOCK` with `variantId`, `name` and `available`, and
-  nothing changes. `lockAndBumpProducts` locks the products in id order
+- **Stock** follows `orderStockHold`: a `new` order reserves its items,
+  `confirmed` through `delivered` have taken them, and `cancelled` or
+  `returned` hold none. A creation, status move or item edit reserves, takes
+  or returns the difference per variant. Asking for more than a variant has
+  available is `409 ORDER_INSUFFICIENT_STOCK` with `variantId`,
+  `name` and `available`, which is stock less reserved, and nothing changes. `lockAndBumpProducts` locks the products in id order
   before touching variants, as the product save does, so the two never
   deadlock. It also bumps each product's revision, so an open product edit
   page sees the change.
@@ -183,7 +184,7 @@ plus the shared ones each route lists in Swagger.
 | `ORDER_STALE`               | 409    | `{ id }`                         | The `version` sent is not the order's current one                                    |
 | `ORDER_INVALID_TRANSITION`  | 409    | `{ from, to }`                   | A status move the lifecycle does not allow                                           |
 | `ORDER_NOT_EDITABLE`        | 409    | `{ status }`                     | Items outside `new`/`confirmed`; delivery details outside `new`/`confirmed`/`packed` |
-| `ORDER_INSUFFICIENT_STOCK`  | 409    | `{ variantId, name, available }` | Taking more of a variant than it has                                                 |
+| `ORDER_INSUFFICIENT_STOCK`  | 409    | `{ variantId, name, available }` | `POST /`, a status move or an item edit asking for more than is available            |
 | `CUSTOMER_NOT_FOUND`        | 404    | `{ id }`                         | `POST /` for a customer who is not the shop's                                        |
 | `VARIANT_NOT_FOUND`         | 404    | `{ id }`                         | A new line's variant is unknown or archived; the quote names an unknown variant      |
 | `DELIVERY_CHARGE_NOT_FOUND` | 404    | `{ id }`                         | `POST /`, `PATCH /:id` or the quote names an area that is not the shop's             |
@@ -206,7 +207,8 @@ missing a name, phone or address the customer's record cannot fill),
     it is a list of cards.
   - The URL holds `status`, `q`, `range`, `from`, `to`, `sort`, `direction`,
     `page` and `pageSize`.
-- **Create order** is a dialog: pick a customer, add items, then delivery and
+- **Create order** is a dialog: pick a customer, add items (the picker shows
+  "N available" per variant), then delivery and
   payment, prefilled from the customer's details. Picking an area fills the
   fee from the quote, and changing items re-quotes it unless the seller typed
   a fee. The dialog makes one `Idempotency-Key` and opens the new order.
@@ -235,7 +237,7 @@ missing a name, phone or address the customer's record cannot fill),
 - `OrdersRepository`, `OrderEventsRepository`, and `OrderCatalogRepository`
   (variant and product locks).
 
-The lifecycle (`canTransitionOrder`, `orderHoldsStock`) lives in
+The lifecycle (`canTransitionOrder`, `orderStockHold`) lives in
 `@app/shared`, so the web shows the same buttons.
 
 | Spec                                                                                                                               | Covers                                                                                                      |

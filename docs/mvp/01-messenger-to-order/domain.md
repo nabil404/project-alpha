@@ -56,10 +56,13 @@ customer has confirmed in Messenger and the seller confirms it again.
   saves a product's options and variants as one document; a single
   variant's SKU, price, stock or image can also change on its own. Every write
   to them bumps the product's revision, so a save from an outdated page is
-  refused. Order confirmation and cancellation, which change stock, must bump
-  it too. The AI sees only active products and their live variants. Stock is
-  decremented when an order is confirmed and restored if it is cancelled or
-  returned.
+  refused. Drafting, confirming, cancelling and returning an order, which
+  change stock or its reservation, must bump it too. Each variant also keeps a
+  reserved count: units held by drafted orders. What can be sold is stock less
+  reserved. A draft reserves its items; confirming takes them from stock;
+  cancelling releases or restores them; a return restores them. The seller
+  cannot set stock below what is reserved. The AI sees only active products
+  and their live variants.
 - **Category** — a seller's flat list, no nesting; names unique per seller.
   A product can sit in several categories. Deleting one is a soft delete and
   removes it from its products.
@@ -90,8 +93,9 @@ customer has confirmed in Messenger and the seller confirms it again.
   note, source (`assistant` or `seller`), linked conversation, and an activity
   log of who changed what. The assistant drafts orders from a confirmed
   conversation; the seller can also add one by hand for a customer who has
-  messaged the Page. Stock is held while an order is confirmed, packed,
-  shipped or delivered, and given back when it is cancelled or returned.
+  messaged the Page. A drafted order reserves its items' stock; a
+  confirmed, packed, shipped or delivered one has taken it; a cancelled or
+  returned one holds none.
   Cancelled and returned orders never count as revenue or a customer's spend.
 
 Money is stored as integer minor units of the shop's currency (e.g.
