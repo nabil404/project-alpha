@@ -55,6 +55,8 @@
     "PRODUCT_IMAGE_UNSUPPORTED_TYPE": "Upload a JPEG, PNG or WebP photo.",
     "PRODUCT_IN_USE": "This product is on existing orders, so it can't be deleted. Archive it instead.",
     "PRODUCT_NOT_FOUND": "That product no longer exists.",
+    "AD_PRODUCT_NOT_FOUND": "That ad is no longer listed.",
+    "AD_PRODUCT_ARCHIVED": "That product is archived. Pick a product you still sell.",
     "PRODUCT_OPTION_NOT_FOUND": "That option was removed in the meantime. Refresh the page and try again.",
     "PRODUCT_STALE": "This product changed since you opened it. Refresh to see the latest version, then make your changes again.",
     "SESSION_IS_CURRENT": "That's the device you're using. Sign out instead.",

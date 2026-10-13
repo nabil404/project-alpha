@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { errorCodeSchema } from '../errors/codes';
+import { productStatusSchema } from './catalog';
 
 /**
  * A seller's connected Facebook Page as the API returns it. The Page access
@@ -64,3 +65,81 @@ export const messengerSettingsSearchSchema = z.object({
   error: errorCodeSchema.optional().catch(undefined),
 });
 export type MessengerSettingsSearch = z.infer<typeof messengerSettingsSearchSchema>;
+
+/** A product link's `ref`: `p_` and the product id. Shared so the link and the webhook agree. */
+export const PRODUCT_REF_PREFIX = 'p_';
+const PRODUCT_REF = /^p_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/** m.me accepts the numeric Page id, so no username lookup is needed. */
+export function messengerProductLink(pageId: string, productId: string): string {
+  return `https://m.me/${pageId}?ref=${PRODUCT_REF_PREFIX}${productId}`;
+}
+
+export function parseProductRef(ref: string): string | null {
+  const match = PRODUCT_REF.exec(ref);
+  return match ? (match[1] as string).toLowerCase() : null;
+}
+
+/** Meta's limits for the Messenger welcome screen. */
+export const GREETING_MAX = 160;
+export const ICE_BREAKERS_MAX = 4;
+export const ICE_BREAKER_QUESTION_MAX = 80;
+
+/** Code points, as Meta counts them; `.max()` would count UTF-16 units. */
+const maxChars = (max: number) => (value: string) => [...value].length <= max;
+
+export const iceBreakerSchema = z.object({
+  /** `browse` opens the categories; `ask` is answered by the assistant like a typed question. */
+  kind: z.enum(['browse', 'ask']),
+  question: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(maxChars(ICE_BREAKER_QUESTION_MAX), { params: { code: 'TOO_LONG' } }),
+});
+export type IceBreaker = z.infer<typeof iceBreakerSchema>;
+
+export const welcomeScreenInputSchema = z
+  .object({
+    greeting: z
+      .string()
+      .trim()
+      .min(1)
+      .refine(maxChars(GREETING_MAX), { params: { code: 'TOO_LONG' } }),
+    iceBreakers: z.array(iceBreakerSchema).max(ICE_BREAKERS_MAX),
+  })
+  .strict();
+export type WelcomeScreenInput = z.infer<typeof welcomeScreenInputSchema>;
+
+export const profileSyncSchema = z.object({
+  status: z.enum(['live', 'pending', 'failed', 'not_connected']),
+  syncedAt: z.string().datetime().nullable(),
+  error: z.enum(['token_invalid', 'graph_error']).nullable(),
+});
+export type ProfileSync = z.infer<typeof profileSyncSchema>;
+
+export const welcomeScreenSchema = welcomeScreenInputSchema.extend({
+  /** True while the seller has never saved: the values are the defaults for the shop's language. */
+  isDefault: z.boolean(),
+  profileSync: profileSyncSchema,
+});
+export type WelcomeScreen = z.infer<typeof welcomeScreenSchema>;
+
+/** An ad seen in a referral, and the product it sells once the seller maps it. */
+export const adProductSchema = z.object({
+  id: z.string().uuid(),
+  adId: z.string().min(1),
+  firstSeenAt: z.string().datetime(),
+  lastSeenAt: z.string().datetime(),
+  chatCount: z.number().int().nonnegative(),
+  product: z
+    .object({ id: z.string().uuid(), name: z.string(), status: productStatusSchema })
+    .nullable(),
+});
+export type AdProduct = z.infer<typeof adProductSchema>;
+
+export const adProductListResponseSchema = z.object({ data: z.array(adProductSchema) });
+export type AdProductListResponse = z.infer<typeof adProductListResponseSchema>;
+
+export const updateAdProductSchema = z.object({ productId: z.string().uuid().nullable() }).strict();
+export type UpdateAdProduct = z.infer<typeof updateAdProductSchema>;

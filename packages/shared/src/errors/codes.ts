@@ -85,6 +85,8 @@ export const errorCodes = [
 
   // Catalog
   'PRODUCT_NOT_FOUND',
+  'AD_PRODUCT_NOT_FOUND',
+  'AD_PRODUCT_ARCHIVED',
   'VARIANT_NOT_FOUND',
   'CATEGORY_NOT_FOUND',
   'CATEGORY_NAME_TAKEN',
