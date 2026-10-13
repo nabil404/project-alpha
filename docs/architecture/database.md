@@ -11,29 +11,29 @@ cannot bypass row-level security. Every table carrying `merchant_id` has RLS
 enabled **and forced**, with a policy comparing `merchant_id` to
 `app_current_merchant()`. `withMerchant()` sets that context per transaction, so
 a query that forgets its `merchant_id` filter returns nothing instead of another
-seller's rows. RLS is the backstop — repositories still filter on `merchantId`.
+seller's rows. RLS is the backstop Repositories still filter on `merchantId`.
 
 ## Roles
 
-| Role                | Created in                                                                                         | Attributes                                                | Used by                                                                        | What it does                                                                                                                                                                                                                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Owner (admin)       | The `POSTGRES_USER` of the cluster                                                                 | Owns every table and migration-created object             | `DATABASE_ADMIN_URL` — `db:generate`, `db:migrate`, `db:verify-rls`, CI deploy | Applies migrations. Default privileges attach to it, so migrations must always run as this same role or new tables land ungranted. `FORCE ROW LEVEL SECURITY` binds it on tenant tables. Never given to the api or worker.                                                                                     |
-| `app_runtime`       | Migration (NOLOGIN); `docker/postgres-init/01-app-runtime.sh` on a fresh volume (LOGIN + password) | `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`         | `DATABASE_URL` — the api and worker                                            | The restricted runtime connection. Because it is not a superuser and has no `BYPASSRLS`, every policy applies to it. The migration creates it without a password so no credential is in git; each environment sets `LOGIN PASSWORD` once, out of band, or the init script does it from `APP_RUNTIME_PASSWORD`. |
-| `app_page_resolver` | Migration                                                                                          | `NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS` | Nobody connects as it; owns `app_page_merchant()`                              | Lets the webhook worker map a Page id to a merchant before any merchant context exists. Can read only two columns of `facebook_page` through its own `SELECT` policy, so the function it owns does not depend on bypassing RLS.                                                                                |
+| Role                | Created in                                                                                         | Attributes                                                | Used by                                                                       | What it does                                                                                                                                                                                                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner (admin)       | The `POSTGRES_USER` of the cluster                                                                 | Owns every table and migration-created object             | `DATABASE_ADMIN_URL`: `db:generate`, `db:migrate`, `db:verify-rls`, CI deploy | Applies migrations. Default privileges attach to it, so migrations must always run as this same role or new tables land ungranted. `FORCE ROW LEVEL SECURITY` binds it on tenant tables. Never given to the api or worker.                                                                                     |
+| `app_runtime`       | Migration (NOLOGIN); `docker/postgres-init/01-app-runtime.sh` on a fresh volume (LOGIN + password) | `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`         | `DATABASE_URL`: the api and worker                                            | The restricted runtime connection. Because it is not a superuser and has no `BYPASSRLS`, every policy applies to it. The migration creates it without a password so no credential is in git; each environment sets `LOGIN PASSWORD` once, out of band, or the init script does it from `APP_RUNTIME_PASSWORD`. |
+| `app_page_resolver` | Migration                                                                                          | `NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS` | Nobody connects as it; owns `app_page_merchant()`                             | Lets the webhook worker map a Page id to a merchant before any merchant context exists. Can read only two columns of `facebook_page` through its own `SELECT` policy, so the function it owns does not depend on bypassing RLS.                                                                                |
 
 ## Grants and default privileges
 
-| Grantee             | Privilege                                            | On                                                                  | Why                                                                                                          |
-| ------------------- | ---------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `app_runtime`       | `USAGE`                                              | schema `public`                                                     | Reach objects in the schema.                                                                                 |
-| `app_runtime`       | `SELECT, INSERT, UPDATE, DELETE`                     | all tables existing when the role was created (Better Auth's seven) | Auth tables need grants but no policy — they carry no `merchant_id` and are read before a merchant is known. |
-| `app_runtime`       | `USAGE, SELECT`                                      | all sequences existing when the role was created                    | Same, for sequences.                                                                                         |
-| `app_runtime`       | `SELECT, INSERT, UPDATE, DELETE` (default privilege) | future tables created by the owner in `public`                      | New tables are reachable without a follow-up grant.                                                          |
-| `app_runtime`       | `USAGE, SELECT` (default privilege)                  | future sequences created by the owner in `public`                   | Same, for sequences.                                                                                         |
-| `app_runtime`       | `EXECUTE`                                            | `app_page_merchant(text)`                                           | The worker's only way to resolve a Page to a merchant.                                                       |
-| `PUBLIC`            | `EXECUTE` **revoked**                                | `app_page_merchant(text)`                                           | A `SECURITY DEFINER` function must not be callable by every role.                                            |
-| `app_page_resolver` | `USAGE`                                              | schema `public`                                                     | Reach `facebook_page`.                                                                                       |
-| `app_page_resolver` | `SELECT (page_id, merchant_id)`                      | `facebook_page`                                                     | Column-level: it can never read `access_token`, `name` or anything else.                                     |
+| Grantee             | Privilege                                            | On                                                                  | Why                                                                                                         |
+| ------------------- | ---------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `app_runtime`       | `USAGE`                                              | schema `public`                                                     | Reach objects in the schema.                                                                                |
+| `app_runtime`       | `SELECT, INSERT, UPDATE, DELETE`                     | all tables existing when the role was created (Better Auth's seven) | Auth tables need grants but no policy: they carry no `merchant_id` and are read before a merchant is known. |
+| `app_runtime`       | `USAGE, SELECT`                                      | all sequences existing when the role was created                    | Same, for sequences.                                                                                        |
+| `app_runtime`       | `SELECT, INSERT, UPDATE, DELETE` (default privilege) | future tables created by the owner in `public`                      | New tables are reachable without a follow-up grant.                                                         |
+| `app_runtime`       | `USAGE, SELECT` (default privilege)                  | future sequences created by the owner in `public`                   | Same, for sequences.                                                                                        |
+| `app_runtime`       | `EXECUTE`                                            | `app_page_merchant(text)`                                           | The worker's only way to resolve a Page to a merchant.                                                      |
+| `PUBLIC`            | `EXECUTE` **revoked**                                | `app_page_merchant(text)`                                           | A `SECURITY DEFINER` function must not be callable by every role.                                           |
+| `app_page_resolver` | `USAGE`                                              | schema `public`                                                     | Reach `facebook_page`.                                                                                      |
+| `app_page_resolver` | `SELECT (page_id, merchant_id)`                      | `facebook_page`                                                     | Column-level: it can never read `access_token`, `name` or anything else.                                    |
 
 `app_current_merchant()` keeps the default `EXECUTE` for `PUBLIC`; it only reads
 a setting.
@@ -84,7 +84,9 @@ row from a non-superuser owner, and such a backfill would silently do nothing.
 | `delivery_charge`                                                                    | yes           | yes         | yes        | `delivery_charge_merchant_isolation`                              |
 | `product_delivery_charge`                                                            | yes           | yes         | yes        | `product_delivery_charge_merchant_isolation`                      |
 | `notification_preference`                                                            | yes           | yes         | yes        | `notification_preference_merchant_isolation`                      |
-| `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation` | no            | no          | no         | none — Better Auth tables, deliberately unprotected by RLS        |
+| `merchant_settings`                                                                  | yes           | yes         | yes        | `merchant_settings_merchant_isolation`                            |
+| `llm_call`                                                                           | yes           | yes         | yes        | `llm_call_merchant_isolation`                                     |
+| `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation` | no            | no          | no         | none. Better Auth tables, deliberately without RLS                |
 
 ## Policies
 
@@ -116,6 +118,8 @@ merchant. With no context set, both evaluate to `NULL` and nothing matches.
 | `delivery_charge_merchant_isolation`              | `delivery_charge`              | `ALL`    | `public`            | same                                   | same                                   | Confines the shop's delivery areas, their charges and times to the current merchant.                                                            |
 | `product_delivery_charge_merchant_isolation`      | `product_delivery_charge`      | `ALL`    | `public`            | same                                   | same                                   | Confines products' own delivery charges to the current merchant.                                                                                |
 | `notification_preference_merchant_isolation`      | `notification_preference`      | `ALL`    | `public`            | same                                   | same                                   | Confines each person's notification switches for a shop to that shop.                                                                           |
+| `merchant_settings_merchant_isolation`            | `merchant_settings`            | `ALL`    | `public`            | same                                   | same                                   | Confines the shop's region, contact details and free-delivery threshold to the current merchant.                                                |
+| `llm_call_merchant_isolation`                     | `llm_call`                     | `ALL`    | `public`            | same                                   | same                                   | Confines the assistant's LLM call log (model, tokens, latency, outcome) to the current merchant.                                                |
 
 ## Triggers
 
@@ -125,10 +129,10 @@ merchant. With no context set, both evaluate to `NULL` and nothing matches.
 
 ## Extensions
 
-| Extension  | Why                                                                                                               |
-| ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| `pgcrypto` | Kept available for `digest()` / `crypt()`. Not required for ids — `gen_random_uuid()` is built into Postgres 13+. |
-| `pg_trgm`  | Trigram GIN indexes behind conversation search on `customer.name` and `message.text`.                             |
+| Extension  | Why                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| `pgcrypto` | Kept available for `digest()` / `crypt()`. Not required for ids: `gen_random_uuid()` is built into Postgres 13+. |
+| `pg_trgm`  | Trigram GIN indexes behind conversation search on `customer.name` and `message.text`.                            |
 
 ## Tenant-scoped foreign keys
 
@@ -161,6 +165,7 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `order_delivery_charge_fk`                   | `order (merchant_id, delivery_charge_id)` → `delivery_charge`                                                                  | `SET NULL (delivery_charge_id)` | An order's area belongs to the same merchant. Removing the area clears only the link; the order keeps its area name, everywhere-else flag and estimate. Migration `0027` (drizzle-kit can't model the column list). |
 | `product_delivery_charge_product_fk`         | `product_delivery_charge` → `product`                                                                                          | `CASCADE`                       | Deleting a product removes its own delivery charges.                                                                                                                                                                |
 | `product_delivery_charge_delivery_charge_fk` | `product_delivery_charge` → `delivery_charge`                                                                                  | `CASCADE`                       | Removing an area removes every product's charge for it.                                                                                                                                                             |
+| `llm_call_conversation_fk`                   | `llm_call` → `conversation`                                                                                                    | `CASCADE`                       | Each LLM call belongs to a conversation of the same merchant; deleting the conversation removes its calls.                                                                                                          |
 
 ## Check constraints
 
@@ -170,7 +175,7 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `product_revision_ck`                     | `product`                 | `revision >= 0`. `revision` is bumped by every write to the product's document and is its `version` on the wire.           |
 | `product_variant_price_ck`                | `product_variant`         | `price >= 0` (minor units).                                                                                                |
 | `product_variant_stock_ck`                | `product_variant`         | `stock >= 0`.                                                                                                              |
-| `product_variant_default_unnamed_ck`      | `product_variant`         | `is_default` exactly when `name` is null — the default variant is the unnamed one.                                         |
+| `product_variant_default_unnamed_ck`      | `product_variant`         | `is_default` exactly when `name` is null: the default variant is the unnamed one.                                          |
 | `product_option_position_ck`              | `product_option`          | `position >= 0`.                                                                                                           |
 | `product_option_value_position_ck`        | `product_option_value`    | `position >= 0`.                                                                                                           |
 | `conversation_state_ck`                   | `conversation`            | `state` in `browsing`, `collecting_details`, `awaiting_confirmation`, `confirmed`, `handed_off`, `abandoned`.              |
@@ -181,6 +186,7 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `order_source_ck`                         | `order`                   | `source` in `assistant`, `seller`.                                                                                         |
 | `order_payment_status_ck`                 | `order`                   | `payment_status` in `unpaid`, `paid`, `refunded`.                                                                          |
 | `order_payment_method_ck`                 | `order`                   | `payment_method` in `cash_on_delivery`, `bank_transfer`, `mobile_wallet`.                                                  |
+| `order_currency_ck`                       | `order`                   | `currency` is three upper-case letters (ISO 4217 shape), copied from the shop's settings when the order is placed.         |
 | `order_revision_ck`                       | `order`                   | `revision >= 0`. Bumped by every write to the order; its `version` on the wire, as for products.                           |
 | `order_number_ck`                         | `order`                   | `number > 0`. `UNIQUE (merchant_id, year, number)`: each shop numbers from 1 each year; `UNIQUE (merchant_id, reference)`. |
 | `order_amounts_ck`                        | `order`                   | `subtotal >= 0`, `delivery_fee >= 0`, `total = subtotal + delivery_fee` (minor units).                                     |
@@ -191,15 +197,21 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `delivery_charge_area_name_ck`            | `delivery_charge`         | `(area_name is null) = is_fallback`: only the everywhere-else row has no name.                                             |
 | `delivery_charge_charge_ck`               | `delivery_charge`         | `charge >= 0` (minor units).                                                                                               |
 | `product_delivery_charge_charge_ck`       | `product_delivery_charge` | `charge >= 0` (minor units).                                                                                               |
+| `merchant_settings_country_ck`            | `merchant_settings`       | `country` is two upper-case letters (ISO 3166 shape). `@app/shared` decides which codes exist.                             |
+| `merchant_settings_currency_ck`           | `merchant_settings`       | `currency` is three upper-case letters (ISO 4217 shape).                                                                   |
+| `merchant_settings_date_format_ck`        | `merchant_settings`       | `date_format` is one of the six `DATE_FORMATS` patterns.                                                                   |
+| `merchant_settings_contact_phone_ck`      | `merchant_settings`       | `contact_phone` is E.164: `+`, then 7 to 15 digits, not starting with 0.                                                   |
 | `merchant_settings_free_delivery_over_ck` | `merchant_settings`       | `free_delivery_over >= 0` (minor units); null always charges.                                                              |
+| `llm_call_purpose_ck`                     | `llm_call`                | `purpose` in `classify`, `extract`, `phrase`.                                                                              |
+| `llm_call_outcome_ck`                     | `llm_call`                | `outcome` in `ok`, `timeout`, `provider_error`, `invalid_output`.                                                          |
 
 ## Partial and special indexes
 
 Ordinary b-tree indexes on `merchant_id`-leading columns are omitted; these are
 the ones that encode a rule or need an extension.
 
-`product_variant_option_value_pk` — primary key `(merchant_id, variant_id,
-option_id)` — gives a variant at most one value per option. Option names within
+The primary key `product_variant_option_value_pk`, `(merchant_id, variant_id,
+option_id)`, gives a variant at most one value per option. Option names within
 a product, value text within an option, and value combinations among a
 product's live variants are unique only by the service's rules (the shared
 schema, re-checked under the product row lock), not by an index: a save that
@@ -211,6 +223,9 @@ swaps two names would trip a non-deferrable index halfway through.
 | `product_variant_merchant_sku_live_uidx` | `product_variant` | unique `(merchant_id, sku)` where `archived_at is null`          | SKUs are unique per merchant among live variants.                                                |
 | `product_variant_default_live_uidx`      | `product_variant` | unique `(product_id)` where `is_default and archived_at is null` | At most one live default variant per product.                                                    |
 | `order_merchant_idempotency_key_uq`      | `order`           | unique `(merchant_id, idempotency_key)` (nulls distinct)         | A replayed `Idempotency-Key` returns the order it first created.                                 |
+| `facebook_page_page_id_uq`               | `facebook_page`   | unique `(page_id)`                                               | A Page belongs to one shop at most; the only tenant-table rule without `merchant_id`.            |
+| `facebook_page_merchant_uq`              | `facebook_page`   | unique `(merchant_id)`                                           | One connected Page per shop in the MVP.                                                          |
+| `message_merchant_meta_message_id_uq`    | `message`         | unique `(merchant_id, meta_message_id)` (nulls distinct)         | The ingest's dedupe backstop (`ON CONFLICT DO NOTHING`); null while a reply is `sending`.        |
 | `delivery_charge_merchant_area_uidx`     | `delivery_charge` | unique `(merchant_id, lower(area_name))` where `not is_fallback` | Area names are case-insensitively unique per shop. A save that swaps two names parks them first. |
 | `delivery_charge_merchant_fallback_uidx` | `delivery_charge` | unique `(merchant_id)` where `is_fallback`                       | At most one everywhere-else row per shop.                                                        |
 | `conversation_needs_you_idx`             | `conversation`    | `(merchant_id)` where `state = 'handed_off'`                     | Serves the "needs you" inbox filter.                                                             |
