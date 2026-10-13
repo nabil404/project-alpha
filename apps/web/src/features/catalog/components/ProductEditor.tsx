@@ -277,7 +277,7 @@ export function ProductEditor({ product }: { product?: Product }) {
             <div className="flex min-w-0 flex-col gap-6">
               <StatusCard />
               <OrganisationCard />
-              <StockSummaryCard />
+              <StockSummaryCard product={product} />
               <DeliveryChargeCard className={card} />
             </div>
           </div>
@@ -426,11 +426,14 @@ function OrganisationCard() {
   );
 }
 
-function StockSummaryCard() {
+function StockSummaryCard({ product }: { product?: Product }) {
   const { t } = useTranslation('catalog');
   const variants = useWatch<ProductFormValues, 'variants'>({ name: 'variants' });
   const total = variants.reduce((sum, v) => sum + (Number.isNaN(v.stock) ? 0 : v.stock), 0);
-  const outOfStock = variants.filter((v) => v.stock === 0).length;
+  const reservedById = new Map(product?.variants.map((v) => [v.id, v.reserved]));
+  const outOfStock = variants.filter(
+    (v) => (Number.isNaN(v.stock) ? 0 : v.stock) - (reservedById.get(v.id ?? '') ?? 0) <= 0,
+  ).length;
 
   return (
     <section className={card}>

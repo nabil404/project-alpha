@@ -14,6 +14,7 @@ FROM (
   FROM "order_item" oi
   JOIN "order" o ON o."id" = oi."order_id" AND o."merchant_id" = oi."merchant_id"
   WHERE o."status" = 'new' AND oi."variant_id" IS NOT NULL
+    AND oi."product_id" IS NOT NULL
   GROUP BY oi."merchant_id", oi."variant_id"
 ) d
 WHERE v."id" = d."variant_id" AND v."merchant_id" = d."merchant_id";

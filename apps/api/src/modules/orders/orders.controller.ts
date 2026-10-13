@@ -210,7 +210,7 @@ export class OrdersController {
   @ApiOperation({
     summary: 'Move an order to its next status',
     description:
-      'Confirm, pack, ship, deliver, return or cancel. Confirming takes the items from stock; cancelling a confirmed order, or returning a delivered one, puts them back.',
+      'Confirm, pack, ship, deliver, return or cancel. Confirming turns a draft’s reservation into stock taken; cancelling a draft releases its reservation; cancelling after confirming, or returning, gives the stock back.',
   })
   @ApiBody({ schema: openApi(updateOrderStatusSchema, 'input') })
   @ApiOkResponse({ description: 'The updated order.', schema: openApi(orderDetailSchema) })
@@ -229,7 +229,7 @@ export class OrdersController {
   @ApiOperation({
     summary: 'Replace an order’s items',
     description:
-      'While the order is new or confirmed. A variant already on the order keeps its name, SKU and price unless `unitPrice` is sent; a new one is priced from the catalog. A confirmed order’s stock follows the change.',
+      'While the order is new or confirmed. A variant already on the order keeps its name, SKU and price unless `unitPrice` is sent; a new one is priced from the catalog. A draft’s reservation, or a confirmed order’s stock, follows the change.',
   })
   @ApiBody({ schema: openApi(replaceOrderItemsSchema, 'input') })
   @ApiOkResponse({ description: 'The updated order.', schema: openApi(orderDetailSchema) })
