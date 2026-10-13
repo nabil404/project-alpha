@@ -22,9 +22,10 @@ export interface OrderableVariant {
 
 /**
  * The orders side of the catalog: reading variants to snapshot onto lines,
- * and moving stock and reservations as orders are drafted, confirmed, cancelled or returned. Every write here
- * bumps the product's revision, as the domain requires, so an edit page open
- * on the product sees its stock changed under it.
+ * and moving stock and reservations as orders are drafted, confirmed,
+ * cancelled or returned. Every write here bumps the product's revision, as the
+ * domain requires, so an edit page open on the product sees its stock changed
+ * under it.
  */
 @Injectable()
 export class OrderCatalogRepository {

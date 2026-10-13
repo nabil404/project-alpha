@@ -76,6 +76,16 @@ class StaleCatalog extends OrderCatalogRepository {
   }
 }
 
+/** An order write that fails for a reason other than stock. */
+class FailingOrders extends OrdersService {
+  override async createInTransaction(
+    ...args: Parameters<OrdersService['createInTransaction']>
+  ): ReturnType<OrdersService['createInTransaction']> {
+    void args;
+    throw new Error('order write failed');
+  }
+}
+
 describeDb('OrderConfirmationService (app_runtime)', () => {
   let t: CatalogTestDb;
   let runtime: ReturnType<typeof openRuntimeDb>;
@@ -111,7 +121,10 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
   const ordersFor = (conversationId: string) =>
     t.db.select().from(schema.order).where(eq(schema.order.conversationId, conversationId));
 
-  const service = (catalog: OrderCatalogRepository = new OrderCatalogRepository()) => {
+  const service = (
+    catalog: OrderCatalogRepository = new OrderCatalogRepository(),
+    ordersClass: typeof OrdersService = OrdersService,
+  ) => {
     const publisher = { publish: async () => undefined } as unknown as ConversationEventsPublisher;
     const settings = new MerchantSettingsRepository();
     const charges = new DeliveryChargesRepository();
@@ -125,14 +138,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
       charges,
       catalog,
       orders,
-      new OrdersService(
-        runtime.db,
-        orders,
-        new OrderEventsRepository(),
-        catalog,
-        settings,
-        charges,
-      ),
+      new ordersClass(runtime.db, orders, new OrderEventsRepository(), catalog, settings, charges),
       new DeliveryQuoteService(
         runtime.db,
         charges,
@@ -321,6 +327,25 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
       .from(schema.productVariant)
       .where(eq(schema.productVariant.id, lungi.variantId));
     expect(variant).toMatchObject({ stock: 1, reserved: 0 });
+  });
+
+  it('does not swallow a failure that is not about stock', async () => {
+    const lungi = await product('Failing Lungi', 10_000, 5);
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+    const message = await seedMessage(t.db, t.merchantA, convo.id, {
+      text: 'Confirm',
+      payload: `confirm:${convo.id}:1`,
+    });
+
+    await expect(
+      service(new OrderCatalogRepository(), FailingOrders).run(
+        { merchantId: t.merchantA, conversationId: convo.id, triggerMessageId: message.id },
+        confirm(convo.id),
+      ),
+    ).rejects.toThrow('order write failed');
+
+    expect(await ordersFor(convo.id)).toEqual([]);
+    expect((await conversationRow(convo.id)).state).toBe('awaiting_confirmation');
   });
 
   it('creates one assistant order with the card numbers, sends its reference, then emails', async () => {

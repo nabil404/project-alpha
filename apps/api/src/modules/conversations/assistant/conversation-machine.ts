@@ -266,7 +266,7 @@ interface Problem {
   choices?: Choice[];
   /** The product or variant found out of stock. */
   unavailable?: string;
-  /** Units in stock, when the customer asked for more. */
+  /** Units available, when the customer asked for more. */
   available?: number;
 }
 
@@ -384,8 +384,8 @@ function resolveItem(
 
 /**
  * Every item resolved, items on the same variant merged, then each variant's
- * quantity checked against what is available. `moved` maps each item's index before
- * the merge to its index after.
+ * quantity checked against what is available. `moved` maps each item's index
+ * before the merge to its index after.
  */
 function resolveItems(
   items: readonly OrderItemSlot[],
