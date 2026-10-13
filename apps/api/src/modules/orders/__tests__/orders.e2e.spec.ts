@@ -68,6 +68,13 @@ describeDb('order routes over HTTP', () => {
       .where(eq(schema.productVariant.id, variantId));
     return row?.stock;
   };
+  const reservedOf = async (variantId: string) => {
+    const [row] = await t.db
+      .select({ reserved: schema.productVariant.reserved })
+      .from(schema.productVariant)
+      .where(eq(schema.productVariant.id, variantId));
+    return row?.reserved;
+  };
   const revisionOf = async (id: string) => {
     const [row] = await t.db
       .select({ revision: schema.product.revision })
@@ -145,7 +152,9 @@ describeDb('order routes over HTTP', () => {
     nusratId = nusrat.id;
     const product = await seedProduct(t.db, a, { name: 'Blue kurti', status: 'active' });
     productId = product.id;
-    kurtiM = (await seedVariant(t.db, a, product.id, { name: 'M', price: 160000, stock: 3 })).id;
+    kurtiM = (
+      await seedVariant(t.db, a, product.id, { name: 'M', price: 160000, stock: 3, reserved: 2 })
+    ).id;
     kurtiL = (await seedVariant(t.db, a, product.id, { name: 'L', price: 170000, stock: 1 })).id;
 
     // An earlier, delivered order: history for the detail's customer figures.
@@ -239,6 +248,7 @@ describeDb('order routes over HTTP', () => {
       nextStatuses: ['packed', 'cancelled'],
     });
     expect(await stockOf(kurtiM)).toBe(1);
+    expect(await reservedOf(kurtiM)).toBe(0);
     expect(await revisionOf(productId)).toBe((revision ?? 0) + 1);
 
     const activity = await request(server())

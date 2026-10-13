@@ -1,5 +1,5 @@
 import {
-  orderHoldsStock,
+  orderStockHold,
   type OrderDeliveryField,
   type OrderEventData,
   type OrderItemInput,
@@ -22,16 +22,30 @@ export interface StockChange {
   variantId: string;
   productId: string;
   /** Added to the variant's stock: negative takes, positive gives back. */
-  change: number;
+  stock: number;
+  /** Added to the variant's reserved count: positive reserves, negative releases. */
+  reserved: number;
 }
 
-function held(lines: readonly StockLine[], status: OrderStatus): Map<string, StockLine> {
-  const byVariant = new Map<string, StockLine>();
-  if (!orderHoldsStock(status)) return byVariant;
+interface Held {
+  productId: string;
+  reserved: number;
+  taken: number;
+}
+
+function held(lines: readonly StockLine[], status: OrderStatus): Map<string, Held> {
+  const byVariant = new Map<string, Held>();
+  const hold = orderStockHold(status);
+  if (hold === 'none') return byVariant;
   for (const line of lines) {
     if (!line.variantId || !line.productId) continue;
-    const seen = byVariant.get(line.variantId);
-    byVariant.set(line.variantId, { ...line, quantity: (seen?.quantity ?? 0) + line.quantity });
+    const seen = byVariant.get(line.variantId) ?? {
+      productId: line.productId,
+      reserved: 0,
+      taken: 0,
+    };
+    seen[hold] += line.quantity;
+    byVariant.set(line.variantId, seen);
   }
   return byVariant;
 }
@@ -40,7 +54,8 @@ function held(lines: readonly StockLine[], status: OrderStatus): Map<string, Sto
  * The stock moves that take an order from `before` to `after`: a status
  * change, an item edit, or both. Whatever the order held before is given back
  * and whatever it holds after is taken, netted per variant, so an edit that
- * only changes a quantity moves only the difference. Sorted by variant id, so
+ * only changes a quantity moves only the difference. A draft's hold is a
+ * reservation, a confirmed order's is stock taken. Sorted by variant id, so
  * concurrent writers update rows in the same order. Zero changes are left out.
  */
 export function stockChanges(
@@ -51,9 +66,12 @@ export function stockChanges(
   const now = held(after.lines, after.status);
   const changes: StockChange[] = [];
   for (const variantId of new Set([...was.keys(), ...now.keys()])) {
-    const line = (now.get(variantId) ?? was.get(variantId)) as StockLine;
-    const change = (was.get(variantId)?.quantity ?? 0) - (now.get(variantId)?.quantity ?? 0);
-    if (change !== 0) changes.push({ variantId, productId: line.productId as string, change });
+    const then = was.get(variantId);
+    const next = now.get(variantId);
+    const stock = (then?.taken ?? 0) - (next?.taken ?? 0);
+    const reserved = (next?.reserved ?? 0) - (then?.reserved ?? 0);
+    if (stock === 0 && reserved === 0) continue;
+    changes.push({ variantId, productId: (next ?? then)!.productId, stock, reserved });
   }
   return changes.sort((a, b) => a.variantId.localeCompare(b.variantId));
 }

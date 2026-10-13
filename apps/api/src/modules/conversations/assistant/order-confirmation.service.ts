@@ -254,7 +254,7 @@ export class OrderConfirmationService {
         !variant ||
         !variant.live ||
         !variant.productActive ||
-        variant.stock < wanted.get(line.variantId)!
+        variant.available < wanted.get(line.variantId)!
       );
     });
     if (gone.length > 0) return unavailable(slots, gone, variants, language);

@@ -41,15 +41,26 @@ export function nextOrderStatuses(from: OrderStatus): readonly OrderStatus[] {
   return orderStatusTransitions[from];
 }
 
+export type StockHold = 'none' | 'reserved' | 'taken';
+
 /**
- * Whether an order in this status holds its items' stock. Stock is taken when
- * the seller confirms and given back when the order is cancelled or returned,
- * so a move's stock effect is the difference between its two ends.
+ * What an order in this status does with its items' stock: a draft reserves
+ * it, confirming takes it, and cancelling or returning gives it back. A
+ * move's stock effect is the difference between its two ends.
  */
-export function orderHoldsStock(status: OrderStatus): boolean {
-  return (
-    status === 'confirmed' || status === 'packed' || status === 'shipped' || status === 'delivered'
-  );
+export function orderStockHold(status: OrderStatus): StockHold {
+  switch (status) {
+    case 'new':
+      return 'reserved';
+    case 'confirmed':
+    case 'packed':
+    case 'shipped':
+    case 'delivered':
+      return 'taken';
+    case 'cancelled':
+    case 'returned':
+      return 'none';
+  }
 }
 
 /** Items can change until the order is packed. */
