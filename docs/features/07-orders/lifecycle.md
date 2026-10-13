@@ -11,7 +11,11 @@ allows exactly these moves. Any other is `409 ORDER_INVALID_TRANSITION`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> new: POST /orders or the assistant's Confirm
+    [*] --> new: POST /orders or the assistant's Confirm, stock reserved
+
+    state "Reserves stock" as reserving {
+        new
+    }
 
     state "Holds stock" as holding {
         confirmed --> packed
@@ -19,8 +23,8 @@ stateDiagram-v2
         shipped --> delivered
     }
 
-    new --> confirmed: seller confirms, stock taken
-    new --> cancelled
+    new --> confirmed: seller confirms, reservation taken from stock
+    new --> cancelled: reservation released
     confirmed --> cancelled: stock returned
     packed --> cancelled: stock returned
     shipped --> cancelled: stock returned
@@ -30,17 +34,21 @@ stateDiagram-v2
     returned --> [*]
 ```
 
-Stock follows `orderHoldsStock`: an order in `confirmed`, `packed`, `shipped`
-or `delivered` holds its items' stock. A move between two holding statuses
-moves no stock. A move into one takes stock, and a move out of one gives it
-back. Taking more than a variant has is `409 ORDER_INSUFFICIENT_STOCK`, and
-the whole change rolls back.
+Stock follows `orderStockHold`: a `new` order reserves its items, an order
+in `confirmed`, `packed`, `shipped` or `delivered` has taken them, and a
+`cancelled` or `returned` one holds nothing. Each variant keeps `stock` (on
+hand) and `reserved`; what can be drafted or confirmed is `stock − reserved`.
+A move between two taking statuses moves nothing. Confirming turns the
+reservation into stock taken, cancelling a draft releases it, and cancelling
+or returning a confirmed order gives the stock back. Drafting more than is
+available is `409 ORDER_INSUFFICIENT_STOCK`, and the whole change rolls
+back.
 
 ## What can change in each status
 
 | Status      | Items (`PUT /:id/items`) | Delivery details (`PATCH /:id`) | Payment, tracking, note |
 | ----------- | ------------------------ | ------------------------------- | ----------------------- |
-| `new`       | yes                      | yes                             | yes                     |
+| `new`       | yes, reservation follows | yes                             | yes                     |
 | `confirmed` | yes, stock follows       | yes                             | yes                     |
 | `packed`    | no                       | yes                             | yes                     |
 | `shipped`   | no                       | no                              | yes                     |

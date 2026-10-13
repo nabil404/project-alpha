@@ -17,7 +17,7 @@ flowchart TD
     llm --> merge["⚙️ mergeItems, mergeSameVariant<br/>item-merge.ts"]:::work
     merge --> match["⚙️ matchProduct, matchVariant per item<br/>catalog-match.ts"]:::work
     fill --> match
-    match --> clear{"Every item has a clear<br/>product, variant and<br/>quantity in stock?"}:::decision
+    match --> clear{"Every item has a clear<br/>product, variant and<br/>quantity available?"}:::decision
     clear -- "close candidates" --> offer["⚙️ Ask with up to 3 quick replies<br/>pick:product:id or pick:variant:id"]:::work
     clear -- "not found, sold out, too many" --> ask["⚙️ Ask again with the reason<br/>counts toward 3 asks"]:::work
     clear -- yes --> details{"Name, phone and<br/>address collected?"}:::decision
@@ -51,11 +51,12 @@ flowchart TD
     replied -. "sending, inside the lease" .-> retry[/"❌ ReplyInFlightError<br/>the job retries"/]:::reject
     exists -- no --> current{"awaiting_confirmation,<br/>this revision and its quote?"}:::decision
     current -. no .-> stale[/"❌ Stale-card sentence"/]:::reject
-    current -- yes --> lines{"Every line live, in stock,<br/>product active?"}:::decision
+    current -- yes --> lines{"Every line live, available,<br/>product active?"}:::decision
     lines -. no .-> drop[/"❌ No order. Drop that item<br/>collecting_details, revision + 1"/]:::reject
     lines -- yes --> price{"Prices, fee and<br/>currency unchanged?"}:::decision
     price -. no .-> fresh[/"❌ No order. Price-changed line<br/>and a fresh card, revision + 1"/]:::reject
-    price -- yes --> create["💾 createInTransaction<br/>source assistant, cash on delivery<br/>state confirmed"]:::store
+    price -- yes --> create["💾 createInTransaction<br/>source assistant, cash on delivery<br/>reserves the stock<br/>state confirmed"]:::store
+    create -. "lost the race:<br/>ORDER_INSUFFICIENT_STOCK" .-> drop
     create --> after["✅ After commit: send the reference,<br/>then orderDrafted emails the seller"]:::work
 
     classDef entry    fill:#E6E6FA,stroke:#333,stroke-width:2px,color:#00008B

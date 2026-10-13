@@ -38,16 +38,16 @@ All but the two link tables have a `text` UUID `id`, `created_at` and
 reads but not the ids a row points at; the composite keys make a write of
 another merchant's `product_id` or `category_id` fail in the database.
 
-| Table                          | Key columns                                                                                             | Constraints worth knowing                                                                                                                                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `product`                      | `name`, `description`, `aliases text[]`, `status`, `custom_delivery`, `cover_image_id`, `revision`      | `status` check; `revision >= 0`                                                                                                                                                                                                |
-| `product_option`               | `product_id`, `name`, `position`                                                                        | FK to product `ON DELETE CASCADE`; `position` dense `0..n-1` (the order customers are asked in), not unique. The service keeps names unique within a product, under the product row lock                                       |
-| `product_option_value`         | `option_id`, `value`, `position`                                                                        | FK to option `ON DELETE CASCADE`; `UNIQUE (merchant_id, option_id, id)`, the target of the link table's key                                                                                                                    |
-| `product_variant`              | `product_id`, `name` (null = default), `sku`, `price`, `stock`, `is_default`, `image_id`, `archived_at` | FK to product `ON DELETE CASCADE`; `price`, `stock >= 0`; `is_default = (name IS NULL)`; partial unique `(merchant_id, sku) WHERE archived_at IS NULL`; partial unique `(product_id) WHERE is_default AND archived_at IS NULL` |
-| `product_variant_option_value` | PK `(merchant_id, variant_id, option_id)`, `option_value_id`                                            | One value per option per variant; the value key carries `option_id`, so the value must be that option's. Both keys cascade                                                                                                     |
-| `product_image`                | `product_id`, `storage_key`, `position`, `width`, `height`, `byte_size`                                 | FK to product `ON DELETE CASCADE`; `storage_key` unique; `position` dense `0..n-1`, gallery order only, not unique so a reorder needs no deferral                                                                              |
-| `category`                     | `name`, `deleted_at`                                                                                    | Partial unique `(merchant_id, lower(name)) WHERE deleted_at IS NULL`                                                                                                                                                           |
-| `product_category`             | PK `(merchant_id, product_id, category_id)`                                                             | FK to product `ON DELETE CASCADE`; FK to category                                                                                                                                                                              |
+| Table                          | Key columns                                                                                                         | Constraints worth knowing                                                                                                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `product`                      | `name`, `description`, `aliases text[]`, `status`, `custom_delivery`, `cover_image_id`, `revision`                  | `status` check; `revision >= 0`                                                                                                                                                                                                                                         |
+| `product_option`               | `product_id`, `name`, `position`                                                                                    | FK to product `ON DELETE CASCADE`; `position` dense `0..n-1` (the order customers are asked in), not unique. The service keeps names unique within a product, under the product row lock                                                                                |
+| `product_option_value`         | `option_id`, `value`, `position`                                                                                    | FK to option `ON DELETE CASCADE`; `UNIQUE (merchant_id, option_id, id)`, the target of the link table's key                                                                                                                                                             |
+| `product_variant`              | `product_id`, `name` (null = default), `sku`, `price`, `stock`, `reserved`, `is_default`, `image_id`, `archived_at` | FK to product `ON DELETE CASCADE`; `price`, `stock >= 0`; `reserved >= 0` and `reserved <= stock`; `is_default = (name IS NULL)`; partial unique `(merchant_id, sku) WHERE archived_at IS NULL`; partial unique `(product_id) WHERE is_default AND archived_at IS NULL` |
+| `product_variant_option_value` | PK `(merchant_id, variant_id, option_id)`, `option_value_id`                                                        | One value per option per variant; the value key carries `option_id`, so the value must be that option's. Both keys cascade                                                                                                                                              |
+| `product_image`                | `product_id`, `storage_key`, `position`, `width`, `height`, `byte_size`                                             | FK to product `ON DELETE CASCADE`; `storage_key` unique; `position` dense `0..n-1`, gallery order only, not unique so a reorder needs no deferral                                                                                                                       |
+| `category`                     | `name`, `deleted_at`                                                                                                | Partial unique `(merchant_id, lower(name)) WHERE deleted_at IS NULL`                                                                                                                                                                                                    |
+| `product_category`             | PK `(merchant_id, product_id, category_id)`                                                                         | FK to product `ON DELETE CASCADE`; FK to category                                                                                                                                                                                                                       |
 
 - `product_variant.image_id` and `product.cover_image_id` reference
   `product_image (merchant_id, id)` `ON DELETE SET NULL (<column>)`. drizzle-kit
@@ -114,7 +114,7 @@ document without a `version`.
   `deliveryCharges.<i>.deliveryChargeId`. Removing an area in Settings
   removes every product's charge for it.
 - **Version.** Every write to the product's fields, options or variants, and
-  every order stock move, bumps `revision`, sent as an opaque `version`. A
+  every order stock or reservation move, bumps `revision`, sent as an opaque `version`. A
   save with an old `version` is `409 PRODUCT_STALE`, so the second of two
   saves from one read is refused. Gallery changes do not bump it, since the
   edit page does not hold the gallery.
@@ -136,8 +136,14 @@ document without a `version`.
   naming another is `PRODUCT_IMAGE_NOT_FOUND`; a save treats it as `null`,
   since the photo may have been deleted after the page read. `null` falls back
   to the cover.
-- **Stock** is set by the seller and moved by orders. `stockStatus`
-  (`in_stock` or `out_of_stock`) is computed on read.
+- **Stock** is set by the seller and moved by orders. `reserved` is the count
+  drafted orders hold and the seller never writes it; `available` is stock
+  less reserved. `stockStatus` (`in_stock` or `out_of_stock`), the list's
+  stock level, the filters, the counts and what the assistant offers all use
+  `available`. A save that sets stock below `reserved` is
+  `409 VARIANT_STOCK_RESERVED` with `{ variantId, name, reserved }`, refused by
+  `assertStockCoversReserved` under the product lock; the `reserved <= stock`
+  check is the backstop.
 
 ### Products
 
@@ -163,11 +169,12 @@ document without a `version`.
 `counts`).
 
 - **One row per product**, summing its live variants: count, price range,
-  total stock, and how many are low or out. Expanding a row reads
+  total available (`available`, on hand less reserved), and how many are low
+  or out. Expanding a row reads
   `GET /products/:id`, which the edit page then opens from cache. A product
   with one live variant carries it inline as `variant`.
-- **Stock levels.** A variant is low at `LOW_STOCK_THRESHOLD` (5) or fewer and
-  out at 0. A product is out when no variant has stock, low when any variant
+- **Stock levels.** A variant is low at `LOW_STOCK_THRESHOLD` (5) or fewer
+  available and out at 0 available. A product is out when no variant has any, low when any variant
   is low or out, and in stock otherwise.
 - **Filters.** `all` and the three stock filters leave archived products out;
   `draft` and `archived` list that status. Each non-archived product counts
@@ -289,16 +296,16 @@ the product with `options`, live `variants`, `categoryIds`, `images`,
 `coverImageId`, `customDelivery`, `deliveryCharges` and `version`. A non-UUID
 `:id` is `400 VALIDATION_FAILED`.
 
-| Method | Path                                       | Body                  | Success               | Errors                                                                                                                                                                                      |
-| ------ | ------------------------------------------ | --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/v1/products`                         | `createProductSchema` | 201, the product      | 400 `VALIDATION_FAILED`, 404 `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `SKU_TAKEN`                                                                                            |
-| GET    | `/api/v1/products`                         | query, below          | 200, a page           | 400 `VALIDATION_FAILED`                                                                                                                                                                     |
-| GET    | `/api/v1/products/counts`                  | none                  | 200, count per filter | none                                                                                                                                                                                        |
-| GET    | `/api/v1/products/:id`                     | none                  | 200, the product      | 404 `PRODUCT_NOT_FOUND`                                                                                                                                                                     |
-| PUT    | `/api/v1/products/:id`                     | `saveProductSchema`   | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `PRODUCT_OPTION_NOT_FOUND` / `VARIANT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `PRODUCT_STALE` / `SKU_TAKEN` |
-| PATCH  | `/api/v1/products/:id`                     | `updateProductSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`                                                                                       |
-| PATCH  | `/api/v1/products/:id/variants/:variantId` | `updateVariantSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `VARIANT_NOT_FOUND` / `PRODUCT_IMAGE_NOT_FOUND`, 409 `SKU_TAKEN`                                                                         |
-| DELETE | `/api/v1/products/:id`                     | none                  | 204                   | 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_IN_USE`                                                                                                                                               |
+| Method | Path                                       | Body                  | Success               | Errors                                                                                                                                                                                                                 |
+| ------ | ------------------------------------------ | --------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/v1/products`                         | `createProductSchema` | 201, the product      | 400 `VALIDATION_FAILED`, 404 `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `SKU_TAKEN`                                                                                                                       |
+| GET    | `/api/v1/products`                         | query, below          | 200, a page           | 400 `VALIDATION_FAILED`                                                                                                                                                                                                |
+| GET    | `/api/v1/products/counts`                  | none                  | 200, count per filter | none                                                                                                                                                                                                                   |
+| GET    | `/api/v1/products/:id`                     | none                  | 200, the product      | 404 `PRODUCT_NOT_FOUND`                                                                                                                                                                                                |
+| PUT    | `/api/v1/products/:id`                     | `saveProductSchema`   | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `PRODUCT_OPTION_NOT_FOUND` / `VARIANT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`, 409 `PRODUCT_STALE` / `SKU_TAKEN` / `VARIANT_STOCK_RESERVED` |
+| PATCH  | `/api/v1/products/:id`                     | `updateProductSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `CATEGORY_NOT_FOUND` / `DELIVERY_CHARGE_NOT_FOUND`                                                                                                                  |
+| PATCH  | `/api/v1/products/:id/variants/:variantId` | `updateVariantSchema` | 200, the product      | 400 `VALIDATION_FAILED`, 404 `PRODUCT_NOT_FOUND` / `VARIANT_NOT_FOUND` / `PRODUCT_IMAGE_NOT_FOUND`, 409 `SKU_TAKEN` / `VARIANT_STOCK_RESERVED`                                                                         |
+| DELETE | `/api/v1/products/:id`                     | none                  | 204                   | 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_IN_USE`                                                                                                                                                                          |
 
 The list takes `filter`, `q`, `categoryId`, `page` and `limit`, ignores other
 parameters, and answers `400 VALIDATION_FAILED` on a bad value. `limit` is
@@ -341,24 +348,25 @@ Thrown from
 the upload interceptor and
 [`s3-object-storage.ts`](../../../apps/api/src/modules/storage/s3-object-storage.ts).
 
-| Code                             | Status | Params           | When                                                          |
-| -------------------------------- | ------ | ---------------- | ------------------------------------------------------------- |
-| `PRODUCT_NOT_FOUND`              | 404    | `{ id }`         | No such product for this merchant                             |
-| `VARIANT_NOT_FOUND`              | 404    | `{ id }`         | No such live variant on the product                           |
-| `CATEGORY_NOT_FOUND`             | 404    | `{ id }` or `{}` | Missing or deleted category (as target or link)               |
-| `CATEGORY_NAME_TAKEN`            | 409    | `{ name }`       | Name used by another live category, ignoring case             |
-| `PRODUCT_OPTION_NOT_FOUND`       | 404    | `{ id }`         | A save names an option or value id that is not this product's |
-| `PRODUCT_STALE`                  | 409    | `{ id }`         | A save's `version` is not the product's current one           |
-| `PRODUCT_IN_USE`                 | 409    | `{ id }`         | Deleting a product an order line references                   |
-| `SKU_TAKEN`                      | 409    | `{ sku }`        | Typed SKU already used by a live variant                      |
-| `DELIVERY_CHARGE_NOT_FOUND`      | 404    | `{ id }`         | A product's own charge names an area the shop does not have   |
-| `PRODUCT_IMAGE_TOO_LARGE`        | 413    | `{ maxBytes }`   | Upload over 10 MB                                             |
-| `PRODUCT_IMAGE_UNSUPPORTED_TYPE` | 415    | none             | Not JPEG, PNG or WebP                                         |
-| `PRODUCT_IMAGE_INVALID`          | 400    | none             | Undecodable, over 40 MP, or not exactly one file in `file`    |
-| `PRODUCT_IMAGE_LIMIT_REACHED`    | 409    | `{ max }`        | Product already has 8 images                                  |
-| `PRODUCT_IMAGE_ORDER_MISMATCH`   | 400    | none             | Reorder ids are not a permutation of the current images       |
-| `PRODUCT_IMAGE_NOT_FOUND`        | 404    | `{ id }`         | No such image on this product, or a variant's foreign image   |
-| `STORAGE_UNAVAILABLE`            | 503    | none             | R2 rejected or failed a request                               |
+| Code                             | Status | Params                          | When                                                            |
+| -------------------------------- | ------ | ------------------------------- | --------------------------------------------------------------- |
+| `PRODUCT_NOT_FOUND`              | 404    | `{ id }`                        | No such product for this merchant                               |
+| `VARIANT_NOT_FOUND`              | 404    | `{ id }`                        | No such live variant on the product                             |
+| `CATEGORY_NOT_FOUND`             | 404    | `{ id }` or `{}`                | Missing or deleted category (as target or link)                 |
+| `CATEGORY_NAME_TAKEN`            | 409    | `{ name }`                      | Name used by another live category, ignoring case               |
+| `PRODUCT_OPTION_NOT_FOUND`       | 404    | `{ id }`                        | A save names an option or value id that is not this product's   |
+| `PRODUCT_STALE`                  | 409    | `{ id }`                        | A save's `version` is not the product's current one             |
+| `PRODUCT_IN_USE`                 | 409    | `{ id }`                        | Deleting a product an order line references                     |
+| `SKU_TAKEN`                      | 409    | `{ sku }`                       | Typed SKU already used by a live variant                        |
+| `VARIANT_STOCK_RESERVED`         | 409    | `{ variantId, name, reserved }` | A save sets a variant's stock below what drafted orders reserve |
+| `DELIVERY_CHARGE_NOT_FOUND`      | 404    | `{ id }`                        | A product's own charge names an area the shop does not have     |
+| `PRODUCT_IMAGE_TOO_LARGE`        | 413    | `{ maxBytes }`                  | Upload over 10 MB                                               |
+| `PRODUCT_IMAGE_UNSUPPORTED_TYPE` | 415    | none                            | Not JPEG, PNG or WebP                                           |
+| `PRODUCT_IMAGE_INVALID`          | 400    | none                            | Undecodable, over 40 MP, or not exactly one file in `file`      |
+| `PRODUCT_IMAGE_LIMIT_REACHED`    | 409    | `{ max }`                       | Product already has 8 images                                    |
+| `PRODUCT_IMAGE_ORDER_MISMATCH`   | 400    | none                            | Reorder ids are not a permutation of the current images         |
+| `PRODUCT_IMAGE_NOT_FOUND`        | 404    | `{ id }`                        | No such image on this product, or a variant's foreign image     |
+| `STORAGE_UNAVAILABLE`            | 503    | none                            | R2 rejected or failed a request                                 |
 
 The document's own rules are field codes under `400 VALIDATION_FAILED`
 ([The product document](#the-product-document)).
@@ -366,9 +374,9 @@ The document's own rules are field codes under `400 VALIDATION_FAILED`
 ## Shared contract
 
 [`packages/shared/src/schemas/catalog.ts`](../../../packages/shared/src/schemas/catalog.ts)
-holds the resources (`productSchema`, `variantSchema` with `stockStatus` and
-`optionValueIds`, `categoryWithCountSchema`, `productImageSchema`, the list's
-`productListItemSchema` and `productCountsSchema`, and others), the inputs
+holds the resources (`productSchema`, `variantSchema` with `reserved`,
+`available`, `stockStatus` and `optionValueIds`, `categoryWithCountSchema`,
+`productImageSchema`, the list's `productListItemSchema` and `productCountsSchema`, and others), the inputs
 (`createProductSchema` and `saveProductSchema`, both running
 `refineProductDocument` and defaulting status to `draft`; `updateProductSchema`,
 `updateVariantSchema`, `listProductsQuerySchema`, the category and reorder
@@ -466,8 +474,10 @@ and builds with SWC into `dist/seed`, leaving the dev server's `dist` alone.
   categories, aliases (shown as Tags), the Delivery charge card, and the photo
   dialogs (Add photos with per-file progress, All photos with delete and the
   default choice, a full-screen viewer). The default photo saves with the
-  page; uploads and deletes happen at once. A `PRODUCT_STALE` answer means
-  another save or an order changed the product since the page read it.
+  page; uploads and deletes happen at once. The variant table shows "N reserved
+  · M available" under a variant's stock, and `VARIANT_STOCK_RESERVED` names
+  the variant. A `PRODUCT_STALE` answer means another save or an order changed
+  the product since the page read it.
 - **`/catalog/categories`**: the [Categories page](#categories-page).
 
 ## Not yet built

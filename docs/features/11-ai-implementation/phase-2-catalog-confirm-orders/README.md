@@ -25,8 +25,8 @@ phrased replies.
   sellable catalog (`ProductsService.findSellableCatalog`), the delivery rows
   and the free-delivery threshold. `decideTurn` merges the extracted items,
   matches each product and variant, folds items on one variant together,
-  checks stock, matches the delivery area, and asks the next question or
-  builds the card.
+  checks what is available (stock less what drafts reserve), matches the
+  delivery area, and asks the next question or builds the card.
 - **A quick-reply tap** on an offered candidate fills its item with no LLM
   call.
 - **After commit**, the matched item's photo goes first, best-effort and
@@ -66,9 +66,9 @@ phrased replies.
   `product`, then `variant` (only for a product with several), then
   `quantity`; then name, phone, address. A clear match fills the item; close
   candidates become quick replies; not found, out of stock, sold out, or more
-  than the stock each ask again with a reason and count toward the three-ask
-  hand-off. An out-of-stock variant is never offered. With nothing missing it
-  quotes every line (`quoteFor`) and moves to `awaiting_confirmation` with
+  than is available each ask again with a reason and count toward the
+  three-ask hand-off. A variant with none available is never offered. With
+  nothing missing it quotes every line (`quoteFor`) and moves to `awaiting_confirmation` with
   `revision + 1`. `factsOf` gives phrasing the catalog names and formatted
   prices, so `checkReply` rejects a price one unit off.
 - **The summary card is built in code** (`summary-card.ts`), a fixed template
@@ -189,16 +189,19 @@ No LLM is called; every reply is a fixed sentence per language
    of another revision sends the stale sentence.
 5. **Re-check every line** (`OrderCatalogRepository.findVariants`) and the fee
    (`DeliveryQuoteService.feeFor`).
-   - A line archived, short of stock, or whose product is no longer active:
-     no order. That item loses its variant (and its product if it left the
+   - A line archived, short of what is available, or whose product is no
+     longer active: no order. That item loses its variant (and its product if it left the
      catalog), the others stay, the chat goes to `collecting_details` with
      `revision + 1`, and a sentence names it.
    - A unit price, the fee or the shop's currency changed: no order, and a
      fresh card for `revision + 1` in the current currency, after a fixed
      "the price changed" line.
 6. **Create** with `createInTransaction`: the card's lines and fee, the
-   slots' name, phone and address, cash on delivery. State becomes
-   `confirmed` and the reference is staged.
+   slots' name, phone and address, cash on delivery. It reserves the lines'
+   stock. If another order took it since the re-check, the order is refused
+   with `ORDER_INSUFFICIENT_STOCK`, nothing is written, and the customer gets
+   the normal "unavailable" reply. Otherwise state becomes `confirmed` and the
+   reference is staged.
 
 After commit the reply is sent, then `NotificationsService.orderDrafted` for
 the card's order, whether this run made it or found it. Its job id
@@ -244,8 +247,8 @@ cycle.
 - **Matching runs in memory, not in Postgres `pg_trgm`**, by judgement, not
   measurement. Most of the matcher is per-word logic pg_trgm lacks (word
   ownership, edit-distance rivals, script twins, the one, some or none
-  decision); the turn already holds the catalog for prices and stock; and a
-  pure matcher lets tests run tens of thousands of queries without a
+  decision); the turn already holds the catalog for prices and availability; and a pure
+  matcher lets tests run tens of thousands of queries without a
   database. Unchecked risk: pg_trgm splits words by the database locale,
   which may mishandle Bangla. At thousands of products, fetch about 20
   candidates with pg_trgm over a GIN index and keep this code for the
@@ -267,8 +270,9 @@ cycle.
 - **A quote is pinned to its revision**, and Confirm orders only when every
   number still holds.
 - **Stock is a yes/no fact.** Facts carry `inStock`, plus `available` only
-  when the customer asked for more. Stock moves when the seller confirms the
-  order, not at the customer's Confirm.
+  when the customer asked for more; both read available (on hand less what
+  drafts reserve). The customer's Confirm reserves the stock; the seller's
+  confirm takes it.
 - **The ask counter follows its item** through removals and reorders, by
   `ref`, then by the same-variant merge.
 - **An invalid phone is asked again at once**, as in phase 1.
@@ -335,8 +339,8 @@ In `apps/api/src/modules/conversations/assistant/__tests__/` unless noted.
   numbers and `orderDrafted` after commit; double and racing taps; resends
   under the lease, including two concurrent retries; a fee-only change; a
   retry after `orderDrafted` threw; stale, paused, other conversation or
-  merchant; an archived line, a drafted product, short stock, a price or
-  currency change; Change; fee parity with `POST /orders/delivery-quote`;
+  merchant; an archived line, a drafted product, short stock, a lost race for the last unit, a
+  price or currency change; Change; fee parity with `POST /orders/delivery-quote`;
   the old card refused after a hand-back.
 - **`conversation-simulator.spec.ts`** (harness in `simulator/`): plays a
   scripted conversation through the worker's code against the local
