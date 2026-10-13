@@ -98,6 +98,7 @@ export const errorCodes = [
   'PRODUCT_OPTION_NOT_FOUND',
   'PRODUCT_STALE',
   'PRODUCT_IN_USE',
+  'VARIANT_STOCK_RESERVED',
 
   // Settings > Delivery charges
   'DELIVERY_CHARGE_NOT_FOUND',

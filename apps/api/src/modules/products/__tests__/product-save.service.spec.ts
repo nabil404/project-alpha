@@ -1,4 +1,5 @@
 import { createProductSchema, type Product, type SaveProduct } from '@app/shared';
+import { eq } from 'drizzle-orm';
 import * as schema from '../../database/schema/index';
 import type { ProductsService } from '../products.service';
 import {
@@ -15,6 +16,13 @@ describeDb('ProductsService — save', () => {
   let t: CatalogTestDb;
   let service: ProductsService;
   let n = 0;
+
+  /** Marks `reserved` units of a variant as held by drafts, as an order would. */
+  const reserve = (variantId: string, reserved: number) =>
+    t.db
+      .update(schema.productVariant)
+      .set({ reserved })
+      .where(eq(schema.productVariant.id, variantId));
   const sku = (label: string) => `SV-${label}-${++n}`;
 
   const plain = (merchantId = t.merchantA) =>
@@ -399,5 +407,42 @@ describeDb('ProductsService — save', () => {
     const product = await sized();
     const unchecked = { ...documentOf(product), options: [] } as SaveProduct;
     await expectCoded(service.save(t.merchantA, product.id, unchecked), 'VALIDATION_FAILED');
+  });
+
+  it('refuses a save that sets stock below what drafts reserve, and writes nothing', async () => {
+    const product = await sized();
+    const m = product.variants.find((variant) => variant.name === 'M')!;
+    await reserve(m.id, 3);
+
+    await expect(
+      save(product, (doc) => {
+        doc.variants.find((variant) => variant.id === m.id)!.stock = 2;
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'VARIANT_STOCK_RESERVED',
+        params: { variantId: m.id, name: 'M', reserved: 3 },
+      },
+    });
+    const [row] = await t.db
+      .select()
+      .from(schema.productVariant)
+      .where(eq(schema.productVariant.id, m.id));
+    expect(row).toMatchObject({ stock: 9, reserved: 3 });
+  });
+
+  it('saves a product with reserved stock when the stock is unchanged', async () => {
+    const product = await sized();
+    const m = product.variants.find((variant) => variant.name === 'M')!;
+    await reserve(m.id, 9);
+
+    const saved = await save(product, (doc) => {
+      doc.name = 'Kurti, renamed';
+    });
+    expect(saved.variants.find((variant) => variant.id === m.id)).toMatchObject({
+      stock: 9,
+      reserved: 9,
+      available: 0,
+    });
   });
 });

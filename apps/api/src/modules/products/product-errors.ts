@@ -26,6 +26,33 @@ export const productInUse = (id: string) =>
     { id },
   );
 
+/** The seller set a variant's stock below what drafted orders hold. */
+export const variantStockReserved = (variant: { id: string; name: string; reserved: number }) =>
+  new CodedConflictException(
+    'VARIANT_STOCK_RESERVED',
+    'Drafted orders reserve more of this variant than the new stock',
+    { variantId: variant.id, name: variant.name, reserved: variant.reserved },
+  );
+
+/**
+ * Refuses the first variant whose new stock is below what drafted orders
+ * reserve. `current` must be read under the product's lock: every
+ * reservation change locks the product first, so the counts cannot move
+ * before the write. A variant without a new stock, or a new variant, passes.
+ */
+export function assertStockCoversReserved(
+  current: readonly { id: string; reserved: number; label: string }[],
+  next: readonly { id?: string | null; stock?: number }[],
+): void {
+  const byId = new Map(current.map((variant) => [variant.id, variant]));
+  for (const { id, stock } of next) {
+    const held = id ? byId.get(id) : undefined;
+    if (held && stock !== undefined && stock < held.reserved) {
+      throw variantStockReserved({ id: held.id, name: held.label, reserved: held.reserved });
+    }
+  }
+}
+
 export const productImageNotFound = (id: string) =>
   new CodedNotFoundException('PRODUCT_IMAGE_NOT_FOUND', 'Image not found', { id });
 

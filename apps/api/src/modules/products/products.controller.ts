@@ -144,7 +144,7 @@ export class ProductsController {
     'CATEGORY_NOT_FOUND',
     'DELIVERY_CHARGE_NOT_FOUND',
   ])
-  @ApiCodedError(409, ['PRODUCT_STALE', 'SKU_TAKEN'])
+  @ApiCodedError(409, ['PRODUCT_STALE', 'SKU_TAKEN', 'VARIANT_STOCK_RESERVED'])
   save(
     @Req() request: TenantRequest,
     @Param('id', uuidParam) id: string,
@@ -181,7 +181,7 @@ export class ProductsController {
   @ApiOkResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'VARIANT_NOT_FOUND', 'PRODUCT_IMAGE_NOT_FOUND'])
-  @ApiCodedError(409, ['SKU_TAKEN'])
+  @ApiCodedError(409, ['SKU_TAKEN', 'VARIANT_STOCK_RESERVED'])
   updateVariant(
     @Req() request: TenantRequest,
     @Param('id', uuidParam) id: string,

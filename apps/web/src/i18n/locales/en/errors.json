@@ -63,6 +63,7 @@
     "STORAGE_UNAVAILABLE": "We couldn't save the file right now. Please try again in a moment.",
     "TENANT_NO_ACTIVE_MERCHANT": "This session has no active seller account.",
     "VALIDATION_FAILED": "Please check the highlighted fields.",
+    "VARIANT_STOCK_RESERVED": "Drafted orders hold {{reserved}} of {{name}}. Set the stock to at least {{reserved}}, or cancel those drafts first.",
     "VARIANT_NOT_FOUND": "That variant no longer exists.",
     "WEBHOOK_INVALID_SIGNATURE": "The webhook signature could not be verified.",
     "WEBHOOK_MALFORMED_PAYLOAD": "The webhook payload could not be read.",

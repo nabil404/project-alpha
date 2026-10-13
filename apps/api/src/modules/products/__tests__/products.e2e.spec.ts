@@ -7,6 +7,7 @@ import {
   type LoggerService,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { eq } from 'drizzle-orm';
 import { productCountsSchema, productListResponseSchema, productSchema } from '@app/shared';
 import request from 'supertest';
 import { AuthModule } from '../../auth/auth.module';
@@ -267,6 +268,24 @@ describeDb('product routes over HTTP', () => {
       .put(`/api/v1/products/${created.body.id}`)
       .send({ ...newProduct, version: created.body.version })
       .expect(409);
+  });
+
+  it('refuses a variant stock patch below what drafts reserve', async () => {
+    const created = await request(server()).post('/api/v1/products').send(newProduct).expect(201);
+    const variantId = created.body.variants[0].id;
+    await t.db
+      .update(schema.productVariant)
+      .set({ reserved: 3 })
+      .where(eq(schema.productVariant.id, variantId));
+
+    const refused = await request(server())
+      .patch(`/api/v1/products/${created.body.id}/variants/${variantId}`)
+      .send({ stock: 2 })
+      .expect(409);
+    expect(refused.body.error).toMatchObject({
+      code: 'VARIANT_STOCK_RESERVED',
+      params: { reserved: 3 },
+    });
   });
 
   it("refuses a variant patch for a missing variant, bad fields, or another merchant's product", async () => {
