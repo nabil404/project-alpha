@@ -1,70 +1,66 @@
 # 01 · Authentication
 
-How a seller gets an account, signs in, and ends up scoped to their own shop.
-Scope comes from the MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
-[data model](../../mvp/01-messenger-to-order/domain.md#data-model). This page
-describes how it is built.
+How a seller gets an account, signs in, and is scoped to their own shop. Scope
+comes from the MVP's [scope](../../mvp/01-messenger-to-order/scope.md) and
+[data model](../../mvp/01-messenger-to-order/domain.md#data-model).
 
-**Status, October 2026.** The API side is complete, and an HTTP-level e2e spec
-covers it. The SPA has sign-in (`/sign-in`, with Google and Facebook), sign-up
-(`/sign-up`), forgot password (`/forgot-password`), and reset password
-(`/reset-password`). [Settings – Account](../08-settings-account/README.md)
-covers linking and unlinking Google or Facebook, changing the password, and
-signing devices out. [03 · Connect Facebook Page](../03-facebook-page/README.md)
-covers connecting a Facebook Page. [Not yet built](#not-yet-built) lists what
-is left.
+**Status (Oct 2026):** the API is complete and covered by an HTTP e2e spec.
+The SPA has `/sign-in` (with Google and Facebook), `/sign-up`,
+`/forgot-password` and `/reset-password`. Linking providers, changing the
+password and signing devices out are in
+[Settings – Account](../08-settings-account/README.md); connecting a Page is
+[03 · Connect Facebook Page](../03-facebook-page/README.md). See
+[Not yet built](#not-yet-built).
 
 ## At a glance
 
-| Concern            | Decision                                                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------- |
-| Library            | Better Auth, mounted in NestJS through `@thallesp/nestjs-better-auth`                       |
-| Storage            | Our own Postgres, sharing the API's Drizzle instance and pool                               |
-| Sign-in methods    | Email and password (verified email required), Google, Facebook                              |
-| Session            | Cookie `better-auth.session_token`, same origin as the SPA                                  |
-| Tenant             | One organization per seller, created at sign-up. The session carries `activeOrganizationId` |
-| Default route rule | Every route needs a session. A public route opts out with `@AllowAnonymous()`               |
-| Mount point        | `/api/v1/auth/*`                                                                            |
-| Errors             | Better Auth's errors rewritten into the API's `{ error: { code, message, params } }`        |
+| Concern         | Decision                                                                              |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Library         | Better Auth, mounted in NestJS through `@thallesp/nestjs-better-auth`                 |
+| Storage         | Our Postgres, through the API's Drizzle instance and pool                             |
+| Sign-in methods | Email and password (verified email required), Google, Facebook                        |
+| Session         | Cookie `better-auth.session_token`, same origin as the SPA                            |
+| Tenant          | One organization per seller, created at sign-up; the session's `activeOrganizationId` |
+| Default rule    | Every route needs a session; a public route opts out with `@AllowAnonymous()`         |
+| Mount point     | `/api/v1/auth/*`                                                                      |
+| Errors          | Better Auth's errors rewritten into `{ error: { code, message, params } }`            |
 
 ## Sign-in methods
 
-[`auth.config.ts`](../../../apps/api/src/modules/auth/auth.config.ts) configures
-all three methods.
+[`auth.config.ts`](../../../apps/api/src/modules/auth/auth.config.ts)
+configures all three.
 
-- **Email and password.** The seller must verify their email before the first
-  sign-in. A password is 8 to 128 characters. The limits are defined once in
-  [`packages/shared/src/schemas/auth.ts`](../../../packages/shared/src/schemas/auth.ts)
-  (`PASSWORD_MIN_LENGTH`, `PASSWORD_MAX_LENGTH`, `passwordSchema`). Better Auth
-  and the SPA's forms both read these constants, so a form never accepts a
-  password the server rejects.
-- **Google.** One step signs the seller up or signs them in.
-- **Facebook.** Sign-in asks for `public_profile` and `email` only. It does not
-  request Page permissions such as `pages_messaging`. Those belong to the
-  separate Page connection step, so signing in never shows a seller the long
-  Page-permissions consent screen.
+- **Email and password.** The email must be verified before the first
+  sign-in. A password is 8 to 128 characters (`PASSWORD_MIN_LENGTH`,
+  `PASSWORD_MAX_LENGTH` in
+  [`packages/shared/src/schemas/auth.ts`](../../../packages/shared/src/schemas/auth.ts)),
+  and Better Auth and the SPA's forms read the same constants.
+- **Google** signs the seller up or in in one step.
+- **Facebook** asks for `public_profile` and `email` only. Page permissions
+  such as `pages_messaging` belong to the Page connection step, so sign-in
+  never shows the long Page consent screen.
 
-The Google and Facebook credentials are optional env vars. Without them, the
-API still boots and the email and password flows keep working.
+The Google and Facebook credentials are optional. Without them the API still
+boots, with email and password only.
 
 ### Account linking
 
 `account.accountLinking.trustedProviders` is `['google']`.
 
-- **Google links automatically** to an existing account with the same email,
-  because Google guarantees the email is verified.
-- **Facebook never links automatically.** Facebook does not guarantee a
-  verified email. Matching on it would let an attacker take over an account by
-  registering the victim's address on Facebook. A Facebook identity joins an
-  existing account only when the seller links it from
+- **Google links automatically** to an account with the same email, because
+  Google guarantees the email is verified.
+- **Facebook never links automatically.** It does not guarantee a verified
+  email, so matching on it would let an attacker register a victim's address
+  on Facebook and take the account. A Facebook identity joins an existing
+  account only from
   [Settings – Account](../08-settings-account/README.md#sign-in-methods).
-  Signing in with a Facebook account whose email already has an account
-  redirects with `?error=AUTH_ACCOUNT_NOT_LINKED`.
+  Signing in with Facebook when the email already has an account redirects
+  with `?error=AUTH_ACCOUNT_NOT_LINKED`.
 
-When an OAuth sign-in fails, Better Auth's callback redirects with
-`?error=<snake_case>`. `toOAuthErrorLocation` in
-[`auth-errors.ts`](../../../apps/api/src/modules/auth/auth-errors.ts) replaces
-that value with an `ErrorCode` and drops `error_description`.
+A failed OAuth sign-in redirects with `?error=<snake_case>`.
+`toOAuthErrorLocation` in
+[`auth-errors.ts`](../../../apps/api/src/modules/auth/auth-errors.ts) swaps
+that value for an `ErrorCode` and drops `error_description`.
 
 | Better Auth `error`                        | Rewritten to                 | When                         |
 | ------------------------------------------ | ---------------------------- | ---------------------------- |
@@ -76,156 +72,120 @@ that value with an `ErrorCode` and drops `error_description`.
 
 ## Email and password flows
 
-The SPA drives these flows through Better Auth's endpoints. The callback paths
-below are the SPA's side of the contract.
+The SPA calls Better Auth's endpoints; the callback paths below are the SPA's
+side of the contract.
 
-`Mailer.dispatch` sends every email without waiting for delivery, so a slow
-SMTP server never delays an auth response. The templates live in
-[`modules/mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts).
-Each email has a plain-text part and an HTML part. The HTML part is built with
-[MJML](https://mjml.io) from the shared layout in
-[`modules/mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts), whose
-look and copy follow the email designs on the dashboard's design canvas.
-
-MJML compiles every template once, when the module loads, with strict
-validation. A broken template therefore fails startup and the specs. The parts
-that differ per message, such as a link or a name, are slots that receive an
-escaped value at send time. Sending an email never runs MJML, so every auth
-path pays the same rendering cost.
+`Mailer.dispatch` sends without waiting for delivery, so a slow SMTP server
+never delays an auth response. The templates in
+[`modules/mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts)
+each have a plain-text and an HTML part. The HTML comes from
+[MJML](https://mjml.io) and the shared layout in
+[`modules/mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts). MJML
+compiles every template once at module load with strict validation, so a
+broken template fails startup and the specs. Sending only fills escaped
+values into slots.
 
 ### Sign-up and verification
 
 1. The SPA sends `POST /api/v1/auth/sign-up/email` with `name`, `shopName`,
-   `email`, `phone`, `password`, and `callbackURL: '/'`. A `before` hook
-   validates the body against `signUpSchema` from `@app/shared`, the same
-   schema the SPA's form uses. An invalid body gets `VALIDATION_FAILED` with
-   per-field errors before Better Auth sees it, because Better Auth checks only
-   the fields it knows about.
-2. Better Auth creates the user row with `phone`. The API checks the number
-   against its country's numbering plan and stores it in E.164. `phone` is a
-   Better Auth `additionalFields` column, nullable because a social sign-up has
-   no phone. Rows from before this check keep the number as it was typed.
-   The form's calling-code picker starts at the country of the browser's time
-   zone (`countryOfTimeZone`), because no shop exists yet to take a country
-   from.
-3. The API creates the seller's organization, named after `shopName` (see
-   [The seller's organization](#the-sellers-organization)), in the region of
-   the phone's country
+   `email`, `phone`, `password` and `callbackURL: '/'`. A `before` hook checks
+   the body against `signUpSchema` from `@app/shared`, the form's own schema,
+   and answers `VALIDATION_FAILED` with field errors. Better Auth alone checks
+   only the fields it knows.
+2. Better Auth creates the user. `phone` is checked against its country's
+   numbering plan and stored as E.164, in a nullable `additionalFields`
+   column (social sign-ups have none; older rows keep the number as typed).
+   The form's calling-code picker starts at the browser time zone's country
+   (`countryOfTimeZone`).
+3. The API creates the seller's organization, named `shopName`
+   ([below](#the-sellers-organization)), in the region of the phone's country
    ([Settings – General](../06-settings-general/README.md#rules)).
-4. The API sends a "Verify your email address" email. The link is valid for
-   24 hours (`VERIFICATION_TOKEN_TTL`).
-5. The link opens `GET /api/v1/auth/verify-email?token=…`. That endpoint marks
-   the email verified, signs the seller in (`autoSignInAfterVerification`), and
-   redirects to `/`.
+4. The API emails a verification link, valid 24 hours
+   (`VERIFICATION_TOKEN_TTL`).
+5. `GET /api/v1/auth/verify-email?token=…` marks the email verified, signs the
+   seller in (`autoSignInAfterVerification`) and redirects to `/`.
 6. A tampered or expired link redirects to `/?error=INVALID_TOKEN` or
-   `/?error=TOKEN_EXPIRED` instead. A request without a callback gets
-   `AUTH_INVALID_TOKEN` in the error envelope.
+   `/?error=TOKEN_EXPIRED`. Without a callback it answers
+   `AUTH_INVALID_TOKEN`.
 
-A seller who signs in before verifying gets `AUTH_EMAIL_NOT_VERIFIED`, and the
-API sends a fresh verification link (`sendOnSignIn`). An expired link never
-leaves the seller stuck.
+Signing in before verifying answers `AUTH_EMAIL_NOT_VERIFIED` and sends a
+fresh link (`sendOnSignIn`), so an expired link never strands the seller.
 
-Signing up with an email that already has an account gets the same answer as a
-new sign-up, so nobody can use the form to find out which addresses are
-registered. The real owner receives a "You already have an account" email that
-links to both `/sign-in` and `/forgot-password`.
+Signing up with a registered email answers exactly like a new sign-up, so the
+form cannot reveal which addresses exist. The owner gets a "You already have
+an account" email linking `/sign-in` and `/forgot-password`.
 
 ### Sign-in and sign-out
 
-- `POST /api/v1/auth/sign-in/email` signs the seller in. A wrong email or
-  password returns `AUTH_INVALID_CREDENTIALS`, with no hint about which of the
-  two was wrong.
+- `POST /api/v1/auth/sign-in/email`. A wrong email or password is
+  `AUTH_INVALID_CREDENTIALS`, without saying which.
 - `POST /api/v1/auth/sign-out` ends the session.
 
 ### Password reset
 
 1. The SPA sends `POST /api/v1/auth/request-password-reset` with
-   `redirectTo: '/reset-password'`. An unknown email gets the same answer as a
-   known one.
-2. The API sends a "Reset your password" email. Its link works once and is
-   valid for 1 hour (`RESET_PASSWORD_TOKEN_TTL` in `@app/shared`, which the SPA
-   also shows). The window is shorter than verification's because a reset link
-   can take over an account.
-3. The link opens `/reset-password?token=…`, or `/reset-password?error=INVALID_TOKEN`
-   for a bad token. That page sends `POST /api/v1/auth/reset-password` with
-   `{ token, newPassword }`.
-4. A successful reset revokes every existing session
-   (`revokeSessionsOnPasswordReset`). A reset is how a seller takes an account
-   back from an intruder, so every session the intruder holds has to end.
+   `redirectTo: '/reset-password'`. An unknown email gets the same answer.
+2. The emailed link works once and lasts 1 hour (`RESET_PASSWORD_TOKEN_TTL`
+   in `@app/shared`, which the SPA also shows), shorter than verification
+   because a reset link can take over an account.
+3. It opens `/reset-password?token=…` (or `?error=INVALID_TOKEN`), which sends
+   `POST /api/v1/auth/reset-password` with `{ token, newPassword }`.
+4. A successful reset revokes every session
+   (`revokeSessionsOnPasswordReset`), so an intruder is signed out.
 
 ## The seller's organization
 
 Every business table's `merchant_id` references `organization(id)`, never
-`user(id)`. A seller with no organization has no merchant, and the API rejects
-every request they make. Two Better Auth database hooks in `auth.config.ts`
-make sure every seller has an organization.
+`user(id)`, and a seller without an organization is refused everywhere. Two
+database hooks in `auth.config.ts` guarantee one.
 
-| Hook                    | Calls                                                                                              | Effect                                                              |
-| ----------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `user.create.after`     | `ensureOrganizationForUser(db, user, shopName)`, then `seedRegionFromPhone(db, merchantId, phone)` | Creates the organization, the owner membership, and the shop region |
-| `session.create.before` | `ensureOrganizationForUserId(db, userId)`                                                          | Puts `activeOrganizationId` on every new session                    |
+| Hook                    | Calls                                                                                              | Effect                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `user.create.after`     | `ensureOrganizationForUser(db, user, shopName)`, then `seedRegionFromPhone(db, merchantId, phone)` | Creates the organization, the `owner` member, the region |
+| `session.create.before` | `ensureOrganizationForUserId(db, userId)`                                                          | Sets `activeOrganizationId` on every new session         |
 
-`user.create.after` names the organization after the sign-up's `shopName`, or
-after the seller's name for a social sign-up. The slug is the organization's
-id. The hook also adds a `member` row with role `owner`. It runs only when
-Better Auth creates a user, so a Google sign-in that links to an existing
-account reuses that seller's shop. `seedRegionFromPhone` then writes the shop's
-`merchant_settings` row in the region of the sign-up phone
-([Settings – General](../06-settings-general/README.md#rules)). If that write
-fails, the hook logs the error and sign-up still succeeds.
-
-`session.create.before` exists because the Organization plugin marks
-`activeOrganizationId` as `input: false`, so a client can't set it. If this hook
-did not resolve it, the field would stay null.
-
-Both functions live in
-[`database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts),
-and both are idempotent on purpose. `user.create.after` runs after Better Auth
-commits the user row. If the hook fails, the user is left with no organization.
-At the next sign-in, the session hook runs the same logic and repairs the
-account, so the seller is not locked out with a permanent 403.
-
-A `SELECT … FOR UPDATE` on the user row, followed by a second membership check,
-serializes concurrent calls. A unique constraint on `member.userId` would be
-simpler, but it would rule out the multiple organizations per seller that the
-data model allows.
-
-The first membership, ordered by `createdAt` and then `id`, is the active one.
-That order stays stable once a seller can hold several organizations. There is
-no organization switcher yet, and adding one needs no migration.
+- The organization is named `shopName`, or the seller's name for a social
+  sign-up, and its slug is its id. The hook runs only when Better Auth creates
+  a user, so a Google sign-in linked to an existing account keeps that shop.
+  If `seedRegionFromPhone` fails, the hook logs it and sign-up succeeds.
+- The session hook is needed because the Organization plugin marks
+  `activeOrganizationId` as `input: false`; without it the field stays null.
+- Both functions, in
+  [`database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts),
+  are idempotent. `user.create.after` runs after the user commits, so if it
+  fails, the next sign-in's session hook creates the organization instead of
+  leaving the seller on a permanent 403.
+- A `SELECT … FOR UPDATE` on the user row plus a second membership check
+  serializes concurrent calls. A unique `member.userId` would be simpler but
+  would forbid several organizations per seller, which the data model allows.
+- The active organization is the first membership by `createdAt`, then `id`.
+  An organization switcher would need no migration.
 
 ## Request pipeline
 
-A request to a Nest controller passes `ThrottlerGuard`, then `SessionGuard`,
-then `TenantGuard` before it reaches a handler. Better Auth's own
-`/api/v1/auth/*` routes skip all three. The
-[request pipeline diagram](request-pipeline.md) shows each guard and the
-response it sends when it rejects a request.
+A request to a Nest controller passes `ThrottlerGuard`, `SessionGuard` and
+`TenantGuard` in that order; Better Auth's own `/api/v1/auth/*` routes skip
+all three. [Request pipeline](request-pipeline.md) draws each guard and its
+rejection.
 
-- [`SessionGuard`](../../../apps/api/src/modules/auth/session.guard.ts) extends
-  the library's `AuthGuard` only to add a code to the rejection. The SPA reads
-  `AUTH_UNAUTHENTICATED` to know when to send the seller to sign-in.
-  [`app.module.ts`](../../../apps/api/src/app.module.ts) registers it in place
-  of the library's own global guard (`disableGlobalAuthGuard: true`).
+- [`SessionGuard`](../../../apps/api/src/modules/auth/session.guard.ts)
+  extends the library's `AuthGuard` only to add the `AUTH_UNAUTHENTICATED`
+  code, which sends the SPA to sign-in.
+  [`app.module.ts`](../../../apps/api/src/app.module.ts) registers it instead
+  of the library's global guard (`disableGlobalAuthGuard: true`).
 - [`TenantGuard`](../../../apps/api/src/common/tenant.guard.ts) reads
   `request.session.session.activeOrganizationId`. It is the first layer of
-  tenant isolation, not the only one. Repositories still take `merchantId` and
-  filter by it. As a backstop,
-  [`withMerchant`](../../../apps/api/src/modules/database/with-merchant.ts) sets
-  the transaction-local `app.current_merchant`, which the row-level security
-  policies check.
+  tenant isolation: repositories still filter on `merchantId`, and
+  [`withMerchant`](../../../apps/api/src/modules/database/with-merchant.ts)
+  sets the transaction-local `app.current_merchant` that the row-level
+  security policies check.
 
 ## HTTP endpoints
 
 [`auth.module.ts`](../../../apps/api/src/modules/auth/auth.module.ts) mounts
-Better Auth at `/api/v1/auth/*`. The `basePath` is the literal
-`'/api/v1/auth'`, not derived from the API version. It is Better Auth's
-contract, so it stays put if the API moves to a future `/api/v2`.
-
-`baseURL` is `APP_URL`. Caddy serves the SPA and proxies `/api` on the same
-origin, so the session cookie needs no CORS setup.
-
-The flows above use these endpoints:
+Better Auth at the literal `basePath` `'/api/v1/auth'`, which stays put if the
+API moves to `/api/v2`. `baseURL` is `APP_URL`; Caddy serves the SPA and
+proxies `/api` on one origin, so the cookie needs no CORS.
 
 | Method | Path                                   | Used for                                    |
 | ------ | -------------------------------------- | ------------------------------------------- |
@@ -240,29 +200,27 @@ The flows above use these endpoints:
 | POST   | `/api/v1/auth/send-verification-email` | Resend the verification link                |
 
 Settings – Account also uses `/update-user`, `/change-password`,
-`/list-accounts`, `/link-social`, and `/unlink-account`. See
-[08 · Settings – Account](../08-settings-account/README.md).
+`/list-accounts`, `/link-social` and `/unlink-account`
+([08](../08-settings-account/README.md)).
 
-Swagger lists every endpoint, merged with our own controllers, at
-http://localhost:5173/api/docs in development only. Open it through the Vite
-proxy. Better Auth trusts only `APP_URL`, so "Try it out" from
-`localhost:3000` fails every auth call with `INVALID_ORIGIN`. Better Auth's own
-schema endpoint and Scalar page are disabled in every environment. See
-[`openapi/openapi.ts`](../../../apps/api/src/openapi/openapi.ts).
+Swagger lists these with our controllers at http://localhost:5173/api/docs,
+in development only and through the Vite proxy: Better Auth trusts only
+`APP_URL`, so "Try it out" from `localhost:3000` fails with
+`INVALID_ORIGIN`. Better Auth's own schema endpoint and Scalar page are off
+everywhere ([`openapi/openapi.ts`](../../../apps/api/src/openapi/openapi.ts)).
 
-**Side effect on the rest of the API.** Better Auth reads the raw request
-itself, so Nest's own body parser is off. The auth module adds JSON and
-urlencoded parsing back for every other route. Its `bodyParser: { rawBody: true }`
-keeps `req.rawBody` available for the Messenger webhook's signature check.
-Setting `rawBody: true` on `NestFactory` has no effect.
+**Body parsing.** Better Auth reads the raw request, so Nest's body parser is
+off and the auth module adds JSON and urlencoded parsing back for other
+routes. Its `bodyParser: { rawBody: true }` keeps `req.rawBody` for the
+Messenger webhook's signature check; `rawBody: true` on `NestFactory` has no
+effect.
 
 ## Errors
 
-Better Auth writes its errors straight to the response and bypasses
-`AllExceptionsFilter`. An after-hook in `auth.config.ts` passes each error
-through [`toAuthErrorBody`](../../../apps/api/src/modules/auth/auth-errors.ts),
-so the SPA parses `/api/v1/auth/*` errors like errors from any other endpoint.
-Redirects (302) pass through untouched.
+Better Auth writes errors straight to the response, bypassing
+`AllExceptionsFilter`. An after-hook in `auth.config.ts` runs each through
+[`toAuthErrorBody`](../../../apps/api/src/modules/auth/auth-errors.ts), so
+auth errors parse like any other. Redirects (302) pass untouched.
 
 | Better Auth code                        | Leaves the API as                                                                                                            |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -277,50 +235,32 @@ Redirects (302) pass through untouched.
 | `SESSION_NOT_FRESH`                     | `AUTH_SESSION_NOT_FRESH`. Unlinking needs a session under a day old                                                          |
 | `VALIDATION_ERROR`                      | `VALIDATION_FAILED`, with fields parsed back out of the message (`[body.email] …`), each with code `INVALID_INPUT`           |
 | any other 401                           | `AUTH_UNAUTHENTICATED`                                                                                                       |
-| anything else                           | `HTTP_<status>`, the same fallback the global filter uses                                                                    |
-
-A new auth `ErrorCode` touches three files:
-`packages/shared/src/errors/codes.ts`, `apps/web/src/i18n/error-keys.ts`, and
-`apps/web/src/i18n/locales/en/errors.json` (see `AGENTS.md`).
+| anything else                           | `HTTP_<status>`, the global filter's fallback                                                                                |
 
 ## Data
 
-Better Auth owns seven tables. `user`, `session`, `account`, and
-`verification` come from its core. `organization`, `member`, and `invitation`
-come from the Organization plugin.
+Better Auth owns seven tables: `user`, `session`, `account` and
+`verification` from its core, and `organization`, `member` and `invitation`
+from the Organization plugin. `user` has two `additionalFields` of ours:
+`phone` (E.164, null for a social sign-up) and `locale` (the dashboard
+language, set only by `PATCH /api/v1/account/preferences`). `user.image` is
+the profile photo and `organization.logo` the shop logo.
 
-`user` carries two `additionalFields` of ours:
-
-- `phone`, in E.164, null for a social sign-up.
-- `locale`, the dashboard language. Only `PATCH /api/v1/account/preferences`
-  sets it, and Better Auth's `/update-user` refuses it.
-
-`user.image` is the profile photo, and `organization.logo` is the shop logo.
-
-To regenerate the Drizzle schema for these tables into
-[`database/schema/auth.ts`](../../../apps/api/src/modules/database/schema/auth.ts),
-run:
-
-```bash
-pnpm --filter api db:auth-schema
-```
-
-Then migrate it through drizzle-kit like any other table: `db:generate`,
-review the SQL, `db:migrate`. Auth schema changes are versioned and reviewed
-like every other schema change. The CLI entry point,
+`pnpm --filter api db:auth-schema` regenerates
+[`database/schema/auth.ts`](../../../apps/api/src/modules/database/schema/auth.ts);
+then `db:generate`, review the SQL, `db:migrate`. The CLI entry,
 [`auth.cli.ts`](../../../apps/api/src/modules/auth/auth.cli.ts), builds the
-same config against `drizzle.mock()`, so generating the schema needs no
-database and no credentials.
+config against `drizzle.mock()`, so it needs no database or credentials.
 
-These tables are granted to the restricted `app_runtime` role (see
-[Database](../../architecture/database.md#roles)), but they must never get an
-RLS policy. They carry no `merchant_id`, and the session lookup runs before any
-merchant context exists, so a policy would block sign-in itself.
+The `app_runtime` role is granted these tables
+([Database](../../architecture/database.md#roles)), but they must never get an
+RLS policy: they have no `merchant_id`, and the session lookup runs before any
+merchant context exists, so a policy would block sign-in.
 
 ## Configuration
 
-[`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts)
-reads these variables from `environments/.env`.
+Read by [`config/env.schema.ts`](../../../apps/api/src/modules/config/env.schema.ts)
+from `environments/.env`.
 
 | Variable                                       | Required | Notes                                                                     |
 | ---------------------------------------------- | -------- | ------------------------------------------------------------------------- |
@@ -330,22 +270,17 @@ reads these variables from `environments/.env`.
 | `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` | no       | Facebook sign-in                                                          |
 | `SMTP_URL`, `MAIL_FROM`                        | yes      | Verification and reset email. Locally, Mailpit at `smtp://localhost:1025` |
 
-Locally, `pnpm dev:up` starts Mailpit, and the emails show up at
-http://localhost:8025.
-
 ## Security notes
 
-- **No account enumeration.** Sign-up with a taken email and a reset request for
-  an unknown email both look the same as the success case.
-- **A reset ends every session.** A seller who takes back a compromised account
-  signs the intruder out.
-- **Nothing sensitive in logs.** Better Auth's logger writes to pino at `warn`,
-  because at `info` it logs the address behind a duplicate sign-up. A failed
-  send logs only the subject and the recipient's domain, because the email body
-  contains a single-use token.
-- **Tenant isolation doesn't rely on the client.** The server sets
-  `activeOrganizationId`, and the client can't supply it. `TenantGuard` checks
-  it, every repository filters on it, and RLS enforces it as a backstop.
+- **No account enumeration.** A sign-up with a taken email and a reset for an
+  unknown one both look like success.
+- **A reset ends every session.**
+- **Nothing sensitive in logs.** Better Auth logs to pino at `warn`, because
+  at `info` it logs the address behind a duplicate sign-up. A failed send logs
+  only the subject and the recipient's domain, since the body holds a
+  single-use token.
+- **The client never picks the tenant.** The server sets
+  `activeOrganizationId`; `TenantGuard`, every repository and RLS check it.
 
 ## Tests
 
@@ -355,46 +290,31 @@ http://localhost:8025.
 | [`auth/__tests__/auth-errors.spec.ts`](../../../apps/api/src/modules/auth/__tests__/auth-errors.spec.ts)                         | The error mapping table                                                                                         |
 | [`database/__tests__/ensure-organization.spec.ts`](../../../apps/api/src/modules/database/__tests__/ensure-organization.spec.ts) | Organization bootstrap and its idempotency                                                                      |
 
-The e2e spec and the organization spec need a real Postgres. Jest skips them
-unless `TEST_DATABASE_ADMIN_URL` is set (see `environments/.env.example`). The
-Jest run creates and migrates that database itself, and CI sets the variable.
-
-To run the auth specs locally, set `TEST_DATABASE_ADMIN_URL` in
-`environments/.env`, start the local services, and run Jest:
-
-```bash
-pnpm dev:up
-```
-
-```bash
-pnpm --filter api test -- auth
-```
+The e2e and organization specs need Postgres and are skipped unless
+`TEST_DATABASE_ADMIN_URL` is set (see `AGENTS.md`). Run them with
+`pnpm --filter api test -- auth`.
 
 ## Not yet built
 
-- **Email verified screen.** A successful verification link lands on `/` with
-  no confirmation. A failed one (`/?error=…`) lands on sign-in with an error
-  banner.
-- **Terms and privacy pages.** Sign-up requires agreeing to them, and
+- **Email verified screen.** A good link lands on `/` with no confirmation; a
+  bad one (`/?error=…`) lands on sign-in with an error banner.
+- **Terms and privacy pages.** Sign-up requires agreeing, and
   `apps/web/src/features/auth/legal.ts` links `/terms` and `/privacy`. Caddy
-  routes those paths to `/legal/*.html`, but the files don't exist yet. The
-  server does not record the agreement.
-- **Shop name and phone for social sign-ups.** A social sign-up arrives with
-  neither. The shop is named after the seller and uses the default region,
-  Bangladesh, until its first save in Settings – General.
-- **Organization switcher.** Deferred. The data model already supports several
+  routes them to `/legal/*.html`, which do not exist yet, and the server does
+  not record the agreement.
+- **Shop name and phone for social sign-ups.** The shop is named after the
+  seller and uses the default region, Bangladesh, until its first save in
+  Settings – General.
+- **Organization switcher.** Deferred; the data model already allows several
   organizations per seller.
 
 ## Key files
 
-- [`apps/api/src/modules/auth/auth.config.ts`](../../../apps/api/src/modules/auth/auth.config.ts): the whole Better Auth configuration
-- [`apps/api/src/modules/auth/auth.module.ts`](../../../apps/api/src/modules/auth/auth.module.ts): mounting, body parser
-- [`apps/api/src/modules/auth/session.guard.ts`](../../../apps/api/src/modules/auth/session.guard.ts): global session requirement
-- [`apps/api/src/modules/auth/auth-errors.ts`](../../../apps/api/src/modules/auth/auth-errors.ts): error envelope mapping
-- [`apps/api/src/modules/auth/auth.cli.ts`](../../../apps/api/src/modules/auth/auth.cli.ts): schema-generation entry point
-- [`apps/api/src/common/tenant.guard.ts`](../../../apps/api/src/common/tenant.guard.ts): merchant resolution
-- [`apps/api/src/modules/database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts): organization bootstrap
-- [`apps/api/src/modules/database/schema/auth.ts`](../../../apps/api/src/modules/database/schema/auth.ts): generated auth tables
-- [`apps/api/src/modules/mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts): auth emails
-- [`apps/api/src/modules/mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts): MJML layout and blocks, compiled at load
-- [`packages/shared/src/schemas/auth.ts`](../../../packages/shared/src/schemas/auth.ts): password rules
+- [`auth/auth.config.ts`](../../../apps/api/src/modules/auth/auth.config.ts): the Better Auth configuration
+- [`auth/auth.module.ts`](../../../apps/api/src/modules/auth/auth.module.ts): mounting and body parser
+- [`auth/session.guard.ts`](../../../apps/api/src/modules/auth/session.guard.ts): the global session requirement
+- [`auth/auth-errors.ts`](../../../apps/api/src/modules/auth/auth-errors.ts): error mapping
+- [`common/tenant.guard.ts`](../../../apps/api/src/common/tenant.guard.ts): merchant resolution
+- [`database/ensure-organization.ts`](../../../apps/api/src/modules/database/ensure-organization.ts): organization bootstrap
+- [`mail/templates.ts`](../../../apps/api/src/modules/mail/templates.ts) and [`mail/layout.ts`](../../../apps/api/src/modules/mail/layout.ts): auth emails
+- [`packages/shared/src/schemas/auth.ts`](../../../packages/shared/src/schemas/auth.ts): password and sign-up rules
