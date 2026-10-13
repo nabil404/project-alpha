@@ -205,9 +205,9 @@ export class OrdersService {
   }
 
   /**
-   * Confirm, pack, ship, deliver, return or cancel. Stock is taken when the
-   * order is confirmed and given back when it is cancelled after that, or
-   * returned.
+   * Confirm, pack, ship, deliver, return or cancel. Confirming turns the
+   * draft's reservation into stock taken; cancelling gives back whichever it
+   * held; returning gives the stock back.
    */
   changeStatus(
     scope: TenantScope,
@@ -334,21 +334,23 @@ export class OrdersService {
   }
 
   /**
-   * Applies the moves, products locked first in id order. Taking more than a
-   * variant has refuses the whole change; the transaction rolls back any
-   * move already made.
+   * Applies the moves, products locked first in id order. Taking or reserving
+   * more than a variant has available refuses the whole change; the
+   * transaction rolls back any move already made.
    */
   private async moveStock(tx: Executor, scope: TenantScope, changes: StockChange[]): Promise<void> {
     if (changes.length === 0) return;
     const productIds = [...new Set(changes.map((change) => change.productId))].sort();
     await this.catalog.lockAndBumpProducts(tx, scope, productIds);
-    for (const { variantId, change } of changes) {
-      if ((await this.catalog.adjustStock(tx, scope, variantId, change)) !== null) continue;
-      const variant = (await this.catalog.findVariants(tx, scope, [variantId])).get(variantId);
+    for (const change of changes) {
+      if ((await this.catalog.adjustStock(tx, scope, change)) !== null) continue;
+      const variant = (await this.catalog.findVariants(tx, scope, [change.variantId])).get(
+        change.variantId,
+      );
       throw orderInsufficientStock({
-        id: variantId,
-        name: variant ? variantLabel(variant) : variantId,
-        available: variant?.stock ?? 0,
+        id: change.variantId,
+        name: variant ? variantLabel(variant) : change.variantId,
+        available: variant?.available ?? 0,
       });
     }
   }

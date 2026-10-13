@@ -12,7 +12,8 @@ export interface OrderableVariant {
   variantName: string | null;
   sku: string;
   price: number;
-  stock: number;
+  /** `stock - reserved`: what a new order or a confirm can still take. */
+  available: number;
   /** Not archived, and neither is its product. */
   live: boolean;
   /** The product is active: still in the catalog the assistant sells from. */
@@ -21,7 +22,7 @@ export interface OrderableVariant {
 
 /**
  * The orders side of the catalog: reading variants to snapshot onto lines,
- * and moving stock when an order takes or gives it back. Every write here
+ * and moving stock and reservations as orders are drafted, confirmed, cancelled or returned. Every write here
  * bumps the product's revision, as the domain requires, so an edit page open
  * on the product sees its stock changed under it.
  */
@@ -41,7 +42,7 @@ export class OrderCatalogRepository {
         variantName: productVariant.name,
         sku: productVariant.sku,
         price: productVariant.price,
-        stock: productVariant.stock,
+        available: sql<number>`${productVariant.stock} - ${productVariant.reserved}`,
         live: sql<boolean>`${productVariant.archivedAt} is null and ${product.status} <> 'archived'`,
         productActive: sql<boolean>`${product.status} = 'active'`,
       })
@@ -83,26 +84,30 @@ export class OrderCatalogRepository {
   }
 
   /**
-   * Adds `change` (negative to take) to the variant's stock. Null when taking
-   * would go below zero, with nothing changed; otherwise the new stock.
+   * Adds `stock` and `reserved` to the variant's counts together. Null, with
+   * nothing changed, when that would leave less than nothing available or a
+   * negative reservation; otherwise the new counts.
    */
   async adjustStock(
     executor: Executor,
     { merchantId }: TenantScope,
-    variantId: string,
-    change: number,
-  ): Promise<number | null> {
+    { variantId, stock, reserved }: { variantId: string; stock: number; reserved: number },
+  ): Promise<{ stock: number; reserved: number } | null> {
     const [row] = await executor
       .update(productVariant)
-      .set({ stock: sql`${productVariant.stock} + ${change}` })
+      .set({
+        stock: sql`${productVariant.stock} + ${stock}`,
+        reserved: sql`${productVariant.reserved} + ${reserved}`,
+      })
       .where(
         and(
           eq(productVariant.merchantId, merchantId),
           eq(productVariant.id, variantId),
-          sql`${productVariant.stock} + ${change} >= 0`,
+          sql`(${productVariant.stock} + ${stock}) - (${productVariant.reserved} + ${reserved}) >= 0`,
+          sql`${productVariant.reserved} + ${reserved} >= 0`,
         ),
       )
-      .returning({ stock: productVariant.stock });
-    return row?.stock ?? null;
+      .returning({ stock: productVariant.stock, reserved: productVariant.reserved });
+    return row ?? null;
   }
 }

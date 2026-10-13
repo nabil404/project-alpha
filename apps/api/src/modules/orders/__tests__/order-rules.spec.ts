@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { orderEventDataSchema } from '@app/shared';
+import { orderEventDataSchema, orderStockHold } from '@app/shared';
 import type { OrderItemRow, OrderRow } from '../../database/schema/index';
 import type { OrderableVariant } from '../order-catalog.repository';
 import { buildLines, planOrderPatch, stockChanges, subtotalOf } from '../order-rules';
@@ -12,24 +12,38 @@ const line = (variantId: string | null, quantity: number, productId: string | nu
 
 describe('stockChanges', () => {
   const lines = [line('v1', 2), line('v2', 1, 'p2')];
+  const none: typeof lines = [];
 
-  it('takes the stock when an order is confirmed', () => {
-    expect(stockChanges({ lines, status: 'new' }, { lines, status: 'confirmed' })).toEqual([
-      { variantId: 'v1', productId: 'p1', change: -2 },
-      { variantId: 'v2', productId: 'p2', change: -1 },
+  it('reserves the items when an order is drafted', () => {
+    expect(stockChanges({ lines: none, status: 'new' }, { lines, status: 'new' })).toEqual([
+      { variantId: 'v1', productId: 'p1', stock: 0, reserved: 2 },
+      { variantId: 'v2', productId: 'p2', stock: 0, reserved: 1 },
     ]);
   });
 
-  it('moves nothing between two statuses that both hold stock, or neither', () => {
+  it('turns the reservation into taken stock when the order is confirmed', () => {
+    expect(stockChanges({ lines, status: 'new' }, { lines, status: 'confirmed' })).toEqual([
+      { variantId: 'v1', productId: 'p1', stock: -2, reserved: -2 },
+      { variantId: 'v2', productId: 'p2', stock: -1, reserved: -1 },
+    ]);
+  });
+
+  it('releases the reservation when a draft is cancelled', () => {
+    expect(stockChanges({ lines, status: 'new' }, { lines, status: 'cancelled' })).toEqual([
+      { variantId: 'v1', productId: 'p1', stock: 0, reserved: -2 },
+      { variantId: 'v2', productId: 'p2', stock: 0, reserved: -1 },
+    ]);
+  });
+
+  it('moves nothing between two statuses that both take stock', () => {
     expect(stockChanges({ lines, status: 'confirmed' }, { lines, status: 'packed' })).toEqual([]);
     expect(stockChanges({ lines, status: 'shipped' }, { lines, status: 'delivered' })).toEqual([]);
-    expect(stockChanges({ lines, status: 'new' }, { lines, status: 'cancelled' })).toEqual([]);
   });
 
   it('gives the stock back on a cancel after confirming, and on a return', () => {
     const back = [
-      { variantId: 'v1', productId: 'p1', change: 2 },
-      { variantId: 'v2', productId: 'p2', change: 1 },
+      { variantId: 'v1', productId: 'p1', stock: 2, reserved: 0 },
+      { variantId: 'v2', productId: 'p2', stock: 1, reserved: 0 },
     ];
     expect(stockChanges({ lines, status: 'packed' }, { lines, status: 'cancelled' })).toEqual(back);
     expect(stockChanges({ lines, status: 'delivered' }, { lines, status: 'returned' })).toEqual(
@@ -37,27 +51,34 @@ describe('stockChanges', () => {
     );
   });
 
-  it('moves only the difference when a confirmed order’s items change', () => {
+  it('moves only the reserved difference when a draft’s items change', () => {
+    const after = [line('v1', 3), line('v3', 1)];
+    expect(stockChanges({ lines, status: 'new' }, { lines: after, status: 'new' })).toEqual([
+      { variantId: 'v1', productId: 'p1', stock: 0, reserved: 1 },
+      { variantId: 'v2', productId: 'p2', stock: 0, reserved: -1 },
+      { variantId: 'v3', productId: 'p1', stock: 0, reserved: 1 },
+    ]);
+  });
+
+  it('moves only the stock difference when a confirmed order’s items change', () => {
     const after = [line('v1', 3), line('v3', 1)];
     expect(
       stockChanges({ lines, status: 'confirmed' }, { lines: after, status: 'confirmed' }),
     ).toEqual([
-      { variantId: 'v1', productId: 'p1', change: -1 },
-      { variantId: 'v2', productId: 'p2', change: 1 },
-      { variantId: 'v3', productId: 'p1', change: -1 },
+      { variantId: 'v1', productId: 'p1', stock: -1, reserved: 0 },
+      { variantId: 'v2', productId: 'p2', stock: 1, reserved: 0 },
+      { variantId: 'v3', productId: 'p1', stock: -1, reserved: 0 },
     ]);
   });
 
-  it('moves nothing for a new order’s edit, or for lines without a variant', () => {
-    expect(
-      stockChanges({ lines, status: 'new' }, { lines: [line('v9', 5)], status: 'new' }),
-    ).toEqual([]);
+  it('moves nothing for lines without a variant, or an edit that changes nothing', () => {
     expect(
       stockChanges(
         { lines: [line(null, 4)], status: 'new' },
         { lines: [line(null, 4)], status: 'confirmed' },
       ),
     ).toEqual([]);
+    expect(stockChanges({ lines, status: 'new' }, { lines, status: 'new' })).toEqual([]);
   });
 
   it('sorts by variant id, so concurrent writers touch rows in the same order', () => {
@@ -71,6 +92,20 @@ describe('stockChanges', () => {
   });
 });
 
+describe('orderStockHold', () => {
+  it.each([
+    ['new', 'reserved'],
+    ['confirmed', 'taken'],
+    ['packed', 'taken'],
+    ['shipped', 'taken'],
+    ['delivered', 'taken'],
+    ['cancelled', 'none'],
+    ['returned', 'none'],
+  ] as const)('%s holds %s', (status, hold) => {
+    expect(orderStockHold(status)).toBe(hold);
+  });
+});
+
 describe('buildLines', () => {
   const variant = (id: string, overrides: Partial<OrderableVariant> = {}): OrderableVariant => ({
     id,
@@ -79,7 +114,7 @@ describe('buildLines', () => {
     variantName: 'L',
     sku: `SKU-${id}`,
     price: 170000,
-    stock: 3,
+    available: 3,
     live: true,
     productActive: true,
     ...overrides,
