@@ -55,7 +55,7 @@ export function ProductListRow({
           max: formatAmount(item.priceMax),
         });
   const notes =
-    single || item.stock === 0
+    single || item.available === 0
       ? []
       : [
           item.lowVariantCount > 0 && t('list.stockNote.low', { n: item.lowVariantCount }),
@@ -150,7 +150,7 @@ export function ProductListRow({
         </td>
         <td className={cn(cell, 'text-right text-body whitespace-nowrap tabular-nums')}>{price}</td>
         <td className={cn(cell, 'text-right')}>
-          <StockFigure stock={item.stock} level={item.stockLevel} notes={notes} />
+          <StockFigure stock={item.available} level={item.stockLevel} notes={notes} />
         </td>
         <td className={cn(cell, columns.status.cell)}>
           <ProductStatusBadge status={item.status} />
@@ -216,7 +216,7 @@ function VariantRows({
                 {formatAmount(variant.price)}
               </td>
               <td className={cn(variantCell, 'text-right')}>
-                <StockFigure stock={variant.stock} level={stockLevelOf(variant.stock)} />
+                <StockFigure stock={variant.available} level={stockLevelOf(variant.available)} />
               </td>
               <td className={cn(variantCell, columns.status.cell)}>
                 <Link

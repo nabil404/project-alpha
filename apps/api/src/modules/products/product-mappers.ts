@@ -40,7 +40,9 @@ export function toVariant(row: VariantRow, optionValueIds: string[]): Variant {
     sku: row.sku,
     price: row.price,
     stock: row.stock,
-    stockStatus: row.stock > 0 ? 'in_stock' : 'out_of_stock',
+    reserved: row.reserved,
+    available: row.stock - row.reserved,
+    stockStatus: row.stock - row.reserved > 0 ? 'in_stock' : 'out_of_stock',
     isDefault: row.isDefault,
     imageId: row.imageId,
     optionValueIds,
@@ -103,7 +105,7 @@ export function toProduct(row: ProductRow, parts: ProductParts): Product {
 
 /** The same rules as the list's stock filters, so a row always sits under the chip it counts in. */
 export function productStockLevel(totals: ProductTotals): StockLevel {
-  if (totals.stock === 0) return 'out_of_stock';
+  if (totals.available === 0) return 'out_of_stock';
   return totals.lowCount + totals.outCount > 0 ? 'low_stock' : 'in_stock';
 }
 
@@ -129,7 +131,7 @@ export function toProductListItem(
     variantCount: totals.variantCount,
     priceMin: totals.priceMin,
     priceMax: totals.priceMax,
-    stock: totals.stock,
+    available: totals.available,
     lowVariantCount: totals.lowCount,
     outVariantCount: totals.outCount,
     stockLevel: productStockLevel(totals),
@@ -140,7 +142,8 @@ export function toProductListItem(
           sku: only.sku,
           price: only.price,
           stock: only.stock,
-          stockLevel: stockLevelOf(only.stock),
+          available: only.stock - only.reserved,
+          stockLevel: stockLevelOf(only.stock - only.reserved),
           thumbnailUrl: thumbnail(only.imageId ?? row.coverImageId),
         }
       : null,

@@ -89,8 +89,13 @@ export const variantSchema = z.object({
   sku: z.string().min(1),
   /** Minor units. */
   price: z.number().int().nonnegative(),
+  /** Units on hand, as the seller counts them. */
   stock: z.number().int().nonnegative(),
-  /** Derived from `stock`; never written. */
+  /** Units held by drafted orders. Never written. */
+  reserved: z.number().int().nonnegative(),
+  /** `stock - reserved`: what the assistant and new orders can take. Never written. */
+  available: z.number().int().nonnegative(),
+  /** Derived from `available`; never written. */
   stockStatus: stockStatusSchema,
   isDefault: z.boolean(),
   /** One of the product's own images, or null for the product's cover. */
@@ -445,6 +450,8 @@ export const productListVariantSchema = z.object({
   /** Minor units. */
   price: z.number().int().nonnegative(),
   stock: z.number().int().nonnegative(),
+  /** `stock - reserved`. */
+  available: z.number().int().nonnegative(),
   stockLevel: stockLevelSchema,
   /** Its own image, else the product's cover; null when the product has no photos. */
   thumbnailUrl: z.string().url().nullable(),
@@ -469,8 +476,8 @@ export const productListItemSchema = z.object({
   /** Minor units, over live variants. */
   priceMin: z.number().int().nonnegative(),
   priceMax: z.number().int().nonnegative(),
-  /** Units left across live variants. */
-  stock: z.number().int().nonnegative(),
+  /** Units left to sell (on hand less reserved) across live variants. */
+  available: z.number().int().nonnegative(),
   lowVariantCount: z.number().int().nonnegative(),
   outVariantCount: z.number().int().nonnegative(),
   stockLevel: stockLevelSchema,

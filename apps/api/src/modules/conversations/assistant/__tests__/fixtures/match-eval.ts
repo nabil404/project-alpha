@@ -51,6 +51,8 @@ function product(
       sku: `${key}-${v}`,
       price: 100_000 + p * 10_000,
       stock: units,
+      reserved: 0,
+      available: units,
       stockStatus: units > 0 ? ('in_stock' as const) : ('out_of_stock' as const),
       isDefault: combo.values.length === 0,
       imageId: null,

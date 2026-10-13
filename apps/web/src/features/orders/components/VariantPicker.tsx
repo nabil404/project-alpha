@@ -126,13 +126,13 @@ function ProductOption({
               label: variantDisplayName(product.name, lone.name),
               sku: lone.sku,
               price: lone.price,
-              stock: lone.stock,
+              stock: lone.available,
             })
           }
           title={variantDisplayName(product.name, lone.name)}
           detail={t('items.optionDetail', {
             price: formatMoney(lone.price),
-            stock: lone.stock,
+            stock: lone.available,
           })}
         />
       </li>

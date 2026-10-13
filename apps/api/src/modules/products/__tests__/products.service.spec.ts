@@ -7,6 +7,8 @@ import {
   expectCoded,
   openCatalogTestDb,
   seedCategory,
+  seedProduct,
+  seedVariant,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
 import { productsService } from './products-service.fixture';
@@ -42,6 +44,8 @@ describeDb('ProductsService — products and category links', () => {
         isDefault: true,
         price: 150000,
         stock: 3,
+        reserved: 0,
+        available: 3,
         stockStatus: 'in_stock',
         imageId: null,
       });
@@ -55,6 +59,23 @@ describeDb('ProductsService — products and category links', () => {
         input({ variants: [{ price: 100, stock: 0 }] }),
       );
       expect(product.variants[0]?.stockStatus).toBe('out_of_stock');
+    });
+
+    it('reports reserved and available, and calls a fully reserved variant out of stock', async () => {
+      const product = await seedProduct(t.db, t.merchantA, { status: 'active' });
+      await seedVariant(t.db, t.merchantA, product.id, {
+        name: null,
+        isDefault: true,
+        stock: 3,
+        reserved: 3,
+      });
+      const loaded = await service.get(t.merchantA, product.id);
+      expect(loaded.variants[0]).toMatchObject({
+        stock: 3,
+        reserved: 3,
+        available: 0,
+        stockStatus: 'out_of_stock',
+      });
     });
 
     it('stores named variants and normalizes a given SKU', async () => {
