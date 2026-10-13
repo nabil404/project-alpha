@@ -106,7 +106,6 @@ function ExitButton({
   const change = useChangeOrderStatus(order.id);
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
-  const givesStockBack = order.status !== 'new';
 
   return (
     <AlertDialog
@@ -130,11 +129,7 @@ function ExitButton({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t(`actions.${status}.title`)}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {givesStockBack
-              ? t(`actions.${status}.descriptionStock`)
-              : t(`actions.${status}.description`)}
-          </AlertDialogDescription>
+          <AlertDialogDescription>{t(`actions.${status}.description`)}</AlertDialogDescription>
         </AlertDialogHeader>
         {change.isError && <ErrorBanner>{forError(change.error)}</ErrorBanner>}
         <div className="flex flex-col gap-2">
