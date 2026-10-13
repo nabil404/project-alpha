@@ -89,6 +89,11 @@ export const productVariant = pgTable(
     sku: text('sku').notNull(),
     price: integer('price').notNull(),
     stock: integer('stock').notNull().default(0),
+    /**
+     * Units held by drafted (`new`) orders. What can still be sold is
+     * `stock - reserved`; orders move it, the seller never writes it.
+     */
+    reserved: integer('reserved').notNull().default(0),
     isDefault: boolean('is_default').notNull().default(false),
     /**
      * One of the product's own images, or null for the product's cover. Its
@@ -111,6 +116,8 @@ export const productVariant = pgTable(
     }).onDelete('cascade'),
     check('product_variant_price_ck', sql`${t.price} >= 0`),
     check('product_variant_stock_ck', sql`${t.stock} >= 0`),
+    check('product_variant_reserved_ck', sql`${t.reserved} >= 0`),
+    check('product_variant_reserved_stock_ck', sql`${t.reserved} <= ${t.stock}`),
     check('product_variant_default_unnamed_ck', sql`${t.isDefault} = (${t.name} is null)`),
     uniqueIndex(VARIANT_SKU_LIVE_UIDX)
       .on(t.merchantId, t.sku)
