@@ -118,9 +118,9 @@ export class OrdersService {
 
   /**
    * An order the seller enters by hand, for a customer who has messaged the
-   * Page. It starts as `new`, so stock moves only when the seller confirms it,
-   * as with one the assistant drafts. With an idempotency key, a repeat of the
-   * same request returns the order the first one created.
+   * Page. It starts as `new` and reserves its items' stock, as one the
+   * assistant drafts does. With an idempotency key, a repeat of the same
+   * request returns the order the first one created and reserves nothing more.
    */
   async create(
     scope: TenantScope,
@@ -198,6 +198,11 @@ export class OrdersService {
       placedAt,
     });
     await this.orders.replaceItems(tx, scope, row.id, lines);
+    await this.moveStock(
+      tx,
+      scope,
+      stockChanges({ lines: [], status: 'new' }, { lines, status: 'new' }),
+    );
     await this.events.insert(tx, scope, row.id, actorId, [
       { type: 'created', source: origin.source },
     ]);
@@ -232,7 +237,7 @@ export class OrdersService {
     });
   }
 
-  /** Replaces the lines while the order is new or confirmed; a confirmed order's stock follows the edit. */
+  /** Replaces the lines while the order is new or confirmed; a draft's reservation, or a confirmed order's stock, follows the edit. */
   replaceItems(
     scope: TenantScope,
     actor: OrderActor,

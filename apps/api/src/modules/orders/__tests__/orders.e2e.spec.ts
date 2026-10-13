@@ -359,9 +359,12 @@ describeDb('order routes over HTTP', () => {
   });
 
   it('adds an order by hand from the customer’s details on file, once per idempotency key', async () => {
+    const shawl = (
+      await seedVariant(t.db, t.merchantA, productId, { name: 'Shawl', price: 170000, stock: 5 })
+    ).id;
     const key = randomUUID();
     const body = {
-      items: [{ variantId: kurtiL, quantity: 1 }],
+      items: [{ variantId: shawl, quantity: 1 }],
       deliveryArea: 'Local',
       paymentMethod: 'bank_transfer',
     };
@@ -381,11 +384,57 @@ describeDb('order routes over HTTP', () => {
     });
     const replay = orderDetailSchema.parse((await create(body, key).expect(201)).body);
     expect(replay.id).toBe(first.id);
+    expect(await reservedOf(shawl)).toBe(1);
+
     const second = orderDetailSchema.parse((await create(body).expect(201)).body);
     expect(second).toMatchObject({ year: first.year, number: first.number + 1 });
     expect(second.reference).toBe(`ORD-${second.year}-${String(second.number).padStart(5, '0')}`);
-    // Drafted, not confirmed: no stock moves yet.
-    expect(await stockOf(kurtiL)).toBe(1);
+    // Drafted, not confirmed: reserved, still on hand.
+    expect(await reservedOf(shawl)).toBe(2);
+    expect(await stockOf(shawl)).toBe(5);
+  });
+
+  it('refuses drafting more than is available, and writes nothing', async () => {
+    const scarce = (
+      await seedVariant(t.db, t.merchantA, productId, { name: 'Scarce', stock: 3, reserved: 2 })
+    ).id;
+    const before = await request(server()).get('/api/v1/orders').expect(200);
+    const res = await create({ items: [{ variantId: scarce, quantity: 2 }] }).expect(409);
+    expect(res.body.error).toMatchObject({
+      code: 'ORDER_INSUFFICIENT_STOCK',
+      params: { variantId: scarce, name: 'Blue kurti, Scarce', available: 1 },
+    });
+    expect(await reservedOf(scarce)).toBe(2);
+    const after = await request(server()).get('/api/v1/orders').expect(200);
+    expect(after.body).toEqual(before.body);
+  });
+
+  it('releases only the cancelled draft’s reservation', async () => {
+    const pair = (await seedVariant(t.db, t.merchantA, productId, { name: 'Pair', stock: 4 })).id;
+    const one = orderDetailSchema.parse(
+      (await create({ items: [{ variantId: pair, quantity: 1 }] }).expect(201)).body,
+    );
+    await create({ items: [{ variantId: pair, quantity: 2 }] }).expect(201);
+    expect(await reservedOf(pair)).toBe(3);
+
+    await move(one.id, 'cancelled').then(ok);
+    expect(await reservedOf(pair)).toBe(2);
+    expect(await stockOf(pair)).toBe(4);
+  });
+
+  it('confirms a draft whose variant was archived since', async () => {
+    const old = (await seedVariant(t.db, t.merchantA, productId, { name: 'Old', stock: 2 })).id;
+    const draft = orderDetailSchema.parse(
+      (await create({ items: [{ variantId: old, quantity: 2 }] }).expect(201)).body,
+    );
+    await t.db
+      .update(schema.productVariant)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.productVariant.id, old));
+
+    await move(draft.id, 'confirmed').then(ok);
+    expect(await stockOf(old)).toBe(0);
+    expect(await reservedOf(old)).toBe(0);
   });
 
   it('numbers each year from 1 in the shop’s time zone, whatever other years and shops hold', async () => {
@@ -398,7 +447,7 @@ describeDb('order routes over HTTP', () => {
     });
     await seedOrder(t.db, t.merchantB, rumana.id, { year: year - 1, number: 900 });
     const scarf = await seedProduct(t.db, t.merchantB, { name: 'Silk scarf', status: 'active' });
-    const variant = await seedVariant(t.db, t.merchantB, scarf.id, { price: 90000, stock: 5 });
+    const variant = await seedVariant(t.db, t.merchantB, scarf.id, { price: 90000, stock: 10 });
     const place = async () =>
       orderDetailSchema.parse(
         (
@@ -477,8 +526,8 @@ describeDb('order routes over HTTP', () => {
       (await request(server()).get('/api/v1/orders/summary').query({ q: '01712' }).expect(200))
         .body,
     );
-    expect(summary.counts).toMatchObject({ all: all.pagination.total, cancelled: 1, delivered: 1 });
-    expect(summary.awaitingConfirmation).toBe(2);
+    expect(summary.counts).toMatchObject({ all: all.pagination.total, cancelled: 2, delivered: 1 });
+    expect(summary.awaitingConfirmation).toBe(3);
     expect(summary.placedInWindow.byAssistant).toBeLessThan(summary.placedInWindow.all);
 
     await request(server())
@@ -528,12 +577,14 @@ describeDb('order routes over HTTP', () => {
       if (!row) throw new Error('no delivery_charge row');
       return row;
     };
-    const items = () => [{ variantId: kurtiM, quantity: 1 }];
+    const items = () => [{ variantId: roomy, quantity: 1 }];
+    let roomy: string;
     let dhakaId: string;
     let gazipurId: string;
     let elsewhereId: string;
 
     beforeAll(async () => {
+      roomy = (await seedVariant(t.db, t.merchantA, productId, { name: 'Roomy', stock: 50 })).id;
       dhakaId = (await seedArea({ areaName: 'Dhaka', charge: 6000, deliveryTime: '1–2 days' })).id;
       gazipurId = (await seedArea({ areaName: 'Gazipur', charge: 8000, position: 1 })).id;
       elsewhereId = (await seedArea({ isFallback: true, charge: 12000, deliveryTime: '3–5 days' }))
