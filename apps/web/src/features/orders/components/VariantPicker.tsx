@@ -18,7 +18,7 @@ export interface PickedVariant {
   label: string;
   sku: string;
   price: number;
-  stock: number;
+  available: number;
 }
 
 /**
@@ -126,13 +126,13 @@ function ProductOption({
               label: variantDisplayName(product.name, lone.name),
               sku: lone.sku,
               price: lone.price,
-              stock: lone.available,
+              available: lone.available,
             })
           }
           title={variantDisplayName(product.name, lone.name)}
           detail={t('items.optionDetail', {
             price: formatMoney(lone.price),
-            stock: lone.available,
+            available: lone.available,
           })}
         />
       </li>
@@ -192,13 +192,13 @@ function ProductVariants({
                 label: variantDisplayName(product.name, variant.name),
                 sku: variant.sku,
                 price: variant.price,
-                stock: variant.stock,
+                available: variant.available,
               })
             }
             title={variant.name ?? product.name}
             detail={t('items.optionDetail', {
               price: formatMoney(variant.price),
-              stock: variant.stock,
+              available: variant.available,
             })}
           />
         </li>

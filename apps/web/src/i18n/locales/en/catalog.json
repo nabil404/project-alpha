@@ -360,6 +360,7 @@
     "priceInvalid": "Enter an amount, like 1600 or 1,600.50.",
     "remove": "Remove",
     "removeVariant": "Remove {{variant}}",
+    "reservedNote": "{{reserved}} reserved · {{available}} available",
     "sku": "SKU",
     "skuFor": "SKU for {{variant}}",
     "skuPlaceholder": "Made for you",

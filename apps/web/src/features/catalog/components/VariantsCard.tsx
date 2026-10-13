@@ -259,6 +259,19 @@ export function VariantsCard({ product }: { product?: Product }) {
                             />
                           </FormControl>
                           <NumberMessage invalid={Number.isNaN(stockField.value)} kind="stock" />
+                          {(() => {
+                            const saved = product?.variants.find(
+                              (variant) => variant.id === form.getValues(`variants.${index}.id`),
+                            );
+                            return saved && saved.reserved > 0 ? (
+                              <p className="text-small text-ink-muted tabular-nums">
+                                {t('variants.reservedNote', {
+                                  reserved: saved.reserved,
+                                  available: saved.available,
+                                })}
+                              </p>
+                            ) : null;
+                          })()}
                         </FormItem>
                       )}
                     />

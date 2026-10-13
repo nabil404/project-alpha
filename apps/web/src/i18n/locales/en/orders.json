@@ -2,14 +2,13 @@
   "actions": {
     "cancelled": {
       "confirm": "Cancel order",
-      "description": "The customer's order won't go ahead. You can't undo this.",
-      "descriptionStock": "The customer's order won't go ahead, and its items go back into stock. You can't undo this.",
+      "description": "The customer's order won't go ahead, and its items go back into stock. You can't undo this.",
       "done": "Order cancelled",
       "label": "Cancel order",
       "title": "Cancel this order?"
     },
     "confirmed": {
-      "done": "Order confirmed. Its items are taken from stock.",
+      "done": "Order confirmed. Its reserved items are taken from stock.",
       "label": "Confirm order"
     },
     "delivered": {
@@ -25,8 +24,7 @@
     "reasonPlaceholder": "Kept on the order's activity",
     "returned": {
       "confirm": "Mark as returned",
-      "description": "The order came back to you. You can't undo this.",
-      "descriptionStock": "The order came back to you, and its items go back into stock. You can't undo this.",
+      "description": "The order came back to you, and its items go back into stock. You can't undo this.",
       "done": "Marked as returned",
       "label": "Mark as returned",
       "title": "Mark this order as returned?"
@@ -127,7 +125,7 @@
   "detail": {
     "backToOrders": "Back to orders",
     "breadcrumb": "Breadcrumb",
-    "checkBeforeConfirming": "Check the items, address and total, then confirm the order for {{name}}. Confirming takes the items from stock.",
+    "checkBeforeConfirming": "Check the items, address and total, then confirm the order for {{name}}. Its items are already reserved; confirming takes them from stock.",
     "fromAssistant": "Drafted by the assistant from a Messenger chat · {{placed}}",
     "fromSeller": "Added by you · {{placed}}"
   },
@@ -142,7 +140,7 @@
       "total": "Total ({{symbol}})"
     },
     "dialog": {
-      "description": "Change quantities and prices, or add and remove products.",
+      "description": "Change quantities and prices, or add and remove products. The items' reserved stock follows your edit.",
       "descriptionConfirmed": "This order is confirmed, so stock changes with your edit: added items are taken from stock, removed ones go back.",
       "title": "Edit items"
     },
@@ -150,7 +148,7 @@
     "lineTotal": "Line total {{total}}",
     "noProducts": "No products match.",
     "none": "No items yet. Add a product.",
-    "optionDetail": "{{price}} · {{stock}} in stock",
+    "optionDetail": "{{price}} · {{available}} available",
     "price": "Price",
     "priceTimesQuantity": "{{price}} × {{quantity}}",
     "quantity": "Qty",
