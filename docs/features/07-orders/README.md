@@ -76,10 +76,10 @@ strings.
   `returned` hold none. A creation, status move or item edit reserves, takes
   or returns the difference per variant. Asking for more than a variant has
   available is `409 ORDER_INSUFFICIENT_STOCK` with `variantId`,
-  `name` and `available`, which is stock less reserved, and nothing changes. `lockAndBumpProducts` locks the products in id order
-  before touching variants, as the product save does, so the two never
-  deadlock. It also bumps each product's revision, so an open product edit
-  page sees the change.
+  `name` and `available`, which is stock less reserved, and nothing changes.
+  `lockAndBumpProducts` locks the products in id order before touching
+  variants, as the product save does, so the two never deadlock. It also bumps
+  each product's revision, so an open product edit page sees the change.
 - **Items** change only while the order is `new` or `confirmed`
   (`409 ORDER_NOT_EDITABLE` after). A variant already on the order keeps its
   name, SKU and price, even if archived since. A new variant must be live and
@@ -207,8 +207,9 @@ missing a name, phone or address the customer's record cannot fill),
     it is a list of cards.
   - The URL holds `status`, `q`, `range`, `from`, `to`, `sort`, `direction`,
     `page` and `pageSize`.
-- **Create order** is a dialog: pick a customer, add items (the picker shows
-  "N available" per variant), then delivery and
+- **The item picker**, in Create order and in Edit items, shows "N available"
+  per variant.
+- **Create order** is a dialog: pick a customer, add items, then delivery and
   payment, prefilled from the customer's details. Picking an area fills the
   fee from the quote, and changing items re-quotes it unless the seller typed
   a fee. The dialog makes one `Idempotency-Key` and opens the new order.

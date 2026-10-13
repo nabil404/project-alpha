@@ -37,7 +37,9 @@ stateDiagram-v2
 Stock follows `orderStockHold`: a `new` order reserves its items, an order
 in `confirmed`, `packed`, `shipped` or `delivered` has taken them, and a
 `cancelled` or `returned` one holds nothing. Each variant keeps `stock` (on
-hand) and `reserved`; what can be drafted or confirmed is `stock − reserved`.
+hand) and `reserved`; drafting an order, and editing a draft's items, are limited by
+`stock − reserved`. Confirming a draft needs nothing more, since its units are
+already reserved.
 A move between two taking statuses moves nothing. Confirming turns the
 reservation into stock taken, cancelling a draft releases it, and cancelling
 or returning a confirmed order gives the stock back. Drafting more than is
