@@ -1,4 +1,6 @@
 import { createProductSchema, type UpdateVariant } from '@app/shared';
+import { eq } from 'drizzle-orm';
+import * as schema from '../../database/schema/index';
 import type { ProductsService } from '../products.service';
 import {
   describeDb,
@@ -14,6 +16,13 @@ describeDb('ProductsService — updateVariant', () => {
   let t: CatalogTestDb;
   let service: ProductsService;
   let n = 0;
+
+  /** Marks `reserved` units of a variant as held by drafts, as an order would. */
+  const reserve = (variantId: string, reserved: number) =>
+    t.db
+      .update(schema.productVariant)
+      .set({ reserved })
+      .where(eq(schema.productVariant.id, variantId));
   const sku = (label: string) => `UV-${label}-${++n}`;
 
   const sized = (merchantId = t.merchantA) =>
@@ -142,5 +151,25 @@ describeDb('ProductsService — updateVariant', () => {
       service.updateVariant(t.merchantA, product.id, product.variants[0]!.id, unchecked),
       'VALIDATION_FAILED',
     );
+  });
+
+  it('refuses stock below what drafts reserve, and saves exactly that much', async () => {
+    const product = await service.create(
+      t.merchantA,
+      createProductSchema.parse({ name: 'Reserved Kurti', variants: [{ price: 50000, stock: 5 }] }),
+    );
+    const variantId = product.variants[0]!.id;
+    await reserve(variantId, 3);
+
+    await expect(
+      service.updateVariant(t.merchantA, product.id, variantId, { stock: 2 }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'VARIANT_STOCK_RESERVED',
+        params: { variantId, name: 'Reserved Kurti', reserved: 3 },
+      },
+    });
+    const saved = await service.updateVariant(t.merchantA, product.id, variantId, { stock: 3 });
+    expect(saved.variants[0]).toMatchObject({ stock: 3, reserved: 3, available: 0 });
   });
 });

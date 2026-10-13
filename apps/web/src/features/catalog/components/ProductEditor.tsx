@@ -122,6 +122,19 @@ export function ProductEditor({ product }: { product?: Product }) {
   };
 
   const onError = (error: unknown) => {
+    if (error instanceof ApiError && error.code === 'VARIANT_STOCK_RESERVED') {
+      const index = form
+        .getValues('variants')
+        .findIndex((variant) => variant.id === error.params.variantId);
+      if (index >= 0) {
+        form.setError(
+          `variants.${index}.stock`,
+          { type: 'server', message: forError(error) },
+          { shouldFocus: true },
+        );
+        return;
+      }
+    }
     const fields =
       error instanceof ApiError
         ? Object.keys(error.fields).filter((name) => topLevelFields.includes(name.split('.')[0]!))

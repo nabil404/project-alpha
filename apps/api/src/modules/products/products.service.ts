@@ -30,6 +30,7 @@ import { EMPTY_PRODUCT_STATE, planProductDocument } from './options/product-docu
 import { ProductOptionsRepository } from './options/product-options.repository';
 import { ProductWriter } from './options/product-writer';
 import {
+  assertStockCoversReserved,
   guardSku,
   productImageNotFound,
   productInUse,
@@ -176,6 +177,14 @@ export class ProductsService {
         },
         doc,
       );
+      assertStockCoversReserved(
+        current.variants.map((variant) => ({
+          id: variant.id,
+          reserved: variant.reserved,
+          label: variant.name ?? current.name,
+        })),
+        plan.variants,
+      );
       await this.products.updateProduct(tx, scope, id, {
         name: doc.name,
         description: doc.description,
@@ -226,11 +235,18 @@ export class ProductsService {
     const fields = parseOrThrow(updateVariantSchema, input);
     return withMerchant(this.db, merchantId, async (tx) => {
       const scope = { merchantId };
-      if (!(await this.products.findProduct(tx, scope, productId, { lock: true }))) {
-        throw productNotFound(productId);
-      }
+      const row = await this.products.findProduct(tx, scope, productId, { lock: true });
+      if (!row) throw productNotFound(productId);
       const live = await this.products.liveVariants(tx, scope, [productId]);
       if (!live.some((variant) => variant.id === variantId)) throw variantNotFound(variantId);
+      assertStockCoversReserved(
+        live.map((variant) => ({
+          id: variant.id,
+          reserved: variant.reserved,
+          label: variant.name ?? row.name,
+        })),
+        [{ id: variantId, stock: fields.stock }],
+      );
       // The foreign key keeps the image within the merchant; this keeps it within the product.
       if (fields.imageId) {
         const own = await this.images.listForProducts(tx, scope, [productId]);
