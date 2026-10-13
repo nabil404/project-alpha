@@ -11,6 +11,7 @@ an assistant reply or a hand-off with a fixed reply, products and variants
 are matched in code, and the summary card's Confirm button creates one
 `source = assistant` order per card. The live run of phase 2 on the dev Page
 is still to be done by the maintainer. The other phases are not started.
+[Progress](progress.md) tracks each phase's "Done when" list and App Review.
 
 ## Phases
 
