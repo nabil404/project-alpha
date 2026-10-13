@@ -409,6 +409,77 @@ describe('decideTurn: products and variants', () => {
     });
   });
 
+  it('treats reserved units as gone: a fully reserved product is out of stock', () => {
+    const held: Product = {
+      ...lungi,
+      variants: [
+        { ...lungi.variants[0]!, stock: 3, reserved: 3, available: 0, stockStatus: 'out_of_stock' },
+      ],
+    };
+    const decision = decideTurn(
+      turn({
+        catalog: { products: [held] },
+        trigger: message({ ...nothing, items: [said({ productQuery: 'lungi', quantity: 1 })] }),
+      }),
+    );
+    expect(decision.reply).toMatchObject({
+      kind: 'ask_slot',
+      slot: 'product',
+      reason: 'product_out_of_stock',
+    });
+  });
+
+  it('says how many are available, not how many are on hand', () => {
+    const mostlyHeld: Product = {
+      ...lungi,
+      variants: [
+        { ...lungi.variants[0]!, stock: 5, reserved: 4, available: 1, stockStatus: 'in_stock' },
+      ],
+    };
+    const decision = decideTurn(
+      turn({
+        catalog: { products: [mostlyHeld] },
+        trigger: message({ ...nothing, items: [said({ productQuery: 'lungi', quantity: 2 })] }),
+      }),
+    );
+    expect(decision.slots.items[0]?.quantity).toBeUndefined();
+    expect(decision.reply).toMatchObject({
+      kind: 'ask_slot',
+      slot: 'quantity',
+      reason: 'too_many',
+      facts: { items: [{ productName: 'Check Lungi', available: 1 }] },
+    });
+  });
+
+  it('offers no button for a variant whose units are all reserved', () => {
+    // One in-stock variant stays sellable; every other is fully reserved.
+    const kept = panjabi.variants.find((variant) => variant.stock > 0)!;
+    const held: Product = {
+      ...panjabi,
+      variants: panjabi.variants.map((variant) =>
+        variant.id === kept.id
+          ? variant
+          : {
+              ...variant,
+              reserved: variant.stock,
+              available: 0,
+              stockStatus: 'out_of_stock' as const,
+            },
+      ),
+    };
+    const decision = decideTurn(
+      turn({
+        catalog: { products: [held] },
+        trigger: message({ ...nothing, items: [said({ productQuery: 'panjabi' })] }),
+      }),
+    );
+    const titles =
+      decision.reply.kind === 'ask_slot'
+        ? decision.reply.choices?.map((choice) => choice.title)
+        : [];
+    expect(titles).toEqual([kept.name]);
+  });
+
   it('drops a matched product the catalog no longer sells and matches the words again', () => {
     const decision = decideTurn(
       turn({

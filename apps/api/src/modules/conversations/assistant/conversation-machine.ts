@@ -276,7 +276,7 @@ function findProduct(catalog: CatalogView, id: string | undefined): Product | un
 
 function inStockChoices(product: Product, variants: readonly Variant[]): Choice[] {
   return variants
-    .filter((variant) => variant.stock > 0)
+    .filter((variant) => variant.available > 0)
     .slice(0, MAX_QUICK_REPLIES)
     .map((variant) => ({ id: variant.id, title: variant.name ?? product.name }));
 }
@@ -318,7 +318,7 @@ function resolveItem(
     touched.add(index);
   }
 
-  if (!product.variants.some((variant) => variant.stock > 0)) {
+  if (!product.variants.some((variant) => variant.available > 0)) {
     delete item.productId;
     delete item.variantId;
     problems.push({
@@ -367,7 +367,7 @@ function resolveItem(
     variant = product.variants.find((entry) => entry.id === match.variantId)!;
     touched.add(index);
   }
-  if (variant.stock <= 0) {
+  if (variant.available <= 0) {
     delete item.variantId;
     problems.push({
       slot: 'variant',
@@ -384,7 +384,7 @@ function resolveItem(
 
 /**
  * Every item resolved, items on the same variant merged, then each variant's
- * quantity checked against its stock. `moved` maps each item's index before
+ * quantity checked against what is available. `moved` maps each item's index before
  * the merge to its index after.
  */
 function resolveItems(
@@ -401,13 +401,13 @@ function resolveItems(
     const variant = findProduct(catalog, item.productId)?.variants.find(
       (entry) => entry.id === item.variantId,
     );
-    if (variant && item.quantity !== undefined && item.quantity > variant.stock) {
+    if (variant && item.quantity !== undefined && item.quantity > variant.available) {
       delete item.quantity;
       remapped.push({
         slot: 'quantity',
         item: index,
         reason: 'too_many',
-        available: variant.stock,
+        available: variant.available,
       });
     }
   }
@@ -556,7 +556,7 @@ export function factsOf(
     if (item.quantity !== undefined) line.quantity = item.quantity;
     if (variant) {
       line.unitPrice = money(variant.price);
-      line.inStock = variant.stock > 0;
+      line.inStock = variant.available > 0;
       if (item.quantity !== undefined) line.lineTotal = money(variant.price * item.quantity);
     }
     if (extra.problem?.item === index && extra.problem.available !== undefined) {

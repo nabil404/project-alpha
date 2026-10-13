@@ -60,6 +60,22 @@ const crypto = new CryptoService({
 } as unknown as AppConfig);
 let nextMid = 1;
 
+/**
+ * Reads every variant as having 10 more available than it does: the
+ * confirmation's check passes, and only the reservation sees the truth, as
+ * when another customer's draft takes the stock between the two.
+ */
+class StaleCatalog extends OrderCatalogRepository {
+  override async findVariants(
+    ...args: Parameters<OrderCatalogRepository['findVariants']>
+  ): ReturnType<OrderCatalogRepository['findVariants']> {
+    const variants = await super.findVariants(...args);
+    return new Map(
+      [...variants].map(([id, variant]) => [id, { ...variant, available: variant.available + 10 }]),
+    );
+  }
+}
+
 describeDb('OrderConfirmationService (app_runtime)', () => {
   let t: CatalogTestDb;
   let runtime: ReturnType<typeof openRuntimeDb>;
@@ -95,9 +111,8 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
   const ordersFor = (conversationId: string) =>
     t.db.select().from(schema.order).where(eq(schema.order.conversationId, conversationId));
 
-  const service = () => {
+  const service = (catalog: OrderCatalogRepository = new OrderCatalogRepository()) => {
     const publisher = { publish: async () => undefined } as unknown as ConversationEventsPublisher;
-    const catalog = new OrderCatalogRepository();
     const settings = new MerchantSettingsRepository();
     const charges = new DeliveryChargesRepository();
     const orders = new OrdersRepository();
@@ -254,6 +269,58 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
   afterAll(async () => {
     await runtime.close();
     await t.close();
+  });
+
+  it('reserves the stock when the customer confirms', async () => {
+    const lungi = await product('Reserving Lungi', 10_000, 4);
+    const convo = await shown([{ ...lungi, quantity: 3 }]);
+
+    await expect(tap(convo.id, confirm(convo.id))).resolves.toBe('ordered');
+
+    const [variant] = await t.db
+      .select()
+      .from(schema.productVariant)
+      .where(eq(schema.productVariant.id, lungi.variantId));
+    expect(variant).toMatchObject({ stock: 4, reserved: 3 });
+  });
+
+  it('refuses a confirm when drafts already hold the stock', async () => {
+    const lungi = await product('Held Lungi', 10_000, 2);
+    await t.db
+      .update(schema.productVariant)
+      .set({ reserved: 2 })
+      .where(eq(schema.productVariant.id, lungi.variantId));
+    const convo = await shown([{ ...lungi, quantity: 1 }]);
+
+    await expect(tap(convo.id, confirm(convo.id))).resolves.toBe('unavailable');
+    expect(await ordersFor(convo.id)).toEqual([]);
+  });
+
+  it('answers unavailable when another draft takes the stock between check and reserve', async () => {
+    const lungi = await product('Raced Lungi', 10_000, 1);
+    const convo = await shown([{ ...lungi, quantity: 2 }]);
+    const message = await seedMessage(t.db, t.merchantA, convo.id, {
+      text: 'Confirm',
+      payload: `confirm:${convo.id}:1`,
+    });
+
+    await expect(
+      service(new StaleCatalog()).run(
+        { merchantId: t.merchantA, conversationId: convo.id, triggerMessageId: message.id },
+        confirm(convo.id),
+      ),
+    ).resolves.toBe('unavailable');
+
+    expect(await ordersFor(convo.id)).toEqual([]);
+    const row = await conversationRow(convo.id);
+    expect(row.state).toBe('collecting_details');
+    expect(readSlots(row.collectedSlots).items[0]).toMatchObject({ productId: lungi.productId });
+    expect(readSlots(row.collectedSlots).items[0]?.variantId).toBeUndefined();
+    const [variant] = await t.db
+      .select()
+      .from(schema.productVariant)
+      .where(eq(schema.productVariant.id, lungi.variantId));
+    expect(variant).toMatchObject({ stock: 1, reserved: 0 });
   });
 
   it('creates one assistant order with the card numbers, sends its reference, then emails', async () => {
