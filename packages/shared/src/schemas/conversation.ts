@@ -13,6 +13,11 @@ export const conversationStates = [
 export const conversationStateSchema = z.enum(conversationStates);
 export type ConversationState = z.infer<typeof conversationStateSchema>;
 
+/** How the current order attempt started; stored on the conversation and copied to its order. */
+export const entrySources = ['ad', 'link', 'get_started', 'organic'] as const;
+export const entrySourceSchema = z.enum(entrySources);
+export type EntrySource = z.infer<typeof entrySourceSchema>;
+
 /** The most items one assistant order holds; extraction and the slots are capped at it. */
 export const MAX_ORDER_ITEMS = 10;
 
