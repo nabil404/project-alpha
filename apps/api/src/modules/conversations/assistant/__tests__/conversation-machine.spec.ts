@@ -377,7 +377,7 @@ describe('decideTurn: products and variants', () => {
   it('asks for another product when no variant of it is in stock', () => {
     const soldOut: Product = {
       ...lungi,
-      variants: [{ ...lungi.variants[0]!, stock: 0, stockStatus: 'out_of_stock' }],
+      variants: [{ ...lungi.variants[0]!, stock: 0, available: 0, stockStatus: 'out_of_stock' }],
     };
     const decision = decideTurn(
       turn({

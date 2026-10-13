@@ -5,7 +5,9 @@ import {
   type ListProductsQuery,
   type Product,
 } from '@app/shared';
+import { eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import * as schema from '../../database/schema/index';
 import type { ProductsService } from '../products.service';
 import { ProductsRepository } from '../products.repository';
 import {
@@ -13,6 +15,8 @@ import {
   openCatalogTestDb,
   seedCategory,
   seedImage,
+  seedProduct,
+  seedVariant,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
 import { productsService } from './products-service.fixture';
@@ -115,7 +119,7 @@ describeDb('ProductsService — list and counts', () => {
       variantCount: 3,
       priceMin: 330000,
       priceMax: 350000,
-      stock: 3,
+      available: 3,
       lowVariantCount: 2,
       outVariantCount: 1,
       stockLevel: 'low_stock',
@@ -129,6 +133,27 @@ describeDb('ProductsService — list and counts', () => {
     expect(data.find((item) => item.name === 'Hijab set')!.stockLevel).toBe('in_stock');
   });
 
+  it('lists and filters by what is available, not what is on hand', async () => {
+    const held = await seedProduct(t.db, t.merchantA, { name: 'Held Shawl', status: 'active' });
+    await seedVariant(t.db, t.merchantA, held.id, {
+      name: null,
+      isDefault: true,
+      stock: 4,
+      reserved: 4,
+    });
+    const out = await list({ filter: 'out_of_stock', q: 'Held Shawl' });
+    // The other specs count every product of the shop, so leave none behind.
+    await t.db.delete(schema.product).where(eq(schema.product.id, held.id));
+    expect(out.data.map((item) => [item.name, item.available, item.stockLevel])).toEqual([
+      ['Held Shawl', 0, 'out_of_stock'],
+    ]);
+    expect(out.data[0]?.variant).toMatchObject({
+      stock: 4,
+      available: 0,
+      stockLevel: 'out_of_stock',
+    });
+  });
+
   it('carries a lone variant inline, named when it has option values', async () => {
     const { data } = await list();
     const hijab = data.find((item) => item.name === 'Hijab set')!;
@@ -138,6 +163,7 @@ describeDb('ProductsService — list and counts', () => {
       sku: 'HIJ-SET-01',
       price: 69000,
       stock: 40,
+      available: 40,
       stockLevel: 'in_stock',
       thumbnailUrl: null,
     });

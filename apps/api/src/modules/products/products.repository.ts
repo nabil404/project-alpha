@@ -36,7 +36,7 @@ export interface ProductTotals {
   variantCount: number;
   priceMin: number;
   priceMax: number;
-  stock: number;
+  available: number;
   lowCount: number;
   outCount: number;
 }
@@ -157,7 +157,7 @@ export class ProductsRepository {
           variantCount: totals.variantCount,
           priceMin: totals.priceMin,
           priceMax: totals.priceMax,
-          stock: totals.stock,
+          available: totals.available,
           lowCount: totals.lowCount,
           outCount: totals.outCount,
         },
@@ -368,18 +368,17 @@ export class ProductsRepository {
 
 /** Per product: its live variants counted, priced and summed. */
 function variantTotals(executor: Executor, { merchantId }: TenantScope) {
-  const low = sql`${productVariant.stock} > 0 and ${productVariant.stock} <= ${LOW_STOCK_THRESHOLD}`;
+  const available = sql`(${productVariant.stock} - ${productVariant.reserved})`;
+  const low = sql`${available} > 0 and ${available} <= ${LOW_STOCK_THRESHOLD}`;
   return executor
     .select({
       productId: productVariant.productId,
       variantCount: sql<number>`count(*)::int`.as('variant_count'),
       priceMin: sql<number>`min(${productVariant.price})::int`.as('price_min'),
       priceMax: sql<number>`max(${productVariant.price})::int`.as('price_max'),
-      stock: sql<number>`coalesce(sum(${productVariant.stock}), 0)::int`.as('stock_total'),
+      available: sql<number>`coalesce(sum(${available}), 0)::int`.as('available_total'),
       lowCount: sql<number>`(count(*) filter (where ${low}))::int`.as('low_count'),
-      outCount: sql<number>`(count(*) filter (where ${productVariant.stock} = 0))::int`.as(
-        'out_count',
-      ),
+      outCount: sql<number>`(count(*) filter (where ${available} = 0))::int`.as('out_count'),
     })
     .from(productVariant)
     .where(and(eq(productVariant.merchantId, merchantId), liveVariant()))
@@ -397,9 +396,9 @@ function stockCondition(
   const flagged = sql`${totals.lowCount} + ${totals.outCount}`;
   switch (level) {
     case 'out_of_stock':
-      return sql`${totals.stock} = 0`;
+      return sql`${totals.available} = 0`;
     case 'low_stock':
-      return sql`${totals.stock} > 0 and ${flagged} > 0`;
+      return sql`${totals.available} > 0 and ${flagged} > 0`;
     case 'in_stock':
       return sql`${flagged} = 0`;
   }
