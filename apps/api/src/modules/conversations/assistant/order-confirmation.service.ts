@@ -16,6 +16,7 @@ import {
   OrderCatalogRepository,
   type OrderableVariant,
 } from '../../orders/order-catalog.repository';
+import { insufficientStockVariant } from '../../orders/order-errors';
 import { OrdersRepository } from '../../orders/orders.repository';
 import { OrdersService } from '../../orders/orders.service';
 import type { AssistantTurnJob } from '../../queue/queue.constants';
@@ -313,27 +314,41 @@ export class OrderConfirmationService {
       };
     }
 
-    const { order, created } = await this.ordersService.createInTransaction(
-      tx,
-      scope,
-      null,
-      {
-        customerId: conversation.customerId,
-        items: quote.lines.map((line) => ({
-          variantId: line.variantId,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-        })),
-        deliveryFee: quote.deliveryFee,
-        deliveryChargeId: quote.deliveryChargeId,
-        customerName: slots.customerName,
-        phone: slots.phone,
-        deliveryAddress: slots.deliveryAddress,
-        paymentMethod: 'cash_on_delivery',
-      },
-      key,
-      { source: 'assistant', conversationId: conversation.id },
-    );
+    // A savepoint: another customer's draft can take the stock between the
+    // check above and the reservation, and that refusal must leave the
+    // conversation's lock and state usable for the reply.
+    let placed: Awaited<ReturnType<OrdersService['createInTransaction']>>;
+    try {
+      placed = await tx.transaction((savepoint) =>
+        this.ordersService.createInTransaction(
+          savepoint,
+          scope,
+          null,
+          {
+            customerId: conversation.customerId,
+            items: quote.lines.map((line) => ({
+              variantId: line.variantId,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+            })),
+            deliveryFee: quote.deliveryFee,
+            deliveryChargeId: quote.deliveryChargeId,
+            customerName: slots.customerName,
+            phone: slots.phone,
+            deliveryAddress: slots.deliveryAddress,
+            paymentMethod: 'cash_on_delivery',
+          },
+          key,
+          { source: 'assistant', conversationId: conversation.id },
+        ),
+      );
+    } catch (error) {
+      const short = insufficientStockVariant(error);
+      if (short === null) throw error;
+      const gone = quote.lines.filter((line) => line.variantId === short);
+      return unavailable(slots, gone, variants, language);
+    }
+    const { order, created } = placed;
     return {
       outcome: created ? 'ordered' : 'replayed',
       state: 'confirmed',

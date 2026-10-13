@@ -1,5 +1,10 @@
+import { HttpException } from '@nestjs/common';
 import type { OrderStatus } from '@app/shared';
-import { CodedConflictException, CodedNotFoundException } from '../../common/errors/index';
+import {
+  CodedConflictException,
+  CodedNotFoundException,
+  isCodedErrorBody,
+} from '../../common/errors/index';
 
 export const orderNotFound = (id: string) =>
   new CodedNotFoundException('ORDER_NOT_FOUND', 'Order not found', { id });
@@ -27,3 +32,11 @@ export const orderInsufficientStock = (variant: { id: string; name: string; avai
     name: variant.name,
     available: variant.available,
   });
+
+/** The variant an ORDER_INSUFFICIENT_STOCK refusal names, or null for any other error. */
+export function insufficientStockVariant(error: unknown): string | null {
+  if (!(error instanceof HttpException)) return null;
+  const body = error.getResponse();
+  if (!isCodedErrorBody(body) || body.code !== 'ORDER_INSUFFICIENT_STOCK') return null;
+  return typeof body.params.variantId === 'string' ? body.params.variantId : null;
+}
