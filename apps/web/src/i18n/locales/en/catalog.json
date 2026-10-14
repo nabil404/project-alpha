@@ -375,5 +375,17 @@
     "next": "Next photo",
     "position": "{{current}} of {{total}}",
     "previous": "Previous photo"
+  },
+  "messengerLink": {
+    "title": "Messenger link",
+    "description": "Opens a chat with this product already chosen. The assistant asks only for the size.",
+    "label": "Link",
+    "copy": "Copy",
+    "copied": "Link copied",
+    "qrLabel": "QR code for the Messenger link",
+    "printHint": "Print it on a tag, a flyer or the parcel. Scanning opens Messenger on the phone.",
+    "download": "Download QR",
+    "notPublished": "Works only while the product is Published. Draft or archived, the link starts a normal chat instead.",
+    "notConnected": "Connect your Facebook Page in Settings to get a link."
   }
 }
