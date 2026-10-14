@@ -12,11 +12,15 @@ interface InboundMessageBase {
   sentAt: number;
 }
 
+/** Where a chat came from: a product link (`m.me/<page>?ref=p_<id>`) or an ad. */
+export type Referral = { kind: 'link'; productId: string } | { kind: 'ad'; adId: string };
+
 /** A customer wrote to the Page, or tapped one of our quick replies (which carries its payload). */
 export interface CustomerMessageJob extends InboundMessageBase {
   kind: 'customer-message';
   senderPsid: string;
   payload?: string;
+  referral?: Referral;
 }
 
 /**
@@ -27,6 +31,17 @@ export interface CustomerPostbackJob extends InboundMessageBase {
   kind: 'customer-postback';
   senderPsid: string;
   payload: string;
+  referral?: Referral;
+}
+
+/**
+ * A returning customer opened a link or an ad: no message, no postback.
+ * The parser sets `text` to ''; the ingest fills it in.
+ */
+export interface CustomerReferralJob extends InboundMessageBase {
+  kind: 'customer-referral';
+  senderPsid: string;
+  referral: Referral;
 }
 
 /**
@@ -39,7 +54,8 @@ export interface PageEchoJob extends InboundMessageBase {
   appId?: string;
 }
 
-export type InboundMessageJob = CustomerMessageJob | CustomerPostbackJob | PageEchoJob;
+export type InboundMessageJob =
+  CustomerMessageJob | CustomerPostbackJob | CustomerReferralJob | PageEchoJob;
 
 /** Housekeeping for object storage. Jobs are scheduled by the worker, never by the API. */
 export const STORAGE_QUEUE = 'storage-maintenance';

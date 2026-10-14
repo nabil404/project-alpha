@@ -77,7 +77,8 @@ export class InboundMessageIngest {
     const scope: TenantScope = { merchantId };
     const psid = job.kind === 'page-echo' ? job.recipientPsid : job.senderPsid;
     const sender: MessageSender = job.kind === 'page-echo' ? 'seller' : 'customer';
-    const payload = job.kind === 'page-echo' ? undefined : job.payload;
+    const payload =
+      job.kind === 'page-echo' || job.kind === 'customer-referral' ? undefined : job.payload;
     const tapped = payload === undefined ? null : parsePayload(payload);
     const cardTap = tapped?.kind === 'confirm' || tapped?.kind === 'change';
     const sentAt = new Date(job.sentAt);
