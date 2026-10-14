@@ -5,9 +5,11 @@ import { useErrorMessages } from '@/i18n/error-keys';
 
 import { useFacebookPage } from '../queries';
 import { ChoosePageCard } from './ChoosePageCard';
+import { AdProductsCard } from './AdProductsCard';
 import { ConnectedPageCard } from './ConnectedPageCard';
 import { ConnectPageCard } from './ConnectPageCard';
 import { NotConnectedNotice } from './NotConnectedNotice';
+import { WelcomeScreenCard } from './WelcomeScreenCard';
 
 /**
  * Settings > Messenger. Which card shows follows the connection flow:
@@ -47,7 +49,11 @@ export function MessengerSettings({
       {step === 'choose-page' ? (
         <ChoosePageCard currentPageId={connected?.pageId} onDone={onFlowDone} />
       ) : connected ? (
-        <ConnectedPageCard page={connected} />
+        <>
+          <ConnectedPageCard page={connected} />
+          <WelcomeScreenCard />
+          <AdProductsCard />
+        </>
       ) : (
         <ConnectPageCard />
       )}
