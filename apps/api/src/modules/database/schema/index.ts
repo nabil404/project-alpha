@@ -18,3 +18,4 @@ export * from './settings';
 export * from './delivery';
 export * from './assistant';
 export * from './ads';
+export * from './posts';

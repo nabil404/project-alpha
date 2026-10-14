@@ -24,6 +24,7 @@ import {
   matchArea,
   matchProduct,
   matchVariant,
+  MAX_CANDIDATES,
   type CatalogView,
   type DeliveryArea,
 } from './catalog-match';
@@ -505,7 +506,11 @@ function addProduct(
   return { slots: { ...slots, items: [...slots.items, { productId }] }, item: slots.items.length };
 }
 
+/** A pick fills its item; a product picked for the item one past the end (a shared post) adds it. */
 function applyPick(slots: CollectedSlots, pick: ItemPick): CollectedSlots {
+  if (pick.slot === 'product' && pick.item === slots.items.length) {
+    return { ...slots, items: [...slots.items, { productId: pick.id }], offered: undefined };
+  }
   const items = slots.items.map((item, index) => {
     if (index !== pick.item) return item;
     if (pick.slot === 'variant') return { ...item, variantId: pick.id };
@@ -707,6 +712,52 @@ export function mergeExtraction(
 function words(value: string | null): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+/**
+ * A shared post whose product is inferred, not linked: the customer confirms
+ * it before it fills a slot. Up to three sellable candidates are offered as
+ * quick replies for a new item ("Do you mean the Jamdani Saree?"), and a tap
+ * adds it. With none, the assistant asks which product, and the next ask
+ * for it hands off. The post's own words are never read as an order.
+ */
+export function decideSharedPost(
+  input: Omit<TurnInput, 'trigger'>,
+  productIds: readonly string[],
+): TurnDecision {
+  const { slots, catalog } = input;
+  if (slots.items.length >= MAX_ORDER_ITEMS) return handOff(slots, 'awaiting_seller');
+  const choices = productIds
+    .map((id) => findProduct(catalog, id))
+    .filter((product): product is Product => product !== undefined)
+    .filter((product) => product.variants.some((variant) => variant.available > 0))
+    .slice(0, MAX_CANDIDATES)
+    .map((product): Choice => ({ id: product.id, title: product.name }));
+  const item = slots.items.length;
+  const asked: CollectedSlots = {
+    ...slots,
+    offered:
+      choices.length > 0
+        ? { slot: 'product', item, ids: choices.map((choice) => choice.id) }
+        : undefined,
+    lastAsked: { slot: 'product', item, times: choices.length > 0 ? 1 : MAX_ASKS - 1 },
+    ...(input.state === 'awaiting_confirmation'
+      ? { quote: undefined, revision: slots.revision + 1 }
+      : {}),
+  };
+  return {
+    state: hasCollectedAnything(slots) ? 'collecting_details' : 'browsing',
+    slots: asked,
+    reply: {
+      kind: 'ask_slot',
+      slot: 'product',
+      item,
+      intent: 'order',
+      reason: choices.length > 0 ? 'shared_post' : 'shared_post_unknown',
+      ...(choices.length > 0 ? { choices } : {}),
+      facts: factsOf(asked, input),
+    },
+  };
 }
 
 export function handOff(slots: CollectedSlots, reason: HandoffReason): TurnDecision {

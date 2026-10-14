@@ -75,7 +75,11 @@ their Facebook sign-in identity.
   [Page connection feature doc](../features/03-facebook-page/README.md)).
   The [AI phases](../features/11-ai-implementation/README.md#app-review) add
   `pages_read_engagement`, `pages_read_user_content` and
-  `pages_manage_engagement` to that step as they land.
+  `pages_manage_engagement` to that step as they land. `pages_read_engagement`
+  is asked for since phase 5, but a seller who declines it still connects
+  (`PAGE_OPTIONAL_SCOPES`); only reading a shared post's caption and the
+  product page's post picker need it. Pages connected earlier reconnect to
+  grant it.
 - Facebook identities never link automatically to an existing account by
   email, because Facebook does not guarantee a verified address.
 - The webhook needs a public HTTPS URL, even in development (see

@@ -29,7 +29,7 @@ import {
   GraphError,
   MESSAGING_TASK,
   MetaGraphClient,
-  PAGE_CONNECT_SCOPES,
+  PAGE_REQUIRED_SCOPES,
 } from './meta-graph.client';
 import {
   PAGE_CONNECT_TTL_MS,
@@ -116,7 +116,7 @@ export class FacebookPageService {
       },
     );
     const granted = await this.callGraph(() => graph.grantedPermissions(userToken));
-    const missing = PAGE_CONNECT_SCOPES.filter((scope) => !granted.has(scope));
+    const missing = PAGE_REQUIRED_SCOPES.filter((scope) => !granted.has(scope));
     if (missing.length > 0) throw facebookPermissionsDeclined(missing);
 
     return sealFlow(this.crypto, {

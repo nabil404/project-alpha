@@ -204,6 +204,15 @@ describeDb('FacebookPageService', () => {
       );
     });
 
+    it('connects without pages_read_engagement, which only shared posts need', async () => {
+      graph.granted.delete('pages_read_engagement');
+      const { url, cookie } = service.start(ownerA());
+      const state = new URL(url).searchParams.get('state') ?? '';
+      await expect(
+        service.completeAuthorization(ownerA(), cookie, { code: 'good-code', state }),
+      ).resolves.toBeDefined();
+    });
+
     it('maps a rejected code and an unreachable Facebook to their own codes', async () => {
       const { url, cookie } = service.start(ownerA());
       const state = new URL(url).searchParams.get('state') ?? '';

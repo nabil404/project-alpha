@@ -55,8 +55,10 @@ uses it as the BullMQ job id and the ingest stores it as `meta_message_id`:
 
 - **Attachments.** `sticker` (also an `image` carrying `sticker_id`, from
   older clients), `location` with `payload.coordinates`, and `image`,
-  `video`, `audio`, `file`. Any other type (`fallback`, `reel`, `post`, …) is
-  `other`.
+  `video`, `audio`, `file`. A `post`, `share` or `fallback` that carries a
+  link or a post id is a shared post
+  ([phase 5](../phase-5-shared-posts/README.md)). Any other type (`reel`, a
+  fallback with no payload, …) is `other`.
 - A reaction or edit whose sender is the Page itself makes no job. An echo
   without text still makes none.
 - **Unsend is undocumented for Messenger.** Meta's `messages` reference lists

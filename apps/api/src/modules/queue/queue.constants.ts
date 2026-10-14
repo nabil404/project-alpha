@@ -22,6 +22,17 @@ export type InboundAttachment =
   | { type: 'image' | 'video' | 'audio' | 'file' | 'other'; url: string | null };
 
 /**
+ * A Facebook post, ad or link shared or pasted into the chat. `url` is kept
+ * only on Facebook's own hosts; `postId` is the id a `post` attachment
+ * carries.
+ */
+export interface SharedLink {
+  url: string | null;
+  title: string | null;
+  postId: string | null;
+}
+
+/**
  * A customer wrote to the Page, or tapped one of our quick replies (which
  * carries its payload). With no words, `text` is '' and `attachments` holds
  * what they sent instead.
@@ -32,6 +43,8 @@ export interface CustomerMessageJob extends InboundMessageBase {
   payload?: string;
   referral?: Referral;
   attachments?: InboundAttachment[];
+  /** Posts and links shared or pasted, with or without words. */
+  links?: SharedLink[];
 }
 
 /**

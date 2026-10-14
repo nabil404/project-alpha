@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { LlmModule } from '../../llm/llm.module';
 import { FacebookPageModule } from '../../messenger/page/facebook-page.module';
+import { ProductPostsModule } from '../../messenger/posts/product-posts.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { OrdersModule } from '../../orders/orders.module';
 import { ProductsModule } from '../../products/products.module';
@@ -19,6 +20,7 @@ import { OrderConfirmationService } from './order-confirmation.service';
     QueueModule,
     LlmModule,
     FacebookPageModule,
+    ProductPostsModule,
     ConversationsModule,
     SettingsModule,
     NotificationsModule,

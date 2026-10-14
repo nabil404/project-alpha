@@ -389,5 +389,33 @@
     "notConnected": "Connect your Facebook Page in Settings to get a link.",
     "copyFailed": "Couldn't copy. Select the link and copy it by hand.",
     "downloadFailed": "Couldn't create the QR image. Try again."
+  },
+  "posts": {
+    "accept": "Accept",
+    "accepted": "Post linked",
+    "description": "When a customer shares one of these posts or ads into Messenger, the assistant knows the product and asks only for the size or colour.",
+    "dismiss": "Dismiss",
+    "empty": "No posts linked yet.",
+    "isLinked": "Linked",
+    "link": "Link",
+    "linked": "Post linked",
+    "linkedTo": "Linked to {{name}}",
+    "loading": "Loading your Page's posts…",
+    "noCaption": "A post without text",
+    "noRecent": "Your Page has no posts yet.",
+    "notConnected": "Connect your Facebook Page in Settings to choose from its posts. You can still paste a post's link.",
+    "notPublished": "Shared posts lead here only while the product is Published.",
+    "open": "Open on Facebook",
+    "pick": "Choose from your Page",
+    "pickDescription": "Your Page's 25 newest posts. Link the ones that sell {{name}}.",
+    "pickTitle": "Choose posts",
+    "removed": "Post removed",
+    "suggestedHint": "A customer shared these and the caption named this product. Accept to answer the next customer without asking.",
+    "suggestedTitle": "Suggested by the assistant",
+    "title": "Facebook posts",
+    "unlink": "Unlink",
+    "untitled": "Post {{id}}",
+    "urlLabel": "Post link",
+    "urlPlaceholder": "Paste a post's link from Facebook"
   }
 }

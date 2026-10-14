@@ -188,6 +188,7 @@ export const messageKinds = [
   'video',
   'audio',
   'file',
+  'share',
   'other',
 ] as const;
 export const messageKindSchema = z.enum(messageKinds);
@@ -198,6 +199,15 @@ export const messageAttachmentSchema = z
   .object({ url: z.string().url().nullable() })
   .meta({ id: 'MessageAttachment' });
 export type MessageAttachment = z.infer<typeof messageAttachmentSchema>;
+
+/**
+ * A Facebook post, ad or link the customer shared or pasted. `url` is null
+ * when Meta sent none on Facebook's own hosts, or none over https.
+ */
+export const messageLinkSchema = z
+  .object({ url: z.string().url().nullable(), title: z.string().nullable() })
+  .meta({ id: 'MessageLink' });
+export type MessageLink = z.infer<typeof messageLinkSchema>;
 
 /** Messenger's limit on one text message. */
 export const MESSAGE_TEXT_MAX_LENGTH = 2000;
@@ -309,6 +319,8 @@ export const messageSchema = z
     /** A sticker's image or the files sent; empty for the other kinds. */
     attachments: z.array(messageAttachmentSchema),
     location: z.object({ lat: z.number(), long: z.number() }).nullable(),
+    /** Facebook posts or links shared or pasted, for `share` and for words that carried one. */
+    links: z.array(messageLinkSchema),
     /** The emoji, and the id of the message reacted to when we have it. */
     reaction: z.object({ emoji: z.string(), messageId: z.string().uuid().nullable() }).nullable(),
     /** The customer's latest edit; `text` keeps what they first sent. */

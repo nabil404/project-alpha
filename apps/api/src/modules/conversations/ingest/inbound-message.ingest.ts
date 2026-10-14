@@ -294,10 +294,11 @@ export class InboundMessageIngest {
         },
       };
     }
-    if (job.kind === 'customer-message' && job.attachments && !job.text) {
-      return attachmentContent(job.attachments);
-    }
-    return { kind: 'text', text, details: null };
+    if (job.kind !== 'customer-message') return { kind: 'text', text, details: null };
+    const links = job.links ?? [];
+    if (!job.text && links.length > 0) return { kind: 'share', text: '', details: { links } };
+    if (job.attachments && !job.text) return attachmentContent(job.attachments);
+    return { kind: 'text', text, details: links.length > 0 ? { links } : null };
   }
 
   /**

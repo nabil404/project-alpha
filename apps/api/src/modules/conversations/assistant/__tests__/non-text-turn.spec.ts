@@ -38,6 +38,11 @@ const NON_TEXT: { kind: MessageKind; text?: string }[] = [
 ];
 
 describe('decideNonText', () => {
+  it('leaves a shared post to the turn, in any state, so it is never a confirmation', () => {
+    expect(decide('browsing', 'share')).toBeNull();
+    expect(decide('awaiting_confirmation', 'share')).toBeNull();
+  });
+
   it('leaves words to the LLM', () => {
     expect(decide('browsing', 'text', { text: 'red saree' })).toBeNull();
     expect(decide('awaiting_confirmation', 'text', { text: 'ok 👍' })).toBeNull();

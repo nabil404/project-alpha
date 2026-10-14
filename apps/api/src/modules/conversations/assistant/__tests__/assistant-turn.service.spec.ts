@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import { emptySlots, MAX_ORDER_ITEMS, type ExtractedOrder, type IntentResult } from '@app/shared';
 import { eq } from 'drizzle-orm';
@@ -28,9 +29,13 @@ import type {
   LlmResult,
 } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
+import { ProductPostRepository } from '../../../messenger/posts/product-post.repository';
+import type { SharedLink } from '../../../queue/queue.constants';
+import { SharedPostResolver } from '../../../messenger/posts/shared-post.resolver';
 import {
   GraphError,
   type GraphOption,
+  type GraphPost,
   type MetaGraphClient,
 } from '../../../messenger/page/meta-graph.client';
 import type { NotificationsService } from '../../../notifications/notifications.service';
@@ -121,6 +126,8 @@ describeDb('AssistantTurnService (app_runtime)', () => {
   let notifyFailures: number;
   let handoffs: { merchantId: string; conversationId: string; at: Date }[];
   let cardTaps: CardTap[];
+  /** Posts Graph can read, by Graph id; any other read fails as a missing permission. */
+  const graphPosts = new Map<string, GraphPost>();
 
   const send = (
     kind: (typeof rich)[number]['kind'],
@@ -142,6 +149,12 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     sendImage: (_token: string, psid: string, url: string) => send('image', psid, url),
     sendGenericTemplate: (_token: string, psid: string, cards: { title: string }[]) =>
       send('carousel', psid, cards.map((card) => card.title).join(', ')),
+    getPost: (_token: string, id: string) => {
+      const post = graphPosts.get(id);
+      return post
+        ? Promise.resolve(post)
+        : Promise.reject(new GraphError(403, 10, 'no permission'));
+    },
   } as unknown as MetaGraphClient;
 
   const service = (client: LlmClient | null = llm) => {
@@ -180,6 +193,10 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         },
       } as unknown as OrderConfirmationService,
       new OrdersRepository(),
+      new SharedPostResolver(runtime.db, new ProductPostRepository(), crypto, graph, () =>
+        Promise.reject(new Error('no short links in this spec')),
+      ),
+      new ProductPostRepository(),
     );
   };
 
@@ -776,6 +793,215 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         expect(rich.at(-1)?.payloads).toEqual([]);
         expect(sent.at(-1)?.text).not.toContain('Shop B Customer');
         expect((await conversationRow(convo.id))?.collectedSlots).not.toHaveProperty('offeredName');
+      });
+    });
+
+    describe('shared posts', () => {
+      /** A conversation the assistant has answered, then a share: the burst is the share alone. */
+      const share = async (links: SharedLink[], words: string | null = null) => {
+        const made = await thread();
+        await seedMessage(t.db, t.merchantA, made.convo.id, {
+          sender: 'assistant',
+          sentAt: new Date(Date.now() - 800),
+          text: 'Hello!',
+        });
+        const shared = await seedMessage(t.db, t.merchantA, made.convo.id, {
+          sentAt: new Date(Date.now() - 500),
+          kind: 'share',
+          text: '',
+          details: { links },
+        });
+        const trigger = words
+          ? await seedMessage(t.db, t.merchantA, made.convo.id, { sentAt: new Date(), text: words })
+          : shared;
+        return { ...made, job: { ...made.job, triggerMessageId: trigger.id } };
+      };
+      const postId = () => String(Math.floor(Math.random() * 1e14));
+      const twoColours = async (name: string) => {
+        const row = await seedProduct(t.db, t.merchantA, { name, status: 'active' });
+        for (const colour of ['Red', 'Blue']) {
+          await seedVariant(t.db, t.merchantA, row.id, { name: colour, price: 450_000, stock: 5 });
+        }
+        return row;
+      };
+      const postsOf = (productId: string) =>
+        t.db.select().from(schema.productPost).where(eq(schema.productPost.productId, productId));
+      const slotsOf = async (id: string) => (await conversationRow(id))?.collectedSlots;
+
+      it('resolves a linked post with no LLM call and asks for its variant', async () => {
+        const jamdani = await twoColours('Turnservice Linked Jamdani');
+        const id = postId();
+        await t.db.insert(schema.productPost).values({
+          merchantId: t.merchantA,
+          productId: jamdani.id,
+          postId: id,
+          status: 'linked',
+        });
+        const { convo, job } = await share([
+          { url: null, title: 'New Jamdani', postId: `${pageA}_${id}` },
+        ]);
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        expect(rich.at(-1)?.kind).toBe('quick_replies');
+        expect(await slotsOf(convo.id)).toMatchObject({
+          items: [{ productId: jamdani.id }],
+          lastAsked: { slot: 'variant', item: 0 },
+        });
+      });
+
+      it('resolves a pfbid-only share of a post linked by its number, through Graph', async () => {
+        // The shape Messenger sent on the dev Page (Oct 14, 2026): only a pfbid
+        // permalink, while the seller linked the post's numeric link.
+        const jamdani = await twoColours('Turnservice Numeric Jamdani');
+        const number = postId();
+        const pfbid = `pfbid02${randomUUID().replaceAll('-', '')}`;
+        await t.db.insert(schema.productPost).values({
+          merchantId: t.merchantA,
+          productId: jamdani.id,
+          postId: number,
+          url: `https://www.facebook.com/122110277373500449/posts/${number}`,
+          status: 'linked',
+        });
+        graphPosts.set(`${pageA}_${pfbid}`, {
+          id: `${pageA}_${number}`,
+          message: 'This is a test post',
+          permalinkUrl: `https://www.facebook.com/122110277373500449/posts/${number}`,
+          pictureUrl: null,
+          createdTime: null,
+        });
+        const shared = `https://www.facebook.com/permalink.php?story_fbid=${pfbid}&id=61595013491325`;
+        const { convo, job } = await share([{ url: shared, title: null, postId: null }]);
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        expect(await slotsOf(convo.id)).toMatchObject({
+          items: [{ productId: jamdani.id }],
+          lastAsked: { slot: 'variant', item: 0 },
+        });
+        // The pfbid is kept, so the next share matches without Graph.
+        expect(await postsOf(jamdani.id)).toEqual([
+          expect.objectContaining({ postId: number, aliasId: pfbid, status: 'linked' }),
+        ]);
+        graphPosts.delete(`${pageA}_${pfbid}`);
+        const again = await share([{ url: shared, title: null, postId: null }]);
+        await service().run(again.job);
+        expect(await slotsOf(again.convo.id)).toMatchObject({ items: [{ productId: jamdani.id }] });
+      });
+
+      it('matches a linked post by the pfbid id of its link', async () => {
+        const jamdani = await twoColours('Turnservice Pfbid Jamdani');
+        const pfbid = `pfbid0${randomUUID().replaceAll('-', '')}`;
+        await t.db.insert(schema.productPost).values({
+          merchantId: t.merchantA,
+          productId: jamdani.id,
+          postId: postId(),
+          aliasId: pfbid,
+          status: 'linked',
+        });
+        const { convo, job } = await share([
+          { url: `https://www.facebook.com/shop/posts/${pfbid}`, title: null, postId: null },
+        ]);
+
+        await service().run(job);
+
+        expect(llm.calls).toEqual([]);
+        expect(await slotsOf(convo.id)).toMatchObject({ items: [{ productId: jamdani.id }] });
+      });
+
+      it('runs the LLM on words sent with a linked post, the item already collected', async () => {
+        const jamdani = await twoColours('Turnservice Typed Linked Jamdani');
+        const id = postId();
+        await t.db.insert(schema.productPost).values({
+          merchantId: t.merchantA,
+          productId: jamdani.id,
+          postId: id,
+          status: 'linked',
+        });
+        llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
+        const { job } = await share(
+          [{ url: null, title: null, postId: `${pageA}_${id}` }],
+          'how much is this?',
+        );
+
+        await service().run(job);
+
+        expect(llm.calls).toContain('classify');
+        expect(llm.extractContexts.at(-1)?.items).toEqual([
+          expect.objectContaining({ product: 'Turnservice Typed Linked Jamdani' }),
+        ]);
+      });
+
+      it('reads an unlinked post by its caption, asks to confirm, and stores a suggestion', async () => {
+        const katan = await twoColours('Turnservice Caption Katan');
+        const id = postId();
+        graphPosts.set(`${pageA}_${id}`, {
+          id: `${pageA}_${id}`,
+          message: 'New stock! Turnservice Caption Katan in two colours, order now',
+          permalinkUrl: `https://www.facebook.com/shop/posts/${id}`,
+          pictureUrl: null,
+          createdTime: null,
+        });
+        const { convo, job } = await share([{ url: null, title: null, postId: id }]);
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        const ask = rich.at(-1);
+        expect(ask?.kind).toBe('quick_replies');
+        expect(ask?.payloads).toEqual([`pick:product:${katan.id}`]);
+        expect(sent.at(-1)?.text).toContain('Turnservice Caption Katan');
+        // Nothing is filled until the customer confirms.
+        expect(await slotsOf(convo.id)).toMatchObject({
+          items: [],
+          offered: { slot: 'product', item: 0, ids: [katan.id] },
+        });
+        expect(await postsOf(katan.id)).toEqual([
+          expect.objectContaining({ postId: id, status: 'suggested', caption: expect.any(String) }),
+        ]);
+
+        const tap = await seedMessage(t.db, t.merchantA, convo.id, {
+          sentAt: new Date(),
+          text: 'Turnservice Caption Katan',
+          payload: `pick:product:${katan.id}`,
+        });
+        await service().run({ ...job, triggerMessageId: tap.id });
+
+        expect(llm.calls).toEqual([]);
+        expect(await slotsOf(convo.id)).toMatchObject({
+          items: [{ productId: katan.id }],
+          lastAsked: { slot: 'variant', item: 0 },
+        });
+      });
+
+      it('asks which product when the post cannot be read, and hands off at the next ask', async () => {
+        const { convo, job } = await share([
+          { url: 'https://www.facebook.com/shop/posts/hello', title: null, postId: postId() },
+        ]);
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        expect(rich.at(-1)?.kind).toBe('text');
+        const slots = await slotsOf(convo.id);
+        expect(slots).toMatchObject({
+          items: [],
+          lastAsked: { slot: 'product', item: 0, times: 2 },
+        });
+        expect(slots).not.toHaveProperty('offered');
+
+        // The customer still names nothing the shop sells.
+        llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
+        llm.extraction = ok({ ...NOTHING, items: [item('something else entirely')] }, 'extract');
+        const reply = await seedMessage(t.db, t.merchantA, convo.id, {
+          sentAt: new Date(),
+          text: 'the nice one',
+        });
+        await expect(service().run({ ...job, triggerMessageId: reply.id })).resolves.toBe(
+          'handed_off',
+        );
       });
     });
 

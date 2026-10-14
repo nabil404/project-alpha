@@ -49,6 +49,7 @@ import { DeleteProductButton } from './DeleteProductButton';
 import { DeliveryChargeCard } from './DeliveryChargeCard';
 import { MessengerLinkCard } from './MessengerLinkCard';
 import { PhotosCard } from './PhotosCard';
+import { ProductPostsCard } from './ProductPostsCard';
 import { ProductStatusBadge } from './ProductStatusBadge';
 import { VariantsCard } from './VariantsCard';
 
@@ -278,6 +279,7 @@ export function ProductEditor({ product }: { product?: Product }) {
             <div className="flex min-w-0 flex-col gap-6">
               <StatusCard />
               {product && <MessengerLinkCard product={product} />}
+              {product && <ProductPostsCard product={product} />}
               <OrganisationCard />
               <StockSummaryCard product={product} />
               <DeliveryChargeCard className={card} />

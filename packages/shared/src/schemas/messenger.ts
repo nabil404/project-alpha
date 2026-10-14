@@ -171,3 +171,74 @@ export const updateAdProductSchema = z
   .strict()
   .meta({ id: 'UpdateAdProduct' });
 export type UpdateAdProduct = z.infer<typeof updateAdProductSchema>;
+
+/**
+ * A Facebook post linked to a product: `linked` by the seller, or `suggested`
+ * by the assistant after a customer shared it and its caption named the
+ * product. Only a linked post resolves a share without asking the customer.
+ */
+export const productPostStatuses = ['linked', 'suggested'] as const;
+export const productPostStatusSchema = z.enum(productPostStatuses);
+export type ProductPostStatus = z.infer<typeof productPostStatusSchema>;
+
+/** Longest post link the seller may paste. */
+export const PRODUCT_POST_URL_MAX = 2048;
+
+export const productPostSchema = z
+  .object({
+    id: z.string().uuid(),
+    /** Facebook's id for the post: a number, or a `pfbid…` id read from a link. */
+    postId: z.string().min(1),
+    /** The post's link on Facebook, when known; always https. */
+    url: z.string().url().nullable(),
+    /** The post's text, when Facebook shared it. */
+    caption: z.string().nullable(),
+    status: productPostStatusSchema,
+    createdAt: z.string().datetime(),
+  })
+  .meta({ id: 'ProductPost' });
+export type ProductPost = z.infer<typeof productPostSchema>;
+
+export const productPostListResponseSchema = z
+  .object({ data: z.array(productPostSchema) })
+  .meta({ id: 'ProductPostListResponse' });
+export type ProductPostListResponse = z.infer<typeof productPostListResponseSchema>;
+
+/**
+ * POST /products/:productId/posts: a pasted link, or a post picked from the
+ * Page's recent posts by its Graph id (`<page id>_<post id>`).
+ */
+export const createProductPostSchema = z
+  .union([
+    z.object({ url: z.string().trim().min(1).max(PRODUCT_POST_URL_MAX) }).strict(),
+    z.object({ pagePostId: z.string().regex(/^\d+_\d+$/) }).strict(),
+  ])
+  .meta({ id: 'CreateProductPost' });
+export type CreateProductPost = z.infer<typeof createProductPostSchema>;
+
+/** PATCH /products/:productId/posts/:id: accept a suggestion. */
+export const updateProductPostSchema = z
+  .object({ status: z.literal('linked') })
+  .strict()
+  .meta({ id: 'UpdateProductPost' });
+export type UpdateProductPost = z.infer<typeof updateProductPostSchema>;
+
+/** One of the Page's recent posts, for the product page's picker. */
+export const pagePostSchema = z
+  .object({
+    /** Graph's id, `<page id>_<post id>`. */
+    id: z.string().min(1),
+    message: z.string().nullable(),
+    url: z.string().url().nullable(),
+    pictureUrl: z.string().url().nullable(),
+    createdAt: z.string().datetime().nullable(),
+    /** The product it is linked to already, if any. */
+    linkedProduct: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
+  })
+  .meta({ id: 'PagePost' });
+export type PagePost = z.infer<typeof pagePostSchema>;
+
+export const pagePostListResponseSchema = z
+  .object({ data: z.array(pagePostSchema) })
+  .meta({ id: 'PagePostListResponse' });
+export type PagePostListResponse = z.infer<typeof pagePostListResponseSchema>;

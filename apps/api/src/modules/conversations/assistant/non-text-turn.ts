@@ -35,6 +35,8 @@ export function decideNonText({
   /** The kind of the customer's message before the trigger, reactions aside. */
   previousKind: MessageKind | null;
 }): TurnDecision | 'silent' | null {
+  // A shared post is resolved to a product by the turn, in any state.
+  if (trigger.kind === 'share') return null;
   if (trigger.kind === 'text' && !isEmojiOnly(trigger.text)) return null;
   const say = (notice: Notice): TurnDecision => ({
     state,

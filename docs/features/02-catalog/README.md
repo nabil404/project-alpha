@@ -484,6 +484,10 @@ and builds with SWC into `dist/seed`, leaving the dev server's `dist` alone.
   connect one, and a product that is not Published gets a note, because the
   assistant ignores a link to it
   ([phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md#dashboard)).
+- **Facebook posts card** on the product page: posts linked to the product,
+  the assistant's suggestions with Accept and Dismiss, a field to paste a
+  post's link, and **Choose from your Page** for the Page's 25 newest posts
+  ([phase 11.5](../11-ai-implementation/phase-5-shared-posts/README.md#dashboard)).
 - **`/catalog/categories`**: the [Categories page](#categories-page).
 
 ## Not yet built
