@@ -15,6 +15,12 @@ const inboundMessageBase = {
   sentAt: z.number(),
 };
 
+/** Mirrors `Referral`; the assignment to InboundMessageJob below fails to compile if they drift. */
+const referralSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('link'), productId: z.guid() }),
+  z.object({ kind: z.literal('ad'), adId: z.string().min(1) }),
+]);
+
 /**
  * What the worker accepts from MESSENGER_QUEUE. A job queued before messages
  * carried a `kind` could only be a customer's message, so it reads as one.
@@ -30,12 +36,20 @@ const inboundMessageJobSchema = z.preprocess(
       kind: z.literal('customer-message'),
       senderPsid: z.string().min(1),
       payload: z.string().min(1).optional(),
+      referral: referralSchema.optional(),
     }),
     z.object({
       ...inboundMessageBase,
       kind: z.literal('customer-postback'),
       senderPsid: z.string().min(1),
       payload: z.string().min(1),
+      referral: referralSchema.optional(),
+    }),
+    z.object({
+      ...inboundMessageBase,
+      kind: z.literal('customer-referral'),
+      senderPsid: z.string().min(1),
+      referral: referralSchema,
     }),
     z.object({
       ...inboundMessageBase,
