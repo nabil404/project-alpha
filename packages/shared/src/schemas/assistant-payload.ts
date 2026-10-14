@@ -12,15 +12,21 @@ export type AssistantPayload =
   | { kind: 'start' }
   /** null: the category list; 'other': products with no category. */
   | { kind: 'browse'; categoryId: string | 'other' | null }
-  /** `choose` is a carousel tap; `ref` a product link or a mapped ad, stored by the ingest. */
-  | { kind: 'product'; via: 'choose' | 'ref'; id: string }
+  /**
+   * `choose` is a carousel tap; `ref` a product link or a mapped ad opened on
+   * its own or with Get Started; `ref-typed` one that came with a message the
+   * customer typed. The ingest stores both refs.
+   */
+  | { kind: 'product'; via: ProductVia; id: string }
   | { kind: 'menu'; item: 'last-order' | 'human' };
+
+export type ProductVia = 'choose' | 'ref' | 'ref-typed';
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const SUMMARY = new RegExp(`^(confirm|change):(${UUID}):(\\d{1,9})$`, 'i');
 const PICK = new RegExp(`^pick:(product|variant):(${UUID})$`, 'i');
 const CATEGORY = new RegExp(`^browse:cat:(${UUID}|other)$`, 'i');
-const PRODUCT = new RegExp(`^(choose|ref):product:(${UUID})$`, 'i');
+const PRODUCT = new RegExp(`^(choose|ref|ref-typed):product:(${UUID})$`, 'i');
 const MENU = /^menu:(last-order|human)$/;
 
 export function encodePayload(payload: AssistantPayload): string {
@@ -59,7 +65,7 @@ export function parsePayload(text: string): AssistantPayload | null {
   if (category) return { kind: 'browse', categoryId: (category[1] as string).toLowerCase() };
   const product = PRODUCT.exec(text);
   if (product) {
-    return { kind: 'product', via: product[1] as 'choose' | 'ref', id: product[2] as string };
+    return { kind: 'product', via: product[1] as ProductVia, id: product[2] as string };
   }
   const menu = MENU.exec(text);
   if (menu) return { kind: 'menu', item: menu[1] as 'last-order' | 'human' };

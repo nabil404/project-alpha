@@ -4,6 +4,7 @@ import {
   parsePayload,
   type AssistantPayload,
   type CollectedSlots,
+  type ProductVia,
 } from '@app/shared';
 import { OrdersRepository } from '../../orders/orders.repository';
 import { ProductsService } from '../../products/products.service';
@@ -32,12 +33,7 @@ import { isReplyWindowOpen } from '../conversation-rules';
 import { MessageRepository } from '../message.repository';
 import { OutboundMessageSender, type OutboundContent } from '../outbound-message.sender';
 import type { MessageRow } from '../../database/schema/index';
-import {
-  fallbackText,
-  languageFor,
-  REFERRAL_TEXT,
-  type ReplyLanguage,
-} from './assistant-fallbacks';
+import { fallbackText, languageFor, type ReplyLanguage } from './assistant-fallbacks';
 import { toChatLines } from './assistant-history';
 import type { CatalogView } from './catalog-match';
 import {
@@ -157,10 +153,8 @@ export class AssistantTurnService {
     };
     const pick = pickIn(read.recent, triggerMessageId, turn.slots);
     const entry = entryIn(tap);
-    const triggerText = read.recent.find((message) => message.id === triggerMessageId)?.text;
     // A ref that arrived with words of the customer's own is a message with a product attached.
-    const typedRef =
-      entry?.kind === 'product' && entry.via === 'ref' && !isReferralLine(triggerText);
+    const typedRef = entry?.kind === 'product' && entry.via === 'ref-typed';
     let decision: TurnDecision;
     let phrased = false;
     if (pick) {
@@ -173,8 +167,17 @@ export class AssistantTurnService {
         ...turn,
         trigger: { kind: 'entry', entry: { kind: 'product', productId: entry.productId } },
       });
-      decision = await this.decide({ ...turn, slots: added.slots }, history, calls);
-      phrased = true;
+      if (added.reply.kind === 'handoff') {
+        // No room for the product (R10): the seller answers, whatever the words said.
+        decision = added;
+      } else {
+        const answered = await this.decide({ ...turn, slots: added.slots }, history, calls);
+        decision =
+          answered.image === undefined && answered.reply.kind !== 'handoff' && added.image
+            ? { ...answered, image: added.image }
+            : answered;
+        phrased = true;
+      }
     } else {
       decision = await this.decide(turn, history, calls);
       phrased = true;
@@ -373,7 +376,7 @@ function pickIn(
 
 type EntryTap =
   | { kind: 'browse'; categoryId: string | 'other' | null }
-  | { kind: 'product'; productId: string; via: 'choose' | 'ref' }
+  | { kind: 'product'; productId: string; via: ProductVia }
   | { kind: 'last_order' }
   | { kind: 'human' };
 
@@ -391,11 +394,6 @@ function entryIn(tap: AssistantPayload | null): EntryTap | null {
     default:
       return null;
   }
-}
-
-/** The fixed line the ingest stores on a referral row that carried no words of the customer's. */
-function isReferralLine(text: string | undefined): boolean {
-  return Object.values(REFERRAL_TEXT).some((lines) => text === lines.link || text === lines.ad);
 }
 
 function toEntry(

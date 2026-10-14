@@ -611,8 +611,52 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
 
     const thread = await threadOf(job.senderPsid);
     expect(await messagesOf(thread!.conversation.id)).toMatchObject([
-      { payload: `ref:product:${product.id}` },
+      { payload: `ref-typed:product:${product.id}`, text: job.text },
     ]);
+  });
+
+  it('marks a typed message that carries a product link as ref-typed', async () => {
+    const job = customerMessage({ referral: { kind: 'link', productId: PRODUCT }, text: 'price?' });
+    await ingest.handle(job);
+
+    const thread = await threadOf(job.senderPsid);
+    expect(thread?.conversation.entrySource).toBe('link');
+    expect(await messagesOf(thread!.conversation.id)).toMatchObject([
+      { payload: `ref-typed:product:${PRODUCT}`, text: 'price?' },
+    ]);
+    expect(turns.added[0]?.opts).toMatchObject({ delay: 0 });
+  });
+
+  it('keeps a Get Started tap that carries a product link as ref, from the link', async () => {
+    const job: CustomerPostbackJob = {
+      kind: 'customer-postback',
+      messageId: `mid-${randomUUID()}`,
+      pageId: pageA,
+      senderPsid: `psid-${randomUUID()}`,
+      text: 'Get Started',
+      payload: 'start',
+      referral: { kind: 'link', productId: PRODUCT },
+      sentAt: Date.parse('2026-10-14T09:00:00Z'),
+    };
+    await ingest.handle(job);
+
+    const thread = await threadOf(job.senderPsid);
+    expect(thread?.conversation.entrySource).toBe('link');
+    expect(await messagesOf(thread!.conversation.id)).toMatchObject([
+      { payload: `ref:product:${PRODUCT}`, text: 'Get Started' },
+    ]);
+  });
+
+  it('stores an unmapped ad opened on its own as browse, from the ad', async () => {
+    const job = referralJob({ referral: { kind: 'ad', adId: `ad-${randomUUID()}` } });
+    await ingest.handle(job);
+
+    const thread = await threadOf(job.senderPsid);
+    expect(thread?.conversation.entrySource).toBe('ad');
+    expect(await messagesOf(thread!.conversation.id)).toMatchObject([
+      { payload: 'browse', text: REFERRAL_TEXT.bn.ad },
+    ]);
+    expect(turns.added[0]?.opts).toMatchObject({ delay: 0 });
   });
 
   it('counts a redelivered ad referral once', async () => {

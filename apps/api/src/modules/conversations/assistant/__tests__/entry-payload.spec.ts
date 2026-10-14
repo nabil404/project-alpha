@@ -20,6 +20,7 @@ describe('entry payloads', () => {
     { kind: 'browse', categoryId: 'other' },
     { kind: 'product', via: 'choose', id: ID },
     { kind: 'product', via: 'ref', id: ID },
+    { kind: 'product', via: 'ref-typed', id: ID },
     { kind: 'menu', item: 'last-order' },
     { kind: 'menu', item: 'human' },
   ])('round-trips %j', (payload) => {

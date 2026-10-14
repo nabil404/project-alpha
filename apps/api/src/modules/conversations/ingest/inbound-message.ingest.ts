@@ -55,10 +55,15 @@ export function entryOf(
       : referral?.kind === 'ad'
         ? mappedProductId
         : null;
+  // Typed is decided here: only a message carries words of the customer's own.
   const payload = product
-    ? encodePayload({ kind: 'product', via: 'ref', id: product })
+    ? encodePayload({
+        kind: 'product',
+        via: job.kind === 'customer-message' ? 'ref-typed' : 'ref',
+        id: product,
+      })
     : job.kind === 'customer-referral'
-      ? null
+      ? encodePayload({ kind: 'browse', categoryId: null })
       : (job.payload ?? null);
   const source: EntrySource | null = referral
     ? referral.kind === 'ad'
