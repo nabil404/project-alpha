@@ -116,6 +116,26 @@ export interface OrderCustomer {
 
 @Injectable()
 export class OrdersRepository {
+  /** The customer's newest order in this shop, any status, for "My last order". */
+  async latestForCustomer(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    customerId: string,
+  ): Promise<{ reference: string; status: OrderStatus; total: number; currency: string } | null> {
+    const [row] = await executor
+      .select({
+        reference: order.reference,
+        status: order.status,
+        total: order.total,
+        currency: order.currency,
+      })
+      .from(order)
+      .where(and(eq(order.merchantId, merchantId), eq(order.customerId, customerId)))
+      .orderBy(desc(order.placedAt), desc(order.id))
+      .limit(1);
+    return row ?? null;
+  }
+
   /** The search and date filters the list and its tab counts share. */
   private searchConditions(merchantId: string, { q, from, to }: OrderSearch): SQL | undefined {
     const conditions: (SQL | undefined)[] = [eq(order.merchantId, merchantId)];

@@ -344,6 +344,7 @@ export class ConversationSimulator {
         outbound,
         notifications,
         confirmation,
+        orders,
       ),
     );
   }

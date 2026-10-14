@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { parsePayload, type AssistantPayload, type CollectedSlots } from '@app/shared';
+import {
+  formatMinorUnitsTrimmed,
+  parsePayload,
+  type AssistantPayload,
+  type CollectedSlots,
+} from '@app/shared';
+import { OrdersRepository } from '../../orders/orders.repository';
 import { ProductsService } from '../../products/products.service';
 import {
   DeliveryChargesRepository,
@@ -26,23 +32,30 @@ import { isReplyWindowOpen } from '../conversation-rules';
 import { MessageRepository } from '../message.repository';
 import { OutboundMessageSender, type OutboundContent } from '../outbound-message.sender';
 import type { MessageRow } from '../../database/schema/index';
-import { fallbackText, languageFor, type ReplyLanguage } from './assistant-fallbacks';
+import {
+  fallbackText,
+  languageFor,
+  REFERRAL_TEXT,
+  type ReplyLanguage,
+} from './assistant-fallbacks';
 import { toChatLines } from './assistant-history';
 import type { CatalogView } from './catalog-match';
 import {
   decideTurn,
   isActiveState,
+  LOCALES,
   readSlots,
   shouldExtract,
   validPick,
   type DeliveryView,
+  type Entry,
   type ItemPick,
   type TurnInput,
   type TurnDecision,
 } from './conversation-machine';
 import { LlmCallRepository } from './llm-call.repository';
 import { checkReply } from './reply-check';
-import type { ReplyIntent } from './reply-intent';
+import type { LastOrderFacts, ReplyIntent } from './reply-intent';
 import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmation.service';
 import { outgoingFor } from './outgoing';
 import { phraseRequestFor } from './reply-phrasing';
@@ -83,6 +96,7 @@ export class AssistantTurnService {
     private readonly outbound: OutboundMessageSender,
     private readonly notifications: NotificationsService,
     private readonly confirmation: OrderConfirmationService,
+    private readonly orders: OrdersRepository,
   ) {}
 
   async run({
@@ -97,9 +111,17 @@ export class AssistantTurnService {
       const found = await this.conversations.findById(tx, scope, conversationId);
       if (!found) return null;
       const settings = (await this.settings.find(tx, scope)) ?? defaultMerchantSettings();
+      const recent = await this.messages.listPage(tx, scope, conversationId, {
+        limit: HISTORY_LIMIT,
+      });
+      const lastOrder =
+        entryIn(tapIn(recent, triggerMessageId))?.kind === 'last_order'
+          ? await this.orders.latestForCustomer(tx, scope, found.conversation.customerId)
+          : null;
       return {
         ...found,
-        recent: await this.messages.listPage(tx, scope, conversationId, { limit: HISTORY_LIMIT }),
+        lastOrder,
+        recent,
         page: await this.pages.findForMerchant(tx, scope),
         country: settings.country,
         delivery: deliveryView(await this.deliveryCharges.list(tx, scope), settings),
@@ -134,12 +156,32 @@ export class AssistantTurnService {
       delivery: read.delivery,
     };
     const pick = pickIn(read.recent, triggerMessageId, turn.slots);
-    const decision = pick
-      ? decideTurn({ ...turn, trigger: { kind: 'pick', pick } })
-      : await this.decide(turn, history, calls);
-    const text = pick
-      ? fallbackText(decision.reply, language)
-      : await this.words(decision.reply, history, language, calls);
+    const entry = entryIn(tap);
+    const triggerText = read.recent.find((message) => message.id === triggerMessageId)?.text;
+    // A ref that arrived with words of the customer's own is a message with a product attached.
+    const typedRef =
+      entry?.kind === 'product' && entry.via === 'ref' && !isReferralLine(triggerText);
+    let decision: TurnDecision;
+    let phrased = false;
+    if (pick) {
+      decision = decideTurn({ ...turn, trigger: { kind: 'pick', pick } });
+    } else if (entry && !typedRef) {
+      const trigger = { kind: 'entry' as const, entry: toEntry(entry, read.lastOrder, language) };
+      decision = decideTurn({ ...turn, trigger });
+    } else if (entry?.kind === 'product') {
+      const added = decideTurn({
+        ...turn,
+        trigger: { kind: 'entry', entry: { kind: 'product', productId: entry.productId } },
+      });
+      decision = await this.decide({ ...turn, slots: added.slots }, history, calls);
+      phrased = true;
+    } else {
+      decision = await this.decide(turn, history, calls);
+      phrased = true;
+    }
+    const text = phrased
+      ? await this.words(decision.reply, history, language, calls)
+      : fallbackText(decision.reply, language);
     const outgoing = outgoingFor(decision.reply, text, { language, conversationId });
 
     // 3. Re-check under the lock and write.
@@ -327,6 +369,57 @@ function pickIn(
 ): ItemPick | null {
   const tap = tapIn(recent, triggerMessageId);
   return tap?.kind === 'pick' ? validPick(slots, tap) : null;
+}
+
+type EntryTap =
+  | { kind: 'browse'; categoryId: string | 'other' | null }
+  | { kind: 'product'; productId: string; via: 'choose' | 'ref' }
+  | { kind: 'last_order' }
+  | { kind: 'human' };
+
+/** The trigger's tap as an entry: Get Started, the menu, browsing, a carousel choice or a referral. */
+function entryIn(tap: AssistantPayload | null): EntryTap | null {
+  switch (tap?.kind) {
+    case 'start':
+      return { kind: 'browse', categoryId: null };
+    case 'browse':
+      return { kind: 'browse', categoryId: tap.categoryId };
+    case 'product':
+      return { kind: 'product', productId: tap.id, via: tap.via };
+    case 'menu':
+      return tap.item === 'human' ? { kind: 'human' } : { kind: 'last_order' };
+    default:
+      return null;
+  }
+}
+
+/** The fixed line the ingest stores on a referral row that carried no words of the customer's. */
+function isReferralLine(text: string | undefined): boolean {
+  return Object.values(REFERRAL_TEXT).some((lines) => text === lines.link || text === lines.ad);
+}
+
+function toEntry(
+  tap: EntryTap,
+  lastOrder: {
+    reference: string;
+    status: LastOrderFacts['status'];
+    total: number;
+    currency: string;
+  } | null,
+  language: ReplyLanguage,
+): Entry {
+  if (tap.kind === 'last_order') {
+    return {
+      kind: 'last_order',
+      order: lastOrder && {
+        reference: lastOrder.reference,
+        status: lastOrder.status,
+        total: formatMinorUnitsTrimmed(lastOrder.total, lastOrder.currency, LOCALES[language]),
+      },
+    };
+  }
+  if (tap.kind === 'product') return { kind: 'product', productId: tap.productId };
+  return tap;
 }
 
 /** What the trigger's button or quick reply carried, when it was ours. */
