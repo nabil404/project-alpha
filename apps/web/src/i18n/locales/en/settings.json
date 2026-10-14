@@ -213,7 +213,7 @@
         "ask": "Sent as the customer's question. If the assistant can't answer it, you're notified to reply.",
         "browse": "Opens your product categories."
       },
-      "editHere": "Edit these here, not in Meta Business Suite; changes there are replaced on the next save.",
+      "editHere": "Meta Business Suite doesn't show these settings, so edit them here. Turning on its Frequently asked questions may replace your questions until you save here again.",
       "failed": {
         "graph_error": "Facebook didn't accept the update. Try again in a moment.",
         "token_invalid": "Facebook no longer accepts this Page's connection. Reconnect the Page, then try again."
