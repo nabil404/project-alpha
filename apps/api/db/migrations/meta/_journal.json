@@ -267,6 +267,20 @@
       "when": 1791913755356,
       "tag": "0037_backfill_variant_reserved",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791947518087,
+      "tag": "0038_entry_points",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791947525298,
+      "tag": "0039_ad_product_force_rls",
+      "breakpoints": true
     }
   ]
 }

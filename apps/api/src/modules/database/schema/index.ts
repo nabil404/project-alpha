@@ -17,3 +17,4 @@ export * from './orders';
 export * from './settings';
 export * from './delivery';
 export * from './assistant';
+export * from './ads';

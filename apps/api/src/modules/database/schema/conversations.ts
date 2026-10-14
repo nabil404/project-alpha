@@ -22,6 +22,8 @@ const CONVERSATION_STATES = [
   'handed_off',
   'abandoned',
 ] as const;
+/** Literal copy of @app/shared's entrySources. */
+const ENTRY_SOURCES = ['ad', 'link', 'get_started', 'organic'] as const;
 const MESSAGE_SENDERS = ['customer', 'assistant', 'seller'] as const;
 const MESSAGE_STATUSES = ['sending', 'sent', 'failed'] as const;
 
@@ -50,6 +52,8 @@ export const conversation = pgTable(
       .notNull()
       .default(sql`'{}'::jsonb`),
     botPaused: boolean('bot_paused').notNull().default(false),
+    /** How the current order attempt started; reset to organic for the next order. */
+    entrySource: text('entry_source', { enum: ENTRY_SOURCES }).notNull().default('organic'),
     /**
      * When the assistant last handed the chat to the seller; null while it is
      * not handed off. The customer-waiting email names the handoff it is about
@@ -75,6 +79,7 @@ export const conversation = pgTable(
       foreignColumns: [customer.merchantId, customer.id],
     }),
     check('conversation_state_ck', oneOf(t.state, CONVERSATION_STATES)),
+    check('conversation_entry_source_ck', oneOf(t.entrySource, ENTRY_SOURCES)),
     check('conversation_last_sender_ck', oneOf(t.lastMessageSender, MESSAGE_SENDERS)),
     index('conversation_merchant_last_message_idx').on(
       t.merchantId,

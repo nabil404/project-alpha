@@ -44,6 +44,7 @@ async function purge(db: Database, merchantIds: string[]): Promise<void> {
   await db
     .delete(schema.deliveryCharge)
     .where(inArray(schema.deliveryCharge.merchantId, merchantIds));
+  await db.delete(schema.adProduct).where(inArray(schema.adProduct.merchantId, merchantIds));
   // Junction and variants first; categories in one statement so the self-FK is
   // checked only once they are all gone. Images cascade from their product.
   await db

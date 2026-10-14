@@ -35,6 +35,7 @@ const ORDER_STATUSES = [
   'cancelled',
 ] as const;
 const ORDER_SOURCES = ['assistant', 'seller'] as const;
+const ENTRY_SOURCES = ['ad', 'link', 'get_started', 'organic'] as const;
 const PAYMENT_STATUSES = ['unpaid', 'paid', 'refunded'] as const;
 const PAYMENT_METHODS = ['cash_on_delivery', 'bank_transfer', 'mobile_wallet'] as const;
 const ORDER_EVENT_TYPES = [
@@ -69,6 +70,8 @@ export const order = pgTable(
     /** The conversation it was confirmed in; null for an order the seller added. */
     conversationId: text('conversation_id'),
     source: text('source', { enum: ORDER_SOURCES }).notNull().default('assistant'),
+    /** How the customer reached the shop for this order; null for orders a seller adds. */
+    entrySource: text('entry_source', { enum: ENTRY_SOURCES }),
     status: text('status', { enum: ORDER_STATUSES }).notNull().default('new'),
     paymentStatus: text('payment_status', { enum: PAYMENT_STATUSES }).notNull().default('unpaid'),
     paymentMethod: text('payment_method', { enum: PAYMENT_METHODS })
@@ -125,6 +128,8 @@ export const order = pgTable(
     }),
     check('order_status_ck', oneOf(t.status, ORDER_STATUSES)),
     check('order_source_ck', oneOf(t.source, ORDER_SOURCES)),
+    // Null passes: `null in (...)` is null, which a CHECK accepts.
+    check('order_entry_source_ck', oneOf(t.entrySource, ENTRY_SOURCES)),
     check('order_payment_status_ck', oneOf(t.paymentStatus, PAYMENT_STATUSES)),
     check('order_payment_method_ck', oneOf(t.paymentMethod, PAYMENT_METHODS)),
     check('order_number_ck', sql`${t.number} > 0`),
