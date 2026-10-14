@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WelcomeScreen, WelcomeScreenInput } from '@app/shared';
 
@@ -21,14 +22,25 @@ export const welcomeScreenQueryOptions = () =>
  */
 let lastSavedAt = 0;
 
-/** Polls while the Page is being updated, for at most a minute after the last save. */
+/**
+ * Polls while the Page is being updated: for at most a minute after the last
+ * save in this tab, or a minute after this mount first saw the sync pending
+ * (a Page connect or a sync queued elsewhere), whichever runs longer.
+ */
 export function useWelcomeScreen() {
+  const pendingSince = useRef<number | null>(null);
   return useQuery({
     ...welcomeScreenQueryOptions(),
-    refetchInterval: (query) =>
-      query.state.data?.profileSync.status === 'pending' && Date.now() - lastSavedAt < POLL_FOR_MS
-        ? POLL_MS
-        : false,
+    refetchInterval: (query) => {
+      if (query.state.data?.profileSync.status !== 'pending') {
+        pendingSince.current = null;
+        return false;
+      }
+      const now = Date.now();
+      pendingSince.current ??= now;
+      const polling = now - lastSavedAt < POLL_FOR_MS || now - pendingSince.current < POLL_FOR_MS;
+      return polling ? POLL_MS : false;
+    },
   });
 }
 

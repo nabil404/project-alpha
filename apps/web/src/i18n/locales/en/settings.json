@@ -210,7 +210,7 @@
       "count": "{{count}} / {{max}}",
       "description": "What a customer sees in Messenger before their first message. Saving updates your Page on Facebook.",
       "does": {
-        "ask": "The assistant answers like a typed question.",
+        "ask": "Sent as the customer's question. If the assistant can't answer it, you're notified to reply.",
         "browse": "Opens your product categories."
       },
       "failed": {
