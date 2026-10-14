@@ -244,12 +244,15 @@ internet over HTTPS, so locally you need a tunnel to your machine.
      the challenge echoed back.
 5. **Webhook fields:** subscribe to at least
    - `messages` (customer messages),
-   - `messaging_postbacks`,
+   - `messaging_postbacks` (button, Get Started, menu and ice-breaker taps),
+   - `messaging_referrals` (`m.me` links, QR codes and click-to-Messenger ads),
    - `message_echoes` (the seller's own replies, which pause the bot).
 
-   The API currently acts on text `messages` and text `message_echoes` (stored
-   as seller messages; echoes of replies sent by this app are skipped). Other
-   fields, and messages without text, are acknowledged and ignored.
+   The API acts on text `messages` (with any quick-reply payload or referral
+   they carry), `messaging_postbacks`, `messaging_referrals`, and text
+   `message_echoes` (stored as seller messages; echoes of replies sent by this
+   app are skipped). Other fields, and messages without text, are acknowledged
+   and ignored.
 
    The AI phases add fields. Each is subscribed by the app itself once its
    phase adds it to `PAGE_WEBHOOK_FIELDS` in

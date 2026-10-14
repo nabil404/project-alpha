@@ -78,20 +78,23 @@ recipient. [Message flow](message-flow.md#a-customer-message) draws the steps.
   `ad_id`). The ingest turns it into the payload the turn reads:
   - A link stores `ref:product:<id>` (the turn checks the product is active
     and the shop's). An ad is first counted in `ad_product`; if the seller has
-    mapped it, it stores `ref:product:<id>`, otherwise no product.
+    mapped it, it stores `ref:product:<id>`, otherwise no product. On a typed
+    message the product payload is `ref-typed:product:<id>`, so the turn
+    adds the product and then reads the customer's words with the LLM.
   - **Get Started** is the `start` payload. With a referral on the postback,
     the `ref:` payload is stored instead.
   - A message with a referral keeps its own text. A standalone referral
     stores a customer row with a fixed line in the shop's language ("Opened a
     link to a product" or "Came from an ad"); its job id is `rf-` and a hash
     of sender, time, `ref` and `ad_id`, so a redelivery is a no-op. The same
-    transaction rolls back an ad's count on a duplicate.
+    transaction rolls back an ad's count on a duplicate. A standalone
+    referral with no usable product (an unmapped ad) stores `browse`.
   - `conversation.entry_source` is set to `ad`, `link` or `get_started` by
     each such event, and back to `organic` when a confirmed chat starts its
     next order. A handed-off or paused chat still stores the row and the
     source, and queues no turn.
   - These taps queue an `assistant-turn` with no delay. A typed message with
-    a plain `ref` payload does too.
+    a `ref-typed` payload does too.
 - **Taps.** A quick-reply tap is a text message with
   `message.quick_reply.payload`. A button tap is a `postback`, stored as a
   customer message whose text is the button title. Both keep the payload in
