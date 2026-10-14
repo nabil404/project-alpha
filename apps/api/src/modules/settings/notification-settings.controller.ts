@@ -1,19 +1,16 @@
 import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, type SchemaObject } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   notificationSettingsSchema,
   updateNotificationSettingsSchema,
   type NotificationSettings,
   type UpdateNotificationSettings,
 } from '@app/shared';
-import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { NotificationSettingsService } from './notification-settings.service';
-
-const json = (schema: z.ZodType, io: 'input' | 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 /** The signed-in person's id, from the session SessionGuard put on the request. */
 function userIdOf(request: TenantRequest): string {
@@ -35,7 +32,7 @@ export class NotificationSettingsController {
     description:
       'Each person keeps their own switches per shop. One who has never changed them reads as the defaults: new orders and waiting customers on, the daily summary off.',
   })
-  @ApiOkResponse({ schema: json(notificationSettingsSchema, 'output') })
+  @ApiOkResponse({ schema: openApiSchema(notificationSettingsSchema) })
   get(@Req() request: TenantRequest): Promise<NotificationSettings> {
     return this.notifications.get(tenantScope(request), userIdOf(request));
   }
@@ -46,8 +43,8 @@ export class NotificationSettingsController {
     description:
       "Omit a switch to leave it alone. Changes only the signed-in person's switches, never a teammate's.",
   })
-  @ApiBody({ schema: json(updateNotificationSettingsSchema, 'input') })
-  @ApiOkResponse({ schema: json(notificationSettingsSchema, 'output') })
+  @ApiBody({ schema: openApiSchema(updateNotificationSettingsSchema, 'input') })
+  @ApiOkResponse({ schema: openApiSchema(notificationSettingsSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   update(
     @Req() request: TenantRequest,

@@ -21,20 +21,24 @@ export const PRODUCT_OPTION_VALUE_MAX_COUNT = 30;
 export const PRODUCT_VARIANT_MAX_COUNT = 100;
 
 /** A stored product image as the API returns it. URLs are public; `position` is gallery order only. */
-export const productImageSchema = z.object({
-  id: z.string().uuid(),
-  url: z.string().url(),
-  thumbnailUrl: z.string().url(),
-  position: z.number().int().nonnegative(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-});
+export const productImageSchema = z
+  .object({
+    id: z.string().uuid(),
+    url: z.string().url(),
+    thumbnailUrl: z.string().url(),
+    position: z.number().int().nonnegative(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  })
+  .meta({ id: 'ProductImage' });
 export type ProductImage = z.infer<typeof productImageSchema>;
 
 /** The product's current image ids, every one exactly once, in the new gallery order. */
-export const reorderProductImagesSchema = z.object({
-  imageIds: z.array(z.string().uuid()).min(1).max(PRODUCT_IMAGE_MAX_COUNT),
-});
+export const reorderProductImagesSchema = z
+  .object({
+    imageIds: z.array(z.string().uuid()).min(1).max(PRODUCT_IMAGE_MAX_COUNT),
+  })
+  .meta({ id: 'ReorderProductImages' });
 export type ReorderProductImages = z.infer<typeof reorderProductImagesSchema>;
 
 const categoryNameSchema = z.string().trim().min(1).max(80);
@@ -50,19 +54,25 @@ export type Category = z.infer<typeof categorySchema>;
  * `productCount` counts every product linked to it, whatever the status, so it
  * is the number a delete takes the category off.
  */
-export const categoryWithCountSchema = categorySchema.extend({
-  productCount: z.number().int().nonnegative(),
-});
+export const categoryWithCountSchema = categorySchema
+  .extend({
+    productCount: z.number().int().nonnegative(),
+  })
+  .meta({ id: 'CategoryWithCount' });
 export type CategoryWithCount = z.infer<typeof categoryWithCountSchema>;
 
-export const createCategorySchema = z.object({
-  name: categoryNameSchema,
-});
+export const createCategorySchema = z
+  .object({
+    name: categoryNameSchema,
+  })
+  .meta({ id: 'CreateCategory' });
 export type CreateCategory = z.infer<typeof createCategorySchema>;
 
-export const updateCategorySchema = z.object({
-  name: categoryNameSchema,
-});
+export const updateCategorySchema = z
+  .object({
+    name: categoryNameSchema,
+  })
+  .meta({ id: 'UpdateCategory' });
 export type UpdateCategory = z.infer<typeof updateCategorySchema>;
 
 export const productOptionValueSchema = z.object({
@@ -113,25 +123,27 @@ export const productDeliveryChargeSchema = z.object({
 });
 export type ProductDeliveryCharge = z.infer<typeof productDeliveryChargeSchema>;
 
-export const productSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1),
-  description: z.string().nullable(),
-  status: productStatusSchema,
-  aliases: z.array(z.string().min(1)).default([]),
-  categoryIds: z.array(z.string().uuid()).default([]),
-  images: z.array(productImageSchema).default([]),
-  /** The default photo; null exactly when there are no images. */
-  coverImageId: z.string().uuid().nullable().default(null),
-  options: z.array(productOptionSchema).default([]),
-  /** False: delivery costs the shop's charges. True: `deliveryCharges`, the shop's where it sets none. */
-  customDelivery: z.boolean(),
-  /** Empty unless `customDelivery`; in the order the shop lists its areas. */
-  deliveryCharges: z.array(productDeliveryChargeSchema),
-  variants: z.array(variantSchema),
-  /** Opaque. Send it back with a save; a save from an older read is refused with PRODUCT_STALE. */
-  version: z.string().min(1),
-});
+export const productSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string().min(1),
+    description: z.string().nullable(),
+    status: productStatusSchema,
+    aliases: z.array(z.string().min(1)).default([]),
+    categoryIds: z.array(z.string().uuid()).default([]),
+    images: z.array(productImageSchema).default([]),
+    /** The default photo; null exactly when there are no images. */
+    coverImageId: z.string().uuid().nullable().default(null),
+    options: z.array(productOptionSchema).default([]),
+    /** False: delivery costs the shop's charges. True: `deliveryCharges`, the shop's where it sets none. */
+    customDelivery: z.boolean(),
+    /** Empty unless `customDelivery`; in the order the shop lists its areas. */
+    deliveryCharges: z.array(productDeliveryChargeSchema),
+    variants: z.array(variantSchema),
+    /** Opaque. Send it back with a save; a save from an older read is refused with PRODUCT_STALE. */
+    version: z.string().min(1),
+  })
+  .meta({ id: 'Product' });
 export type Product = z.infer<typeof productSchema>;
 
 const productNameSchema = z.string().trim().min(1).max(200);
@@ -142,7 +154,12 @@ const moneySchema = z.number().int().nonnegative();
 
 /** A product's own delivery charges, one per area at most. */
 const productDeliveryChargeList = z
-  .array(z.object({ deliveryChargeId: z.string().uuid(), charge: moneySchema }).strict())
+  .array(
+    z
+      .object({ deliveryChargeId: z.string().uuid(), charge: moneySchema })
+      .strict()
+      .meta({ id: 'ProductDeliveryChargeInput' }),
+  )
   .max(DELIVERY_AREAS_MAX + 1)
   .superRefine((rows, ctx) => {
     const seen = new Set<string>();
@@ -162,42 +179,48 @@ const productDeliveryChargeList = z
 const stockSchema = z.number().int().nonnegative();
 
 /** `categoryIds`, when present, replaces the product's links. */
-export const updateProductSchema = z.object({
-  name: productNameSchema.optional(),
-  description: descriptionSchema.optional(),
-  status: productStatusSchema.optional(),
-  aliases: z.array(z.string().trim().min(1)).optional(),
-  customDelivery: z.boolean().optional(),
-  deliveryCharges: productDeliveryChargeList.optional(),
-  categoryIds: z.array(z.string().uuid()).optional(),
-});
+export const updateProductSchema = z
+  .object({
+    name: productNameSchema.optional(),
+    description: descriptionSchema.optional(),
+    status: productStatusSchema.optional(),
+    aliases: z.array(z.string().trim().min(1)).optional(),
+    customDelivery: z.boolean().optional(),
+    deliveryCharges: productDeliveryChargeList.optional(),
+    categoryIds: z.array(z.string().uuid()).optional(),
+  })
+  .meta({ id: 'UpdateProduct' });
 export type UpdateProduct = z.infer<typeof updateProductSchema>;
 
 /**
  * One variant's own fields, outside the edit page's document save: a quick
  * stock or price change. Its option values change only through that save.
  */
-export const updateVariantSchema = z.object({
-  sku: z.string().trim().min(1).max(64).optional(),
-  price: moneySchema.optional(),
-  stock: stockSchema.optional(),
-  /** One of the product's own images; null shows the product's cover. */
-  imageId: z.string().uuid().nullable().optional(),
-});
+export const updateVariantSchema = z
+  .object({
+    sku: z.string().trim().min(1).max(64).optional(),
+    price: moneySchema.optional(),
+    stock: stockSchema.optional(),
+    /** One of the product's own images; null shows the product's cover. */
+    imageId: z.string().uuid().nullable().optional(),
+  })
+  .meta({ id: 'UpdateVariant' });
 export type UpdateVariant = z.infer<typeof updateVariantSchema>;
 
 const optionNameSchema = z.string().trim().min(1).max(40);
 const optionValueTextSchema = z.string().trim().min(1).max(40);
 
 /** `id` keeps (and may rename) an existing option or value; omit it to create one. */
-export const productOptionInputSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: optionNameSchema,
-  values: z
-    .array(z.object({ id: z.string().uuid().optional(), value: optionValueTextSchema }))
-    .min(1)
-    .max(PRODUCT_OPTION_VALUE_MAX_COUNT),
-});
+export const productOptionInputSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    name: optionNameSchema,
+    values: z
+      .array(z.object({ id: z.string().uuid().optional(), value: optionValueTextSchema }))
+      .min(1)
+      .max(PRODUCT_OPTION_VALUE_MAX_COUNT),
+  })
+  .meta({ id: 'ProductOptionInput' });
 export type ProductOptionInput = z.infer<typeof productOptionInputSchema>;
 
 /** Room for three 40-character values joined with " / ". */
@@ -210,16 +233,18 @@ export const VARIANT_NAME_MAX_LENGTH = 128;
  * `name` is what customers and the assistant call it. Blank, it defaults to the
  * joined values, and a product without options keeps its variant unnamed.
  */
-export const productVariantInputSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().trim().max(VARIANT_NAME_MAX_LENGTH).optional(),
-  optionValues: z.array(optionValueTextSchema).max(PRODUCT_OPTION_MAX_COUNT).default([]),
-  sku: skuInputSchema,
-  price: moneySchema,
-  stock: stockSchema.default(0),
-  /** One of the product's own images; null shows the product's cover. */
-  imageId: z.string().uuid().nullable().default(null),
-});
+export const productVariantInputSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().max(VARIANT_NAME_MAX_LENGTH).optional(),
+    optionValues: z.array(optionValueTextSchema).max(PRODUCT_OPTION_MAX_COUNT).default([]),
+    sku: skuInputSchema,
+    price: moneySchema,
+    stock: stockSchema.default(0),
+    /** One of the product's own images; null shows the product's cover. */
+    imageId: z.string().uuid().nullable().default(null),
+  })
+  .meta({ id: 'ProductVariantInput' });
 export type ProductVariantInput = z.infer<typeof productVariantInputSchema>;
 
 /** Values compare trimmed and case-insensitively, as a customer would read them. */
@@ -362,13 +387,15 @@ export const saveProductSchema = z
     /** Null picks the first photo, so a product with photos always has a cover. */
     coverImageId: z.string().uuid().nullable().default(null),
   })
-  .superRefine(refineProductDocument);
+  .superRefine(refineProductDocument)
+  .meta({ id: 'SaveProduct' });
 export type SaveProduct = z.infer<typeof saveProductSchema>;
 
 /** Images attach through their own endpoint afterwards, so creation carries none. */
 export const createProductSchema = z
   .object(productDocumentShape)
-  .superRefine(refineProductDocument);
+  .superRefine(refineProductDocument)
+  .meta({ id: 'CreateProduct' });
 export type CreateProduct = z.infer<typeof createProductSchema>;
 
 /** CSV import carries no images or categories; sellers add those in the dashboard afterwards. */
@@ -486,24 +513,28 @@ export const productListItemSchema = z.object({
 });
 export type ProductListItem = z.infer<typeof productListItemSchema>;
 
-export const productListResponseSchema = z.object({
-  data: z.array(productListItemSchema),
-  pagination: z.object({
-    page: z.number().int().positive(),
-    limit: z.number().int().positive(),
-    total: z.number().int().nonnegative(),
-    totalPages: z.number().int().nonnegative(),
-  }),
-});
+export const productListResponseSchema = z
+  .object({
+    data: z.array(productListItemSchema),
+    pagination: z.object({
+      page: z.number().int().positive(),
+      limit: z.number().int().positive(),
+      total: z.number().int().nonnegative(),
+      totalPages: z.number().int().nonnegative(),
+    }),
+  })
+  .meta({ id: 'ProductListResponse' });
 export type ProductListResponse = z.infer<typeof productListResponseSchema>;
 
 /** GET /products/counts: the filter chips and the stock banner. Ignores search and category. */
-export const productCountsSchema = z.object({
-  all: z.number().int().nonnegative(),
-  inStock: z.number().int().nonnegative(),
-  lowStock: z.number().int().nonnegative(),
-  outOfStock: z.number().int().nonnegative(),
-  draft: z.number().int().nonnegative(),
-  archived: z.number().int().nonnegative(),
-});
+export const productCountsSchema = z
+  .object({
+    all: z.number().int().nonnegative(),
+    inStock: z.number().int().nonnegative(),
+    lowStock: z.number().int().nonnegative(),
+    outOfStock: z.number().int().nonnegative(),
+    draft: z.number().int().nonnegative(),
+    archived: z.number().int().nonnegative(),
+  })
+  .meta({ id: 'ProductCounts' });
 export type ProductCounts = z.infer<typeof productCountsSchema>;

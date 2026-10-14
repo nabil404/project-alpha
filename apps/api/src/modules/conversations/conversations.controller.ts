@@ -24,7 +24,6 @@ import {
   ApiProduces,
   ApiQuery,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -49,17 +48,16 @@ import {
   type UpdateConversation,
 } from '@app/shared';
 import type { Observable } from 'rxjs';
-import { z, type ZodType } from 'zod';
+import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { ConversationsService } from './conversations.service';
 import { ConversationEventsHub } from './events/conversation-events.hub';
 import { conversationEventStream } from './events/event-stream';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
-const openApi = (schema: ZodType, io: 'input' | 'output' = 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 /** The merchant always comes from the session via TenantGuard, never the request. */
 @ApiTags('Conversations')
@@ -87,7 +85,7 @@ export class ConversationsController {
   })
   @ApiOkResponse({
     description: 'A page of conversations.',
-    schema: openApi(conversationListResponseSchema),
+    schema: openApiSchema(conversationListResponseSchema),
   })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   list(
@@ -101,7 +99,7 @@ export class ConversationsController {
   @ApiOperation({ summary: 'Count conversations per filter', description: 'Ignores search.' })
   @ApiOkResponse({
     description: 'Counts for the filter chips.',
-    schema: openApi(conversationCountsSchema),
+    schema: openApiSchema(conversationCountsSchema),
   })
   counts(@Req() request: TenantRequest): Promise<ConversationCounts> {
     return this.conversations.counts(tenantScope(request));
@@ -130,7 +128,10 @@ export class ConversationsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a conversation' })
-  @ApiOkResponse({ description: 'The conversation.', schema: openApi(conversationDetailSchema) })
+  @ApiOkResponse({
+    description: 'The conversation.',
+    schema: openApiSchema(conversationDetailSchema),
+  })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CONVERSATION_NOT_FOUND'])
   get(
@@ -152,7 +153,7 @@ export class ConversationsController {
     required: false,
     schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
   })
-  @ApiOkResponse({ description: 'A page of messages.', schema: openApi(messagePageSchema) })
+  @ApiOkResponse({ description: 'A page of messages.', schema: openApiSchema(messagePageSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CONVERSATION_NOT_FOUND'])
   messages(
@@ -179,10 +180,10 @@ export class ConversationsController {
     description:
       '`botPaused: true` pauses the assistant in this chat; `false` hands it back, and a handed-off chat resumes.',
   })
-  @ApiBody({ schema: openApi(updateConversationSchema, 'input') })
+  @ApiBody({ schema: openApiSchema(updateConversationSchema, 'input') })
   @ApiOkResponse({
     description: 'The updated conversation.',
-    schema: openApi(conversationDetailSchema),
+    schema: openApiSchema(conversationDetailSchema),
   })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CONVERSATION_NOT_FOUND'])
@@ -219,8 +220,11 @@ export class ConversationsController {
     description:
       'Sends a text reply through Messenger and pauses the assistant in this chat. Allowed only within 24 hours of the customer’s last message.',
   })
-  @ApiBody({ schema: openApi(sendMessageSchema, 'input') })
-  @ApiCreatedResponse({ description: 'The delivered message.', schema: openApi(messageSchema) })
+  @ApiBody({ schema: openApiSchema(sendMessageSchema, 'input') })
+  @ApiCreatedResponse({
+    description: 'The delivered message.',
+    schema: openApiSchema(messageSchema),
+  })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CONVERSATION_NOT_FOUND'])
   @ApiCodedError(409, ['MESSENGER_WINDOW_CLOSED', 'MESSENGER_PAGE_NOT_CONNECTED'])

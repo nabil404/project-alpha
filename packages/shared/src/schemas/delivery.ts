@@ -56,16 +56,18 @@ export const everywhereElseSchema = deliveryAreaChargeSchema.omit({ areaName: tr
 export type EverywhereElse = z.infer<typeof everywhereElseSchema>;
 
 /** GET and PUT /settings/delivery. */
-export const deliverySettingsSchema = z.object({
-  /** ISO 4217: every charge and the threshold are in it. */
-  currency: z.string(),
-  /** The named areas, in the order the seller listed them. */
-  deliveryCharges: z.array(deliveryAreaChargeSchema),
-  /** For an address that matches no area. Null until the shop first saves. */
-  everywhereElse: everywhereElseSchema.nullable(),
-  /** Orders with a subtotal at or over this ship free; null always charges. */
-  freeDeliveryOver: money.nullable(),
-});
+export const deliverySettingsSchema = z
+  .object({
+    /** ISO 4217: every charge and the threshold are in it. */
+    currency: z.string(),
+    /** The named areas, in the order the seller listed them. */
+    deliveryCharges: z.array(deliveryAreaChargeSchema),
+    /** For an address that matches no area. Null until the shop first saves. */
+    everywhereElse: everywhereElseSchema.nullable(),
+    /** Orders with a subtotal at or over this ship free; null always charges. */
+    freeDeliveryOver: money.nullable(),
+  })
+  .meta({ id: 'DeliverySettings' });
 export type DeliverySettings = z.infer<typeof deliverySettingsSchema>;
 
 /**
@@ -107,7 +109,8 @@ export const saveDeliverySettingsSchema = z
       .strict(),
     freeDeliveryOver: money.nullable(),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'SaveDeliverySettings' });
 export type SaveDeliverySettings = z.infer<typeof saveDeliverySettingsSchema>;
 export type SaveDeliverySettingsInput = z.input<typeof saveDeliverySettingsSchema>;
 
@@ -150,14 +153,17 @@ export const deliveryQuoteRequestSchema = z
       )
       .max(ORDER_MAX_ITEMS),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'DeliveryQuoteRequest' });
 export type DeliveryQuoteRequest = z.infer<typeof deliveryQuoteRequestSchema>;
 
-export const deliveryQuoteSchema = z.object({
-  fee: money,
-  /** The subtotal the threshold was checked against. */
-  subtotal: money,
-  /** True when the threshold made it free. */
-  freeDeliveryApplied: z.boolean(),
-});
+export const deliveryQuoteSchema = z
+  .object({
+    fee: money,
+    /** The subtotal the threshold was checked against. */
+    subtotal: money,
+    /** True when the threshold made it free. */
+    freeDeliveryApplied: z.boolean(),
+  })
+  .meta({ id: 'DeliveryQuote' });
 export type DeliveryQuote = z.infer<typeof deliveryQuoteSchema>;

@@ -195,13 +195,15 @@ export const listConversationsQuerySchema = z.object({
 });
 export type ListConversationsQuery = z.infer<typeof listConversationsQuerySchema>;
 
-export const conversationCustomerSchema = z.object({
-  id: z.string().uuid(),
-  /** Null until Facebook shares the customer's profile. */
-  name: z.string().nullable(),
-  /** Facebook's signed CDN link. It expires, so the image may fail to load. */
-  pictureUrl: z.string().url().nullable(),
-});
+export const conversationCustomerSchema = z
+  .object({
+    id: z.string().uuid(),
+    /** Null until Facebook shares the customer's profile. */
+    name: z.string().nullable(),
+    /** Facebook's signed CDN link. It expires, so the image may fail to load. */
+    pictureUrl: z.string().url().nullable(),
+  })
+  .meta({ id: 'ConversationCustomer' });
 
 export const conversationListItemSchema = z.object({
   id: z.string().uuid(),
@@ -218,42 +220,50 @@ export const conversationListItemSchema = z.object({
 });
 export type ConversationListItem = z.infer<typeof conversationListItemSchema>;
 
-export const conversationListResponseSchema = z.object({
-  data: z.array(conversationListItemSchema),
-  pagination: z.object({ nextCursor: z.string().nullable() }),
-});
+export const conversationListResponseSchema = z
+  .object({
+    data: z.array(conversationListItemSchema),
+    pagination: z.object({ nextCursor: z.string().nullable() }),
+  })
+  .meta({ id: 'ConversationListResponse' });
 export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>;
 
 /** GET /conversations/counts: the filter chips and the sidebar badge. Ignores search. */
-export const conversationCountsSchema = z.object({
-  all: z.number().int().nonnegative(),
-  needsYou: z.number().int().nonnegative(),
-  drafted: z.number().int().nonnegative(),
-  unread: z.number().int().nonnegative(),
-});
+export const conversationCountsSchema = z
+  .object({
+    all: z.number().int().nonnegative(),
+    needsYou: z.number().int().nonnegative(),
+    drafted: z.number().int().nonnegative(),
+    unread: z.number().int().nonnegative(),
+  })
+  .meta({ id: 'ConversationCounts' });
 export type ConversationCounts = z.infer<typeof conversationCountsSchema>;
 
-export const conversationDetailSchema = z.object({
-  id: z.string().uuid(),
-  customer: conversationCustomerSchema,
-  state: conversationStateSchema,
-  botPaused: z.boolean(),
-  unread: z.boolean(),
-  lastInboundAt: z.string().datetime().nullable(),
-  /** When the seller can no longer reply; null if the customer has never written. */
-  replyWindowClosesAt: z.string().datetime().nullable(),
-  /** The order placed from this chat most recently, whatever its status; null if none. */
-  latestOrderId: z.string().uuid().nullable(),
-});
+export const conversationDetailSchema = z
+  .object({
+    id: z.string().uuid(),
+    customer: conversationCustomerSchema,
+    state: conversationStateSchema,
+    botPaused: z.boolean(),
+    unread: z.boolean(),
+    lastInboundAt: z.string().datetime().nullable(),
+    /** When the seller can no longer reply; null if the customer has never written. */
+    replyWindowClosesAt: z.string().datetime().nullable(),
+    /** The order placed from this chat most recently, whatever its status; null if none. */
+    latestOrderId: z.string().uuid().nullable(),
+  })
+  .meta({ id: 'ConversationDetail' });
 export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
 
-export const messageSchema = z.object({
-  id: z.string().uuid(),
-  sender: messageSenderSchema,
-  text: z.string(),
-  status: messageStatusSchema,
-  sentAt: z.string().datetime(),
-});
+export const messageSchema = z
+  .object({
+    id: z.string().uuid(),
+    sender: messageSenderSchema,
+    text: z.string(),
+    status: messageStatusSchema,
+    sentAt: z.string().datetime(),
+  })
+  .meta({ id: 'Message' });
 export type Message = z.infer<typeof messageSchema>;
 
 /** GET /conversations/:id/messages. `before` is the `prevCursor` of a newer page. */
@@ -264,20 +274,27 @@ export const listMessagesQuerySchema = z.object({
 export type ListMessagesQuery = z.infer<typeof listMessagesQuerySchema>;
 
 /** Chronological (oldest first). `prevCursor` loads the page before it, or is null at the start. */
-export const messagePageSchema = z.object({
-  data: z.array(messageSchema),
-  pagination: z.object({ prevCursor: z.string().nullable() }),
-});
+export const messagePageSchema = z
+  .object({
+    data: z.array(messageSchema),
+    pagination: z.object({ prevCursor: z.string().nullable() }),
+  })
+  .meta({ id: 'MessagePage' });
 export type MessagePage = z.infer<typeof messagePageSchema>;
 
 /** PATCH /conversations/:id: take over (true) or hand back (false). State is never client-set. */
-export const updateConversationSchema = z.object({ botPaused: z.boolean() }).strict();
+export const updateConversationSchema = z
+  .object({ botPaused: z.boolean() })
+  .strict()
+  .meta({ id: 'UpdateConversation' });
 export type UpdateConversation = z.infer<typeof updateConversationSchema>;
 
 /** POST /conversations/:id/messages: a seller reply. */
-export const sendMessageSchema = z.object({
-  text: z.string().trim().min(1).max(MESSAGE_TEXT_MAX_LENGTH),
-});
+export const sendMessageSchema = z
+  .object({
+    text: z.string().trim().min(1).max(MESSAGE_TEXT_MAX_LENGTH),
+  })
+  .meta({ id: 'SendMessage' });
 export type SendMessage = z.infer<typeof sendMessageSchema>;
 
 /** The one SSE event on GET /conversations/events. Carries an id only: refetch over REST. */

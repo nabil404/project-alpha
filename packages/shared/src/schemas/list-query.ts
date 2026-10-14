@@ -22,10 +22,12 @@ export const pageSizeOf = (sizes: readonly number[]) =>
     .refine((value) => sizes.includes(value), { params: { code: 'INVALID_VALUE' } })
     .default(10);
 
-export const pagePaginationSchema = z.object({
-  page: z.number().int().positive(),
-  pageSize: z.number().int().positive(),
-  total: z.number().int().nonnegative(),
-  totalPages: z.number().int().nonnegative(),
-});
+export const pagePaginationSchema = z
+  .object({
+    page: z.number().int().positive(),
+    pageSize: z.number().int().positive(),
+    total: z.number().int().nonnegative(),
+    totalPages: z.number().int().nonnegative(),
+  })
+  .meta({ id: 'PagePagination' });
 export type PagePagination = z.infer<typeof pagePaginationSchema>;

@@ -6,7 +6,6 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import {
   createCustomerNoteSchema,
@@ -32,15 +31,14 @@ import {
   type ListCustomersQuery,
   type UpdateCustomer,
 } from '@app/shared';
-import { z, type ZodType } from 'zod';
+import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { CustomersService } from './customers.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
-const openApi = (schema: ZodType, io: 'input' | 'output' = 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 /** The note's author is the signed-in seller; SessionGuard always runs first. */
 function author(request: TenantRequest): { id: string; name: string } {
@@ -74,7 +72,7 @@ export class CustomersController {
   })
   @ApiOkResponse({
     description: 'A page of customers.',
-    schema: openApi(customerListResponseSchema),
+    schema: openApiSchema(customerListResponseSchema),
   })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   list(
@@ -90,14 +88,14 @@ export class CustomersController {
     description:
       'Counts per status, new customers and average order value over the last 30 days and the 30 before. Ignores search.',
   })
-  @ApiOkResponse({ description: 'The stat cards.', schema: openApi(customerSummarySchema) })
+  @ApiOkResponse({ description: 'The stat cards.', schema: openApiSchema(customerSummarySchema) })
   summary(@Req() request: TenantRequest): Promise<CustomerSummary> {
     return this.customers.summary(tenantScope(request));
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a customer' })
-  @ApiOkResponse({ description: 'The customer.', schema: openApi(customerDetailSchema) })
+  @ApiOkResponse({ description: 'The customer.', schema: openApiSchema(customerDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CUSTOMER_NOT_FOUND'])
   get(@Req() request: TenantRequest, @Param('id', uuidParam) id: string): Promise<CustomerDetail> {
@@ -110,8 +108,11 @@ export class CustomersController {
     description:
       'Phone, delivery address and area. Omit a field to leave it; send `null` or a blank string to clear it. Orders keep the details they were placed with.',
   })
-  @ApiBody({ schema: openApi(updateCustomerSchema, 'input') })
-  @ApiOkResponse({ description: 'The updated customer.', schema: openApi(customerDetailSchema) })
+  @ApiBody({ schema: openApiSchema(updateCustomerSchema, 'input') })
+  @ApiOkResponse({
+    description: 'The updated customer.',
+    schema: openApiSchema(customerDetailSchema),
+  })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CUSTOMER_NOT_FOUND'])
   update(
@@ -133,7 +134,10 @@ export class CustomersController {
     required: false,
     schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
   })
-  @ApiOkResponse({ description: 'A page of orders.', schema: openApi(customerOrderPageSchema) })
+  @ApiOkResponse({
+    description: 'A page of orders.',
+    schema: openApiSchema(customerOrderPageSchema),
+  })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CUSTOMER_NOT_FOUND'])
   orders(
@@ -148,7 +152,7 @@ export class CustomersController {
   @ApiOperation({ summary: 'List notes on a customer', description: 'Newest first.' })
   @ApiOkResponse({
     description: 'Every note.',
-    schema: { type: 'array', items: openApi(customerNoteSchema) },
+    schema: { type: 'array', items: openApiSchema(customerNoteSchema) },
   })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CUSTOMER_NOT_FOUND'])
@@ -164,8 +168,8 @@ export class CustomersController {
     summary: 'Add a note on a customer',
     description: 'Seen only by the shop’s team, never the customer.',
   })
-  @ApiBody({ schema: openApi(createCustomerNoteSchema, 'input') })
-  @ApiCreatedResponse({ description: 'The note.', schema: openApi(customerNoteSchema) })
+  @ApiBody({ schema: openApiSchema(createCustomerNoteSchema, 'input') })
+  @ApiCreatedResponse({ description: 'The note.', schema: openApiSchema(customerNoteSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CUSTOMER_NOT_FOUND'])
   addNote(

@@ -80,56 +80,62 @@ export const customerListItemSchema = customerOrderStatsSchema.extend({
 });
 export type CustomerListItem = z.infer<typeof customerListItemSchema>;
 
-export const customerListResponseSchema = z.object({
-  data: z.array(customerListItemSchema),
-  pagination: pagePaginationSchema,
-});
+export const customerListResponseSchema = z
+  .object({
+    data: z.array(customerListItemSchema),
+    pagination: pagePaginationSchema,
+  })
+  .meta({ id: 'CustomerListResponse' });
 export type CustomerListResponse = z.infer<typeof customerListResponseSchema>;
 
 /** GET /customers/summary: the stat cards and the tab counts. Ignores search. */
-export const customerSummarySchema = z.object({
-  counts: z.object({
-    all: z.number().int().nonnegative(),
-    needsYou: z.number().int().nonnegative(),
-    inactive: z.number().int().nonnegative(),
-    repeat: z.number().int().nonnegative(),
-    new: z.number().int().nonnegative(),
-  }),
-  /** First contact within the last CUSTOMER_STATS_WINDOW_DAYS. */
-  newInWindow: z.number().int().nonnegative(),
-  /** Customers with REPEAT_MIN_ORDERS or more orders, whatever their badge. */
-  repeatCustomers: z.number().int().nonnegative(),
-  /** Customers with at least one order. */
-  customersWithOrders: z.number().int().nonnegative(),
-  /** Minor units, rounded; null when there were no orders to average. */
-  averageOrderValue: z.object({
-    allTime: z.number().int().nonnegative().nullable(),
-    currentWindow: z.number().int().nonnegative().nullable(),
-    previousWindow: z.number().int().nonnegative().nullable(),
-  }),
-});
+export const customerSummarySchema = z
+  .object({
+    counts: z.object({
+      all: z.number().int().nonnegative(),
+      needsYou: z.number().int().nonnegative(),
+      inactive: z.number().int().nonnegative(),
+      repeat: z.number().int().nonnegative(),
+      new: z.number().int().nonnegative(),
+    }),
+    /** First contact within the last CUSTOMER_STATS_WINDOW_DAYS. */
+    newInWindow: z.number().int().nonnegative(),
+    /** Customers with REPEAT_MIN_ORDERS or more orders, whatever their badge. */
+    repeatCustomers: z.number().int().nonnegative(),
+    /** Customers with at least one order. */
+    customersWithOrders: z.number().int().nonnegative(),
+    /** Minor units, rounded; null when there were no orders to average. */
+    averageOrderValue: z.object({
+      allTime: z.number().int().nonnegative().nullable(),
+      currentWindow: z.number().int().nonnegative().nullable(),
+      previousWindow: z.number().int().nonnegative().nullable(),
+    }),
+  })
+  .meta({ id: 'CustomerSummary' });
 export type CustomerSummary = z.infer<typeof customerSummarySchema>;
 
-export const customerDetailSchema = customerListItemSchema.extend({
-  deliveryAddress: z.string().nullable(),
-  /** Rounded minor units; null with no orders. */
-  averageOrderValue: z.number().int().nonnegative().nullable(),
-  /** First contact. */
-  createdAt: z.string().datetime(),
-  /** Their most recently active conversation; null if they have none. */
-  latestConversation: z
-    .object({
-      id: z.string().uuid(),
-      state: conversationStateSchema,
-      botPaused: z.boolean(),
-      lastMessage: z.object({
-        preview: z.string(),
-        sender: messageSenderSchema,
-        at: z.string().datetime(),
-      }),
-    })
-    .nullable(),
-});
+export const customerDetailSchema = customerListItemSchema
+  .extend({
+    deliveryAddress: z.string().nullable(),
+    /** Rounded minor units; null with no orders. */
+    averageOrderValue: z.number().int().nonnegative().nullable(),
+    /** First contact. */
+    createdAt: z.string().datetime(),
+    /** Their most recently active conversation; null if they have none. */
+    latestConversation: z
+      .object({
+        id: z.string().uuid(),
+        state: conversationStateSchema,
+        botPaused: z.boolean(),
+        lastMessage: z.object({
+          preview: z.string(),
+          sender: messageSenderSchema,
+          at: z.string().datetime(),
+        }),
+      })
+      .nullable(),
+  })
+  .meta({ id: 'CustomerDetail' });
 export type CustomerDetail = z.infer<typeof customerDetailSchema>;
 
 export const customerOrderSchema = z.object({
@@ -154,10 +160,12 @@ export const customerOrderSchema = z.object({
 });
 export type CustomerOrder = z.infer<typeof customerOrderSchema>;
 
-export const customerOrderPageSchema = z.object({
-  data: z.array(customerOrderSchema),
-  pagination: pagePaginationSchema,
-});
+export const customerOrderPageSchema = z
+  .object({
+    data: z.array(customerOrderSchema),
+    pagination: pagePaginationSchema,
+  })
+  .meta({ id: 'CustomerOrderPage' });
 export type CustomerOrderPage = z.infer<typeof customerOrderPageSchema>;
 
 export const CUSTOMER_ADDRESS_MAX_LENGTH = 500;
@@ -177,7 +185,8 @@ export const updateCustomerSchema = z
     deliveryAddress: clearable(z.string().trim().max(CUSTOMER_ADDRESS_MAX_LENGTH)).optional(),
     area: clearable(z.string().trim().max(CUSTOMER_AREA_MAX_LENGTH)).optional(),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'UpdateCustomer' });
 export type UpdateCustomer = z.infer<typeof updateCustomerSchema>;
 
 export const CUSTOMER_NOTE_MAX_LENGTH = 2000;
@@ -185,14 +194,17 @@ export const CUSTOMER_NOTE_MAX_LENGTH = 2000;
 /** POST /customers/:id/notes. */
 export const createCustomerNoteSchema = z
   .object({ body: z.string().trim().min(1).max(CUSTOMER_NOTE_MAX_LENGTH) })
-  .strict();
+  .strict()
+  .meta({ id: 'CreateCustomerNote' });
 export type CreateCustomerNote = z.infer<typeof createCustomerNoteSchema>;
 
-export const customerNoteSchema = z.object({
-  id: z.string().uuid(),
-  body: z.string(),
-  /** Null once the author's account is deleted. */
-  author: z.object({ id: z.string(), name: z.string() }).nullable(),
-  createdAt: z.string().datetime(),
-});
+export const customerNoteSchema = z
+  .object({
+    id: z.string().uuid(),
+    body: z.string(),
+    /** Null once the author's account is deleted. */
+    author: z.object({ id: z.string(), name: z.string() }).nullable(),
+    createdAt: z.string().datetime(),
+  })
+  .meta({ id: 'CustomerNote' });
 export type CustomerNote = z.infer<typeof customerNoteSchema>;

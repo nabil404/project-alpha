@@ -19,7 +19,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
@@ -38,6 +37,7 @@ import { z } from 'zod';
 import { CodedValidationException } from '../../common/errors/coded-exceptions';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { AvatarUploadInterceptor } from './avatar/avatar-upload.interceptor';
 import { AvatarService } from './avatar/avatar.service';
 import { UserPreferencesRepository } from './preferences/user-preferences.repository';
@@ -50,9 +50,6 @@ interface SignedInRequest extends Request {
 
 /** Better Auth session ids are random strings, not uuids. */
 const sessionIdParam = new ZodValidationPipe(z.string().min(1).max(255));
-
-const schemaOf = (schema: z.ZodType) =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io: 'output' }) as SchemaObject;
 
 function signedIn(request: SignedInRequest): { userId: string; sessionId: string } {
   const session = request.session;
@@ -83,12 +80,9 @@ export class AccountController {
       "Theirs alone, not the shop's. `null` follows the shop's country. The session's `user.locale` carries the current value.",
   })
   @ApiBody({
-    schema: z.toJSONSchema(updateAccountPreferencesSchema, {
-      target: 'openapi-3.0',
-      io: 'input',
-    }) as SchemaObject,
+    schema: openApiSchema(updateAccountPreferencesSchema, 'input'),
   })
-  @ApiOkResponse({ schema: schemaOf(accountPreferencesSchema) })
+  @ApiOkResponse({ schema: openApiSchema(accountPreferencesSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   async updatePreferences(
     @Req() request: SignedInRequest,
@@ -115,7 +109,7 @@ export class AccountController {
       properties: { file: { type: 'string', format: 'binary' } },
     },
   })
-  @ApiOkResponse({ description: 'The new photo URL.', schema: schemaOf(accountAvatarSchema) })
+  @ApiOkResponse({ description: 'The new photo URL.', schema: openApiSchema(accountAvatarSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED', 'AVATAR_INVALID', 'AVATAR_TOO_SMALL'])
   @ApiCodedError(413, ['AVATAR_TOO_LARGE'])
   @ApiCodedError(415, ['AVATAR_UNSUPPORTED_TYPE'])
@@ -135,7 +129,7 @@ export class AccountController {
   @Delete('avatar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove the profile photo' })
-  @ApiOkResponse({ description: '`image` is null.', schema: schemaOf(accountAvatarSchema) })
+  @ApiOkResponse({ description: '`image` is null.', schema: openApiSchema(accountAvatarSchema) })
   removeAvatar(@Req() request: SignedInRequest): Promise<AccountAvatar> {
     return this.avatars.remove(signedIn(request).userId);
   }
@@ -146,7 +140,7 @@ export class AccountController {
     description:
       'Unexpired sessions, the current one first. Never includes tokens or IP addresses.',
   })
-  @ApiOkResponse({ schema: { type: 'array', items: schemaOf(deviceSessionSchema) } })
+  @ApiOkResponse({ schema: { type: 'array', items: openApiSchema(deviceSessionSchema) } })
   listSessions(@Req() request: SignedInRequest): Promise<DeviceSession[]> {
     const { userId, sessionId } = signedIn(request);
     return this.devices.list(userId, sessionId);

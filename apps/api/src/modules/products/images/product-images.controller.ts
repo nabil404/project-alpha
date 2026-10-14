@@ -20,7 +20,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -34,14 +33,12 @@ import { CodedValidationException } from '../../../common/errors/coded-exception
 import { TenantGuard, tenantScope, type TenantRequest } from '../../../common/tenant.guard';
 import { ZodValidationPipe } from '../../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../../openapi/api-coded-error';
+import { openApiSchema } from '../../../openapi/openapi-schema';
 import { ProductImageUploadInterceptor } from './product-image-upload.interceptor';
 import { ProductImagesService } from './product-images.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
-const imageSchema = z.toJSONSchema(productImageSchema, {
-  target: 'openapi-3.0',
-  io: 'output',
-}) as SchemaObject;
+const imageSchema = openApiSchema(productImageSchema);
 
 /** The merchant always comes from the session via TenantGuard, never the request. */
 @ApiTags('Product images')
@@ -110,10 +107,7 @@ export class ProductImagesController {
       "`imageIds` must list each of the product's images exactly once. The order is the gallery's only; the cover is set separately.",
   })
   @ApiBody({
-    schema: z.toJSONSchema(reorderProductImagesSchema, {
-      target: 'openapi-3.0',
-      io: 'input',
-    }) as SchemaObject,
+    schema: openApiSchema(reorderProductImagesSchema, 'input'),
   })
   @ApiOkResponse({
     description: 'The gallery in its new order.',

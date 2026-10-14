@@ -21,7 +21,6 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import {
   createOrderSchema,
@@ -53,11 +52,12 @@ import {
   type UpdateOrder,
   type UpdateOrderStatus,
 } from '@app/shared';
-import { z, type ZodType } from 'zod';
+import { z } from 'zod';
 import { parseOrThrow } from '../../common/parse-or-throw';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { DeliveryQuoteService } from './delivery-quote.service';
 import { OrdersService, type OrderActor } from './orders.service';
 
@@ -66,8 +66,6 @@ const uuidParam = new ZodValidationPipe(z.string().uuid());
 const idempotencyHeader = z.object({
   'Idempotency-Key': z.string().trim().min(1).max(200).optional(),
 });
-const openApi = (schema: ZodType, io: 'input' | 'output' = 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 const instantQuery = { required: false, schema: { type: 'string', format: 'date-time' } } as const;
 const fromQuery = {
@@ -112,7 +110,10 @@ export class OrdersController {
     required: false,
     schema: { type: 'integer', enum: [...orderPageSizes], default: 10 },
   })
-  @ApiOkResponse({ description: 'A page of orders.', schema: openApi(orderListResponseSchema) })
+  @ApiOkResponse({
+    description: 'A page of orders.',
+    schema: openApiSchema(orderListResponseSchema),
+  })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   list(
     @Req() request: TenantRequest,
@@ -132,7 +133,7 @@ export class OrdersController {
   @ApiQuery(toQuery)
   @ApiOkResponse({
     description: 'The stat cards and tab counts.',
-    schema: openApi(orderSummarySchema),
+    schema: openApiSchema(orderSummarySchema),
   })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   summary(
@@ -149,8 +150,8 @@ export class OrdersController {
       'For a customer who has messaged the Page. It starts as `new` and reserves its items’ stock. Name, phone and address default to the customer’s details on file. `deliveryChargeId` links a Settings delivery charge and copies its area name, everywhere-else flag and estimate onto the order; `deliveryFee` is stored as sent (quote it with POST /orders/delivery-quote). Send an `Idempotency-Key` to make a retry safe: a repeat returns the order the first request created.',
   })
   @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Up to 200 characters.' })
-  @ApiBody({ schema: openApi(createOrderSchema, 'input') })
-  @ApiCreatedResponse({ description: 'The order.', schema: openApi(orderDetailSchema) })
+  @ApiBody({ schema: openApiSchema(createOrderSchema, 'input') })
+  @ApiCreatedResponse({ description: 'The order.', schema: openApiSchema(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CUSTOMER_NOT_FOUND', 'VARIANT_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
   @ApiCodedError(409, ['ORDER_INSUFFICIENT_STOCK'])
@@ -170,8 +171,8 @@ export class OrdersController {
     description:
       "Each product costs its own charge for the area if it sets one, else the shop's; the fee is the highest, not the sum, and nothing once the subtotal reaches the shop's free-delivery threshold. Prices are the ones sent, else the catalog's. Writes nothing.",
   })
-  @ApiBody({ schema: openApi(deliveryQuoteRequestSchema, 'input') })
-  @ApiOkResponse({ description: 'The fee.', schema: openApi(deliveryQuoteSchema) })
+  @ApiBody({ schema: openApiSchema(deliveryQuoteRequestSchema, 'input') })
+  @ApiOkResponse({ description: 'The fee.', schema: openApiSchema(deliveryQuoteSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['DELIVERY_CHARGE_NOT_FOUND', 'VARIANT_NOT_FOUND'])
   deliveryQuote(
@@ -183,7 +184,7 @@ export class OrdersController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get an order' })
-  @ApiOkResponse({ description: 'The order.', schema: openApi(orderDetailSchema) })
+  @ApiOkResponse({ description: 'The order.', schema: openApiSchema(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['ORDER_NOT_FOUND'])
   get(@Req() request: TenantRequest, @Param('id', uuidParam) id: string): Promise<OrderDetail> {
@@ -194,7 +195,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'An order’s activity', description: 'Newest first.' })
   @ApiOkResponse({
     description: 'Every event.',
-    schema: { type: 'array', items: openApi(orderEventSchema) },
+    schema: { type: 'array', items: openApiSchema(orderEventSchema) },
   })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['ORDER_NOT_FOUND'])
@@ -212,8 +213,8 @@ export class OrdersController {
     description:
       'Confirm, pack, ship, deliver, return or cancel. Confirming turns a draft’s reservation into stock taken; cancelling a draft releases its reservation; cancelling after confirming, or returning, gives the stock back.',
   })
-  @ApiBody({ schema: openApi(updateOrderStatusSchema, 'input') })
-  @ApiOkResponse({ description: 'The updated order.', schema: openApi(orderDetailSchema) })
+  @ApiBody({ schema: openApiSchema(updateOrderStatusSchema, 'input') })
+  @ApiOkResponse({ description: 'The updated order.', schema: openApiSchema(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['ORDER_NOT_FOUND'])
   @ApiCodedError(409, ['ORDER_STALE', 'ORDER_INVALID_TRANSITION', 'ORDER_INSUFFICIENT_STOCK'])
@@ -231,8 +232,8 @@ export class OrdersController {
     description:
       'While the order is new or confirmed. A variant already on the order keeps its name, SKU and price unless `unitPrice` is sent; a new one is priced from the catalog. A draft’s reservation, or a confirmed order’s stock, follows the change.',
   })
-  @ApiBody({ schema: openApi(replaceOrderItemsSchema, 'input') })
-  @ApiOkResponse({ description: 'The updated order.', schema: openApi(orderDetailSchema) })
+  @ApiBody({ schema: openApiSchema(replaceOrderItemsSchema, 'input') })
+  @ApiOkResponse({ description: 'The updated order.', schema: openApiSchema(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['ORDER_NOT_FOUND', 'VARIANT_NOT_FOUND'])
   @ApiCodedError(409, ['ORDER_STALE', 'ORDER_NOT_EDITABLE', 'ORDER_INSUFFICIENT_STOCK'])
@@ -250,8 +251,8 @@ export class OrdersController {
     description:
       'Delivery details (name, phone, address, area, fee) until the order ships; payment, tracking number and the internal note at any time. Omit a field to leave it; a blank area, tracking number or note clears it. `deliveryChargeId` links a Settings delivery charge and copies its area name (unless `deliveryArea` is sent), everywhere-else flag and estimate; `null` unlinks and clears them. The fee is never recomputed. The customer’s own details never change.',
   })
-  @ApiBody({ schema: openApi(updateOrderSchema, 'input') })
-  @ApiOkResponse({ description: 'The updated order.', schema: openApi(orderDetailSchema) })
+  @ApiBody({ schema: openApiSchema(updateOrderSchema, 'input') })
+  @ApiOkResponse({ description: 'The updated order.', schema: openApiSchema(orderDetailSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['ORDER_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
   @ApiCodedError(409, ['ORDER_STALE', 'ORDER_NOT_EDITABLE'])

@@ -172,36 +172,40 @@ export const orderListItemSchema = z.object({
 });
 export type OrderListItem = z.infer<typeof orderListItemSchema>;
 
-export const orderListResponseSchema = z.object({
-  data: z.array(orderListItemSchema),
-  pagination: pagePaginationSchema,
-});
+export const orderListResponseSchema = z
+  .object({
+    data: z.array(orderListItemSchema),
+    pagination: pagePaginationSchema,
+  })
+  .meta({ id: 'OrderListResponse' });
 export type OrderListResponse = z.infer<typeof orderListResponseSchema>;
 
-export const orderSummarySchema = z.object({
-  /** Per tab, under the same search and dates as the list. */
-  counts: z.object({
-    all: count,
-    new: count,
-    confirmed: count,
-    packed: count,
-    shipped: count,
-    delivered: count,
-    returned: count,
-    cancelled: count,
-  }),
-  /** Drafted orders waiting for the seller, whenever they were placed. */
-  awaitingConfirmation: count,
-  /** Confirmed or packed: still to go out. */
-  toShip: z.object({ confirmed: count, packed: count }),
-  /**
-   * Minor units of the shop's currency, over the last ORDER_STATS_WINDOW_DAYS
-   * and the window before. Cancelled and returned orders never count.
-   */
-  revenue: z.object({ currentWindow: money, previousWindow: money }),
-  /** Orders placed in the current window, and how many the assistant drafted. */
-  placedInWindow: z.object({ all: count, byAssistant: count }),
-});
+export const orderSummarySchema = z
+  .object({
+    /** Per tab, under the same search and dates as the list. */
+    counts: z.object({
+      all: count,
+      new: count,
+      confirmed: count,
+      packed: count,
+      shipped: count,
+      delivered: count,
+      returned: count,
+      cancelled: count,
+    }),
+    /** Drafted orders waiting for the seller, whenever they were placed. */
+    awaitingConfirmation: count,
+    /** Confirmed or packed: still to go out. */
+    toShip: z.object({ confirmed: count, packed: count }),
+    /**
+     * Minor units of the shop's currency, over the last ORDER_STATS_WINDOW_DAYS
+     * and the window before. Cancelled and returned orders never count.
+     */
+    revenue: z.object({ currentWindow: money, previousWindow: money }),
+    /** Orders placed in the current window, and how many the assistant drafted. */
+    placedInWindow: z.object({ all: count, byAssistant: count }),
+  })
+  .meta({ id: 'OrderSummary' });
 export type OrderSummary = z.infer<typeof orderSummarySchema>;
 
 export const orderLineSchema = z.object({
@@ -219,60 +223,62 @@ export const orderLineSchema = z.object({
 });
 export type OrderLine = z.infer<typeof orderLineSchema>;
 
-export const orderDetailSchema = z.object({
-  id: z.string().uuid(),
-  /** ORD-2026-00481: the order's identifier, shown to the seller and sent to the customer. */
-  reference: z.string().min(1),
-  /** The shop's own order number within `year`, counted from 1 each year. */
-  number: z.number().int().positive(),
-  /** The calendar year it was placed, in the shop's time zone. */
-  year: z.number().int().positive(),
-  /** Opaque. Send it back with a change; a change from an older read is refused with ORDER_STALE. */
-  version: z.string().min(1),
-  source: orderSourceSchema,
-  /** How the customer reached the shop for this order; null for an order the seller added. */
-  entrySource: entrySourceSchema.nullable(),
-  status: orderStatusSchema,
-  /** Where the order can go from here; empty once it is done. */
-  nextStatuses: z.array(orderStatusSchema),
-  paymentStatus: paymentStatusSchema,
-  paymentMethod: paymentMethodSchema,
-  currency: z.string().length(3),
-  subtotal: money,
-  deliveryFee: money,
-  total: money,
-  items: z.array(orderLineSchema),
-  /** The delivery details the order was placed with; editing the customer never changes them. */
-  delivery: z.object({
-    name: z.string(),
-    phone: z.string(),
-    address: z.string(),
-    /** The area's name when it was delivered there; null for everywhere else or none. Kept when the area goes. */
-    area: z.string().nullable(),
-    /** The Settings delivery charge it was priced by; null once that area is removed, or for none. */
-    chargeId: z.string().uuid().nullable(),
-    /** Priced at the shop's everywhere-else charge. */
-    everywhereElse: z.boolean(),
-    /** The estimate when priced, e.g. "1–2 days" after shipping. */
-    time: z.string().nullable(),
-  }),
-  trackingNumber: z.string().nullable(),
-  /** The seller's own note; the customer never sees it. */
-  note: z.string().nullable(),
-  customer: z.object({
+export const orderDetailSchema = z
+  .object({
     id: z.string().uuid(),
-    /** The customer as they are now, unlike `delivery`. Null until Facebook shares a name. */
-    name: z.string().nullable(),
-    pictureUrl: z.string().url().nullable(),
-    /** Their orders placed before this one, cancelled and returned ones left out. */
-    earlierOrderCount: count,
-    spentBefore: money,
-  }),
-  /** The Messenger conversation it came from; null for an order the seller added. */
-  conversationId: z.string().uuid().nullable(),
-  placedAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-});
+    /** ORD-2026-00481: the order's identifier, shown to the seller and sent to the customer. */
+    reference: z.string().min(1),
+    /** The shop's own order number within `year`, counted from 1 each year. */
+    number: z.number().int().positive(),
+    /** The calendar year it was placed, in the shop's time zone. */
+    year: z.number().int().positive(),
+    /** Opaque. Send it back with a change; a change from an older read is refused with ORDER_STALE. */
+    version: z.string().min(1),
+    source: orderSourceSchema,
+    /** How the customer reached the shop for this order; null for an order the seller added. */
+    entrySource: entrySourceSchema.nullable(),
+    status: orderStatusSchema,
+    /** Where the order can go from here; empty once it is done. */
+    nextStatuses: z.array(orderStatusSchema),
+    paymentStatus: paymentStatusSchema,
+    paymentMethod: paymentMethodSchema,
+    currency: z.string().length(3),
+    subtotal: money,
+    deliveryFee: money,
+    total: money,
+    items: z.array(orderLineSchema),
+    /** The delivery details the order was placed with; editing the customer never changes them. */
+    delivery: z.object({
+      name: z.string(),
+      phone: z.string(),
+      address: z.string(),
+      /** The area's name when it was delivered there; null for everywhere else or none. Kept when the area goes. */
+      area: z.string().nullable(),
+      /** The Settings delivery charge it was priced by; null once that area is removed, or for none. */
+      chargeId: z.string().uuid().nullable(),
+      /** Priced at the shop's everywhere-else charge. */
+      everywhereElse: z.boolean(),
+      /** The estimate when priced, e.g. "1–2 days" after shipping. */
+      time: z.string().nullable(),
+    }),
+    trackingNumber: z.string().nullable(),
+    /** The seller's own note; the customer never sees it. */
+    note: z.string().nullable(),
+    customer: z.object({
+      id: z.string().uuid(),
+      /** The customer as they are now, unlike `delivery`. Null until Facebook shares a name. */
+      name: z.string().nullable(),
+      pictureUrl: z.string().url().nullable(),
+      /** Their orders placed before this one, cancelled and returned ones left out. */
+      earlierOrderCount: count,
+      spentBefore: money,
+    }),
+    /** The Messenger conversation it came from; null for an order the seller added. */
+    conversationId: z.string().uuid().nullable(),
+    placedAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  })
+  .meta({ id: 'OrderDetail' });
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
 
 export const ORDER_MAX_ITEMS = 50;
@@ -299,7 +305,8 @@ export const orderItemInputSchema = z
     quantity: z.number().int().positive().max(9999),
     unitPrice: money.optional(),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'OrderItemInput' });
 export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
 
 const itemList = z
@@ -346,7 +353,8 @@ export const createOrderSchema = z
     paymentMethod: paymentMethodSchema.default('cash_on_delivery'),
     note: noteInput.optional(),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'CreateOrder' });
 export type CreateOrder = z.infer<typeof createOrderSchema>;
 
 /** POST /orders/:id/status. */
@@ -357,13 +365,15 @@ export const updateOrderStatusSchema = z
     note: z.string().trim().max(ORDER_NOTE_MAX_LENGTH).optional(),
     version: versionInput,
   })
-  .strict();
+  .strict()
+  .meta({ id: 'UpdateOrderStatus' });
 export type UpdateOrderStatus = z.infer<typeof updateOrderStatusSchema>;
 
 /** PUT /orders/:id/items: the whole list, while the order is new or confirmed. */
 export const replaceOrderItemsSchema = z
   .object({ items: itemList, version: versionInput })
-  .strict();
+  .strict()
+  .meta({ id: 'ReplaceOrderItems' });
 export type ReplaceOrderItems = z.infer<typeof replaceOrderItemsSchema>;
 
 /**
@@ -387,7 +397,8 @@ export const updateOrderSchema = z
     note: noteInput.optional(),
     version: versionInput,
   })
-  .strict();
+  .strict()
+  .meta({ id: 'UpdateOrder' });
 export type UpdateOrder = z.infer<typeof updateOrderSchema>;
 
 export const orderDeliveryFields = ['name', 'phone', 'address', 'area', 'fee'] as const;
@@ -435,11 +446,13 @@ export const orderEventTypes = [
   'tracking_changed',
 ] as const satisfies readonly OrderEventType[];
 
-export const orderEventSchema = z.object({
-  id: z.string().uuid(),
-  data: orderEventDataSchema,
-  /** The seller who did it; null for the assistant, or once their account is deleted. */
-  actor: z.object({ id: z.string(), name: z.string() }).nullable(),
-  createdAt: z.string().datetime(),
-});
+export const orderEventSchema = z
+  .object({
+    id: z.string().uuid(),
+    data: orderEventDataSchema,
+    /** The seller who did it; null for the assistant, or once their account is deleted. */
+    actor: z.object({ id: z.string(), name: z.string() }).nullable(),
+    createdAt: z.string().datetime(),
+  })
+  .meta({ id: 'OrderEvent' });
 export type OrderEvent = z.infer<typeof orderEventSchema>;
