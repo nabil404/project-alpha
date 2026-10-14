@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { phoneSchema } from './auth';
-import { conversationStateSchema, messageSenderSchema } from './conversation';
+import { conversationStateSchema, lastMessageSchema } from './conversation';
 import {
   pageNumber,
   pagePaginationSchema,
@@ -127,11 +127,7 @@ export const customerDetailSchema = customerListItemSchema
         id: z.string().uuid(),
         state: conversationStateSchema,
         botPaused: z.boolean(),
-        lastMessage: z.object({
-          preview: z.string(),
-          sender: messageSenderSchema,
-          at: z.string().datetime(),
-        }),
+        lastMessage: lastMessageSchema,
       })
       .nullable(),
   })

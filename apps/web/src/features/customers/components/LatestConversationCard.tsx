@@ -14,7 +14,7 @@ export function LatestConversationCard({
   conversation: CustomerDetail['latestConversation'];
 }) {
   const { t } = useTranslation('customers');
-  const { messageSender } = useStatusLabels();
+  const { messageSender, messageContent } = useStatusLabels();
   const { formatDate } = useFormatters();
 
   return (
@@ -44,7 +44,12 @@ export function LatestConversationCard({
               </span>
               <ConversationStateBadge state={conversation.state} />
             </span>
-            <p className="text-body break-words">{conversation.lastMessage.preview}</p>
+            <p className="text-body break-words">
+              {messageContent({
+                kind: conversation.lastMessage.kind,
+                text: conversation.lastMessage.preview,
+              })}
+            </p>
           </div>
           {conversation.botPaused && (
             <p className="flex items-center gap-2 text-small text-ink-muted">

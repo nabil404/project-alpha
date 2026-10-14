@@ -21,6 +21,22 @@ const referralSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ad'), adId: z.string().min(1) }),
 ]);
 
+/** Mirrors `InboundAttachment`. */
+const attachmentSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('sticker'),
+    url: z.string().nullable(),
+    stickerId: z.string().nullable(),
+  }),
+  z.object({ type: z.literal('location'), lat: z.number(), long: z.number() }),
+  z.object({
+    type: z.enum(['image', 'video', 'audio', 'file', 'other']),
+    url: z.string().nullable(),
+  }),
+]);
+
+const changeOf = { senderPsid: z.string().min(1), targetMid: z.string().min(1) };
+
 /**
  * What the worker accepts from MESSENGER_QUEUE. A job queued before messages
  * carried a `kind` could only be a customer's message, so it reads as one.
@@ -37,7 +53,18 @@ const inboundMessageJobSchema = z.preprocess(
       senderPsid: z.string().min(1),
       payload: z.string().min(1).optional(),
       referral: referralSchema.optional(),
+      attachments: z.array(attachmentSchema).min(1).optional(),
     }),
+    z.object({
+      ...inboundMessageBase,
+      ...changeOf,
+      kind: z.literal('customer-reaction'),
+      action: z.enum(['react', 'unreact']),
+      emoji: z.string(),
+      reaction: z.string(),
+    }),
+    z.object({ ...inboundMessageBase, ...changeOf, kind: z.literal('customer-edit') }),
+    z.object({ ...inboundMessageBase, ...changeOf, kind: z.literal('customer-unsend') }),
     z.object({
       ...inboundMessageBase,
       kind: z.literal('customer-postback'),

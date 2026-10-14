@@ -39,7 +39,8 @@ export type HandoffReason =
   | 'question'
   | 'repeated_confusion'
   | 'awaiting_seller'
-  | 'no_delivery_charge';
+  | 'no_delivery_charge'
+  | 'unreadable';
 
 /** Why a slot is asked for again, when it is not just missing. */
 export type AskReason =
@@ -73,7 +74,12 @@ export type ReplyIntent =
   | { kind: 'browse_categories'; choices: Choice[] }
   | { kind: 'browse_products'; cards: ProductCard[]; more: boolean }
   | { kind: 'last_order'; order: LastOrderFacts | null }
+  | { kind: 'notice'; notice: Notice }
   | { kind: 'handoff'; reason: HandoffReason };
+
+/** A fixed line for a message without words; it changes no state. */
+export type Notice =
+  'use_confirm' | 'type_please' | 'location_write_address' | 'location_seen' | 'text_only';
 
 /** One carousel card: a product with its lowest available price. */
 export interface ProductCard {

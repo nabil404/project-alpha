@@ -13,12 +13,18 @@ export const PAGE_CONNECT_SCOPES = [
   'pages_manage_metadata',
 ] as const;
 
-/** The webhook fields a connected Page delivers. Echoes are how a seller's own reply pauses the bot; referrals carry links and ads. */
+/**
+ * The webhook fields a connected Page delivers. Echoes are how a seller's own
+ * reply pauses the bot; referrals carry links and ads; reactions and edits are
+ * stored and shown, and never confirm an order.
+ */
 export const PAGE_WEBHOOK_FIELDS = [
   'messages',
   'messaging_postbacks',
   'message_echoes',
   'messaging_referrals',
+  'message_reactions',
+  'message_edits',
 ] as const;
 
 /** A Page role's capabilities; the assistant needs MESSAGING to answer chats. */

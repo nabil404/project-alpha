@@ -248,25 +248,26 @@ internet over HTTPS, so locally you need a tunnel to your machine.
    - `messaging_referrals` (`m.me` links, QR codes and click-to-Messenger ads),
    - `message_echoes` (the seller's own replies, which pause the bot).
 
-   The API acts on text `messages` (with any quick-reply payload or referral
-   they carry), `messaging_postbacks`, `messaging_referrals`, and text
+   The API acts on `messages` (text with any quick-reply payload or referral
+   they carry, and stickers, photos, files and locations), `messaging_postbacks`,
+   `messaging_referrals`, `message_reactions`, `message_edits`, and text
    `message_echoes` (stored as seller messages; echoes of replies sent by this
-   app are skipped). Other fields, and messages without text, are acknowledged
-   and ignored.
+   app are skipped). Other fields are acknowledged and ignored.
 
    The AI phases add fields. Each is subscribed by the app itself once its
    phase adds it to `PAGE_WEBHOOK_FIELDS` in
    [`meta-graph.client.ts`](../../apps/api/src/modules/messenger/page/meta-graph.client.ts);
-   Pages connected before then must be connected again, except for
-   `messaging_referrals` (below). Tick the same fields here so the dashboard's
+   Pages connected before then must be connected again, except for the fields
+   below, which the worker re-subscribes. Tick the same fields here so the dashboard's
    **Test** buttons work.
 
-   `messaging_referrals` ([phase 11.3](../features/11-ai-implementation/phase-3-entry-points/README.md))
-   is already in `PAGE_WEBHOOK_FIELDS`, so tick it too. Pages connected before
-   it was added are re-subscribed by the worker the first time it starts on a
-   build that has it (a one-off job, `resubscribe-pages-v1`), which also sets
-   their Messenger Profile; sellers do not reconnect. A later field that needs
-   the same treatment bumps that job id.
+   `messaging_referrals` ([phase 11.3](../features/11-ai-implementation/phase-3-entry-points/README.md)),
+   `message_reactions` and `message_edits` ([phase 11.4](../features/11-ai-implementation/phase-4-non-text-events/README.md))
+   are already in `PAGE_WEBHOOK_FIELDS`, so tick them too. Pages connected
+   before they were added are re-subscribed by the worker the first time it
+   starts on a build that has them (a one-off job, now `resubscribe-pages-v2`),
+   which also sets their Messenger Profile; sellers do not reconnect. A later
+   field that needs the same treatment bumps that job id.
 
    | Field                 | Phase                                                                                                                                                              | Delivers                                               |
    | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |

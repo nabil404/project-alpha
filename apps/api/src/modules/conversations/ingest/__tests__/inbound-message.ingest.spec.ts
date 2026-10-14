@@ -15,8 +15,10 @@ import {
 import { randomPageId, seedFacebookPage } from '../../../database/__tests__/conversation-seeds';
 import {
   ASSISTANT_TURN_RETRY,
+  type CustomerEditJob,
   type CustomerMessageJob,
   type CustomerPostbackJob,
+  type CustomerReactionJob,
   type CustomerReferralJob,
   type PageEchoJob,
 } from '../../../queue/queue.constants';
@@ -717,5 +719,193 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
     await ingest.handle(customerMessage({ pageId: pageB, referral: { kind: 'ad', adId } }));
     const rows = await t.db.select().from(schema.adProduct).where(eq(schema.adProduct.adId, adId));
     expect(rows.map((row) => row.merchantId)).toEqual([t.merchantB]);
+  });
+
+  describe('non-text events', () => {
+    const reaction = (
+      target: CustomerMessageJob,
+      overrides: Partial<CustomerReactionJob> = {},
+    ): CustomerReactionJob => ({
+      kind: 'customer-reaction',
+      messageId: `rx-${randomUUID()}`,
+      pageId: target.pageId,
+      senderPsid: target.senderPsid,
+      targetMid: target.messageId,
+      action: 'react',
+      emoji: '❤️',
+      reaction: 'love',
+      text: '',
+      sentAt: target.sentAt + 5_000,
+      ...overrides,
+    });
+    const edit = (target: CustomerMessageJob, text: string, at = 60_000): CustomerEditJob => ({
+      kind: 'customer-edit',
+      messageId: `ed-${randomUUID()}`,
+      pageId: target.pageId,
+      senderPsid: target.senderPsid,
+      targetMid: target.messageId,
+      text,
+      sentAt: target.sentAt + at,
+    });
+    const setState = async (psid: string, state: 'awaiting_confirmation' | 'confirmed') => {
+      const thread = await threadOf(psid);
+      await t.db
+        .update(schema.conversation)
+        .set({ state })
+        .where(eq(schema.conversation.id, thread!.conversation.id));
+      return thread!.conversation.id;
+    };
+
+    it('stores a sticker with its kind and link and no words, and asks the assistant', async () => {
+      const job = customerMessage({
+        text: '',
+        attachments: [{ type: 'sticker', url: 'https://cdn.example/s.png', stickerId: '1' }],
+      });
+      expect(await ingest.handle(job)).toBe('stored');
+      const thread = await threadOf(job.senderPsid);
+      const [row] = await messagesOf(thread!.conversation.id);
+      expect(row).toMatchObject({
+        kind: 'sticker',
+        text: '',
+        details: { attachments: [{ url: 'https://cdn.example/s.png', stickerId: '1' }] },
+      });
+      // No words in any language: the dashboard names the kind in the seller's own.
+      expect(thread!.conversation).toMatchObject({
+        lastMessagePreview: '',
+        lastMessageKind: 'sticker',
+      });
+      expect(turns.added).toHaveLength(1);
+    });
+
+    it('stores the 👍 sticker as 👍', async () => {
+      const job = customerMessage({
+        text: '',
+        attachments: [{ type: 'sticker', url: null, stickerId: '369239263222822' }],
+      });
+      await ingest.handle(job);
+      const [row] = await messagesOf((await threadOf(job.senderPsid))!.conversation.id);
+      expect(row?.text).toBe('👍');
+    });
+
+    it('stores a duplicate reaction webhook once, and asks nothing outside the card', async () => {
+      const target = customerMessage();
+      await ingest.handle(target);
+      turns.added = [];
+      const job = reaction(target);
+
+      expect(await ingest.handle(job)).toBe('stored');
+      expect(await ingest.handle({ ...job })).toBe('duplicate');
+      const thread = await threadOf(target.senderPsid);
+      const rows = (await messagesOf(thread!.conversation.id)).filter(
+        (row) => row.kind === 'reaction',
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ text: '❤️' });
+      expect(turns.added).toEqual([]);
+      // A reaction is not a message: the reply window stays where the message left it.
+      expect(thread!.conversation.lastInboundAt).toEqual(new Date(target.sentAt));
+    });
+
+    it('asks the assistant for a reaction on the summary card', async () => {
+      const target = customerMessage();
+      await ingest.handle(target);
+      await setState(target.senderPsid, 'awaiting_confirmation');
+      turns.added = [];
+
+      await ingest.handle(reaction(target));
+      expect(turns.added).toHaveLength(1);
+      expect((turns.added[0]?.opts as { jobId: string }).jobId).toMatch(/^turn-rx-/);
+    });
+
+    it('takes a reaction back', async () => {
+      const target = customerMessage();
+      await ingest.handle(target);
+      await ingest.handle(reaction(target));
+      expect(
+        await ingest.handle(reaction(target, { action: 'unreact', sentAt: target.sentAt + 9_000 })),
+      ).toBe('stored');
+      const rows = await messagesOf((await threadOf(target.senderPsid))!.conversation.id);
+      expect(rows.find((row) => row.kind === 'reaction')?.deletedAt).not.toBeNull();
+    });
+
+    it('keeps an edit beside the original and asks again before the card', async () => {
+      const target = customerMessage({ text: 'red saree' });
+      await ingest.handle(target);
+      turns.added = [];
+
+      const job = edit(target, 'blue saree');
+      expect(await ingest.handle(job)).toBe('stored');
+      expect(await ingest.handle({ ...job })).toBe('duplicate');
+      const [row] = await messagesOf((await threadOf(target.senderPsid))!.conversation.id);
+      expect(row).toMatchObject({ text: 'red saree', editedText: 'blue saree' });
+      expect(turns.added).toHaveLength(1);
+      expect(turns.added[0]).toMatchObject({ data: { triggerMessageId: row!.id } });
+      expect((turns.added[0]?.opts as { jobId: string }).jobId).toBe(`turn-${job.messageId}`);
+    });
+
+    it('never asks again for an edit after the card', async () => {
+      const target = customerMessage({ text: 'red saree' });
+      await ingest.handle(target);
+      await setState(target.senderPsid, 'awaiting_confirmation');
+      turns.added = [];
+
+      expect(await ingest.handle(edit(target, 'blue saree'))).toBe('stored');
+      expect(turns.added).toEqual([]);
+    });
+
+    it('ignores an edit naming another customer’s message', async () => {
+      const target = customerMessage();
+      await ingest.handle(target);
+      const job = { ...edit(target, 'mine now'), senderPsid: `psid-${randomUUID()}` };
+      expect(await ingest.handle(job)).toBe('unknown-target');
+    });
+
+    it('marks an unsent message deleted and keeps what it filled', async () => {
+      const target = customerMessage();
+      await ingest.handle(target);
+      const conversationId = (await threadOf(target.senderPsid))!.conversation.id;
+      const before = (await threadOf(target.senderPsid))!.conversation.collectedSlots;
+
+      const job = {
+        kind: 'customer-unsend' as const,
+        messageId: `un-${target.messageId}`,
+        pageId: target.pageId,
+        senderPsid: target.senderPsid,
+        targetMid: target.messageId,
+        text: '',
+        sentAt: target.sentAt + 30_000,
+      };
+      expect(await ingest.handle(job)).toBe('stored');
+      expect(await ingest.handle(job)).toBe('duplicate');
+      const [row] = await messagesOf(conversationId);
+      expect(row?.deletedAt).not.toBeNull();
+      expect((await threadOf(target.senderPsid))!.conversation.collectedSlots).toEqual(before);
+    });
+
+    it('keeps a confirmed chat confirmed for a sticker or a reaction', async () => {
+      const target = customerMessage();
+      await ingest.handle(target);
+      await setState(target.senderPsid, 'confirmed');
+      turns.added = [];
+
+      await ingest.handle(
+        customerMessage({
+          senderPsid: target.senderPsid,
+          text: '',
+          attachments: [{ type: 'sticker', url: null, stickerId: '369239263222822' }],
+          sentAt: target.sentAt + 60_000,
+        }),
+      );
+      await ingest.handle(reaction(target, { sentAt: target.sentAt + 70_000 }));
+      await ingest.handle(
+        customerMessage({
+          senderPsid: target.senderPsid,
+          text: '🙏',
+          sentAt: target.sentAt + 80_000,
+        }),
+      );
+      expect((await threadOf(target.senderPsid))?.conversation.state).toBe('confirmed');
+      expect(turns.added).toEqual([]);
+    });
   });
 });

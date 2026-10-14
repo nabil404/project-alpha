@@ -288,6 +288,20 @@
       "when": 1791949696293,
       "tag": "0040_connected_merchants_fn",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792000755649,
+      "tag": "0041_message_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792003276458,
+      "tag": "0042_conversation_last_message_kind",
+      "breakpoints": true
     }
   ]
 }

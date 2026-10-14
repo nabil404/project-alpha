@@ -182,13 +182,14 @@ function ConversationRow({
   selected: boolean;
 }) {
   const { t } = useTranslation('conversations');
-  const { messageSender } = useStatusLabels();
+  const { messageSender, messageContent } = useStatusLabels();
   const customerName = useCustomerName();
   const { lastMessage } = conversation;
+  const text = messageContent({ kind: lastMessage.kind, text: lastMessage.preview });
   const preview =
     lastMessage.sender === 'customer'
-      ? lastMessage.preview
-      : t('list.preview', { sender: messageSender(lastMessage.sender), text: lastMessage.preview });
+      ? text
+      : t('list.preview', { sender: messageSender(lastMessage.sender), text });
 
   return (
     <Link

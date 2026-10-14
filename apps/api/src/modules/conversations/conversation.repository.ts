@@ -5,6 +5,7 @@ import type {
   ConversationFilter,
   ConversationState,
   EntrySource,
+  MessageKind,
   MessageSender,
 } from '@app/shared';
 import { and, desc, eq, exists, ilike, or, sql, type SQL } from 'drizzle-orm';
@@ -25,6 +26,8 @@ export interface IncomingMessage {
   sender: MessageSender;
   text: string;
   sentAt: Date;
+  /** `text` when left out: everything we send is words. */
+  kind?: MessageKind;
 }
 
 export interface ConversationListRow {
@@ -87,6 +90,7 @@ export class ConversationRepository {
         lastMessageAt: first.sentAt,
         lastMessagePreview: messagePreview(first.text),
         lastMessageSender: first.sender,
+        lastMessageKind: first.kind ?? 'text',
       })
       .onConflictDoNothing({
         target: [conversation.merchantId, conversation.facebookPageId, conversation.customerId],
@@ -116,15 +120,27 @@ export class ConversationRepository {
     executor: Executor,
     { merchantId }: TenantScope,
     row: ConversationRow,
-    { sender, text, sentAt, pauseBot = false }: IncomingMessage & { pauseBot?: boolean },
+    {
+      sender,
+      text,
+      sentAt,
+      kind = 'text',
+      pauseBot = false,
+      opensWindow = sender === 'customer',
+    }: IncomingMessage & {
+      pauseBot?: boolean;
+      /** A reaction is the customer's but is not a message: it opens no reply window. */
+      opensWindow?: boolean;
+    },
   ): Promise<ConversationRow> {
     const set: Partial<typeof conversation.$inferInsert> = {};
     if (sentAt >= row.lastMessageAt) {
       set.lastMessageAt = sentAt;
       set.lastMessagePreview = messagePreview(text);
       set.lastMessageSender = sender;
+      set.lastMessageKind = kind;
     }
-    if (sender === 'customer' && (row.lastInboundAt === null || sentAt > row.lastInboundAt)) {
+    if (opensWindow && (row.lastInboundAt === null || sentAt > row.lastInboundAt)) {
       set.lastInboundAt = sentAt;
     }
     if (pauseBot) set.botPaused = true;
@@ -156,6 +172,7 @@ export class ConversationRepository {
         lastMessageAt: latest.sentAt,
         lastMessagePreview: messagePreview(latest.text),
         lastMessageSender: latest.sender,
+        lastMessageKind: latest.kind ?? 'text',
       })
       .where(and(eq(conversation.merchantId, merchantId), eq(conversation.id, id)));
   }

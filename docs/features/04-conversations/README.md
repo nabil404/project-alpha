@@ -66,13 +66,15 @@ and the signature are Meta's authentication.
 
 `InboundMessageProcessor`, in the worker only, hands each `messenger-inbound`
 job to `InboundMessageIngest`. A job is a `customer-message`,
-`customer-postback`, `customer-referral` or `page-echo`; for an echo, the customer is the
-recipient. [Message flow](message-flow.md#a-customer-message) draws the steps.
+`customer-postback`, `customer-referral`, `customer-reaction`,
+`customer-edit`, `customer-unsend` or `page-echo`; for an echo, the customer
+is the recipient. [Message flow](message-flow.md#a-customer-message) draws the steps.
 
-- **Text, taps and referrals only.** An event without `message.text`
-  (attachments, stickers, reactions, deliveries) makes no job, so an
-  image-only first message creates no customer or conversation. The exception
-  is a standalone `referral` event, which makes a `customer-referral` job.
+- **Non-text events** ([AI phase 4](../11-ai-implementation/phase-4-non-text-events/README.md)).
+  A customer's sticker, photo, video, audio clip, file or shared location is
+  a `customer-message` with `text: ''` and its attachments; reactions, edits
+  and unsends have job kinds of their own. Deliveries and reads make no job,
+  and neither does a seller's echo without text.
 - **Entry messages.** A `message` or `postback` may carry a `referral`: a
   product link (`ref` = `p_<productId>`) or an ad (`source: ADS` with an
   `ad_id`). The ingest turns it into the payload the turn reads:
@@ -281,7 +283,8 @@ policy. `conversation` references `customer`, and `message` references
   `customer_id`, `state` (default `browsing`), `collected_slots` (jsonb),
   `bot_paused`, `handed_off_at` (set exactly while `state = handed_off`,
   migration `0030`), `last_message_at`, `last_message_preview`,
-  `last_message_sender`, `last_inbound_at`, `seller_last_read_at`.
+  `last_message_sender`, `last_message_kind` (migration `0042`; the list
+  names a non-text message from it), `last_inbound_at`, `seller_last_read_at`.
   `entry_source` (`ad`, `link`, `get_started` or `organic`, default
   `organic`, migration `0038`; how the current order attempt started),
   `UNIQUE (merchant_id, facebook_page_id, customer_id)`, an index on the list
@@ -289,7 +292,10 @@ policy. `conversation` references `customer`, and `message` references
 - `message`: `sender`, `text`, `meta_message_id` (null while `sending`),
   `payload` (a tap's payload, migration `0033`), `status`, `sent_at`, and
   `updated_at` (a reply's last claim to be sent, which the Confirm redelivery
-  leases, migration `0034`). `UNIQUE (merchant_id, meta_message_id)`, deleted
+  leases, migration `0034`). Migration `0041` adds `kind` (`text` by default),
+  `details` (jsonb, parsed with `messageDetailsSchema` on read),
+  `edited_text`, `edited_at` and `deleted_at`
+  ([AI phase 4](../11-ai-implementation/phase-4-non-text-events/README.md#data)). `UNIQUE (merchant_id, meta_message_id)`, deleted
   with its conversation, and a trigram index on `text`. The assistant writes
   `assistant` rows through `OutboundMessageSender`.
 
@@ -325,6 +331,13 @@ migrating role must be a superuser or hold `SET` membership in
   **`/conversations/:id/details`**, opened from the person icon in the chat
   header, with a back link and breadcrumb. While the order is drafted,
   `ChatOrderBanner` above the reply box ("Order drafted · ৳3,260") opens it.
+- **Non-text messages.** A sticker, photo, video or audio clip renders from
+  Meta's link, and a file as a link; Meta's links expire, so each falls back
+  to naming what was sent ("Sent a photo"), in the seller's chosen language. A location shows its coordinates and an OpenStreetMap
+  link. A reaction is pinned to the corner of the message it answers, as in
+  Messenger: the newest standing one shows, and one taken back disappears.
+  A reaction whose message is not loaded stays a line in the thread. An edit shows the latest text, "Edited" and the
+  original; an unsent message is struck through and marked "Unsent".
 - **Days** split at the shop's midnight
   ([Settings – General](../06-settings-general/README.md#dashboard)).
 - Code: `apps/web/src/features/conversations/` and

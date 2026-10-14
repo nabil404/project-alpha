@@ -15,7 +15,12 @@ type FallbackKey =
   | 'ask_variant_out_of_stock'
   | 'ask_quantity_too_many'
   | 'handoff'
-  | 'handoff_awaiting_seller';
+  | 'handoff_awaiting_seller'
+  | 'use_confirm'
+  | 'type_please'
+  | 'location_write_address'
+  | 'location_seen'
+  | 'text_only';
 
 /** The BCP-47 locale each reply language formats money in. */
 export const LOCALES: Record<ReplyLanguage, string> = { bn: 'bn-BD', en: 'en-US' };
@@ -119,6 +124,12 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
     ask_deliveryAddress: () => 'ডেলিভারির পুরো ঠিকানাটি (এলাকা ও জেলাসহ) দিন, প্লিজ।',
     handoff: () => 'ধন্যবাদ! আমাদের একজন প্রতিনিধি শিগগিরই আপনার সাথে কথা বলবেন।',
     handoff_awaiting_seller: () => 'ধন্যবাদ! আপনার অর্ডারটি দোকান শিগগিরই নিশ্চিত করবে।',
+    use_confirm: () => 'অর্ডারটি দিতে উপরের সারাংশে "নিশ্চিত করুন" বোতামটি চাপুন, প্লিজ।',
+    type_please: () => 'ধন্যবাদ! কী অর্ডার করতে চান, লিখে জানান, প্লিজ।',
+    location_write_address: () =>
+      'লোকেশনের জন্য ধন্যবাদ, দোকান এটি দেখতে পাবে। ডেলিভারির পুরো ঠিকানাটিও (এলাকা ও জেলাসহ) লিখে দিন, প্লিজ।',
+    location_seen: () => 'লোকেশনের জন্য ধন্যবাদ, দোকান এটি দেখতে পাবে।',
+    text_only: () => 'দুঃখিত, আমি শুধু লেখা মেসেজ আর ছবি পড়তে পারি। আপনার কথাটি লিখে পাঠাবেন?',
   },
   en: {
     ask_product: () => 'Which product would you like to order?',
@@ -144,6 +155,13 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
       'Please share the full delivery address, with the area and district.',
     handoff: () => 'Thanks! Someone from the shop will reply to you shortly.',
     handoff_awaiting_seller: () => 'Thanks! The shop will confirm your order shortly.',
+    use_confirm: () => 'To place your order, please tap Confirm on the summary above.',
+    type_please: () => "Thanks! Please type what you'd like to order.",
+    location_write_address: () =>
+      'Thanks for the location, the shop can see it. Please also write your full delivery address, with the area and district.',
+    location_seen: () => 'Thanks for the location, the shop can see it.',
+    text_only: () =>
+      'Sorry, I can read only text messages and photos. Could you type your message instead?',
   },
 };
 
@@ -183,6 +201,8 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
       return reply.order
         ? ENTRY_TEXT[language].lastOrder(reply.order)
         : ENTRY_TEXT[language].noOrder;
+    case 'notice':
+      return sentences[reply.notice]({ facts: { items: [] }, item: undefined });
     default:
       return reply satisfies never;
   }
