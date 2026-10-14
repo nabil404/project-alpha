@@ -245,12 +245,15 @@ Migrations `0038` to `0040`; `db:verify-rls` passes.
   assistant cannot answer it ([Follow-ups](#follow-ups)). A failed
   sync shows a banner with Retry; `token_invalid` asks the seller to reconnect.
   The greeting field left the Replies card. A line under the card's
-  description tells the seller to edit these here, not in Meta Business
-  Suite: Business Suite's **Inbox › Automations › Frequently asked
-  questions** edits the same `ice_breakers` field, and each sync replaces
-  the whole profile, so a change made there lasts only until the next save,
-  reconnect or language change. Get Started and the persistent menu have no
-  editor in Meta's tools; they are API-only.
+  description says Meta Business Suite doesn't show these settings, so they
+  are edited here. Checked on the dev Page (Oct 14, 2026): after a sync,
+  `GET /me/messenger_profile` returned our Get Started, ice breakers and menu,
+  while Business Suite's **Inbox › Automations › Frequently asked questions**
+  stayed off and empty, so it keeps its own record. Whether turning it on
+  replaces the Page's ice breakers is unchecked; our next sync replaces the
+  whole profile either way. Get Started and the persistent menu have no
+  editor in Meta's tools. They show in Messenger only on a new conversation
+  (the menu in any chat).
 - **Settings › Messenger › Click-to-Messenger ads** (`AdProductsCard`): a
   table on desktop and cards on a phone. Each row has a searchable product
   picker that saves at once with an optimistic update, and unmaps with a null.
@@ -353,6 +356,10 @@ See the MVP [rules](../../../mvp/01-messenger-to-order/rules.md).
 - Run the three manual checks below on the dev Page, and look at the Welcome
   screen, Ads and Messenger link cards in a browser, including at 375 px and
   with a real QR scan. The browser check was not run in this change.
+- The greeting does not stick. On the dev Page (Oct 14, 2026) the sync's
+  `POST /me/messenger_profile` succeeded, but a `GET` returned Get Started,
+  ice breakers and the menu with no `greeting`. Not yet known whether Meta
+  drops it or our body is wrong; test a greeting-only update and read it back.
 - Whether Graph accepts an empty `ice_breakers` list to clear them is
   unchecked against a live Page. If it refuses, clear the field with a
   `DELETE` instead (noted in `buildMessengerProfile`).
