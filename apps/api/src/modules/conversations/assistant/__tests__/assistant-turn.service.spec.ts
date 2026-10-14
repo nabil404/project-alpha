@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { emptySlots, type ExtractedOrder, type IntentResult } from '@app/shared';
+import { emptySlots, MAX_ORDER_ITEMS, type ExtractedOrder, type IntentResult } from '@app/shared';
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../../common/crypto.service';
 import type { AppConfig } from '../../../config/app.config';
@@ -660,8 +660,12 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
     describe('entry triggers', () => {
       /** A tap row after the thread's first message, with the text Meta or the ingest stored. */
-      const entryTap = async (text: string, payload: string) => {
-        const made = await thread();
+      const entryTap = async (
+        text: string,
+        payload: string,
+        overrides: Partial<typeof schema.conversation.$inferInsert> = {},
+      ) => {
+        const made = await thread(t.merchantA, overrides);
         const tap = await seedMessage(t.db, t.merchantA, made.convo.id, {
           sentAt: new Date(),
           text,
@@ -669,8 +673,11 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         });
         return { ...made, job: { ...made.job, triggerMessageId: tap.id } };
       };
-      /** Two live categories with a sellable product each, so browsing offers a choice. */
+      /** Two live categories with a sellable product each, so browsing offers a choice. Seeded once. */
+      let categoriesSeeded = false;
       const twoCategories = async () => {
+        if (categoriesSeeded) return;
+        categoriesSeeded = true;
         for (const name of ['Turnservice Sarees', 'Turnservice Kurtis']) {
           const category = await seedCategory(t.db, t.merchantA, { name });
           const { product: row } = await product(`${name} item`);
@@ -680,6 +687,19 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         }
       };
       const slotsOf = async (id: string) => (await conversationRow(id))?.collectedSlots;
+      const withCover = async (productId: string) => {
+        const cover = await seedImage(t.db, t.merchantA, productId);
+        await t.db
+          .update(schema.product)
+          .set({ coverImageId: cover.id })
+          .where(eq(schema.product.id, productId));
+      };
+      /** Slots already holding the most items an order may have. */
+      const fullOrder = () => ({
+        items: Array.from({ length: MAX_ORDER_ITEMS }, (_, index) => ({
+          productQuery: `item ${index}`,
+        })),
+      });
 
       it('answers Get Started with the categories and never calls the LLM', async () => {
         await twoCategories();
@@ -722,10 +742,41 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         expect(rich.at(-1)?.kind).toBe('quick_replies');
       });
 
+      it('answers Get Started that carried a link with the product, never the LLM', async () => {
+        const jamdani = await seedProduct(t.db, t.merchantA, {
+          name: 'Turnservice Started Jamdani',
+          status: 'active',
+        });
+        for (const name of ['Red', 'Blue']) {
+          await seedVariant(t.db, t.merchantA, jamdani.id, { name, price: 450_000, stock: 5 });
+        }
+        await withCover(jamdani.id);
+        const { convo, job } = await entryTap('Get Started', `ref:product:${jamdani.id}`);
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        expect(rich.map((entry) => entry.kind)).toEqual(['image', 'quick_replies']);
+        expect(await slotsOf(convo.id)).toMatchObject({
+          items: [{ productId: jamdani.id }],
+          lastAsked: { slot: 'variant', item: 0 },
+        });
+      });
+
+      it('answers an unmapped ad opened on its own with the categories, never the LLM', async () => {
+        await twoCategories();
+        const { job } = await entryTap(REFERRAL_TEXT.bn.ad, 'browse');
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        expect(rich.map((entry) => entry.kind)).toEqual(['quick_replies']);
+      });
+
       it('runs the LLM on a ref that came with typed text, the item already collected', async () => {
         const { product: saree } = await product('Turnservice Typed Saree');
         llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
-        const { job } = await entryTap('how much is this?', `ref:product:${saree.id}`);
+        const { job } = await entryTap('how much is this?', `ref-typed:product:${saree.id}`);
 
         await service().run(job);
 
@@ -733,6 +784,33 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         expect(llm.extractContexts.at(-1)?.items).toEqual([
           expect.objectContaining({ product: 'Turnservice Typed Saree' }),
         ]);
+      });
+
+      it("sends the typed ref's product photo before the reply", async () => {
+        const { product: saree } = await product('Turnservice Typed Photo Saree');
+        await withCover(saree.id);
+        llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
+        const { job } = await entryTap('how much is this?', `ref-typed:product:${saree.id}`);
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(rich[0]?.kind).toBe('image');
+        expect(rich[0]?.text).toMatch(/^https?:\/\//);
+      });
+
+      it('hands off a typed ref with no room for another item, without the LLM', async () => {
+        const { product: saree } = await product('Turnservice Full Saree');
+        const { convo, job } = await entryTap('and this one', `ref-typed:product:${saree.id}`, {
+          state: 'collecting_details',
+          collectedSlots: fullOrder(),
+        });
+
+        await expect(service().run(job)).resolves.toBe('handed_off');
+
+        expect(llm.calls).toEqual([]);
+        expect(rich.some((entry) => entry.kind === 'image')).toBe(false);
+        // Arrays match whole under toMatchObject: nothing was added.
+        expect(await slotsOf(convo.id)).toMatchObject({ items: fullOrder().items });
       });
 
       it('answers My last order with the newest order', async () => {
