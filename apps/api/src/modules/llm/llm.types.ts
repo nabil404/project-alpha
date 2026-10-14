@@ -58,6 +58,8 @@ export interface ExtractionContext {
   phone?: string;
   deliveryAddress?: string;
   deliveryArea?: string;
+  /** The customer's profile name the shop just asked them to confirm for the order. */
+  offeredName?: string;
 }
 
 export interface LlmClient {

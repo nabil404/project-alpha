@@ -15,6 +15,7 @@ Items:
 
 Details:
 - customerName, phone, deliveryAddress: as the customer wrote them.
+- offeredName in "Already collected" is a name the shop just asked the customer to confirm for the order. When their latest message agrees to it ("yes", "ok", "ji", "hya", "হ্যাঁ", "জি", "ঠিক আছে"), return offeredName exactly as customerName. When they give another name, return theirs. Otherwise customerName is null.
 - deliveryArea: the area, thana or district the customer named for delivery (for example "Mirpur" or "Chattogram"), as written; null if they named none.
 - Use null for anything the customer has not given. Never invent a value. When the customer changes a detail, return the new value.
 
