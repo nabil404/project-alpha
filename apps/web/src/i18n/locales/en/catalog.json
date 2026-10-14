@@ -386,6 +386,8 @@
     "printHint": "Print it on a tag, a flyer or the parcel. Scanning opens Messenger on the phone.",
     "download": "Download QR",
     "notPublished": "Works only while the product is Published. Draft or archived, the link starts a normal chat instead.",
-    "notConnected": "Connect your Facebook Page in Settings to get a link."
+    "notConnected": "Connect your Facebook Page in Settings to get a link.",
+    "copyFailed": "Couldn't copy. Select the link and copy it by hand.",
+    "downloadFailed": "Couldn't create the QR image. Try again."
   }
 }
