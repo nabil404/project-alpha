@@ -5,7 +5,7 @@ import { DATABASE, type Database } from '../database/database.module';
 import type { ConversationRow, MessageRow } from '../database/schema/index';
 import { withMerchant } from '../database/with-merchant';
 import { META_GRAPH } from '../messenger/page/facebook-page.service';
-import type { GraphOption, MetaGraphClient } from '../messenger/page/meta-graph.client';
+import type { GraphCard, GraphOption, MetaGraphClient } from '../messenger/page/meta-graph.client';
 import { ConversationRepository } from './conversation.repository';
 import { ConversationEventsPublisher } from './events/conversation-events.publisher';
 import { MessageRepository } from './message.repository';
@@ -17,7 +17,8 @@ import { MessageRepository } from './message.repository';
 export type OutboundContent =
   | { kind: 'text' }
   | { kind: 'quick_replies'; options: GraphOption[] }
-  | { kind: 'card'; buttons: GraphOption[] };
+  | { kind: 'card'; buttons: GraphOption[] }
+  | { kind: 'carousel'; cards: GraphCard[] };
 
 /**
  * A reply to a customer, from the seller or the assistant, in two halves so no
@@ -144,6 +145,8 @@ export class OutboundMessageSender {
         return graph.sendQuickReplies(token, psid, text, content.options);
       case 'card':
         return graph.sendButtonTemplate(token, psid, text, content.buttons);
+      case 'carousel':
+        return graph.sendGenericTemplate(token, psid, content.cards);
     }
   }
 }

@@ -94,4 +94,96 @@ describe('outgoingFor', () => {
     expect(card?.content.kind).toBe('card');
     expect(card?.text).not.toContain('queen size');
   });
+
+  describe('entry replies', () => {
+    const CAT = '00000000-0000-4000-8000-0000000000a1';
+    const PRODUCT = '00000000-0000-4000-8000-0000000000b1';
+
+    it('sends categories as browse quick replies', () => {
+      const out = outgoingFor(
+        {
+          kind: 'browse_categories',
+          choices: [
+            { id: CAT, title: 'Sarees' },
+            { id: 'other', title: 'Other' },
+          ],
+        },
+        'What would you like to see?',
+        options,
+      );
+      expect(out).toEqual([
+        {
+          text: 'What would you like to see?',
+          content: {
+            kind: 'quick_replies',
+            options: [
+              { title: 'Sarees', payload: `browse:cat:${CAT}` },
+              { title: 'Other', payload: 'browse:cat:other' },
+            ],
+          },
+        },
+      ]);
+    });
+
+    it('sends plain text when there are no categories to offer', () => {
+      expect(outgoingFor({ kind: 'browse_categories', choices: [] }, 'Hi', options)).toEqual([
+        { text: 'Hi', content: { kind: 'text' } },
+      ]);
+    });
+
+    it('sends products as a carousel whose row text names them, then the "more" line', () => {
+      const out = outgoingFor(
+        {
+          kind: 'browse_products',
+          cards: [
+            {
+              id: PRODUCT,
+              title: 'Jamdani saree',
+              subtitle: 'From ৳4,500',
+              imageUrl: 'https://img.test/1.jpg',
+            },
+          ],
+          more: true,
+        },
+        'Here they are.',
+        options,
+      );
+      expect(out).toEqual([
+        {
+          text: 'Jamdani saree (From ৳4,500)',
+          content: {
+            kind: 'carousel',
+            cards: [
+              {
+                title: 'Jamdani saree',
+                subtitle: 'From ৳4,500',
+                imageUrl: 'https://img.test/1.jpg',
+                button: { title: 'Choose', payload: `choose:product:${PRODUCT}` },
+              },
+            ],
+          },
+        },
+        { text: "Don't see it? Type its name.", content: { kind: 'text' } },
+      ]);
+    });
+
+    it('sends only the carousel when there is nothing more', () => {
+      const out = outgoingFor(
+        {
+          kind: 'browse_products',
+          cards: [{ id: PRODUCT, title: 'Kurti', subtitle: 'From ৳1,600', imageUrl: null }],
+          more: false,
+        },
+        'Here they are.',
+        options,
+      );
+      expect(out).toHaveLength(1);
+    });
+
+    it('sends the last-order answer as text', () => {
+      expect(outgoingFor({ kind: 'last_order', order: null }, 'None yet.', options)).toEqual([
+        { text: 'None yet.', content: { kind: 'text' } },
+      ]);
+    });
+  });
 });

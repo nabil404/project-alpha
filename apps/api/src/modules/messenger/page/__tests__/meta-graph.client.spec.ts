@@ -279,6 +279,70 @@ describe('MetaGraphClient', () => {
       });
     });
 
+    it('sends a carousel as a generic template with one postback button per card', async () => {
+      const fetch = fakeFetch({ body: { message_id: 'm_g' } });
+      const client = new MetaGraphClient(settings, fetch.fn);
+
+      await client.sendGenericTemplate('page-token', 'psid-1', [
+        {
+          title: 'Jamdani saree',
+          subtitle: 'From ৳4,500',
+          imageUrl: 'https://img.test/1.jpg',
+          button: { title: 'Choose', payload: 'choose:product:x' },
+        },
+        {
+          title: 'Kurti',
+          subtitle: 'From ৳1,600',
+          imageUrl: null,
+          button: { title: 'Choose', payload: 'choose:product:y' },
+        },
+      ]);
+
+      expect(fetch.calls[0]?.body).toEqual({
+        recipient: { id: 'psid-1' },
+        messaging_type: 'RESPONSE',
+        message: {
+          attachment: {
+            type: 'template',
+            payload: {
+              template_type: 'generic',
+              elements: [
+                {
+                  title: 'Jamdani saree',
+                  subtitle: 'From ৳4,500',
+                  image_url: 'https://img.test/1.jpg',
+                  buttons: [{ type: 'postback', title: 'Choose', payload: 'choose:product:x' }],
+                },
+                {
+                  title: 'Kurti',
+                  subtitle: 'From ৳1,600',
+                  buttons: [{ type: 'postback', title: 'Choose', payload: 'choose:product:y' }],
+                },
+              ],
+            },
+          },
+        },
+      });
+    });
+
+    it('sends at most ten cards', async () => {
+      const fetch = fakeFetch({ body: { message_id: 'm_g' } });
+      const client = new MetaGraphClient(settings, fetch.fn);
+      const card = {
+        title: 'T',
+        subtitle: 'S',
+        imageUrl: null,
+        button: { title: 'Choose', payload: 'choose:product:x' },
+      };
+
+      await client.sendGenericTemplate('page-token', 'psid-1', Array(12).fill(card));
+
+      const elements = (
+        fetch.calls[0]?.body as { message: { attachment: { payload: { elements: unknown[] } } } }
+      ).message.attachment.payload.elements;
+      expect(elements).toHaveLength(10);
+    });
+
     it('sends an image by its URL', async () => {
       const fetch = fakeFetch({ body: { message_id: 'm_i' } });
       const client = new MetaGraphClient(settings, fetch.fn);
