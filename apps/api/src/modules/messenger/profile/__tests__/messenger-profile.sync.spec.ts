@@ -132,7 +132,11 @@ describeDb('MessengerProfileSync (app_runtime)', () => {
       {
         name: SYNC_PROFILE_JOB,
         data: { merchantId: t.merchantA, resubscribe: true },
-        opts: expect.objectContaining({ jobId: expect.stringMatching(/^profile-/), attempts: 3 }),
+        opts: expect.objectContaining({
+          jobId: expect.stringMatching(/^profile-/),
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 10_000 },
+        }),
       },
     ]);
     expect(await pageOf(t.merchantA)).toMatchObject({

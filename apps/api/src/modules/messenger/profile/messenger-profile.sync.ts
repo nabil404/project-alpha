@@ -20,8 +20,11 @@ import { GraphError, MetaGraphClient } from '../page/meta-graph.client';
 import { buildMessengerProfile } from './messenger-profile';
 import { defaultWelcome, readIceBreakers } from './welcome-defaults';
 
-/** Three tries, then the dashboard shows `graph_error` until the next save. */
-const SYNC_ATTEMPTS = 3;
+/**
+ * Three tries 10 s then 20 s apart, to ride out a short Graph outage; then the
+ * dashboard shows `graph_error` until the next save.
+ */
+const SYNC_RETRY = { attempts: 3, backoff: { type: 'exponential', delay: 10_000 } } as const;
 
 /**
  * Keeps a Page's Messenger Profile in step with the shop's welcome screen.
@@ -51,7 +54,7 @@ export class MessengerProfileSync {
     const data: SyncProfileJob = { merchantId, ...(resubscribe ? { resubscribe } : {}) };
     await this.queue.add(SYNC_PROFILE_JOB, data, {
       jobId: customJobId('profile-', `${merchantId}-${at.getTime()}`),
-      attempts: SYNC_ATTEMPTS,
+      ...SYNC_RETRY,
     });
   }
 
