@@ -1,5 +1,5 @@
-import type { SlotName } from '@app/shared';
-import type { AskReason, ReplyFacts, ReplyIntent } from './reply-intent';
+import type { OrderStatus, SlotName } from '@app/shared';
+import type { AskReason, LastOrderFacts, ReplyFacts, ReplyIntent } from './reply-intent';
 import { summaryMessages } from './summary-card';
 
 export type ReplyLanguage = 'bn' | 'en';
@@ -29,6 +29,57 @@ export function languageFor(country: string): ReplyLanguage {
 export const REFERRAL_TEXT: Record<ReplyLanguage, { link: string; ad: string }> = {
   bn: { link: 'একটি পণ্যের লিংক থেকে এসেছেন', ad: 'একটি বিজ্ঞাপন থেকে এসেছেন' },
   en: { link: 'Opened a link to a product', ad: 'Came from an ad' },
+};
+
+/** Fixed lines for entry replies; never phrased by the LLM. Draft Bangla, to be reviewed. */
+export const ENTRY_TEXT: Record<
+  ReplyLanguage,
+  {
+    categories: string;
+    products: string;
+    more: string;
+    chooseButton: string;
+    noOrder: string;
+    lastOrder: (order: LastOrderFacts) => string;
+    status: Record<OrderStatus, string>;
+  }
+> = {
+  bn: {
+    categories: 'কোনটি দেখতে চান?',
+    products: 'এগুলো দেখুন।',
+    more: 'খুঁজে না পেলে পণ্যের নামটি লিখুন।',
+    chooseButton: 'এটি নেব',
+    noOrder: 'আমাদের কাছে আপনার এখনো কোনো অর্ডার নেই।',
+    lastOrder: (order) =>
+      `আপনার শেষ অর্ডার ${order.reference}: ${ENTRY_TEXT.bn.status[order.status]}, মোট ${order.total}।`,
+    status: {
+      new: 'নতুন',
+      confirmed: 'নিশ্চিত',
+      packed: 'প্যাক করা হয়েছে',
+      shipped: 'পাঠানো হয়েছে',
+      delivered: 'পৌঁছে গেছে',
+      returned: 'ফেরত এসেছে',
+      cancelled: 'বাতিল',
+    },
+  },
+  en: {
+    categories: 'What would you like to see?',
+    products: 'Here they are.',
+    more: "Don't see it? Type its name.",
+    chooseButton: 'Choose',
+    noOrder: "You don't have an order with us yet.",
+    lastOrder: (order) =>
+      `Your last order ${order.reference} is ${ENTRY_TEXT.en.status[order.status]}. Total ${order.total}.`,
+    status: {
+      new: 'new',
+      confirmed: 'confirmed',
+      packed: 'packed',
+      shipped: 'on its way',
+      delivered: 'delivered',
+      returned: 'returned',
+      cancelled: 'cancelled',
+    },
+  },
 };
 
 /** The facts, and the item the slot is asked for. */
@@ -124,9 +175,16 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
         reply.reason === 'awaiting_seller' ? sentences.handoff_awaiting_seller : sentences.handoff;
       return say({ facts: { items: [] }, item: undefined });
     }
-    // Task 7 stopgap: the entry replies have no fallback text yet.
+    case 'browse_categories':
+      return ENTRY_TEXT[language].categories;
+    case 'browse_products':
+      return ENTRY_TEXT[language].products;
+    case 'last_order':
+      return reply.order
+        ? ENTRY_TEXT[language].lastOrder(reply.order)
+        : ENTRY_TEXT[language].noOrder;
     default:
-      return sentences.handoff({ facts: { items: [] }, item: undefined });
+      return reply satisfies never;
   }
 }
 

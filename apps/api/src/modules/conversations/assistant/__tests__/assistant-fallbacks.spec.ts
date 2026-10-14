@@ -99,4 +99,18 @@ describe('confirmText', () => {
       expect(confirmText(sentences[2]!, language)).toContain('Check Lungi');
     }
   });
+
+  it.each(['bn', 'en'] as const)('words every entry reply in %s', (language) => {
+    expect(fallbackText({ kind: 'browse_categories', choices: [] }, language)).not.toBe('');
+    expect(fallbackText({ kind: 'browse_products', cards: [], more: false }, language)).not.toBe(
+      '',
+    );
+    expect(fallbackText({ kind: 'last_order', order: null }, language)).not.toBe('');
+    expect(
+      fallbackText(
+        { kind: 'last_order', order: { reference: 'ORD-1', status: 'packed', total: '৳10' } },
+        language,
+      ),
+    ).toContain('ORD-1');
+  });
 });

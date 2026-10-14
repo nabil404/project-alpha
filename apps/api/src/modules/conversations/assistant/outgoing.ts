@@ -1,6 +1,6 @@
 import { encodePayload } from '@app/shared';
 import type { OutboundContent } from '../outbound-message.sender';
-import type { ReplyLanguage } from './assistant-fallbacks';
+import { ENTRY_TEXT, type ReplyLanguage } from './assistant-fallbacks';
 import type { ReplyIntent } from './reply-intent';
 import { summaryMessages } from './summary-card';
 
@@ -52,6 +52,41 @@ export function outgoingFor(
     return items === null
       ? [cardMessage]
       : [{ text: items, content: { kind: 'text' } }, cardMessage];
+  }
+  if (reply.kind === 'browse_categories' && reply.choices.length > 0) {
+    return [
+      {
+        text,
+        content: {
+          kind: 'quick_replies',
+          options: reply.choices.map((choice) => ({
+            title: choice.title,
+            payload: encodePayload({ kind: 'browse', categoryId: choice.id }),
+          })),
+        },
+      },
+    ];
+  }
+  if (reply.kind === 'browse_products') {
+    const carousel: Outgoing = {
+      // The dashboard thread shows the row's text; it names what the customer saw.
+      text: reply.cards.map((card) => `${card.title} (${card.subtitle})`).join(', '),
+      content: {
+        kind: 'carousel',
+        cards: reply.cards.map((card) => ({
+          title: card.title,
+          subtitle: card.subtitle,
+          imageUrl: card.imageUrl,
+          button: {
+            title: ENTRY_TEXT[language].chooseButton,
+            payload: encodePayload({ kind: 'product', via: 'choose', id: card.id }),
+          },
+        })),
+      },
+    };
+    return reply.more
+      ? [carousel, { text: ENTRY_TEXT[language].more, content: { kind: 'text' } }]
+      : [carousel];
   }
   if (reply.kind === 'ask_slot' && reply.choices && reply.choices.length > 0) {
     const slot = reply.slot === 'variant' ? 'variant' : 'product';

@@ -75,6 +75,17 @@ export const QUICK_REPLY_MAX = 13;
 export const BUTTON_MAX = 3;
 export const OPTION_TITLE_MAX = 20;
 export const BUTTON_TEXT_MAX = 640;
+/** A carousel holds up to ten cards; a card's title and subtitle take 80 characters each. */
+export const CAROUSEL_MAX = 10;
+export const CARD_TITLE_MAX = 80;
+
+/** One carousel card: a photo, a title, a line under it, and one postback button. */
+export interface GraphCard {
+  title: string;
+  subtitle: string;
+  imageUrl: string | null;
+  button: GraphOption;
+}
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
@@ -266,6 +277,34 @@ export class MetaGraphClient {
             type: 'postback',
             title: cutText(button.title, OPTION_TITLE_MAX),
             payload: button.payload,
+          })),
+        },
+      },
+    });
+  }
+
+  /** A carousel (generic template) of up to ten cards. */
+  async sendGenericTemplate(
+    pageToken: string,
+    psid: string,
+    cards: readonly GraphCard[],
+  ): Promise<{ messageId: string }> {
+    return this.sendMessage(pageToken, psid, {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'generic',
+          elements: cards.slice(0, CAROUSEL_MAX).map((card) => ({
+            title: cutText(card.title, CARD_TITLE_MAX),
+            subtitle: cutText(card.subtitle, CARD_TITLE_MAX),
+            ...(card.imageUrl ? { image_url: card.imageUrl } : {}),
+            buttons: [
+              {
+                type: 'postback',
+                title: cutText(card.button.title, OPTION_TITLE_MAX),
+                payload: card.button.payload,
+              },
+            ],
           })),
         },
       },
