@@ -4,6 +4,7 @@ import type {
   ConversationState,
   CustomerIntent,
   CustomerStatus,
+  MessageKind,
   MessageSender,
   MessageStatus,
   OrderSource,
@@ -86,6 +87,30 @@ export const messageStatusKeys = {
   failed: 'status.messageStatus.failed',
 } as const satisfies Record<MessageStatus, ParseKeys<'common'>>;
 
+export const messageKindKeys = {
+  text: 'status.messageKind.text',
+  sticker: 'status.messageKind.sticker',
+  reaction: 'status.messageKind.reaction',
+  location: 'status.messageKind.location',
+  image: 'status.messageKind.image',
+  video: 'status.messageKind.video',
+  audio: 'status.messageKind.audio',
+  file: 'status.messageKind.file',
+  other: 'status.messageKind.other',
+} as const satisfies Record<MessageKind, ParseKeys<'common'>>;
+
+/** What a message without words says, in the viewer's language. A reaction adds its emoji. */
+export const messageContentKeys = {
+  sticker: 'status.messageContent.sticker',
+  reaction: 'status.messageContent.reaction',
+  location: 'status.messageContent.location',
+  image: 'status.messageContent.image',
+  video: 'status.messageContent.video',
+  audio: 'status.messageContent.audio',
+  file: 'status.messageContent.file',
+  other: 'status.messageContent.other',
+} as const satisfies Record<Exclude<MessageKind, 'text'>, ParseKeys<'common'>>;
+
 export const customerIntentKeys = {
   browse: 'status.intent.browse',
   order: 'status.intent.order',
@@ -118,6 +143,17 @@ export function useStatusLabels() {
     productStatus: (status: ProductStatus): string => t(productStatusKeys[status]),
     messageSender: (sender: MessageSender): string => t(messageSenderKeys[sender]),
     messageStatus: (status: MessageStatus): string => t(messageStatusKeys[status]),
+    messageKind: (kind: MessageKind): string => t(messageKindKeys[kind]),
+    /**
+     * A message as words: its text when it has some (the Like sticker is 👍),
+     * otherwise what was sent. The API stores no words for these, so they
+     * follow the seller's chosen language.
+     */
+    messageContent: ({ kind, text }: { kind: MessageKind; text: string }): string => {
+      if (kind === 'text') return text;
+      if (kind === 'reaction') return t(messageContentKeys.reaction, { emoji: text });
+      return text || t(messageContentKeys[kind]);
+    },
     customerIntent: (intent: CustomerIntent): string => t(customerIntentKeys[intent]),
     customerStatus: (status: CustomerStatus): string => t(customerStatusKeys[status]),
   };

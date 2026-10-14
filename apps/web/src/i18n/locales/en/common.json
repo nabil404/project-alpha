@@ -62,6 +62,27 @@
       "other": "Other",
       "request_human": "Wants a human"
     },
+    "messageContent": {
+      "audio": "Sent an audio clip",
+      "file": "Sent a file",
+      "image": "Sent a photo",
+      "location": "Shared a location",
+      "other": "Sent an attachment",
+      "reaction": "Reacted {{emoji}}",
+      "sticker": "Sent a sticker",
+      "video": "Sent a video"
+    },
+    "messageKind": {
+      "audio": "Audio",
+      "file": "File",
+      "image": "Photo",
+      "location": "Location",
+      "other": "Attachment",
+      "reaction": "Reaction",
+      "sticker": "Sticker",
+      "text": "Message",
+      "video": "Video"
+    },
     "messageSender": {
       "assistant": "Assistant",
       "customer": "Customer",

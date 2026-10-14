@@ -1,6 +1,7 @@
 import type { ConversationDetail, ConversationListItem, Message } from '@app/shared';
 import type { ConversationRow, CustomerRow, MessageRow } from '../database/schema/index';
 import { isUnread, replyWindowClosesAt } from './conversation-rules';
+import { readDetails } from './message-content';
 
 export function toConversationListItem(
   row: ConversationRow,
@@ -15,6 +16,7 @@ export function toConversationListItem(
     lastMessage: {
       preview: row.lastMessagePreview,
       sender: row.lastMessageSender,
+      kind: row.lastMessageKind,
       at: row.lastMessageAt.toISOString(),
     },
     lastInboundAt: row.lastInboundAt?.toISOString() ?? null,
@@ -39,11 +41,30 @@ export function toConversationDetail(
 }
 
 export function toMessage(row: MessageRow): Message {
+  const details = readDetails(row.details);
   return {
     id: row.id,
     sender: row.sender,
+    kind: row.kind,
     text: row.text,
+    attachments: (details.attachments ?? []).map(({ url }) => ({ url: safeUrl(url) })),
+    location: details.location ?? null,
+    reaction: details.reaction
+      ? { emoji: details.reaction.emoji, messageId: details.reaction.targetMessageId }
+      : null,
+    editedText: row.editedText,
+    deleted: row.deletedAt !== null,
     status: row.status,
     sentAt: row.sentAt.toISOString(),
   };
+}
+
+/** Only an https link reaches the browser: it is Meta's, but it came in a webhook. */
+function safeUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
 }

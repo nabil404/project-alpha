@@ -129,7 +129,7 @@ describe('MetaGraphClient', () => {
     expect(calls[0]?.method).toBe('POST');
     expect(calls[0]?.url.pathname).toBe('/v21.0/42/subscribed_apps');
     expect(calls[0]?.url.searchParams.get('subscribed_fields')).toBe(
-      'messages,messaging_postbacks,message_echoes,messaging_referrals',
+      'messages,messaging_postbacks,message_echoes,messaging_referrals,message_reactions,message_edits',
     );
     expect(calls[0]?.authorization).toBe('Bearer page-token');
   });

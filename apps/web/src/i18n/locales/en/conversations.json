@@ -41,6 +41,7 @@
   "thread": {
     "back": "Back to conversations",
     "details": "Customer and order details",
+    "edited": "Edited",
     "empty": "No messages yet.",
     "handBack": "Hand back to assistant",
     "loadOlder": "Load earlier messages",
@@ -48,10 +49,15 @@
       "assistant": "Assistant is replying",
       "seller": "You are replying"
     },
+    "openAttachment": "Open {{kind}}",
+    "openMap": "Open in map",
+    "original": "Originally: {{text}}",
+    "reactionBadge": "Customer reacted {{emoji}} at {{time}}",
     "remove": "Remove",
     "retry": "Retry",
     "sender": "{{sender}} · {{time}}",
     "takeOver": "Take over chat",
-    "today": "Today"
+    "today": "Today",
+    "unsent": "Unsent"
   }
 }

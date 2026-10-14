@@ -15,12 +15,55 @@ interface InboundMessageBase {
 /** Where a chat came from: a product link (`m.me/<page>?ref=p_<id>`) or an ad. */
 export type Referral = { kind: 'link'; productId: string } | { kind: 'ad'; adId: string };
 
-/** A customer wrote to the Page, or tapped one of our quick replies (which carries its payload). */
+/** Something sent in place of words. Meta's links expire. */
+export type InboundAttachment =
+  | { type: 'sticker'; url: string | null; stickerId: string | null }
+  | { type: 'location'; lat: number; long: number }
+  | { type: 'image' | 'video' | 'audio' | 'file' | 'other'; url: string | null };
+
+/**
+ * A customer wrote to the Page, or tapped one of our quick replies (which
+ * carries its payload). With no words, `text` is '' and `attachments` holds
+ * what they sent instead.
+ */
 export interface CustomerMessageJob extends InboundMessageBase {
   kind: 'customer-message';
   senderPsid: string;
   payload?: string;
   referral?: Referral;
+  attachments?: InboundAttachment[];
+}
+
+/**
+ * A customer reacted to a message, or took a reaction back. Meta sends no mid
+ * of its own, so `messageId` is derived from the event; `text` is ''.
+ */
+export interface CustomerReactionJob extends InboundMessageBase {
+  kind: 'customer-reaction';
+  senderPsid: string;
+  /** The mid of the message reacted to. */
+  targetMid: string;
+  action: 'react' | 'unreact';
+  emoji: string;
+  /** Meta's label: like, love, smile and so on. */
+  reaction: string;
+}
+
+/**
+ * A customer edited a message. It reuses the message's mid, so `messageId`
+ * adds the edit's time; `text` is the new text.
+ */
+export interface CustomerEditJob extends InboundMessageBase {
+  kind: 'customer-edit';
+  senderPsid: string;
+  targetMid: string;
+}
+
+/** A customer unsent a message; `text` is ''. */
+export interface CustomerUnsendJob extends InboundMessageBase {
+  kind: 'customer-unsend';
+  senderPsid: string;
+  targetMid: string;
 }
 
 /**
@@ -55,7 +98,13 @@ export interface PageEchoJob extends InboundMessageBase {
 }
 
 export type InboundMessageJob =
-  CustomerMessageJob | CustomerPostbackJob | CustomerReferralJob | PageEchoJob;
+  | CustomerMessageJob
+  | CustomerPostbackJob
+  | CustomerReferralJob
+  | CustomerReactionJob
+  | CustomerEditJob
+  | CustomerUnsendJob
+  | PageEchoJob;
 
 /** Housekeeping for object storage. Jobs are scheduled by the worker, never by the API. */
 export const STORAGE_QUEUE = 'storage-maintenance';

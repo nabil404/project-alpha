@@ -1,5 +1,5 @@
 import { Fragment, useLayoutEffect, useRef } from 'react';
-import { Bot } from 'lucide-react';
+import { Bot, MapPin } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Message, MessageSender, MessageStatus } from '@app/shared';
 
@@ -30,6 +30,8 @@ interface ThreadItem {
   sender: MessageSender;
   sentAt: string;
   status: MessageStatus;
+  /** Set on a stored message: its kind, attachments, edit and unsend. */
+  stored?: Message;
   /** Set on a local reply; retry and remove act on it. */
   local?: LocalMessage;
 }
@@ -41,7 +43,11 @@ interface ThreadItem {
  */
 function threadItems(messages: Message[], local: LocalMessage[]): ThreadItem[] {
   const claimed = new Set<string>();
-  const items: ThreadItem[] = messages.map((message) => ({ key: message.id, ...message }));
+  const items: ThreadItem[] = messages.map((message) => ({
+    key: message.id,
+    ...message,
+    stored: message,
+  }));
 
   for (const reply of local) {
     const stored =
@@ -88,7 +94,11 @@ export function MessageList({ conversationId }: { conversationId: string }) {
       .slice()
       .reverse()
       .flatMap((page) => page.data) ?? [];
-  const messages = threadItems(stored, local);
+  const { attached, unattached } = placeReactions(stored);
+  const messages = threadItems(
+    stored.filter((message) => message.kind !== 'reaction' || unattached.has(message.id)),
+    local,
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const previous = useRef<{ firstId?: string; lastId?: string; height: number; atBottom: boolean }>(
@@ -147,13 +157,43 @@ export function MessageList({ conversationId }: { conversationId: string }) {
               {!sameDay(isSameDay, messages[index - 1]?.sentAt, message.sentAt) && (
                 <DaySeparator at={message.sentAt} />
               )}
-              <MessageBubble conversationId={conversationId} message={message} />
+              {message.stored?.kind === 'reaction' ? (
+                <ReactionLine reaction={message.stored} />
+              ) : (
+                <MessageBubble
+                  conversationId={conversationId}
+                  message={message}
+                  reaction={attached.get(message.key)}
+                />
+              )}
             </Fragment>
           ))
         )}
       </div>
     </div>
   );
+}
+
+/**
+ * Where each reaction shows, as Messenger does it: the newest standing one on
+ * a loaded message is pinned to that bubble, and a taken-back one disappears.
+ * One whose message is not loaded (or was never stored) stays a line in the
+ * thread, so the seller still sees it.
+ */
+function placeReactions(messages: Message[]): {
+  attached: Map<string, Message>;
+  unattached: Set<string>;
+} {
+  const loaded = new Set(messages.map((message) => message.id));
+  const attached = new Map<string, Message>();
+  const unattached = new Set<string>();
+  for (const message of messages) {
+    if (message.kind !== 'reaction' || message.deleted) continue;
+    const target = message.reaction?.messageId;
+    if (target && loaded.has(target)) attached.set(target, message);
+    else unattached.add(message.id);
+  }
+  return { attached, unattached };
 }
 
 /** Days are the shop's, so a separator falls at the shop's midnight. */
@@ -180,16 +220,22 @@ function DaySeparator({ at }: { at: string }) {
 function MessageBubble({
   conversationId,
   message,
+  reaction,
 }: {
   conversationId: string;
   message: ThreadItem;
+  /** The customer's reaction to this message, pinned to its corner. */
+  reaction?: Message;
 }) {
   const { t } = useTranslation('conversations');
   const { formatDate } = useFormatters();
-  const { messageSender, messageStatus } = useStatusLabels();
+  const { messageSender, messageStatus, messageContent } = useStatusLabels();
   const inbound = message.sender === 'customer';
   const time = formatDate(message.sentAt, 'time');
   const failed = message.status === 'failed';
+  const stored = message.stored;
+  const edited = stored?.editedText ?? null;
+  const media = stored && stored.kind !== 'text' && stored.kind !== 'location';
 
   return (
     <div
@@ -198,18 +244,35 @@ function MessageBubble({
         inbound ? 'items-start self-start' : 'items-end self-end',
       )}
     >
-      <div
-        className={cn(
-          'rounded-lg px-3.5 py-2.5 text-body break-words whitespace-pre-wrap',
-          inbound
-            ? 'rounded-bl-sm border border-border bg-surface'
-            : 'rounded-br-sm bg-accent-soft',
-          failed && 'border border-danger',
-          message.status === 'sending' && 'opacity-70',
+      <div className={cn('relative', reaction && 'mb-3')}>
+        {media ? (
+          <Attachments message={stored} />
+        ) : (
+          <div
+            className={cn(
+              'rounded-lg px-3.5 py-2.5 text-body break-words whitespace-pre-wrap',
+              inbound
+                ? 'rounded-bl-sm border border-border bg-surface'
+                : 'rounded-br-sm bg-accent-soft',
+              failed && 'border border-danger',
+              message.status === 'sending' && 'opacity-70',
+              stored?.deleted && 'text-ink-muted line-through',
+            )}
+          >
+            {stored?.location ? (
+              <LocationPin text={messageContent(stored)} {...stored.location} />
+            ) : (
+              (edited ?? message.text)
+            )}
+          </div>
         )}
-      >
-        {message.text}
+        {reaction && <ReactionBadge reaction={reaction} inbound={inbound} />}
       </div>
+      {edited !== null && (
+        <p className="text-small break-words whitespace-pre-wrap text-ink-muted">
+          {t('thread.original', { text: message.text })}
+        </p>
+      )}
       <span className="flex items-center gap-1 text-small text-ink-muted">
         {message.sender === 'assistant' && (
           <Bot aria-hidden className="size-3.5" strokeWidth={1.5} />
@@ -220,11 +283,136 @@ function MessageBubble({
         {message.status !== 'sent' && (
           <span className={cn(failed && 'text-danger')}>· {messageStatus(message.status)}</span>
         )}
+        {edited !== null && <span>· {t('thread.edited')}</span>}
+        {stored?.deleted && <span>· {t('thread.unsent')}</span>}
       </span>
       {failed && message.sender === 'seller' && (
         <SendFailure conversationId={conversationId} message={message} />
       )}
     </div>
+  );
+}
+
+/**
+ * A sticker, photo, video, audio clip or file. Meta's links expire, so each
+ * falls back to naming what was sent, and a sticker shows without a bubble.
+ */
+function Attachments({ message }: { message: Message }) {
+  const { t } = useTranslation('conversations');
+  const { messageKind, messageContent } = useStatusLabels();
+  const kind = messageKind(message.kind).toLowerCase();
+  const label = messageContent(message);
+  const linked = message.attachments.filter((attachment) => attachment.url !== null);
+  if (linked.length === 0) {
+    return (
+      <span className="rounded-lg border border-border bg-surface px-3.5 py-2.5 text-body text-ink-muted">
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <div className={cn('flex flex-wrap gap-2', message.deleted && 'opacity-50')}>
+      {linked.map(({ url }, index) => {
+        const src = url ?? undefined;
+        switch (message.kind) {
+          case 'sticker':
+            return <img key={index} src={src} alt={label} className="size-24 object-contain" />;
+          case 'image':
+            return (
+              <a key={index} href={src} target="_blank" rel="noreferrer noopener">
+                <img
+                  src={src}
+                  alt={label}
+                  className="max-h-60 max-w-full rounded-lg border border-border object-cover"
+                />
+              </a>
+            );
+          case 'video':
+            return (
+              <video key={index} src={src} controls className="max-h-60 max-w-full rounded-lg" />
+            );
+          case 'audio':
+            return <audio key={index} src={src} controls className="max-w-full" />;
+          default:
+            return (
+              <a
+                key={index}
+                href={src}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="rounded-lg border border-border bg-surface px-3.5 py-2.5 text-body text-accent underline"
+              >
+                {t('thread.openAttachment', { kind })}
+              </a>
+            );
+        }
+      })}
+    </div>
+  );
+}
+
+/** A shared pin: the label, the coordinates, and a link to a map. */
+function LocationPin({ text, lat, long }: { text: string; lat: number; long: number }) {
+  const { t } = useTranslation('conversations');
+  const map = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${long}#map=17/${lat}/${long}`;
+
+  return (
+    <span className="flex flex-col gap-1">
+      <span className="flex items-center gap-1.5">
+        <MapPin aria-hidden className="size-4" strokeWidth={1.5} />
+        {text}
+      </span>
+      <span className="text-small text-ink-muted tabular-nums">
+        {lat.toFixed(5)}, {long.toFixed(5)}
+      </span>
+      <a
+        href={map}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="text-small text-accent underline"
+      >
+        {t('thread.openMap')}
+      </a>
+    </span>
+  );
+}
+
+/** A reaction pinned to the bottom corner of the message it answers, as in Messenger. */
+function ReactionBadge({ reaction, inbound }: { reaction: Message; inbound: boolean }) {
+  const { t } = useTranslation('conversations');
+  const { formatDate } = useFormatters();
+  const emoji = reaction.reaction?.emoji ?? '';
+  const label = t('thread.reactionBadge', {
+    emoji,
+    time: formatDate(reaction.sentAt, 'time'),
+  });
+
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={cn(
+        'absolute -bottom-3 flex h-6 min-w-6 items-center justify-center rounded-full border border-border bg-surface px-1 text-small leading-none shadow-sm animate-in zoom-in-50 duration-200',
+        inbound ? 'right-1.5' : 'left-1.5',
+      )}
+    >
+      {emoji}
+    </span>
+  );
+}
+
+/** A reaction whose message is not in the thread: a line, so it is not lost. */
+function ReactionLine({ reaction }: { reaction: Message }) {
+  const { formatDate } = useFormatters();
+  const { messageContent } = useStatusLabels();
+
+  return (
+    <p className="self-start text-small text-ink-muted">
+      {messageContent(reaction)} ·{' '}
+      <time dateTime={reaction.sentAt}>{formatDate(reaction.sentAt, 'time')}</time>
+    </p>
   );
 }
 

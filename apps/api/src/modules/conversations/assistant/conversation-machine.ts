@@ -693,7 +693,7 @@ function words(value: string | null): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function handOff(slots: CollectedSlots, reason: HandoffReason): TurnDecision {
+export function handOff(slots: CollectedSlots, reason: HandoffReason): TurnDecision {
   return {
     state: 'handed_off',
     slots: { ...slots, lastAsked: undefined, offered: undefined },

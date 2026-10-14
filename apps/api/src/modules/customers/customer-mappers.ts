@@ -41,6 +41,7 @@ export function toCustomerDetail(
       lastMessage: {
         preview: latest.lastMessagePreview,
         sender: latest.lastMessageSender,
+        kind: latest.lastMessageKind,
         at: latest.lastMessageAt.toISOString(),
       },
     },

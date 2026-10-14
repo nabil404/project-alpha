@@ -4,9 +4,9 @@ Where each phase of [11 · AI implementation](README.md) stands against its
 "Done when" list. Update this page in the same change that moves a phase,
 and tick an item only once it has been run, not when the code merely exists.
 
-**As of Oct 14, 2026:** 3 of 9 phases built. Phases 1 and 2 wait on one manual
-run each on the dev Page with a real `LLM_API_KEY`; phase 3 waits on three.
-Phases 4 to 9 are not started. The MVP
+**As of Oct 15, 2026:** 4 of 9 phases built. Phases 1 and 2 wait on one manual
+run each on the dev Page with a real `LLM_API_KEY`; phase 3 waits on three,
+and phase 4 on one. Phases 5 to 9 are not started. The MVP
 ends Dec 11; App Review is due by Oct 18.
 
 ## Summary
@@ -16,7 +16,7 @@ ends Dec 11; App Review is due by Oct 18.
 | 1   | [Foundation](phase-1-foundation/README.md)                                    | Built       | 3 of 4    | Manual run on the dev Page, with a good key and a bad one |
 | 2   | [Catalog matching, Confirm, orders](phase-2-catalog-confirm-orders/README.md) | Built       | 3 of 4    | Manual run from "I want the red saree" to a drafted order |
 | 3   | [Entry points](phase-3-entry-points/README.md)                                | Built       | 1 of 4    | Three manual runs on the dev Page, after phases 1 and 2   |
-| 4   | [Non-text events](phase-4-non-text-events/README.md)                          | Not started | 0 of 2    |                                                           |
+| 4   | [Non-text events](phase-4-non-text-events/README.md)                          | Built       | 1 of 2    | Each event type in the viewer, sent from the dev Page     |
 | 5   | [Shared posts and ads](phase-5-shared-posts/README.md)                        | Not started | 0 of 2    | Needs `pages_read_engagement` from App Review             |
 | 6   | [Product photos](phase-6-product-photos/README.md)                            | Not started | 0 of 2    |                                                           |
 | 7   | [Comments to Messenger](phase-7-comments-to-messenger/README.md)              | Not started | 0 of 1    | First to cut if the schedule slips, after 9 and 8         |
@@ -27,7 +27,7 @@ ends Dec 11; App Review is due by Oct 18.
 flowchart LR
     p1["✅ 1 · Foundation"]:::built --> p2["✅ 2 · Matching, Confirm, orders"]:::built
     p2 --> p3["✅ 3 · Entry points"]:::built
-    p3 --> p4["4 · Non-text events"]:::todo
+    p3 --> p4["✅ 4 · Non-text events"]:::built
     p4 --> p5["5 · Shared posts"]:::todo
     p5 --> p6["6 · Product photos"]:::todo
     p6 --> p7["7 · Comments"]:::cut
@@ -45,14 +45,14 @@ first, from 9 backwards, if the schedule slips. Phases 1 and 2 cannot be cut.
 ## Phase checklists
 
 Copied from each phase's "Done when". The automated checks were last run on
-Oct 14, 2026: `pnpm --filter @app/shared build`, `pnpm typecheck`,
-`pnpm lint`, `pnpm format:check` and `pnpm test` pass (133 suites, 1,412
+Oct 15, 2026: `pnpm --filter @app/shared build`, `pnpm typecheck`,
+`pnpm lint`, `pnpm format:check` and `pnpm test` pass (135 suites, 1,478
 tests; 2 suites and 2 tests skipped), and `db:verify-rls` reports 22 tenant
 tables protected. `format:check` also lists the local `.superpowers/`
 workspace, which is not committed; every other file passes. The two skipped
 suites are opt-in: the matcher sweep (`MATCH_SWEEP=1`) and the live-model eval
 (`LLM_EVAL=1` with `LLM_API_KEY`). The database suites ran against the test
-database, phase 3's among them.
+database, phases 3 and 4's among them.
 
 ### 1 · Foundation
 
@@ -97,7 +97,13 @@ including 375 px overflow and a real QR scan) was not run either.
 
 - [ ] Every event type in the phase's scope shows in the conversation viewer
       on the dev Page.
-- [ ] An automated test proves none of them can create an order.
+- [x] An automated test proves none of them can create an order
+      (`assistant-turn.service.spec.ts`, "messages without words").
+
+Also run: shared build, typecheck, lint and tests pass, the new database
+suites ran, and `db:verify-rls` passes after migrations `0041` and `0042`.
+Only the reaction pills were checked in a browser, against stubbed API
+responses; no event was sent from the dev Page.
 
 ### 5 · Shared posts and ads
 

@@ -87,7 +87,9 @@ class FakeLlm implements LlmClient {
   calls: LlmPurpose[] = [];
   extractContexts: ExtractionContext[] = [];
   onClassify: () => Promise<void> = async () => undefined;
-  async classifyIntent() {
+  histories: ChatLine[][] = [];
+  async classifyIntent(history: ChatLine[]) {
+    this.histories.push(history);
     this.calls.push('classify');
     await this.onClassify();
     return this.intent;
@@ -877,6 +879,131 @@ describeDb('AssistantTurnService (app_runtime)', () => {
           quote: { revision: 4, subtotal: 100_000, deliveryFee: 12_000, total: 112_000 },
         },
       });
+    });
+  });
+  describe('messages without words', () => {
+    const USE_CONFIRM = fallbackText({ kind: 'notice', notice: 'use_confirm' }, 'bn');
+    const LIKE = { attachments: [{ url: null, stickerId: '369239263222822' }] };
+    /** Every non-text event a customer can send on the summary card. */
+    const EVENTS: { name: string; values: Partial<typeof schema.message.$inferInsert> }[] = [
+      { name: 'the 👍 sticker', values: { kind: 'sticker', text: '👍', details: LIKE } },
+      {
+        name: 'an "ok" sticker',
+        values: { kind: 'sticker', text: '', details: { attachments: [] } },
+      },
+      {
+        name: 'a ❤️ reaction on the card',
+        values: {
+          kind: 'reaction',
+          text: '❤️',
+          details: {
+            reaction: { emoji: '❤️', label: 'love', targetMid: 'mid-card', targetMessageId: null },
+          },
+        },
+      },
+      { name: 'a 👍 typed', values: { kind: 'text', text: '👍' } },
+      {
+        name: 'a location',
+        values: {
+          kind: 'location',
+          text: '',
+          details: { location: { lat: 23.8, long: 90.4 } },
+        },
+      },
+      { name: 'a photo', values: { kind: 'image', text: '' } },
+      { name: 'a video', values: { kind: 'video', text: '' } },
+      { name: 'a file', values: { kind: 'file', text: '' } },
+    ];
+
+    const onCard = async (values: Partial<typeof schema.message.$inferInsert>) => {
+      const sentAt = new Date(Date.now() - 1_000);
+      const customer = await seedCustomer(t.db, t.merchantA);
+      const convo = await seedConversation(t.db, t.merchantA, {
+        customerId: customer.id,
+        facebookPageId: pageA,
+        lastMessageAt: sentAt,
+        lastInboundAt: sentAt,
+        state: 'awaiting_confirmation',
+      });
+      const trigger = await seedMessage(t.db, t.merchantA, convo.id, { sentAt, ...values });
+      return {
+        convo,
+        job: { merchantId: t.merchantA, conversationId: convo.id, triggerMessageId: trigger.id },
+      };
+    };
+    const ordersOf = (conversationId: string) =>
+      t.db.select().from(schema.order).where(eq(schema.order.conversationId, conversationId));
+
+    it.each(EVENTS)(
+      '$name on the card creates no order and points to Confirm',
+      async ({ values }) => {
+        const { convo, job } = await onCard(values);
+        const before = await conversationRow(convo.id);
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(sent.map((message) => message.text)).toEqual([USE_CONFIRM]);
+        expect(llm.calls).toEqual([]);
+        expect(cardTaps).toEqual([]);
+        expect(await ordersOf(convo.id)).toEqual([]);
+        const after = await conversationRow(convo.id);
+        expect(after).toMatchObject({
+          state: 'awaiting_confirmation',
+          collectedSlots: before?.collectedSlots,
+        });
+      },
+    );
+
+    it('stays silent for a reaction before the card, with no LLM call', async () => {
+      const { job } = await thread();
+      const reaction = await seedMessage(t.db, t.merchantA, job.conversationId, {
+        kind: 'reaction',
+        text: '😆',
+        details: {
+          reaction: { emoji: '😆', label: 'smile', targetMid: 'm', targetMessageId: null },
+        },
+      });
+
+      await expect(service().run({ ...job, triggerMessageId: reaction.id })).resolves.toBe(
+        'silent',
+      );
+      expect(sent).toEqual([]);
+      expect(llm.calls).toEqual([]);
+    });
+
+    it('nudges a sticker before the card with a fixed line and no LLM call', async () => {
+      const { convo, job } = await thread();
+      const sticker = await seedMessage(t.db, t.merchantA, convo.id, {
+        kind: 'sticker',
+        text: '',
+      });
+
+      await expect(service().run({ ...job, triggerMessageId: sticker.id })).resolves.toBe(
+        'replied',
+      );
+      expect(sent.map((message) => message.text)).toEqual([
+        fallbackText({ kind: 'notice', notice: 'type_please' }, 'bn'),
+      ]);
+      expect(llm.calls).toEqual([]);
+      expect((await conversationRow(convo.id))?.state).toBe('browsing');
+    });
+
+    it('reads an edited message as its edit, and answers it again', async () => {
+      const { convo, job, trigger } = await thread();
+      await service().run(job);
+      await t.db
+        .update(schema.message)
+        .set({ editedText: 'blue saree', editedAt: new Date() })
+        .where(eq(schema.message.id, trigger.id));
+      llm.calls = [];
+
+      await expect(service().run(job)).resolves.toBe('replied');
+      // The edit keeps its place in the thread and replaces what was first sent.
+      expect(llm.histories.at(-1)).toEqual([
+        { from: 'customer', text: 'blue saree' },
+        { from: 'assistant', text: 'Which product would you like?' },
+      ]);
+      expect((await messagesOf(convo.id)).filter((m) => m.sender === 'assistant')).toHaveLength(2);
     });
   });
 });

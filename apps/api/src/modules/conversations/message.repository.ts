@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { MessageSender } from '@app/shared';
-import { and, desc, eq, or, sql } from 'drizzle-orm';
+import type { MessageKind, MessageSender } from '@app/shared';
+import { and, desc, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { one } from '../database/rows';
 import { message, type MessageRow } from '../database/schema/index';
 import type { CursorKey } from './cursor';
+import type { MessageDetails } from './message-content';
 
 /**
  * How long a staged send may be in flight before a retry may send it again:
@@ -30,12 +31,106 @@ export class MessageRepository {
       metaMessageId: string;
       sentAt: Date;
       payload?: string | null;
+      kind?: MessageKind;
+      details?: MessageDetails | null;
     },
   ): Promise<MessageRow | null> {
     const [row] = await executor
       .insert(message)
       .values({ ...values, merchantId, status: 'sent' })
       .onConflictDoNothing({ target: [message.merchantId, message.metaMessageId] })
+      .returning();
+    return row ?? null;
+  }
+
+  /** The message Meta knows by this mid; null when it was never stored. */
+  async findByMetaId(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    metaMessageId: string,
+  ): Promise<MessageRow | null> {
+    const [row] = await executor
+      .select()
+      .from(message)
+      .where(and(eq(message.merchantId, merchantId), eq(message.metaMessageId, metaMessageId)));
+    return row ?? null;
+  }
+
+  /**
+   * Keeps a customer's edit beside the original text. Null for an edit no
+   * newer than the one stored: a redelivery, or one that arrived late.
+   */
+  async applyEdit(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+    { text, at }: { text: string; at: Date },
+  ): Promise<MessageRow | null> {
+    const [row] = await executor
+      .update(message)
+      .set({ editedText: text, editedAt: at })
+      .where(
+        and(
+          eq(message.merchantId, merchantId),
+          eq(message.id, id),
+          eq(message.sender, 'customer'),
+          or(isNull(message.editedAt), lt(message.editedAt, at)),
+        ),
+      )
+      .returning();
+    return row ?? null;
+  }
+
+  /** Marks a customer's message unsent; null when it already was. */
+  async markDeleted(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+    at: Date,
+  ): Promise<MessageRow | null> {
+    const [row] = await executor
+      .update(message)
+      .set({ deletedAt: at })
+      .where(
+        and(
+          eq(message.merchantId, merchantId),
+          eq(message.id, id),
+          eq(message.sender, 'customer'),
+          isNull(message.deletedAt),
+        ),
+      )
+      .returning();
+    return row ?? null;
+  }
+
+  /**
+   * Takes back the customer's newest standing reaction to `targetMid`; null
+   * when there is none. A mid belongs to one thread, so it names the chat.
+   */
+  async retractReaction(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    targetMid: string,
+    at: Date,
+  ): Promise<MessageRow | null> {
+    const newest = executor
+      .select({ id: message.id })
+      .from(message)
+      .where(
+        and(
+          eq(message.merchantId, merchantId),
+          eq(message.sender, 'customer'),
+          eq(message.kind, 'reaction'),
+          isNull(message.deletedAt),
+          sql`${message.details} -> 'reaction' ->> 'targetMid' = ${targetMid}`,
+        ),
+      )
+      .orderBy(desc(message.sentAt), desc(message.id))
+      .limit(1);
+    const [row] = await executor
+      .update(message)
+      .set({ deletedAt: at })
+      .where(and(eq(message.merchantId, merchantId), sql`${message.id} = (${newest})`))
       .returning();
     return row ?? null;
   }

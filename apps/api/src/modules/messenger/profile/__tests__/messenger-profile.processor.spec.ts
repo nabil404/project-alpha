@@ -27,7 +27,7 @@ describe('MessengerProfileProcessor', () => {
         name: RESUBSCRIBE_PAGES_JOB,
         data: {},
         opts: {
-          jobId: 'resubscribe-pages-v1',
+          jobId: 'resubscribe-pages-v2',
           removeOnComplete: false,
           attempts: 5,
           backoff: { type: 'exponential', delay: 30_000 },

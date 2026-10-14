@@ -55,7 +55,9 @@ import type { LastOrderFacts, ReplyIntent } from './reply-intent';
 import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmation.service';
 import { outgoingFor } from './outgoing';
 import { phraseRequestFor } from './reply-phrasing';
-import { turnGate, type TurnGate } from './turn-gate';
+import { askedAt, turnGate, type TurnGate } from './turn-gate';
+import { decideNonText } from './non-text-turn';
+import { readDetails } from '../message-content';
 
 /** Messages read for a turn; the phrasing call sees the last PHRASE_HISTORY of them. */
 const HISTORY_LIMIT = 20;
@@ -67,6 +69,8 @@ export type TurnOutcome =
   | 'send_failed'
   | 'window_closed'
   | 'no_page'
+  /** A reaction that asked nothing: no reply. */
+  | 'silent'
   | Exclude<TurnGate, 'go'>
   | ConfirmOutcome;
 
@@ -151,13 +155,17 @@ export class AssistantTurnService {
       catalog,
       delivery: read.delivery,
     };
+    const nonText = nonTextIn(read.recent, triggerMessageId, turn);
+    if (nonText === 'silent') return 'silent';
     const pick = pickIn(read.recent, triggerMessageId, turn.slots);
     const entry = entryIn(tap);
     // A ref that arrived with words of the customer's own is a message with a product attached.
     const typedRef = entry?.kind === 'product' && entry.via === 'ref-typed';
     let decision: TurnDecision;
     let phrased = false;
-    if (pick) {
+    if (nonText) {
+      decision = nonText;
+    } else if (pick) {
       decision = decideTurn({ ...turn, trigger: { kind: 'pick', pick } });
     } else if (entry && !typedRef) {
       const trigger = { kind: 'entry' as const, entry: toEntry(entry, read.lastOrder, language) };
@@ -199,7 +207,7 @@ export class AssistantTurnService {
       if (recheck !== 'go') return { outcome: recheck };
       // The reply must sort after its trigger even when Meta's clock runs ahead of ours.
       const trigger = recent.find((message) => message.id === triggerMessageId);
-      const now = new Date(Math.max(Date.now(), (trigger?.sentAt.getTime() ?? 0) + 1));
+      const now = new Date(Math.max(Date.now(), (trigger ? askedAt(trigger).getTime() : 0) + 1));
       if (!isReplyWindowOpen(locked.conversation.lastInboundAt, now))
         return { outcome: 'window_closed' as const };
 
@@ -362,6 +370,33 @@ export class AssistantTurnService {
     );
     return phrased !== 'failed' && checkReply(phrased, reply.facts).ok ? phrased.trim() : fallback;
   }
+}
+
+/**
+ * The trigger's reply when it carries no words to read: decided by code, with
+ * no LLM call. Null for words.
+ */
+function nonTextIn(
+  recent: MessageRow[],
+  triggerMessageId: string,
+  turn: Pick<TurnInput, 'state' | 'slots'>,
+): TurnDecision | 'silent' | null {
+  const index = recent.findIndex((message) => message.id === triggerMessageId);
+  const trigger = recent[index];
+  if (!trigger) return null;
+  const previous = recent
+    .slice(index + 1)
+    .find((message) => message.sender === 'customer' && message.kind !== 'reaction');
+  return decideNonText({
+    state: turn.state,
+    slots: turn.slots,
+    trigger: {
+      kind: trigger.kind,
+      text: trigger.editedText ?? trigger.text,
+      details: readDetails(trigger.details),
+    },
+    previousKind: previous?.kind ?? null,
+  });
 }
 
 /** The trigger's tap as a pick of an offered candidate, or null for anything else. */

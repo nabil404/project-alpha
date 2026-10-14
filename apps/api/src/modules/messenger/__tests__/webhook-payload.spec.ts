@@ -1,4 +1,107 @@
-import { parseInboundJobs, parseReferral } from '../webhook-payload';
+import {
+  parseAttachments,
+  parseInboundJobs,
+  parseReferral,
+  type MetaWebhookBody,
+} from '../webhook-payload';
+
+type RawEvent = NonNullable<NonNullable<MetaWebhookBody['entry']>[number]['messaging']>[number];
+const one = (event: RawEvent) =>
+  parseInboundJobs({
+    object: 'page',
+    entry: [
+      {
+        id: 'page-1',
+        messaging: [
+          {
+            sender: { id: 'psid-1' },
+            recipient: { id: 'page-1' },
+            timestamp: 1700000000000,
+            ...event,
+          },
+        ],
+      },
+    ],
+  });
+
+describe('non-text events', () => {
+  it('maps a sticker, a location and a video to a message with no words', () => {
+    expect(
+      one({
+        message: {
+          mid: 'mid-s',
+          sticker_id: 369239263222822,
+          attachments: [
+            { type: 'image', payload: { url: 'https://cdn/s.png', sticker_id: 369239263222822 } },
+          ],
+        },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'customer-message',
+        messageId: 'mid-s',
+        text: '',
+        attachments: [{ type: 'sticker', url: 'https://cdn/s.png', stickerId: '369239263222822' }],
+      }),
+    ]);
+    expect(
+      parseAttachments({
+        attachments: [
+          { type: 'location', payload: { coordinates: { lat: 23.8, long: 90.4 } } },
+          { type: 'video', payload: { url: 'https://cdn/v.mp4' } },
+          { type: 'reel', payload: { url: 'https://cdn/r' } },
+        ],
+      }),
+    ).toEqual([
+      { type: 'location', lat: 23.8, long: 90.4 },
+      { type: 'video', url: 'https://cdn/v.mp4' },
+      { type: 'other', url: 'https://cdn/r' },
+    ]);
+  });
+
+  it('still drops a message with neither words nor attachments', () => {
+    expect(one({ message: { mid: 'mid-empty' } })).toEqual([]);
+  });
+
+  it('keys a reaction by the event, so a redelivery repeats the id and a new one does not', () => {
+    const reaction = { mid: 'mid-card', action: 'react', emoji: '❤️', reaction: 'love' };
+    const [first] = one({ reaction });
+    const [again] = one({ reaction });
+    const [later] = one({ reaction, timestamp: 1700000009999 });
+    expect(first).toMatchObject({
+      kind: 'customer-reaction',
+      targetMid: 'mid-card',
+      action: 'react',
+      emoji: '❤️',
+    });
+    expect(first?.messageId).toMatch(/^rx-/);
+    expect(again?.messageId).toBe(first?.messageId);
+    expect(later?.messageId).not.toBe(first?.messageId);
+  });
+
+  it('keys an edit apart from the message it edits', () => {
+    const [job] = one({ message_edit: { mid: 'mid-1', text: 'blue saree', num_edit: 1 } });
+    expect(job).toMatchObject({ kind: 'customer-edit', targetMid: 'mid-1', text: 'blue saree' });
+    expect(job?.messageId).not.toBe('mid-1');
+    expect(job?.messageId).toMatch(/^ed-/);
+  });
+
+  it('maps an unsend to its own key', () => {
+    expect(one({ message: { mid: 'mid-1', is_deleted: true } })).toEqual([
+      expect.objectContaining({
+        kind: 'customer-unsend',
+        messageId: 'un-mid-1',
+        targetMid: 'mid-1',
+      }),
+    ]);
+  });
+
+  it('ignores the Page’s own reactions and edits', () => {
+    expect(
+      one({ sender: { id: 'page-1' }, reaction: { mid: 'm', action: 'react', emoji: '👍' } }),
+    ).toEqual([]);
+  });
+});
 
 describe('parseInboundJobs', () => {
   it('maps a customer message to a job keyed by the Meta message ID', () => {

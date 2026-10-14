@@ -169,6 +169,30 @@ export const messageStatuses = ['sending', 'sent', 'failed'] as const;
 export const messageStatusSchema = z.enum(messageStatuses);
 export type MessageStatus = z.infer<typeof messageStatusSchema>;
 
+/**
+ * What a customer sent: words, or something else Messenger delivers. None of
+ * the others is ever read as a confirmation.
+ */
+export const messageKinds = [
+  'text',
+  'sticker',
+  'reaction',
+  'location',
+  'image',
+  'video',
+  'audio',
+  'file',
+  'other',
+] as const;
+export const messageKindSchema = z.enum(messageKinds);
+export type MessageKind = z.infer<typeof messageKindSchema>;
+
+/** A sticker or file as Meta links it. Meta's links expire, so it may fail to load. */
+export const messageAttachmentSchema = z
+  .object({ url: z.string().url().nullable() })
+  .meta({ id: 'MessageAttachment' });
+export type MessageAttachment = z.infer<typeof messageAttachmentSchema>;
+
 /** Messenger's limit on one text message. */
 export const MESSAGE_TEXT_MAX_LENGTH = 2000;
 
@@ -205,17 +229,28 @@ export const conversationCustomerSchema = z
   })
   .meta({ id: 'ConversationCustomer' });
 
+/**
+ * A thread's newest message, for a list row. For anything but `text` the
+ * preview holds no words (a reaction's emoji, or nothing): the dashboard says
+ * what `kind` was sent in the seller's own language.
+ */
+export const lastMessageSchema = z
+  .object({
+    preview: z.string(),
+    sender: messageSenderSchema,
+    kind: messageKindSchema,
+    at: z.string().datetime(),
+  })
+  .meta({ id: 'LastMessage' });
+export type LastMessage = z.infer<typeof lastMessageSchema>;
+
 export const conversationListItemSchema = z.object({
   id: z.string().uuid(),
   customer: conversationCustomerSchema,
   state: conversationStateSchema,
   botPaused: z.boolean(),
   unread: z.boolean(),
-  lastMessage: z.object({
-    preview: z.string(),
-    sender: messageSenderSchema,
-    at: z.string().datetime(),
-  }),
+  lastMessage: lastMessageSchema,
   lastInboundAt: z.string().datetime().nullable(),
 });
 export type ConversationListItem = z.infer<typeof conversationListItemSchema>;
@@ -259,7 +294,21 @@ export const messageSchema = z
   .object({
     id: z.string().uuid(),
     sender: messageSenderSchema,
+    kind: messageKindSchema,
+    /**
+     * Words only for `text`. A reaction holds its emoji and the Like sticker
+     * `👍`; other kinds hold nothing, and the dashboard names the kind.
+     */
     text: z.string(),
+    /** A sticker's image or the files sent; empty for the other kinds. */
+    attachments: z.array(messageAttachmentSchema),
+    location: z.object({ lat: z.number(), long: z.number() }).nullable(),
+    /** The emoji, and the id of the message reacted to when we have it. */
+    reaction: z.object({ emoji: z.string(), messageId: z.string().uuid().nullable() }).nullable(),
+    /** The customer's latest edit; `text` keeps what they first sent. */
+    editedText: z.string().nullable(),
+    /** The customer unsent it, or took the reaction back. */
+    deleted: z.boolean(),
     status: messageStatusSchema,
     sentAt: z.string().datetime(),
   })

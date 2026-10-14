@@ -1,12 +1,21 @@
 import { createHash } from 'node:crypto';
 import { parseProductRef } from '@app/shared';
-import type { InboundMessageJob, Referral } from '../queue/queue.constants';
+import type { InboundAttachment, InboundMessageJob, Referral } from '../queue/queue.constants';
 
 export interface RawReferral {
   ref?: string;
   source?: string;
   type?: string;
   ad_id?: string;
+}
+
+export interface RawAttachment {
+  type?: string;
+  payload?: {
+    url?: string;
+    sticker_id?: number | string;
+    coordinates?: { lat?: number; long?: number };
+  } | null;
 }
 
 export interface MetaWebhookBody {
@@ -24,9 +33,14 @@ export interface MetaWebhookBody {
         app_id?: number | string;
         quick_reply?: { payload?: string };
         referral?: RawReferral;
+        sticker_id?: number | string;
+        attachments?: RawAttachment[];
+        is_deleted?: boolean;
       };
       postback?: { mid?: string; title?: string; payload?: string; referral?: RawReferral };
       referral?: RawReferral;
+      reaction?: { mid?: string; action?: string; emoji?: string; reaction?: string };
+      message_edit?: { mid?: string; text?: string; num_edit?: number };
     }[];
   }[];
 }
@@ -51,15 +65,21 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
         jobs.push(postback);
         continue;
       }
+      const change =
+        reactionJob(pageId, event) ?? editJob(pageId, event) ?? unsendJob(pageId, event);
+      if (change) {
+        jobs.push(change);
+        continue;
+      }
       const { mid, text, is_echo: isEcho, app_id: appId } = event.message ?? {};
-      // Text only in the MVP: attachments, stickers, reactions and deliveries carry none.
-      if (!mid || !text) continue;
+      if (!mid) continue;
       const sentAt = event.timestamp ?? Date.now();
 
       if (isEcho) {
-        // Sent by the Page: the customer is the recipient.
+        // Sent by the Page: the customer is the recipient. Text only: a seller's
+        // own photo or sticker from Facebook's inbox is not stored yet.
         const recipientPsid = event.recipient?.id;
-        if (!recipientPsid) continue;
+        if (!recipientPsid || !text) continue;
         jobs.push({
           kind: 'page-echo',
           messageId: mid,
@@ -74,15 +94,18 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
 
       const senderPsid = event.sender?.id;
       if (!senderPsid) continue;
+      const attachments = text ? [] : parseAttachments(event.message ?? {});
+      if (!text && attachments.length === 0) continue;
       const payload = event.message?.quick_reply?.payload;
       jobs.push({
         kind: 'customer-message',
         messageId: mid,
         pageId,
         senderPsid,
-        text,
+        text: text ?? '',
         sentAt,
         ...(payload ? { payload } : {}),
+        ...(attachments.length > 0 ? { attachments } : {}),
         ...withReferral(parseReferral(event.message?.referral)),
       });
     }
@@ -93,6 +116,103 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
 type MessagingEvent = NonNullable<
   NonNullable<MetaWebhookBody['entry']>[number]['messaging']
 >[number];
+
+const MEDIA_TYPES = ['image', 'video', 'audio', 'file'] as const;
+const isMedia = (type: string | undefined): type is (typeof MEDIA_TYPES)[number] =>
+  MEDIA_TYPES.some((media) => media === type);
+
+/**
+ * What a message without words carried. A sticker may come as its own type, or
+ * (from older clients) as an image with a sticker id; a shared location as
+ * coordinates. Anything else Meta adds later is kept as `other`.
+ */
+export function parseAttachments(message: {
+  sticker_id?: number | string;
+  attachments?: RawAttachment[];
+}): InboundAttachment[] {
+  const parsed = (message.attachments ?? []).map((raw): InboundAttachment => {
+    const url = typeof raw.payload?.url === 'string' && raw.payload.url ? raw.payload.url : null;
+    const stickerId = raw.payload?.sticker_id ?? message.sticker_id;
+    if (raw.type === 'sticker' || (raw.type === 'image' && stickerId !== undefined)) {
+      return {
+        type: 'sticker',
+        url,
+        stickerId: stickerId === undefined ? null : String(stickerId),
+      };
+    }
+    const { lat, long } = raw.payload?.coordinates ?? {};
+    if (raw.type === 'location' && typeof lat === 'number' && typeof long === 'number') {
+      return { type: 'location', lat, long };
+    }
+    return { type: isMedia(raw.type) ? raw.type : 'other', url };
+  });
+  if (parsed.length === 0 && message.sticker_id !== undefined) {
+    return [{ type: 'sticker', url: null, stickerId: String(message.sticker_id) }];
+  }
+  return parsed;
+}
+
+const eventKey = (...parts: (string | number)[]) =>
+  createHash('sha256').update(parts.join('|')).digest('hex');
+
+/** A reaction or its removal. Its id is derived from the event, so a redelivery stays a no-op. */
+function reactionJob(pageId: string, event: MessagingEvent): InboundMessageJob | null {
+  const senderPsid = event.sender?.id;
+  const { mid, action, emoji, reaction } = event.reaction ?? {};
+  if (!senderPsid || senderPsid === pageId || !mid) return null;
+  if (action !== 'react' && action !== 'unreact') return null;
+  const sentAt = event.timestamp ?? Date.now();
+  return {
+    kind: 'customer-reaction',
+    messageId: `rx-${eventKey(senderPsid, mid, action, emoji ?? '', reaction ?? '', sentAt)}`,
+    pageId,
+    senderPsid,
+    targetMid: mid,
+    action,
+    emoji: emoji ?? '',
+    reaction: reaction ?? '',
+    text: '',
+    sentAt,
+  };
+}
+
+/** An edit reuses its message's mid; the edit count and time tell redeliveries from new edits. */
+function editJob(pageId: string, event: MessagingEvent): InboundMessageJob | null {
+  const senderPsid = event.sender?.id;
+  const { mid, text, num_edit: count } = event.message_edit ?? {};
+  if (!senderPsid || senderPsid === pageId || !mid || typeof text !== 'string') return null;
+  const sentAt = event.timestamp ?? Date.now();
+  return {
+    kind: 'customer-edit',
+    messageId: `ed-${eventKey(mid, count ?? '', sentAt)}`,
+    pageId,
+    senderPsid,
+    targetMid: mid,
+    text,
+    sentAt,
+  };
+}
+
+/**
+ * Meta's Messenger reference does not document unsends; Instagram marks them
+ * `is_deleted`, and Messenger is read the same way when it does.
+ */
+function unsendJob(pageId: string, event: MessagingEvent): InboundMessageJob | null {
+  const senderPsid = event.sender?.id;
+  const mid = event.message?.mid;
+  if (event.message?.is_deleted !== true || !senderPsid || senderPsid === pageId || !mid) {
+    return null;
+  }
+  return {
+    kind: 'customer-unsend',
+    messageId: `un-${mid}`,
+    pageId,
+    senderPsid,
+    targetMid: mid,
+    text: '',
+    sentAt: event.timestamp ?? Date.now(),
+  };
+}
 
 /**
  * A button tap. Meta may send it without a mid, so one is derived from the

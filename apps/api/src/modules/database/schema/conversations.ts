@@ -27,6 +27,19 @@ const ENTRY_SOURCES = ['ad', 'link', 'get_started', 'organic'] as const;
 const MESSAGE_SENDERS = ['customer', 'assistant', 'seller'] as const;
 const MESSAGE_STATUSES = ['sending', 'sent', 'failed'] as const;
 
+/** Literal copy of @app/shared's messageKinds. */
+const MESSAGE_KINDS = [
+  'text',
+  'sticker',
+  'reaction',
+  'location',
+  'image',
+  'video',
+  'audio',
+  'file',
+  'other',
+] as const;
+
 export const CONVERSATION_THREAD_UQ = 'conversation_merchant_page_customer_uq';
 export const MESSAGE_META_ID_UQ = 'message_merchant_meta_message_id_uq';
 
@@ -63,6 +76,8 @@ export const conversation = pgTable(
     lastMessageAt: instant('last_message_at').notNull(),
     lastMessagePreview: text('last_message_preview').notNull(),
     lastMessageSender: text('last_message_sender', { enum: MESSAGE_SENDERS }).notNull(),
+    /** What the newest message was; the dashboard names a non-text one in the seller's language. */
+    lastMessageKind: text('last_message_kind', { enum: MESSAGE_KINDS }).notNull().default('text'),
     /** The customer's last message: the 24h reply window, "Active N min ago", and unread. */
     lastInboundAt: instant('last_inbound_at'),
     /** Read up to: the `last_inbound_at` the seller last saw, not when they looked. */
@@ -81,6 +96,7 @@ export const conversation = pgTable(
     check('conversation_state_ck', oneOf(t.state, CONVERSATION_STATES)),
     check('conversation_entry_source_ck', oneOf(t.entrySource, ENTRY_SOURCES)),
     check('conversation_last_sender_ck', oneOf(t.lastMessageSender, MESSAGE_SENDERS)),
+    check('conversation_last_kind_ck', oneOf(t.lastMessageKind, MESSAGE_KINDS)),
     index('conversation_merchant_last_message_idx').on(
       t.merchantId,
       t.lastMessageAt.desc(),
@@ -109,12 +125,22 @@ export const message = pgTable(
     merchantId: merchantId(),
     conversationId: text('conversation_id').notNull(),
     sender: text('sender', { enum: MESSAGE_SENDERS }).notNull(),
+    kind: text('kind', { enum: MESSAGE_KINDS }).notNull().default('text'),
+    /** For anything but text, a label of what was sent: the list preview and the LLM read it. */
     text: text('text').notNull(),
+    /** What a non-text message carried; parsed with messageDetailsSchema on read. */
+    details: jsonb('details').$type<unknown>(),
     metaMessageId: text('meta_message_id'),
     /** A quick reply's or button's payload, for a tap; null for typed text and for our sends. */
     payload: text('payload'),
     status: text('status', { enum: MESSAGE_STATUSES }).notNull(),
     sentAt: instant('sent_at').notNull(),
+    /** The customer's latest edit; `text` keeps the original. */
+    editedText: text('edited_text'),
+    /** Meta's time for that edit: a turn asked again by it answers after it. */
+    editedAt: instant('edited_at'),
+    /** The customer unsent the message, or took the reaction back. */
+    deletedAt: instant('deleted_at'),
     createdAt: createdAt(),
     /** A reply's last claim to be sent: when staged, then each redelivery's. */
     updatedAt: updatedAt(),
@@ -128,6 +154,7 @@ export const message = pgTable(
     unique(MESSAGE_META_ID_UQ).on(t.merchantId, t.metaMessageId),
     check('message_sender_ck', oneOf(t.sender, MESSAGE_SENDERS)),
     check('message_status_ck', oneOf(t.status, MESSAGE_STATUSES)),
+    check('message_kind_ck', oneOf(t.kind, MESSAGE_KINDS)),
     index('message_thread_idx').on(t.merchantId, t.conversationId, t.sentAt, t.id),
     index('message_text_trgm_idx').using('gin', t.text.op('gin_trgm_ops')),
     merchantIsolation('message_merchant_isolation', t.merchantId),
