@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FacebookPageModule } from '../messenger/page/facebook-page.module';
 import { StorageModule } from '../storage/storage.module';
 import { DeliveryChargesRepository } from './delivery-charges.repository';
 import { DeliverySettingsController } from './delivery-settings.controller';
@@ -14,7 +15,7 @@ import { ShopProfileRepository } from './shop-profile.repository';
 
 /** Settings > General (profile, logo, region), Delivery charges and Notifications. */
 @Module({
-  imports: [StorageModule],
+  imports: [StorageModule, FacebookPageModule],
   controllers: [
     GeneralSettingsController,
     DeliverySettingsController,

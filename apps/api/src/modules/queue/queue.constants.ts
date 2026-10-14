@@ -144,7 +144,8 @@ export interface AssistantTurnJob {
 /**
  * The Page's Messenger Profile (Get Started, greeting, ice breakers, menu).
  * The API and the worker enqueue SYNC_PROFILE_JOB; only the worker processes
- * it, and only the worker adds RESUBSCRIBE_PAGES_JOB, once per deploy.
+ * it, and only the worker adds RESUBSCRIBE_PAGES_JOB. That runs once; bump the
+ * job id (e.g. -v2) to run it again for a new webhook field.
  */
 export const MESSENGER_PROFILE_QUEUE = 'messenger-profile';
 export const SYNC_PROFILE_JOB = 'sync-profile';

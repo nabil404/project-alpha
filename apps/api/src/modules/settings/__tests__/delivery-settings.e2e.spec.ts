@@ -15,6 +15,8 @@ import { SessionGuard } from '../../auth/session.guard';
 import { AppConfig } from '../../config/app.config';
 import { DATABASE, type Database } from '../../database/database.module';
 import * as schema from '../../database/schema/index';
+import { QueueModule } from '../../queue/queue.module';
+import { FakeQueueModule } from '../../queue/__tests__/fake-queue.module';
 import { MailService } from '../../mail/mail.service';
 import { ObjectStorage } from '../../storage/object-storage';
 import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
@@ -67,6 +69,7 @@ describeDb('Settings > Delivery charges over HTTP', () => {
       NODE_ENV: 'test',
       APP_URL,
       BETTER_AUTH_SECRET: 'x'.repeat(32),
+      TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     };
 
     @Global()
@@ -83,6 +86,9 @@ describeDb('Settings > Delivery charges over HTTP', () => {
       imports: [TestInfrastructureModule, AuthModule, AccountModule, SettingsModule],
       providers: [{ provide: APP_GUARD, useClass: SessionGuard }],
     })
+      // SettingsModule reaches the Messenger Profile queue; Redis is not needed here.
+      .overrideModule(QueueModule)
+      .useModule(FakeQueueModule)
       .overrideProvider(MailService)
       .useValue(mailer)
       .overrideProvider(ObjectStorage)

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { WelcomeScreenInput } from '@app/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { Executor, TenantScope } from '../database/base.repository';
@@ -74,6 +75,18 @@ export class MerchantSettingsRepository {
       .where(eq(merchantSettings.merchantId, merchantId))
       .returning();
     return one(rows, 'update merchant_settings');
+  }
+
+  /** The seller's own welcome screen. The shop's row must exist; callers lock or create it first. */
+  async updateWelcome(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    input: WelcomeScreenInput,
+  ): Promise<void> {
+    await executor
+      .update(merchantSettings)
+      .set({ messengerGreeting: input.greeting, iceBreakers: input.iceBreakers })
+      .where(eq(merchantSettings.merchantId, merchantId));
   }
 
   /** Whether the shop has any order, in any status: once it has, the currency is fixed. */

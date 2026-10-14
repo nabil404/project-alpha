@@ -86,17 +86,23 @@ export const ICE_BREAKERS_MAX = 4;
 export const ICE_BREAKER_QUESTION_MAX = 80;
 
 /** Code points, as Meta counts them; `.max()` would count UTF-16 units. */
-const maxChars = (max: number) => (value: string, ctx: z.RefinementCtx) => {
-  if ([...value].length > max) {
-    ctx.addIssue({
-      code: 'too_big',
-      origin: 'string',
-      maximum: max,
-      inclusive: true,
-      input: value,
-    });
-  }
-};
+const maxChars =
+  (max: number, asSent: (value: string) => string = (value) => value) =>
+  (value: string, ctx: z.RefinementCtx) => {
+    if ([...asSent(value)].length > max) {
+      ctx.addIssue({
+        code: 'too_big',
+        origin: 'string',
+        maximum: max,
+        inclusive: true,
+        input: value,
+      });
+    }
+  };
+
+/** Meta counts the greeting as sent: each `{first_name}` becomes `{{user_first_name}}`, 7 characters longer. */
+const greetingAsSent = (greeting: string) =>
+  greeting.replaceAll('{first_name}', '{{user_first_name}}');
 
 export const iceBreakerSchema = z.object({
   /** `browse` opens the categories; `ask` is answered by the assistant like a typed question. */
@@ -107,7 +113,7 @@ export type IceBreaker = z.infer<typeof iceBreakerSchema>;
 
 export const welcomeScreenInputSchema = z
   .object({
-    greeting: z.string().trim().min(1).superRefine(maxChars(GREETING_MAX)),
+    greeting: z.string().trim().min(1).superRefine(maxChars(GREETING_MAX, greetingAsSent)),
     iceBreakers: z.array(iceBreakerSchema).max(ICE_BREAKERS_MAX),
   })
   .strict();

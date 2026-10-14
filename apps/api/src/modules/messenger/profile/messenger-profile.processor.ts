@@ -28,8 +28,9 @@ export class MessengerProfileProcessor extends WorkerHost implements OnApplicati
 
   /**
    * Pages connected before messaging_referrals was added still have the old
-   * field list. One job per deploy: its id is fixed, so BullMQ ignores the add
-   * while the last one is still retained.
+   * field list. Runs once: its id is fixed, so BullMQ ignores the add while the
+   * last one is retained. Bump the job id (e.g. -v2) to run it again for a new
+   * webhook field.
    */
   async onApplicationBootstrap(): Promise<void> {
     await this.queue.add(

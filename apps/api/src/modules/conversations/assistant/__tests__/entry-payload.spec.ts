@@ -77,6 +77,13 @@ describe('welcomeScreenInputSchema', () => {
     expect(welcomeScreenInputSchema.safeParse(input(`${question}\u{1F600}`)).success).toBe(false);
   });
 
+  it('counts a {first_name} as the 19 characters Meta receives', () => {
+    const refused = `${'x'.repeat(148)}{first_name}`;
+    const accepted = `${'x'.repeat(141)}{first_name}`;
+    expect(welcomeScreenInputSchema.safeParse({ ...valid, greeting: refused }).success).toBe(false);
+    expect(welcomeScreenInputSchema.safeParse({ ...valid, greeting: accepted }).success).toBe(true);
+  });
+
   it('counts Bangla greeting length in characters', () => {
     const greeting = '\u0986'.repeat(GREETING_MAX);
     expect(welcomeScreenInputSchema.safeParse({ ...valid, greeting }).success).toBe(true);
