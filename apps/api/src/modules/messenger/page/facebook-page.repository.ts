@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../../database/base.repository';
 import { one } from '../../database/rows';
 import { facebookPage, type FacebookPageRow } from '../../database/schema/index';
+
+/** Our code for a failed Messenger Profile sync, never Graph's text. */
+export type ProfileSyncError = 'token_invalid' | 'graph_error';
 
 export interface PageValues {
   pageId: string;
@@ -69,5 +72,54 @@ export class FacebookPageRepository {
       .where(eq(facebookPage.merchantId, merchantId))
       .returning();
     return row ?? null;
+  }
+
+  /** A sync was asked for. Clears the last error, so a fresh request never reads as failed. */
+  async markProfileRequested(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    at: Date,
+  ): Promise<void> {
+    await executor
+      .update(facebookPage)
+      .set({ profileSyncRequestedAt: at, profileSyncError: null })
+      .where(eq(facebookPage.merchantId, merchantId));
+  }
+
+  async markProfileSynced(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    at: Date,
+  ): Promise<void> {
+    await executor
+      .update(facebookPage)
+      .set({ profileSyncedAt: at, profileSyncError: null })
+      .where(eq(facebookPage.merchantId, merchantId));
+  }
+
+  /** Keeps `profileSyncedAt`: the Page still shows the profile Meta last accepted. */
+  async markProfileFailed(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    error: ProfileSyncError,
+    at: Date,
+  ): Promise<void> {
+    await executor
+      .update(facebookPage)
+      .set({ profileSyncError: error, updatedAt: at })
+      .where(eq(facebookPage.merchantId, merchantId));
+  }
+
+  /**
+   * Every shop with a connected Page, for worker jobs that run without a
+   * merchant context. facebook_page is under forced RLS, so this goes through
+   * the app_connected_merchants() SECURITY DEFINER function (migration 0040),
+   * which returns merchant ids only.
+   */
+  async listConnectedMerchantIds(executor: Executor): Promise<string[]> {
+    const result = await executor.execute<{ merchant_id: string }>(
+      sql`select merchant_id from app_connected_merchants() as merchant_id`,
+    );
+    return result.rows.map((row) => row.merchant_id);
   }
 }

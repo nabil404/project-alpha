@@ -4,6 +4,7 @@ import {
   PAGE_CONNECT_SCOPES,
   appSecretProof,
 } from '../meta-graph.client';
+import { buildMessengerProfile, PROFILE_FIELDS } from '../../profile/messenger-profile';
 
 interface Call {
   method: string;
@@ -131,6 +132,27 @@ describe('MetaGraphClient', () => {
       'messages,messaging_postbacks,message_echoes,messaging_referrals',
     );
     expect(calls[0]?.authorization).toBe('Bearer page-token');
+  });
+
+  it('sets the Messenger Profile with the Page token, as a JSON body', async () => {
+    const { fn, calls } = fakeFetch({ body: { result: 'success' } });
+    const body = buildMessengerProfile({ greeting: 'Hi', iceBreakers: [], language: 'en' });
+    await new MetaGraphClient(settings, fn).setMessengerProfile('page-token', body);
+
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url.pathname).toBe('/v21.0/me/messenger_profile');
+    expect(calls[0]?.authorization).toBe('Bearer page-token');
+    expect(calls[0]?.body).toEqual(body);
+  });
+
+  it('clears every Messenger Profile field we own', async () => {
+    const { fn, calls } = fakeFetch({ body: { result: 'success' } });
+    await new MetaGraphClient(settings, fn).clearMessengerProfile('page-token');
+
+    expect(calls[0]?.method).toBe('DELETE');
+    expect(calls[0]?.url.pathname).toBe('/v21.0/me/messenger_profile');
+    expect(calls[0]?.authorization).toBe('Bearer page-token');
+    expect(calls[0]?.body).toEqual({ fields: [...PROFILE_FIELDS] });
   });
 
   it('fails with a GraphError that names neither the token nor the URL', async () => {

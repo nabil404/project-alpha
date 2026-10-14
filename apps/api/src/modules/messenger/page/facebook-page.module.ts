@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { CryptoService } from '../../../common/crypto.service';
 import { AppConfig } from '../../config/app.config';
+import { QueueModule } from '../../queue/queue.module';
+import { MerchantSettingsRepository } from '../../settings/merchant-settings.repository';
+import { MessengerProfileSync } from '../profile/messenger-profile.sync';
 import { FacebookPageController, PAGE_CONNECT_CALLBACK_PATH } from './facebook-page.controller';
 import { FacebookPageRepository } from './facebook-page.repository';
 import {
@@ -18,11 +21,19 @@ import { MetaGraphClient } from './meta-graph.client';
  * and connecting answers MESSENGER_NOT_CONFIGURED.
  */
 @Module({
+  imports: [QueueModule],
   controllers: [FacebookPageController],
   providers: [
     CryptoService,
     FacebookPageRepository,
     FacebookPageService,
+    // Here, not in MessengerProfileModule: the Page service calls it on
+    // connect and disconnect, and the sync needs this module's repository and
+    // Graph client, so either home elsewhere is an import cycle. The settings
+    // repository is stateless and provided locally for the same reason:
+    // SettingsModule will call the sync on a country change.
+    MerchantSettingsRepository,
+    MessengerProfileSync,
     {
       provide: META_GRAPH,
       inject: [AppConfig],
@@ -45,6 +56,6 @@ import { MetaGraphClient } from './meta-graph.client';
   ],
   // META_GRAPH is shared so ingestion and seller replies use the same pinned
   // client (or null, and MESSENGER_NOT_CONFIGURED).
-  exports: [FacebookPageRepository, META_GRAPH],
+  exports: [FacebookPageRepository, META_GRAPH, MessengerProfileSync],
 })
 export class FacebookPageModule {}
