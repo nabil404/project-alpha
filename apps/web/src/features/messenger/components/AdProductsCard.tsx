@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AdProduct } from '@app/shared';
+import type { AdProduct, ProductStatus } from '@app/shared';
 
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -40,23 +40,22 @@ export function AdProductsCard() {
   const rows = ads.data.data;
   const needing = rows.filter((ad) => ad.product === null).length;
 
+  const labelOf = ({ name, status }: { name: string; status: ProductStatus }) =>
+    status === 'draft'
+      ? t('messenger.ads.draftOption', { name })
+      : status === 'archived'
+        ? t('messenger.ads.archivedOption', { name })
+        : name;
+
   const optionsFor = (ad: AdProduct): ComboboxOption[] => {
     const options: ComboboxOption[] = [
       { value: '', label: t('messenger.ads.noProduct') },
-      ...catalog.map((product) => ({
-        value: product.id,
-        label:
-          product.status === 'draft'
-            ? t('messenger.ads.draftOption', { name: product.name })
-            : product.name,
-      })),
+      ...catalog.map((product) => ({ value: product.id, label: labelOf(product) })),
     ];
-    // A product archived since it was mapped is not in the list, but the row must still name it.
+    // A mapped product missing from the list (archived since, or beyond the newest
+    // PRODUCT_LIMIT) is still named in its row, labelled by its own status.
     if (ad.product && !catalog.some((product) => product.id === ad.product?.id)) {
-      options.push({
-        value: ad.product.id,
-        label: t('messenger.ads.archivedOption', { name: ad.product.name }),
-      });
+      options.push({ value: ad.product.id, label: labelOf(ad.product) });
     }
     return options;
   };
