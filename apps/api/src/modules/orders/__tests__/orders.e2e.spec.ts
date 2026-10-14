@@ -369,6 +369,9 @@ describeDb('order routes over HTTP', () => {
       paymentMethod: 'bank_transfer',
     };
     const first = orderDetailSchema.parse((await create(body, key).expect(201)).body);
+    const [seller] = await t.db.select().from(schema.order).where(eq(schema.order.id, first.id));
+    expect(seller?.entrySource).toBeNull();
+    expect(first.entrySource).toBeNull();
     expect(first).toMatchObject({
       source: 'seller',
       status: 'new',

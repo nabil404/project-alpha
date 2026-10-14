@@ -3,6 +3,7 @@ import {
   canTransitionOrder,
   orderDeliveryEditable,
   orderItemsEditable,
+  type EntrySource,
   type CreateOrder,
   type FieldError,
   type ListOrdersQuery,
@@ -55,7 +56,8 @@ export interface OrderActor {
 
 /** Who an order comes from: a seller by hand, or the assistant from a conversation. */
 export type OrderOrigin =
-  { source: 'seller'; conversationId: null } | { source: 'assistant'; conversationId: string };
+  | { source: 'seller'; conversationId: null }
+  | { source: 'assistant'; conversationId: string; entrySource: EntrySource };
 
 const SELLER_ORIGIN: OrderOrigin = { source: 'seller', conversationId: null };
 
@@ -181,6 +183,7 @@ export class OrdersService {
       customerId: customer.id,
       conversationId: origin.conversationId,
       source: origin.source,
+      entrySource: origin.source === 'assistant' ? origin.entrySource : null,
       status: 'new',
       paymentMethod: input.paymentMethod,
       subtotal,

@@ -82,6 +82,7 @@ export function toOrderDetail({ order, items, customer, history }: OrderDetailPa
       earlierOrderCount: history.count,
       spentBefore: history.spent,
     },
+    entrySource: order.entrySource,
     conversationId: order.conversationId,
     placedAt: order.placedAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),

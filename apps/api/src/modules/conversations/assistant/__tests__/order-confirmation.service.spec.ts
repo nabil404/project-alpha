@@ -394,6 +394,16 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
     expect(drafted).toEqual([{ orderId: order!.id, committed: true }]);
   });
 
+  it('copies the conversation’s entry source onto an assistant order', async () => {
+    const lungi = await product('Entry Lungi', 160_000);
+    const convo = await shown([{ ...lungi, quantity: 1 }], { entrySource: 'ad' });
+
+    await expect(tap(convo.id, confirm(convo.id))).resolves.toBe('ordered');
+
+    const [order] = await ordersFor(convo.id);
+    expect(order?.entrySource).toBe('ad');
+  });
+
   it('answers a second tap with the same reference and no second order or email', async () => {
     const lungi = await product('Double Lungi', 160_000);
     const convo = await shown([{ ...lungi, quantity: 1 }]);

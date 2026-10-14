@@ -339,7 +339,7 @@ export class OrderConfirmationService {
             paymentMethod: 'cash_on_delivery',
           },
           key,
-          { source: 'assistant', conversationId: conversation.id },
+          { source: 'assistant', conversationId: conversation.id, entrySource: conversation.entrySource },
         ),
       );
     } catch (error) {
