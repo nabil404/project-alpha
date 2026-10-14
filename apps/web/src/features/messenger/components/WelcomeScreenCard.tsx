@@ -97,6 +97,7 @@ function WelcomeScreenForm({ welcome }: { welcome: WelcomeScreen }) {
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-heading">{t('messenger.welcome.title')}</h2>
                 <p className="text-body text-ink-muted">{t('messenger.welcome.description')}</p>
+                <p className="text-small text-ink-muted">{t('messenger.welcome.editHere')}</p>
               </div>
               {profileSync.status === 'live' && (
                 <span className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-success-soft px-2.5 text-label text-success">

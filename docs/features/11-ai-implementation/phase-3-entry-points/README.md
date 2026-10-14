@@ -244,7 +244,13 @@ Migrations `0038` to `0040`; `db:verify-rls` passes.
   it is sent as the customer's question and the seller is notified if the
   assistant cannot answer it ([Follow-ups](#follow-ups)). A failed
   sync shows a banner with Retry; `token_invalid` asks the seller to reconnect.
-  The greeting field left the Replies card.
+  The greeting field left the Replies card. A line under the card's
+  description tells the seller to edit these here, not in Meta Business
+  Suite: Business Suite's **Inbox › Automations › Frequently asked
+  questions** edits the same `ice_breakers` field, and each sync replaces
+  the whole profile, so a change made there lasts only until the next save,
+  reconnect or language change. Get Started and the persistent menu have no
+  editor in Meta's tools; they are API-only.
 - **Settings › Messenger › Click-to-Messenger ads** (`AdProductsCard`): a
   table on desktop and cards on a phone. Each row has a searchable product
   picker that saves at once with an optimistic update, and unmaps with a null.
