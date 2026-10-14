@@ -70,6 +70,25 @@ describe('outgoingFor', () => {
     ]);
   });
 
+  it('offers the profile name as one quick reply that carries no name', () => {
+    const reply: ReplyIntent = {
+      kind: 'ask_slot',
+      slot: 'customerName',
+      intent: 'order',
+      offeredName: 'Nusrat Jahan',
+      facts: { items: [] },
+    };
+    expect(outgoingFor(reply, 'Order under Nusrat Jahan?', options)).toEqual([
+      {
+        text: 'Order under Nusrat Jahan?',
+        content: {
+          kind: 'quick_replies',
+          options: [{ title: 'Nusrat Jahan', payload: 'name:profile' }],
+        },
+      },
+    ]);
+  });
+
   it('sends the summary as one card whose buttons carry its revision', () => {
     const [card, ...rest] = outgoingFor(summary(['Kajal']), 'ignored', options);
     expect(rest).toEqual([]);

@@ -6,6 +6,7 @@ export type ReplyLanguage = 'bn' | 'en';
 
 type FallbackKey =
   | `ask_${SlotName}`
+  | 'ask_customerName_offered'
   | 'ask_phone_invalid'
   | 'ask_product_not_found'
   | 'ask_product_choose'
@@ -87,10 +88,11 @@ export const ENTRY_TEXT: Record<
   },
 };
 
-/** The facts, and the item the slot is asked for. */
+/** The facts, the item the slot is asked for, and the profile name offered. */
 interface Asked {
   facts: ReplyFacts;
   item: number | undefined;
+  offeredName?: string;
 }
 
 const nameOf = ({ facts, item }: Asked) =>
@@ -119,6 +121,8 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
     ask_quantity_too_many: (asked) =>
       `দুঃখিত, ${nameOf(asked)} এখন ${availableOf(asked)}টি আছে। কয়টি নেবেন?`,
     ask_customerName: () => 'অর্ডারের জন্য আপনার নামটি বলবেন?',
+    ask_customerName_offered: (asked) =>
+      `অর্ডারটি কি ${asked.offeredName ?? ''} নামে হবে? না হলে নামটি লিখে দিন।`,
     ask_phone: () => 'আপনার মোবাইল নম্বরটি দিন, প্লিজ।',
     ask_phone_invalid: () => 'নম্বরটি সঠিক মনে হচ্ছে না। মোবাইল নম্বরটি আবার দেবেন?',
     ask_deliveryAddress: () => 'ডেলিভারির পুরো ঠিকানাটি (এলাকা ও জেলাসহ) দিন, প্লিজ।',
@@ -148,6 +152,8 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
     ask_quantity_too_many: (asked) =>
       `Sorry, we have only ${availableOf(asked)} ${nameOf(asked)} right now. How many would you like?`,
     ask_customerName: () => 'What name should we put on the order?',
+    ask_customerName_offered: (asked) =>
+      `Order under ${asked.offeredName ?? ''}? If not, type the name to use.`,
     ask_phone: () => 'Could you share your mobile number, please?',
     ask_phone_invalid: () =>
       "That number doesn't look right. Could you send your mobile number again?",
@@ -181,8 +187,14 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
   switch (reply.kind) {
     case 'ask_slot': {
       const reasoned = reply.reason && REASON_KEYS[`${reply.slot}:${reply.reason}`];
-      const key: FallbackKey = reasoned || `ask_${reply.slot}`;
-      return sentences[key]({ facts: reply.facts, item: reply.item });
+      const key: FallbackKey =
+        reasoned ||
+        (reply.offeredName === undefined ? `ask_${reply.slot}` : 'ask_customerName_offered');
+      return sentences[key]({
+        facts: reply.facts,
+        item: reply.item,
+        offeredName: reply.offeredName,
+      });
     }
     case 'summary': {
       const { items, card } = summaryMessages(reply.facts, language);

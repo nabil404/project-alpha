@@ -42,6 +42,7 @@ import {
   LOCALES,
   readSlots,
   shouldExtract,
+  validNameTap,
   validPick,
   type DeliveryView,
   type Entry,
@@ -142,7 +143,7 @@ export class AssistantTurnService {
     const page = read.page;
     if (!page || page.pageId !== read.conversation.facebookPageId) return 'no_page';
 
-    // 2. Think, with no transaction open. A tapped candidate needs no LLM.
+    // 2. Think, with no transaction open. A tapped candidate or name needs no LLM.
     const catalog = await this.products.findSellableCatalog(merchantId);
     const calls: LlmCallRecord[] = [];
     const history = toChatLines(read.recent);
@@ -154,10 +155,12 @@ export class AssistantTurnService {
       language,
       catalog,
       delivery: read.delivery,
+      profileName: read.customer.name,
     };
     const nonText = nonTextIn(read.recent, triggerMessageId, turn);
     if (nonText === 'silent') return 'silent';
     const pick = pickIn(read.recent, triggerMessageId, turn.slots);
+    const name = tap?.kind === 'name' ? validNameTap(turn.slots) : null;
     const entry = entryIn(tap);
     // A ref that arrived with words of the customer's own is a message with a product attached.
     const typedRef = entry?.kind === 'product' && entry.via === 'ref-typed';
@@ -167,6 +170,8 @@ export class AssistantTurnService {
       decision = nonText;
     } else if (pick) {
       decision = decideTurn({ ...turn, trigger: { kind: 'pick', pick } });
+    } else if (name !== null) {
+      decision = decideTurn({ ...turn, trigger: { kind: 'name', name } });
     } else if (entry && !typedRef) {
       const trigger = { kind: 'entry' as const, entry: toEntry(entry, read.lastOrder, language) };
       decision = decideTurn({ ...turn, trigger });
@@ -354,7 +359,7 @@ export class AssistantTurnService {
 
   /**
    * The phrased reply if it passes checkReply; otherwise the fixed sentence.
-   * A hand-off and the summary are never phrased.
+   * A hand-off, the summary and the offered name are never phrased.
    */
   private async words(
     reply: ReplyIntent,
@@ -363,7 +368,7 @@ export class AssistantTurnService {
     calls: LlmCallRecord[],
   ): Promise<string> {
     const fallback = fallbackText(reply, language);
-    if (reply.kind !== 'ask_slot' || !this.llm) return fallback;
+    if (reply.kind !== 'ask_slot' || reply.offeredName !== undefined || !this.llm) return fallback;
     const phrased = record(
       await this.llm.phraseReply(phraseRequestFor(reply, language), history.slice(-PHRASE_HISTORY)),
       calls,

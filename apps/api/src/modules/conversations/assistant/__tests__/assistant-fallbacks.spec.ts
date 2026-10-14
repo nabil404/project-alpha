@@ -62,6 +62,12 @@ describe('fallbackText', () => {
     }
   });
 
+  it.each(languages)('%s asks to confirm the offered profile name, naming it', (language) => {
+    const offered = { ...ask('customerName'), offeredName: 'Nusrat Jahan' };
+    expect(fallbackText(offered, language)).toContain('Nusrat Jahan');
+    expect(fallbackText(offered, language)).not.toBe(fallbackText(ask('customerName'), language));
+  });
+
   it('names the item, what ran out, and how many are left', () => {
     expect(fallbackText(ask('quantity'), 'en')).toBe('How many Check Lungi would you like?');
     expect(fallbackText(ask('variant', 'out_of_stock'), 'en')).toContain('42 / Black');

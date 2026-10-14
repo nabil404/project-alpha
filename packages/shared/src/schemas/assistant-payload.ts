@@ -2,13 +2,16 @@
  * What the assistant's buttons and quick replies carry back in Messenger. A
  * Confirm or Change names the conversation and the summary revision it was
  * shown with; a pick names the candidate the customer tapped, so it resolves
- * by id and never by re-matching its shortened title. Entry payloads come from
+ * by id and never by re-matching its shortened title; a name tap carries no
+ * name, since the turn fills the one it offered. Entry payloads come from
  * Get Started, the menu, ice breakers, browsing and referrals.
  */
 export type AssistantPayload =
   | { kind: 'confirm'; conversationId: string; revision: number }
   | { kind: 'change'; conversationId: string; revision: number }
   | { kind: 'pick'; slot: 'product' | 'variant'; id: string }
+  /** The customer's Facebook profile name, offered as the name for the order. */
+  | { kind: 'name' }
   | { kind: 'start' }
   /** null: the category list; 'other': products with no category. */
   | { kind: 'browse'; categoryId: string | 'other' | null }
@@ -36,6 +39,8 @@ export function encodePayload(payload: AssistantPayload): string {
       return `${payload.kind}:${payload.conversationId}:${payload.revision}`;
     case 'pick':
       return `pick:${payload.slot}:${payload.id}`;
+    case 'name':
+      return 'name:profile';
     case 'start':
       return 'start';
     case 'browse':
@@ -59,6 +64,7 @@ export function parsePayload(text: string): AssistantPayload | null {
   }
   const pick = PICK.exec(text);
   if (pick) return { kind: 'pick', slot: pick[1] as 'product' | 'variant', id: pick[2] as string };
+  if (text === 'name:profile') return { kind: 'name' };
   if (text === 'start') return { kind: 'start' };
   if (text === 'browse') return { kind: 'browse', categoryId: null };
   const category = CATEGORY.exec(text);

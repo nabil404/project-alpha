@@ -68,6 +68,8 @@ export type ReplyIntent =
       intent: CustomerIntent;
       reason?: AskReason;
       choices?: Choice[];
+      /** The customer's profile name, offered as a quick reply; the ask is then a fixed line. */
+      offeredName?: string;
       facts: ReplyFacts;
     }
   | { kind: 'summary'; quote: Quote; facts: ReplyFacts }

@@ -103,6 +103,12 @@ export const collectedSlotsSchema = z.object({
       ids: z.array(uuid).min(1).max(MAX_QUICK_REPLIES),
     })
     .optional(),
+  /**
+   * The customer's Facebook profile name, offered as a quick reply for the
+   * order's name. Only a tap fills it in; the customer confirms it, since
+   * profile names are often nicknames or in another script.
+   */
+  offeredName: words.optional(),
   /** Bumped by every summary card sent; a Confirm carrying an older one is refused. */
   revision: z.number().int().nonnegative().default(0),
   /** What the card with `revision` showed. */

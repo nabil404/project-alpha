@@ -42,7 +42,8 @@ phrased replies.
   (`productQuery`, `variantQuery`), the same words in the other script
   (`*Alt`), the matched `productId` and `variantId`, and a quantity. Also
   `deliveryArea`, `deliveryChargeId`, `offered` (one item's quick-reply
-  candidates), `revision` (bumped by every card) and `quote` (that card's
+  candidates), `offeredName` (the profile name offered for the order),
+  `revision` (bumped by every card) and `quote` (that card's
   numbers). Phase 1's `productText` is gone; an old row parses as an empty
   list.
 - **Extraction returns the whole list** (`schemas/llm.ts`,
@@ -67,7 +68,14 @@ phrased replies.
   `quantity`; then name, phone, address. A clear match fills the item; close
   candidates become quick replies; not found, out of stock, sold out, or more
   than is available each ask again with a reason and count toward the
-  three-ask hand-off. A variant with none available is never offered. With
+  three-ask hand-off. A variant with none available is never offered. When
+  the name is next and the customer's Facebook profile has one
+  (`customer.name`, `TurnInput.profileName`), the ask is a fixed line, "Order
+  under <name>? If not, type the name to use." (Bangla draft "অর্ডারটি কি
+  <name> নামে হবে? না হলে নামটি লিখে দিন।"), never phrased, with the name as
+  one quick reply. Tapping it fills `customerName` from `offeredName` with no
+  LLM call; anything typed is read by extraction as before. With
+  no profile name, the ask is the phrased one. With
   nothing missing it quotes every line (`quoteFor`) and moves to
   `awaiting_confirmation` with `revision + 1`. `factsOf` gives phrasing the
   catalog names and formatted prices, so `checkReply` rejects a price one unit off.
@@ -79,7 +87,9 @@ phrased replies.
   640 characters, the item lines go first as a plain message and the card
   keeps the totals and details.
 - **`outgoing.ts`** turns a decision into messages: text, text with quick
-  replies (`pick:product:<id>`, `pick:variant:<id>`), or the card. The turn
+  replies (`pick:product:<id>`, `pick:variant:<id>`, `name:profile`), or the
+  card. `name:profile` carries no name: the turn fills the one it offered, and
+  a tap with nothing offered is read as an ordinary message. The turn
   stages each as a row in its transaction and delivers them in order after
   commit; after one is refused, the rest are marked failed unsent and the
   chat hands off.
@@ -219,6 +229,9 @@ cycle.
   characters per field cannot hold the items, totals and details; the photo
   goes as its own image message.
 - **No LLM writes a number on the card.**
+- **The profile name is offered, never filled.** It goes on the parcel and
+  the courier slip, and profile names are often nicknames or in another
+  script, so the customer confirms it with a tap or types another.
 - **Money the customer reads drops zero decimals.** The card and the phrasing
   facts share one formatter; `checkReply` also accepts "৪,৫০০.০০" for
   "৪,৫০০" and holds "১,৬০০.৫০" to its paisa.
@@ -327,13 +340,18 @@ In `apps/api/src/modules/conversations/assistant/__tests__/` unless noted.
   options; picks; not found to hand-off; stock; "make the second one 3";
   switches ("not the A, the B", "B instead of A", "A na B" in both scripts,
   for every pair of eval products); removal and the ask counter; summary,
-  revision, own charges, threshold, fallback; retiring the card; the photo.
+  revision, own charges, threshold, fallback; retiring the card; the photo;
+  the profile name offered only when the name is next, filled only by a tap,
+  replaced by a typed name, dropped on a hand-off, absent without one.
 - **`reply-check.spec.ts`**, **`summary-card.spec.ts`**, **`outgoing.spec.ts`**,
   **`assistant-fallbacks.spec.ts`**: price checks in both digit sets; card
   text, notice line and the 640-character split; payloads; a sentence per
   reason in both languages.
 - **`assistant-turn.service.spec.ts`** (DB): the photo first; candidates and a
-  tap with no LLM call; an unoffered tap read as a message; the card's
+  tap with no LLM call; the profile name offered as a quick reply and a tap
+  filling it with no LLM call, a typed name, no offer without a profile name,
+  a name tap with nothing offered read as a message, and no other merchant's
+  customer's name; an unoffered tap read as a message; the card's
   revision in its buttons; a card tap routed to Confirm.
 - **`order-confirmation.service.spec.ts`** (DB): one order with the card's
   numbers and `orderDrafted` after commit; double and racing taps; resends
@@ -361,6 +379,9 @@ In `apps/api/src/modules/conversations/assistant/__tests__/` unless noted.
 
 ## Follow-ups
 
+- A typed "yes" to the profile-name offer is not read as accepting it:
+  extraction does not see the offer, so the name is asked again. Passing
+  `offeredName` in the extraction context would let it fill the name.
 - A native-speaker review of the Bangla card labels and sentences
   (`summary-card.ts`, `assistant-fallbacks.ts`).
 - Run `catalog-match.live-eval.spec.ts` with the live model and record the
