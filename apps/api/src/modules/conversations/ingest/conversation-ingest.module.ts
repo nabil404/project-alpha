@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AdProductRepository } from '../../messenger/ads/ad-product.repository';
+import { AdProductsModule } from '../../messenger/ads/ad-products.module';
 import { FacebookPageModule } from '../../messenger/page/facebook-page.module';
 import { QueueModule } from '../../queue/queue.module';
 import { SettingsModule } from '../../settings/settings.module';
@@ -18,7 +18,8 @@ import { InboundMessageProcessor } from './inbound-message.processor';
     ConversationEventsModule,
     CustomerProfilesModule,
     SettingsModule,
+    AdProductsModule,
   ],
-  providers: [AdProductRepository, InboundMessageIngest, InboundMessageProcessor],
+  providers: [InboundMessageIngest, InboundMessageProcessor],
 })
 export class ConversationIngestModule {}
