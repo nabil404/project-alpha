@@ -75,6 +75,10 @@ is the recipient. [Message flow](message-flow.md#a-customer-message) draws the s
   a `customer-message` with `text: ''` and its attachments; reactions, edits
   and unsends have job kinds of their own. Deliveries and reads make no job,
   and neither does a seller's echo without text.
+- **Shared posts** ([AI phase 5](../11-ai-implementation/phase-5-shared-posts/README.md)).
+  A `post`, `share` or `fallback` attachment, and a Facebook link typed into
+  the words, add `links[]` to the `customer-message` job. With no words the
+  row is stored as kind `share`.
 - **Entry messages.** A `message` or `postback` may carry a `referral`: a
   product link (`ref` = `p_<productId>`) or an ad (`source: ADS` with an
   `ad_id`). The ingest turns it into the payload the turn reads:
@@ -336,7 +340,8 @@ migrating role must be a superuser or hold `SET` membership in
   to naming what was sent ("Sent a photo"), in the seller's chosen language. A location shows its coordinates and an OpenStreetMap
   link. A reaction is pinned to the corner of the message it answers, as in
   Messenger: the newest standing one shows, and one taken back disappears.
-  A reaction whose message is not loaded stays a line in the thread. An edit shows the latest text, "Edited" and the
+  A reaction whose message is not loaded stays a line in the thread. A
+  shared post shows "Shared a post" and the post's title, linked to Facebook. An edit shows the latest text, "Edited" and the
   original; an unsent message is struck through and marked "Unsent".
 - **Days** split at the shop's midnight
   ([Settings – General](../06-settings-general/README.md#dashboard)).

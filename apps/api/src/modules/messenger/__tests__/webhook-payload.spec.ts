@@ -383,3 +383,74 @@ describe('referrals', () => {
     ).toEqual([]);
   });
 });
+
+describe('shared posts and links', () => {
+  const POST_URL = 'https://www.facebook.com/100200/posts/987';
+
+  it('turns a shared post with no words into a message carrying its link and id', () => {
+    const [job] = one({
+      message: {
+        mid: 'mid-post',
+        attachments: [
+          { type: 'post', payload: { url: POST_URL, title: 'Jamdani saree', id: '100200_987' } },
+        ],
+      },
+    });
+    expect(job).toMatchObject({
+      kind: 'customer-message',
+      messageId: 'mid-post',
+      text: '',
+      links: [{ url: POST_URL, title: 'Jamdani saree', postId: '100200_987' }],
+    });
+    expect(job).not.toHaveProperty('attachments');
+  });
+
+  it('reads a share and a fallback by their links, and keeps words with a pasted link', () => {
+    expect(
+      one({
+        message: {
+          mid: 'mid-share',
+          attachments: [{ type: 'share', payload: { url: 'https://fb.me/abc' } }],
+        },
+      })[0],
+    ).toMatchObject({ links: [{ url: 'https://fb.me/abc', title: null, postId: null }] });
+
+    const [pasted] = one({
+      message: {
+        mid: 'mid-pasted',
+        text: `how much? ${POST_URL}`,
+        attachments: [{ type: 'fallback', payload: { url: POST_URL, title: 'Shop' } }],
+      },
+    });
+    expect(pasted).toMatchObject({
+      text: `how much? ${POST_URL}`,
+      links: [{ url: POST_URL, title: 'Shop', postId: null }],
+    });
+  });
+
+  it('keeps a link only on Facebook hosts, and a post id whatever its link', () => {
+    const [job] = one({
+      message: {
+        mid: 'mid-other-host',
+        attachments: [
+          { type: 'post', payload: { url: 'https://evil.test/x', id: '987' } },
+          { type: 'fallback', payload: { url: 'javascript:alert(1)' } },
+        ],
+      },
+    });
+    expect(job).toMatchObject({ links: [{ url: null, title: null, postId: '987' }] });
+    // The fallback named nothing we read, so it is an attachment like any other.
+    expect(job).toMatchObject({ attachments: [{ type: 'other', url: 'javascript:alert(1)' }] });
+  });
+
+  it('reads no link from words that link elsewhere', () => {
+    const [job] = one({ message: { mid: 'mid-words', text: 'see https://example.com/x' } });
+    expect(job).not.toHaveProperty('links');
+  });
+
+  it('keeps a fallback with no payload as an attachment, not a share', () => {
+    expect(parseAttachments({ attachments: [{ type: 'fallback', payload: null }] })).toEqual([
+      { type: 'other', url: null },
+    ]);
+  });
+});

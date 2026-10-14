@@ -777,6 +777,29 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
       expect(turns.added).toHaveLength(1);
     });
 
+    it('stores a shared post as a share with its links, and asks the assistant', async () => {
+      const link = {
+        url: 'https://www.facebook.com/shop/posts/987',
+        title: 'Jamdani',
+        postId: '100_987',
+      };
+      const job = customerMessage({ text: '', links: [link] });
+      expect(await ingest.handle(job)).toBe('stored');
+      const thread = await threadOf(job.senderPsid);
+      const [row] = await messagesOf(thread!.conversation.id);
+      expect(row).toMatchObject({ kind: 'share', text: '', details: { links: [link] } });
+      expect(thread!.conversation).toMatchObject({ lastMessageKind: 'share' });
+      expect(turns.added).toHaveLength(1);
+    });
+
+    it('keeps the words of a message that pasted a link, and its link beside them', async () => {
+      const link = { url: 'https://www.facebook.com/shop/posts/987', title: null, postId: null };
+      const job = customerMessage({ text: `how much? ${link.url}`, links: [link] });
+      await ingest.handle(job);
+      const [row] = await messagesOf((await threadOf(job.senderPsid))!.conversation.id);
+      expect(row).toMatchObject({ kind: 'text', text: job.text, details: { links: [link] } });
+    });
+
     it('stores the 👍 sticker as 👍', async () => {
       const job = customerMessage({
         text: '',

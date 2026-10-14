@@ -25,8 +25,13 @@ import {
   type LlmResult,
 } from '../../llm/llm.types';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
+import {
+  ProductPostRepository,
+  type PostDetails,
+} from '../../messenger/posts/product-post.repository';
+import { SharedPostResolver } from '../../messenger/posts/shared-post.resolver';
 import { NotificationsService } from '../../notifications/notifications.service';
-import type { AssistantTurnJob } from '../../queue/queue.constants';
+import type { AssistantTurnJob, SharedLink } from '../../queue/queue.constants';
 import { MerchantSettingsRepository } from '../../settings/merchant-settings.repository';
 import { ConversationRepository } from '../conversation.repository';
 import { isReplyWindowOpen } from '../conversation-rules';
@@ -35,8 +40,9 @@ import { OutboundMessageSender, type OutboundContent } from '../outbound-message
 import type { MessageRow } from '../../database/schema/index';
 import { fallbackText, languageFor, type ReplyLanguage } from './assistant-fallbacks';
 import { toChatLines } from './assistant-history';
-import type { CatalogView } from './catalog-match';
+import { matchProduct, type CatalogView } from './catalog-match';
 import {
+  decideSharedPost,
   decideTurn,
   isActiveState,
   LOCALES,
@@ -58,7 +64,7 @@ import { outgoingFor } from './outgoing';
 import { phraseRequestFor } from './reply-phrasing';
 import { askedAt, turnGate, type TurnGate } from './turn-gate';
 import { decideNonText } from './non-text-turn';
-import { readDetails } from '../message-content';
+import { isEmojiOnly, readDetails } from '../message-content';
 
 /** Messages read for a turn; the phrasing call sees the last PHRASE_HISTORY of them. */
 const HISTORY_LIMIT = 20;
@@ -98,6 +104,8 @@ export class AssistantTurnService {
     private readonly notifications: NotificationsService,
     private readonly confirmation: OrderConfirmationService,
     private readonly orders: OrdersRepository,
+    private readonly sharedPosts: SharedPostResolver,
+    private readonly productPosts: ProductPostRepository,
   ) {}
 
   async run({
@@ -161,13 +169,41 @@ export class AssistantTurnService {
     if (nonText === 'silent') return 'silent';
     const pick = pickIn(read.recent, triggerMessageId, turn.slots);
     const name = tap?.kind === 'name' ? validNameTap(turn.slots) : null;
-    const entry = entryIn(tap);
+    let entry = entryIn(tap);
+    // A shared post resolves, most exact first, before any LLM call (phase 5).
+    const share = nonText || pick || name || entry ? null : shareIn(read.recent, triggerMessageId);
+    let shareDecision: TurnDecision | null = null;
+    let suggestion: { productId: string; post: PostDetails } | null = null;
+    if (share) {
+      const shared = await this.sharedPosts.resolve(scope, share.links, page);
+      if (shared.kind === 'product') {
+        entry = {
+          kind: 'product',
+          productId: shared.productId,
+          via: share.typed ? 'ref-typed' : 'ref',
+        };
+      } else {
+        const candidates =
+          shared.kind === 'suggested'
+            ? [shared.productId]
+            : shared.kind === 'caption'
+              ? captionCandidates(shared.caption, catalog)
+              : [];
+        shareDecision = decideSharedPost(turn, candidates);
+        const offered = shareDecision.reply.kind === 'ask_slot' ? shareDecision.reply.choices : [];
+        if (shared.kind === 'caption' && candidates.length === 1 && offered?.length === 1) {
+          suggestion = { productId: candidates[0]!, post: shared.post };
+        }
+      }
+    }
     // A ref that arrived with words of the customer's own is a message with a product attached.
     const typedRef = entry?.kind === 'product' && entry.via === 'ref-typed';
     let decision: TurnDecision;
     let phrased = false;
     if (nonText) {
       decision = nonText;
+    } else if (shareDecision) {
+      decision = shareDecision;
     } else if (pick) {
       decision = decideTurn({ ...turn, trigger: { kind: 'pick', pick } });
     } else if (name !== null) {
@@ -205,6 +241,9 @@ export class AssistantTurnService {
       const locked = await this.conversations.findById(tx, scope, conversationId, { lock: true });
       if (!locked) return { outcome: 'stale' as const };
       await this.llmCalls.insertMany(tx, scope, conversationId, calls);
+      if (suggestion) {
+        await this.productPosts.suggest(tx, scope, suggestion.productId, suggestion.post);
+      }
       const recent = await this.messages.listPage(tx, scope, conversationId, {
         limit: HISTORY_LIMIT,
       });
@@ -402,6 +441,39 @@ function nonTextIn(
     },
     previousKind: previous?.kind ?? null,
   });
+}
+
+const LINK_IN_TEXT = /\bhttps?:\/\/\S+/giu;
+
+/**
+ * The newest post or link shared in the burst the trigger ends (the
+ * customer's messages since the last reply), and whether the burst holds
+ * words of their own beside it ("how much is this?"). Null with no share.
+ */
+export function shareIn(
+  recent: MessageRow[],
+  triggerMessageId: string,
+): { links: SharedLink[]; typed: boolean } | null {
+  const index = recent.findIndex((message) => message.id === triggerMessageId);
+  if (index < 0) return null;
+  let links: SharedLink[] | null = null;
+  let typed = false;
+  for (const message of recent.slice(index)) {
+    if (message.sender !== 'customer') break;
+    if (message.kind === 'reaction') continue;
+    const shared = readDetails(message.details).links ?? [];
+    if (!links && shared.length > 0) links = shared;
+    const words = (message.editedText ?? message.text).replace(LINK_IN_TEXT, '').trim();
+    if (message.kind === 'text' && words && !isEmojiOnly(words)) typed = true;
+  }
+  return links ? { links, typed } : null;
+}
+
+/** The products a shared post's caption names: one clear match, or up to three close ones. */
+function captionCandidates(caption: string, catalog: CatalogView): string[] {
+  const match = matchProduct([caption], catalog);
+  if (match.kind === 'one') return [match.productId];
+  return match.kind === 'some' ? match.productIds : [];
 }
 
 /** The trigger's tap as a pick of an offered candidate, or null for anything else. */

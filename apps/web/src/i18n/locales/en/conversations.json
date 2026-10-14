@@ -51,6 +51,7 @@
     },
     "openAttachment": "Open {{kind}}",
     "openMap": "Open in map",
+    "openPost": "Open the post",
     "original": "Originally: {{text}}",
     "reactionBadge": "Customer reacted {{emoji}} at {{time}}",
     "remove": "Remove",

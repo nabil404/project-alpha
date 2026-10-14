@@ -1,5 +1,5 @@
 import type { OrderStatus, SlotName } from '@app/shared';
-import type { AskReason, LastOrderFacts, ReplyFacts, ReplyIntent } from './reply-intent';
+import type { AskReason, Choice, LastOrderFacts, ReplyFacts, ReplyIntent } from './reply-intent';
 import { summaryMessages } from './summary-card';
 
 export type ReplyLanguage = 'bn' | 'en';
@@ -11,6 +11,8 @@ type FallbackKey =
   | 'ask_product_not_found'
   | 'ask_product_choose'
   | 'ask_product_out_of_stock'
+  | 'ask_product_shared_post'
+  | 'ask_product_shared_post_unknown'
   | 'ask_variant_not_found'
   | 'ask_variant_choose'
   | 'ask_variant_out_of_stock'
@@ -88,12 +90,16 @@ export const ENTRY_TEXT: Record<
   },
 };
 
-/** The facts, the item the slot is asked for, and the profile name offered. */
+/** The facts, the item the slot is asked for, and what is offered: a profile name or candidates. */
 interface Asked {
   facts: ReplyFacts;
   item: number | undefined;
   offeredName?: string;
+  choices?: Choice[];
 }
+
+/** The one candidate's name, when exactly one is offered. */
+const onlyChoice = ({ choices }: Asked) => (choices?.length === 1 ? choices[0]!.title : null);
 
 const nameOf = ({ facts, item }: Asked) =>
   item === undefined ? '' : (facts.items[item]?.productName ?? '');
@@ -112,6 +118,12 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
     ask_product_choose: () => 'আপনি কোনটির কথা বলছেন?',
     ask_product_out_of_stock: (asked) =>
       `দুঃখিত, ${asked.facts.unavailable ?? 'পণ্যটি'} এখন স্টকে নেই। অন্য কোনো পণ্য নেবেন?`,
+    ask_product_shared_post: (asked) => {
+      const name = onlyChoice(asked);
+      return name ? `আপনি কি ${name}-এর কথা বলছেন?` : 'আপনি এগুলোর মধ্যে কোনটির কথা বলছেন?';
+    },
+    ask_product_shared_post_unknown: () =>
+      'দুঃখিত, পোস্টটি খুলতে পারিনি। কোন পণ্যটির কথা বলছেন? পণ্যের নামটি লিখুন, প্লিজ।',
     ask_variant: (asked) => `${nameOf(asked)} - কোনটি নেবেন?`,
     ask_variant_not_found: (asked) => `${nameOf(asked)} - এগুলোর মধ্যে কোনটি নেবেন?`,
     ask_variant_choose: (asked) => `${nameOf(asked)} - কোনটি নেবেন?`,
@@ -142,6 +154,12 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
     ask_product_choose: () => 'Which of these do you mean?',
     ask_product_out_of_stock: (asked) =>
       `Sorry, ${asked.facts.unavailable ?? 'that product'} is out of stock right now. Would you like something else?`,
+    ask_product_shared_post: (asked) => {
+      const name = onlyChoice(asked);
+      return name ? `Do you mean the ${name}?` : 'Which of these do you mean?';
+    },
+    ask_product_shared_post_unknown: () =>
+      "Sorry, I couldn't open that post. Which product is it about? Please type its name.",
     ask_variant: (asked) => `Which ${nameOf(asked)} would you like?`,
     ask_variant_not_found: (asked) =>
       `We have these ${nameOf(asked)} options. Which one would you like?`,
@@ -176,6 +194,8 @@ const REASON_KEYS: Partial<Record<`${SlotName}:${AskReason}`, FallbackKey>> = {
   'product:not_found': 'ask_product_not_found',
   'product:choose': 'ask_product_choose',
   'product:product_out_of_stock': 'ask_product_out_of_stock',
+  'product:shared_post': 'ask_product_shared_post',
+  'product:shared_post_unknown': 'ask_product_shared_post_unknown',
   'variant:not_found': 'ask_variant_not_found',
   'variant:choose': 'ask_variant_choose',
   'variant:out_of_stock': 'ask_variant_out_of_stock',
@@ -194,6 +214,7 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
         facts: reply.facts,
         item: reply.item,
         offeredName: reply.offeredName,
+        choices: reply.choices,
       });
     }
     case 'summary': {

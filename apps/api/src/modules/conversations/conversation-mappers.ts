@@ -49,6 +49,7 @@ export function toMessage(row: MessageRow): Message {
     text: row.text,
     attachments: (details.attachments ?? []).map(({ url }) => ({ url: safeUrl(url) })),
     location: details.location ?? null,
+    links: (details.links ?? []).map(({ url, title }) => ({ url: safeUrl(url), title })),
     reaction: details.reaction
       ? { emoji: details.reaction.emoji, messageId: details.reaction.targetMessageId }
       : null,

@@ -69,6 +69,7 @@
       "location": "Shared a location",
       "other": "Sent an attachment",
       "reaction": "Reacted {{emoji}}",
+      "share": "Shared a post",
       "sticker": "Sent a sticker",
       "video": "Sent a video"
     },
@@ -79,6 +80,7 @@
       "location": "Location",
       "other": "Attachment",
       "reaction": "Reaction",
+      "share": "Shared post",
       "sticker": "Sticker",
       "text": "Message",
       "video": "Video"

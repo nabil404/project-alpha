@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 import { parseProductRef } from '@app/shared';
-import type { InboundAttachment, InboundMessageJob, Referral } from '../queue/queue.constants';
+import type {
+  InboundAttachment,
+  InboundMessageJob,
+  Referral,
+  SharedLink,
+} from '../queue/queue.constants';
+import { allowedUrl, linksInText, MAX_LINKS } from './posts/post-links';
 
 export interface RawReferral {
   ref?: string;
@@ -11,8 +17,13 @@ export interface RawReferral {
 
 export interface RawAttachment {
   type?: string;
+  /** Echoes put a fallback's title here. */
+  title?: string;
+  url?: string;
   payload?: {
     url?: string;
+    title?: string;
+    id?: number | string;
     sticker_id?: number | string;
     coordinates?: { lat?: number; long?: number };
   } | null;
@@ -94,8 +105,9 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
 
       const senderPsid = event.sender?.id;
       if (!senderPsid) continue;
+      const links = parseLinks(event.message ?? {});
       const attachments = text ? [] : parseAttachments(event.message ?? {});
-      if (!text && attachments.length === 0) continue;
+      if (!text && attachments.length === 0 && links.length === 0) continue;
       const payload = event.message?.quick_reply?.payload;
       jobs.push({
         kind: 'customer-message',
@@ -106,6 +118,7 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
         sentAt,
         ...(payload ? { payload } : {}),
         ...(attachments.length > 0 ? { attachments } : {}),
+        ...(links.length > 0 ? { links } : {}),
         ...withReferral(parseReferral(event.message?.referral)),
       });
     }
@@ -121,6 +134,43 @@ const MEDIA_TYPES = ['image', 'video', 'audio', 'file'] as const;
 const isMedia = (type: string | undefined): type is (typeof MEDIA_TYPES)[number] =>
   MEDIA_TYPES.some((media) => media === type);
 
+/** Attachments that share a post or a link rather than a file. */
+const SHARE_TYPES: ReadonlySet<string> = new Set(['post', 'share', 'fallback']);
+
+const textOf = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() ? value.trim() : null;
+
+/**
+ * The posts and links a message shared: `post`, `share` and `fallback`
+ * attachments, then Facebook links in its words, once each. A link is kept
+ * only on Facebook's own hosts; a `post` attachment keeps its id whatever its
+ * link. A fallback with neither is not a share.
+ */
+export function parseLinks(message: {
+  text?: string;
+  attachments?: RawAttachment[];
+}): SharedLink[] {
+  const links: SharedLink[] = [];
+  const seen = new Set<string>();
+  const add = (link: SharedLink) => {
+    const key = link.url ?? `id:${link.postId}`;
+    if (seen.has(key) || links.length >= MAX_LINKS) return;
+    seen.add(key);
+    links.push(link);
+  };
+  for (const raw of message.attachments ?? []) {
+    if (!raw.type || !SHARE_TYPES.has(raw.type)) continue;
+    const rawUrl = textOf(raw.payload?.url) ?? textOf(raw.url);
+    const url = rawUrl && allowedUrl(rawUrl) ? rawUrl : null;
+    const id = raw.type === 'post' ? raw.payload?.id : undefined;
+    const postId = id === undefined || id === null ? null : textOf(String(id));
+    if (!url && !postId) continue;
+    add({ url, title: textOf(raw.payload?.title) ?? textOf(raw.title), postId });
+  }
+  for (const url of linksInText(message.text ?? '')) add({ url, title: null, postId: null });
+  return links;
+}
+
 /**
  * What a message without words carried. A sticker may come as its own type, or
  * (from older clients) as an image with a sticker id; a shared location as
@@ -130,7 +180,11 @@ export function parseAttachments(message: {
   sticker_id?: number | string;
   attachments?: RawAttachment[];
 }): InboundAttachment[] {
-  const parsed = (message.attachments ?? []).map((raw): InboundAttachment => {
+  const files = (message.attachments ?? []).filter(
+    (raw) =>
+      !raw.type || !SHARE_TYPES.has(raw.type) || parseLinks({ attachments: [raw] }).length === 0,
+  );
+  const parsed = files.map((raw): InboundAttachment => {
     const url = typeof raw.payload?.url === 'string' && raw.payload.url ? raw.payload.url : null;
     const stickerId = raw.payload?.sticker_id ?? message.sticker_id;
     if (raw.type === 'sticker' || (raw.type === 'image' && stickerId !== undefined)) {

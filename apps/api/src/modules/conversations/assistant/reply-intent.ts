@@ -50,7 +50,11 @@ export type AskReason =
   | 'unavailable'
   | 'out_of_stock'
   | 'product_out_of_stock'
-  | 'too_many';
+  | 'too_many'
+  /** A shared post's caption or an earlier suggestion named these: "Do you mean …?" */
+  | 'shared_post'
+  /** A shared post we could not read: which product is it? */
+  | 'shared_post_unknown';
 
 /** A candidate offered as a quick reply. */
 export interface Choice {

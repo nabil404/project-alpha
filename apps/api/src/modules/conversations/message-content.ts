@@ -8,6 +8,16 @@ export const messageDetailsSchema = z.object({
     .array(z.object({ url: z.string().nullable(), stickerId: z.string().nullable().optional() }))
     .optional(),
   location: z.object({ lat: z.number(), long: z.number() }).optional(),
+  /** Posts and links shared or pasted; see SharedLink. */
+  links: z
+    .array(
+      z.object({
+        url: z.string().nullable(),
+        title: z.string().nullable(),
+        postId: z.string().nullable(),
+      }),
+    )
+    .optional(),
   reaction: z
     .object({
       emoji: z.string(),
@@ -77,6 +87,7 @@ const CHAT_TAGS: Record<Exclude<MessageKind, 'text'>, string> = {
   video: '[sent a video]',
   audio: '[sent an audio clip]',
   file: '[sent a file]',
+  share: '[shared a post]',
   other: '[sent an attachment]',
 };
 

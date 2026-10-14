@@ -1,5 +1,5 @@
 import { Fragment, useLayoutEffect, useRef } from 'react';
-import { Bot, MapPin } from 'lucide-react';
+import { Bot, MapPin, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Message, MessageSender, MessageStatus } from '@app/shared';
 
@@ -235,7 +235,8 @@ function MessageBubble({
   const failed = message.status === 'failed';
   const stored = message.stored;
   const edited = stored?.editedText ?? null;
-  const media = stored && stored.kind !== 'text' && stored.kind !== 'location';
+  const media =
+    stored && stored.kind !== 'text' && stored.kind !== 'location' && stored.kind !== 'share';
 
   return (
     <div
@@ -261,6 +262,8 @@ function MessageBubble({
           >
             {stored?.location ? (
               <LocationPin text={messageContent(stored)} {...stored.location} />
+            ) : stored?.kind === 'share' ? (
+              <SharedPost text={messageContent(stored)} links={stored.links} />
             ) : (
               (edited ?? message.text)
             )}
@@ -349,6 +352,40 @@ function Attachments({ message }: { message: Message }) {
         }
       })}
     </div>
+  );
+}
+
+/** A shared post or ad: the label, then each post by its title, linked when Facebook gave a link. */
+function SharedPost({ text, links }: { text: string; links: Message['links'] }) {
+  const { t } = useTranslation('conversations');
+
+  return (
+    <span className="flex flex-col gap-1">
+      <span className="flex items-center gap-1.5">
+        <Share2 aria-hidden className="size-4" strokeWidth={1.5} />
+        {text}
+      </span>
+      {links.map(({ url, title }, index) => {
+        const name = title ?? t('thread.openPost');
+        return url ? (
+          <a
+            key={index}
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-small break-all text-accent underline"
+          >
+            {name}
+          </a>
+        ) : (
+          title && (
+            <span key={index} className="text-small text-ink-muted">
+              {title}
+            </span>
+          )
+        );
+      })}
+    </span>
   );
 }
 

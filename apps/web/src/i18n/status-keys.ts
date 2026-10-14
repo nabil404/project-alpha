@@ -89,6 +89,7 @@ export const messageStatusKeys = {
 
 export const messageKindKeys = {
   text: 'status.messageKind.text',
+  share: 'status.messageKind.share',
   sticker: 'status.messageKind.sticker',
   reaction: 'status.messageKind.reaction',
   location: 'status.messageKind.location',
@@ -101,6 +102,7 @@ export const messageKindKeys = {
 
 /** What a message without words says, in the viewer's language. A reaction adds its emoji. */
 export const messageContentKeys = {
+  share: 'status.messageContent.share',
   sticker: 'status.messageContent.sticker',
   reaction: 'status.messageContent.reaction',
   location: 'status.messageContent.location',

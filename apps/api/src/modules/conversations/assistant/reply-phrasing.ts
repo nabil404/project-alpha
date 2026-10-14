@@ -26,6 +26,11 @@ const BECAUSE: Record<AskReason, string> = {
     'Say "{unavailable}" is out of stock, and ask if they would like another product.',
   too_many:
     'Say only the available number of {item} is in stock, and ask how many they would like.',
+  // A shared post's ask is a fixed line today; these keep the record whole.
+  shared_post:
+    'Ask whether they mean the product shown as a button under your message, from the post they shared.',
+  shared_post_unknown:
+    'Say you could not open the post they shared, and ask them to type the name of the product.',
 };
 
 /** The facts as the phrasing call sees them; the phone in its readable international form. */

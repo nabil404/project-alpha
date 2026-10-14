@@ -37,6 +37,7 @@ const MESSAGE_KINDS = [
   'video',
   'audio',
   'file',
+  'share',
   'other',
 ] as const;
 

@@ -31,11 +31,10 @@ In [MVP 01's scope](../mvp/01-messenger-to-order/scope.md) or
 [Meta requirements](../mvp/01-messenger-to-order/meta-requirements.md), with no
 feature page because no code exists yet:
 
-- **The AI assistant's later phases** (3–9 in
-  [AI implementation](11-ai-implementation/README.md)): entry points,
-  non-text events, shared posts, product photos, comments and Live sales.
-  The core flow, from a message to a confirmed `source = assistant` order, is
-  built.
+- **The AI assistant's later phases** (6–9 in
+  [AI implementation](11-ai-implementation/README.md)): product photos,
+  comments, Live sales, mentions and visitor posts. The core flow, entry
+  points, non-text events and shared posts are built.
 - **Needs Attention queue** on the dashboard. Today "Needs you" exists as a
   conversation filter and a customer status, and drafted orders as an Orders
   tab and banner.

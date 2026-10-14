@@ -45,6 +45,8 @@ import type { ConversationEventsPublisher } from '../../../events/conversation-e
 import { InboundMessageIngest } from '../../../ingest/inbound-message.ingest';
 import { InboundMessageProcessor } from '../../../ingest/inbound-message.processor';
 import { AdProductRepository } from '../../../../messenger/ads/ad-product.repository';
+import { ProductPostRepository } from '../../../../messenger/posts/product-post.repository';
+import { SharedPostResolver } from '../../../../messenger/posts/shared-post.resolver';
 import { MessageRepository } from '../../../message.repository';
 import { OutboundMessageSender } from '../../../outbound-message.sender';
 import { CustomerProfileReader } from '../../../profiles/customer-profile.reader';
@@ -345,6 +347,10 @@ export class ConversationSimulator {
         notifications,
         confirmation,
         orders,
+        new SharedPostResolver(runtime, new ProductPostRepository(), crypto, graph, () =>
+          Promise.reject(new Error('the simulator follows no links')),
+        ),
+        new ProductPostRepository(),
       ),
     );
   }

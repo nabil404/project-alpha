@@ -2,16 +2,27 @@ import { createHmac } from 'node:crypto';
 import { PROFILE_FIELDS, type MessengerProfileBody } from '../profile/messenger-profile';
 
 /**
- * What the Page connection flow asks Facebook for. `pages_show_list` lists the
+ * What a Page cannot be connected without. `pages_show_list` lists the
  * seller's Pages, `pages_messaging` reads and answers their chats, and
  * `pages_manage_metadata` subscribes our app to a Page's webhooks. Sign-in
  * itself asks for `public_profile` and `email` only (auth.config.ts).
  */
-export const PAGE_CONNECT_SCOPES = [
+export const PAGE_REQUIRED_SCOPES = [
   'pages_show_list',
   'pages_messaging',
   'pages_manage_metadata',
 ] as const;
+
+/**
+ * Asked for, but a seller who declines it still connects:
+ * `pages_read_engagement` reads a shared post's caption and lists the Page's
+ * posts for the product page's picker. Without it, only posts linked by a
+ * pasted link resolve.
+ */
+export const PAGE_OPTIONAL_SCOPES = ['pages_read_engagement'] as const;
+
+/** What the Page connection flow asks Facebook for. */
+export const PAGE_CONNECT_SCOPES = [...PAGE_REQUIRED_SCOPES, ...PAGE_OPTIONAL_SCOPES] as const;
 
 /**
  * The webhook fields a connected Page delivers. Echoes are how a seller's own
@@ -45,6 +56,30 @@ export interface GraphPage {
 
 export interface GraphPageWithToken extends GraphPage {
   accessToken: string;
+}
+
+/** A Page post as Graph returns it; any field Facebook leaves out is null. */
+export interface GraphPost {
+  /** `<page id>_<post id>`. */
+  id: string;
+  message: string | null;
+  permalinkUrl: string | null;
+  /** https only. */
+  pictureUrl: string | null;
+  createdTime: string | null;
+}
+
+/** How many of the Page's recent posts the picker lists. */
+export const PAGE_POSTS_LIMIT = 25;
+
+/**
+ * Graph refused for want of a permission (10, 200 to 299) or a valid token
+ * (190): the seller must reconnect the Page to grant it.
+ */
+export function isPermissionError(error: unknown): boolean {
+  if (!(error instanceof GraphError)) return false;
+  const code = error.graphCode;
+  return code === 10 || code === 190 || (code !== undefined && code >= 200 && code < 300);
 }
 
 export interface GraphUserProfile {
@@ -255,6 +290,28 @@ export class MetaGraphClient {
     };
   }
 
+  /** One post by its Graph id, `<page id>_<post id>`; needs `pages_read_engagement`. */
+  async getPost(pageToken: string, graphPostId: string): Promise<GraphPost | null> {
+    const body = await this.request<unknown>('GET', `/${encodeURIComponent(graphPostId)}`, {
+      token: pageToken,
+      query: { fields: POST_FIELDS },
+    });
+    return toGraphPost(body);
+  }
+
+  /** The Page's most recent posts, newest first; needs `pages_read_engagement`. */
+  async listPagePosts(pageToken: string, pageId: string): Promise<GraphPost[]> {
+    const body = await this.request<{ data?: unknown[] }>(
+      'GET',
+      `/${encodeURIComponent(pageId)}/published_posts`,
+      { token: pageToken, query: { fields: POST_FIELDS, limit: String(PAGE_POSTS_LIMIT) } },
+    );
+    return (body.data ?? []).flatMap((entry) => {
+      const post = toGraphPost(entry);
+      return post ? [post] : [];
+    });
+  }
+
   /**
    * A text reply inside the 24h window (`messaging_type: RESPONSE`). The caller
    * enforces the window; If Facebook refuses anyway, the call throws a GraphError.
@@ -442,6 +499,24 @@ function scrubGraphMessage(message: string): string {
 /** HMAC-SHA256 of the token keyed with the app secret, as Graph's "Require App Secret" setting expects. */
 export function appSecretProof(token: string, appSecret: string): string {
   return createHmac('sha256', appSecret).update(token).digest('hex');
+}
+
+const POST_FIELDS = 'id,message,permalink_url,full_picture,created_time';
+
+function toGraphPost(value: unknown): GraphPost | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const body = value as Record<string, unknown>;
+  const text = (field: unknown) => (typeof field === 'string' && field ? field : null);
+  const id = text(body.id);
+  if (!id) return null;
+  const picture = text(body.full_picture);
+  return {
+    id,
+    message: text(body.message),
+    permalinkUrl: text(body.permalink_url),
+    pictureUrl: picture?.startsWith('https://') ? picture : null,
+    createdTime: text(body.created_time),
+  };
 }
 
 function toGraphPage(value: unknown): GraphPage | null {

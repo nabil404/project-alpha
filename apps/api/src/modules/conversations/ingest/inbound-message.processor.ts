@@ -35,6 +35,13 @@ const attachmentSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+/** Mirrors `SharedLink`. */
+const linkSchema = z.object({
+  url: z.string().nullable(),
+  title: z.string().nullable(),
+  postId: z.string().nullable(),
+});
+
 const changeOf = { senderPsid: z.string().min(1), targetMid: z.string().min(1) };
 
 /**
@@ -54,6 +61,7 @@ const inboundMessageJobSchema = z.preprocess(
       payload: z.string().min(1).optional(),
       referral: referralSchema.optional(),
       attachments: z.array(attachmentSchema).min(1).optional(),
+      links: z.array(linkSchema).min(1).optional(),
     }),
     z.object({
       ...inboundMessageBase,
