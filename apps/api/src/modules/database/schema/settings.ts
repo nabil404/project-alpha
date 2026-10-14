@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, pgTable, primaryKey, text } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+} from 'drizzle-orm/pg-core';
 import { user } from './auth';
 import { createdAt, merchantId, merchantIsolation, oneOf, updatedAt } from './columns';
 
@@ -33,6 +42,10 @@ export const merchantSettings = pgTable(
     pickupAddress: text('pickup_address'),
     /** Minor units; orders with a subtotal at or over it ship free. Null always charges. */
     freeDeliveryOver: integer('free_delivery_over'),
+    /** Messenger's pre-chat greeting; null is the default for the shop's language. */
+    messengerGreeting: text('messenger_greeting'),
+    /** Up to 4 `{ kind, question }`, parsed with iceBreakerSchema on read; null is the defaults. */
+    iceBreakers: jsonb('ice_breakers').$type<unknown>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

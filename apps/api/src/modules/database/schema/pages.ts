@@ -28,6 +28,11 @@ export const facebookPage = pgTable(
     name: text('name').notNull(),
     accessToken: text('access_token').notNull(),
     botEnabled: boolean('bot_enabled').notNull().default(true),
+    /** Messenger Profile sync: requested on save or connect, synced when Graph accepted it. */
+    profileSyncRequestedAt: timestamp('profile_sync_requested_at', { withTimezone: true }),
+    profileSyncedAt: timestamp('profile_synced_at', { withTimezone: true }),
+    /** Our code, never Graph's text: `token_invalid` | `graph_error`. */
+    profileSyncError: text('profile_sync_error'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
