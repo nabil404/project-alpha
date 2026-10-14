@@ -478,6 +478,12 @@ and builds with SWC into `dist/seed`, leaving the dev server's `dist` alone.
   · M available" under a variant's stock, and `VARIANT_STOCK_RESERVED` names
   the variant. A `PRODUCT_STALE` answer means another save or an order changed
   the product since the page read it.
+- **Messenger link card** on the product page: the product's
+  `https://m.me/<pageId>?ref=p_<productId>` link with Copy, a QR code drawn in
+  the browser and Download QR (PNG). Without a connected Page it says to
+  connect one, and a product that is not Published gets a note, because the
+  assistant ignores a link to it
+  ([phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md#dashboard)).
 - **`/catalog/categories`**: the [Categories page](#categories-page).
 
 ## Not yet built
@@ -489,10 +495,10 @@ and builds with SWC into `dist/seed`, leaving the dev server's `dist` alone.
   left out on purpose; the shop's threshold is the only free delivery.
 - **CSV import.** Only `productCsvRowSchema` exists. CSV carries no images or
   categories.
-- **Categories in the assistant.** `findSellableCatalog` returns them, but
-  matching ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#matching))
-  uses names, aliases and option values only. Browsing by category is
-  phase 3.
+- **Categories in typed matching.** Matching
+  ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#matching))
+  uses names, aliases and option values only. Categories drive browsing since
+  [phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md#browsing).
 - **Bulk object removal on account deletion**, which the `m/{merchantId}/`
   prefix makes one prefix delete.
 

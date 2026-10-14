@@ -14,7 +14,11 @@ The assistant replies
 ([phase 11.1](../11-ai-implementation/phase-1-foundation/README.md)) with quick
 replies, product photos, and a summary card whose Confirm button creates the
 order ([phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md)).
-A tap comes back as a customer message carrying its payload. The customer's
+A tap comes back as a customer message carrying its payload. Entry points
+([phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md)) add
+Get Started, the menu, ice breakers, product links, QR codes and
+click-to-Messenger ads: each is stored as a customer message with its payload
+and an `entry_source`. The customer's
 details and the chat's latest order sit beside the thread, where the seller
 can confirm a drafted order. Not built: the customer's order list beside the
 thread ([Follow-ups](#follow-ups)).
@@ -40,8 +44,8 @@ and the signature are Meta's authentication.
   | 401    | `WEBHOOK_INVALID_SIGNATURE` | `X-Hub-Signature-256` is not `sha256=<hex>` of the raw body, keyed with `META_APP_SECRET` (constant-time compare) |
   | 400    | `WEBHOOK_MALFORMED_PAYLOAD` | the body is not a JSON object                                                                                     |
 
-  It then queues one job per text message or button tap and answers
-  `200 EVENT_RECEIVED` at once. The job id is the Meta message id (`mid`),
+  It then queues one job per text message, button tap or standalone
+  `referral` event and answers `200 EVENT_RECEIVED` at once. The job id is the Meta message id (`mid`),
   with `%` and `:` escaped by `customJobId`. A body whose `object` is not
   `page` queues nothing and still gets `200`.
 
@@ -62,12 +66,32 @@ and the signature are Meta's authentication.
 
 `InboundMessageProcessor`, in the worker only, hands each `messenger-inbound`
 job to `InboundMessageIngest`. A job is a `customer-message`,
-`customer-postback` or `page-echo`; for an echo, the customer is the
+`customer-postback`, `customer-referral` or `page-echo`; for an echo, the customer is the
 recipient. [Message flow](message-flow.md#a-customer-message) draws the steps.
 
-- **Text and taps only.** An event without `message.text` (attachments,
-  stickers, reactions, deliveries) makes no job, so an image-only first
-  message creates no customer or conversation.
+- **Text, taps and referrals only.** An event without `message.text`
+  (attachments, stickers, reactions, deliveries) makes no job, so an
+  image-only first message creates no customer or conversation. The exception
+  is a standalone `referral` event, which makes a `customer-referral` job.
+- **Entry messages.** A `message` or `postback` may carry a `referral`: a
+  product link (`ref` = `p_<productId>`) or an ad (`source: ADS` with an
+  `ad_id`). The ingest turns it into the payload the turn reads:
+  - A link stores `ref:product:<id>` (the turn checks the product is active
+    and the shop's). An ad is first counted in `ad_product`; if the seller has
+    mapped it, it stores `ref:product:<id>`, otherwise no product.
+  - **Get Started** is the `start` payload. With a referral on the postback,
+    the `ref:` payload is stored instead.
+  - A message with a referral keeps its own text. A standalone referral
+    stores a customer row with a fixed line in the shop's language ("Opened a
+    link to a product" or "Came from an ad"); its job id is `rf-` and a hash
+    of sender, time, `ref` and `ad_id`, so a redelivery is a no-op. The same
+    transaction rolls back an ad's count on a duplicate.
+  - `conversation.entry_source` is set to `ad`, `link` or `get_started` by
+    each such event, and back to `organic` when a confirmed chat starts its
+    next order. A handed-off or paused chat still stores the row and the
+    source, and queues no turn.
+  - These taps queue an `assistant-turn` with no delay. A typed message with
+    a plain `ref` payload does too.
 - **Taps.** A quick-reply tap is a text message with
   `message.quick_reply.payload`. A button tap is a `postback`, stored as a
   customer message whose text is the button title. Both keep the payload in
@@ -255,6 +279,8 @@ policy. `conversation` references `customer`, and `message` references
   `bot_paused`, `handed_off_at` (set exactly while `state = handed_off`,
   migration `0030`), `last_message_at`, `last_message_preview`,
   `last_message_sender`, `last_inbound_at`, `seller_last_read_at`.
+  `entry_source` (`ad`, `link`, `get_started` or `organic`, default
+  `organic`, migration `0038`; how the current order attempt started),
   `UNIQUE (merchant_id, facebook_page_id, customer_id)`, an index on the list
   order, and partial indexes for `handed_off` and `awaiting_confirmation`.
 - `message`: `sender`, `text`, `meta_message_id` (null while `sending`),

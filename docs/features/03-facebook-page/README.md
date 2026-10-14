@@ -25,8 +25,12 @@ resolve their Page to a shop through `app_page_merchant()`
 3. `GET /candidates` lists the seller's Pages with `canMessage` for each.
 4. `PUT /` with the chosen `pageId` fetches the Page token, subscribes the app
    to the Page's webhooks, stores the token encrypted, and clears the cookie.
+   After the commit it queues a Messenger Profile sync (Get Started, ice
+   breakers, persistent menu, greeting;
+   [phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md#messenger-profile)).
 
-`DELETE /` deletes the row, then unsubscribes the app, best-effort.
+`DELETE /` deletes the row, clears the Messenger Profile with that Page's
+token (best effort), then unsubscribes the app, best-effort.
 
 ### Flow state lives in one cookie
 
@@ -136,8 +140,13 @@ routes send it in the envelope with the status shown.
 - **Conversations survive a disconnect.** They key on Facebook's Page id
   ([Conversations](../04-conversations/README.md#rules)), so reconnecting the
   same Page brings its threads back.
-- **Webhook fields** subscribed on connect: `messages`, `messaging_postbacks`
-  and `message_echoes` ([webhook](../04-conversations/README.md#webhook)).
+- **Webhook fields** subscribed on connect: `messages`, `messaging_postbacks`,
+  `message_echoes` and `messaging_referrals`
+  ([webhook](../04-conversations/README.md#webhook)). A Page connected before
+  `messaging_referrals` was added is re-subscribed by a one-off worker job.
+- **Messenger Profile columns.** `facebook_page` also holds
+  `profile_sync_requested_at`, `profile_synced_at` and `profile_sync_error`
+  (`token_invalid` or `graph_error`), which the welcome screen's status reads.
 
 ## Configuration
 
@@ -171,4 +180,5 @@ In [`messenger/page/__tests__/`](../../../apps/api/src/modules/messenger/page/__
 - **Bot on/off toggle.** `facebook_page.bot_enabled` defaults to `true` and is
   returned as `botEnabled`. Ingestion queues an assistant turn only when it is
   `true`, but no route or screen sets it.
-- **Replies settings** from the design (**Settings › Messenger**).
+- **Replies settings** from the design (**Settings › Messenger**), other than
+  the greeting and ice breakers, which the Welcome screen card now holds.
