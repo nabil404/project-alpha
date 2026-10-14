@@ -726,12 +726,30 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         expect(slots).not.toHaveProperty('offeredName');
       });
 
+      it('shows extraction the offer, so a typed yes fills the name', async () => {
+        const { convo, job } = await nameNext('Nusrat Jahan');
+        await service().run(job);
+
+        llm.extraction = ok({ ...NOTHING, customerName: 'Nusrat Jahan' }, 'extract');
+        const typed = await seedMessage(t.db, t.merchantA, convo.id, {
+          sentAt: new Date(),
+          text: 'হ্যাঁ',
+        });
+        await service().run({ ...job, triggerMessageId: typed.id });
+
+        expect(llm.extractContexts.at(-1)).toMatchObject({ offeredName: 'Nusrat Jahan' });
+        const slots = (await conversationRow(convo.id))?.collectedSlots;
+        expect(slots).toMatchObject({ customerName: 'Nusrat Jahan' });
+        expect(slots).not.toHaveProperty('offeredName');
+      });
+
       it('asks as before, phrased, when Facebook shared no name', async () => {
         const { convo, job } = await nameNext(null);
 
         await service().run(job);
 
         expect(llm.calls).toEqual(['classify', 'extract', 'phrase']);
+        expect(llm.extractContexts.at(-1)).not.toHaveProperty('offeredName');
         expect(rich.at(-1)?.kind).toBe('text');
         expect((await conversationRow(convo.id))?.collectedSlots).not.toHaveProperty('offeredName');
       });
@@ -1133,5 +1151,12 @@ describe('extractionContext', () => {
       },
       { ref: 1, product: 'kajol', customerWords: 'kajol', quantity: 2 },
     ]);
+  });
+
+  it('passes the offered profile name, and nothing when none was offered', () => {
+    expect(
+      extractionContext({ ...emptySlots(), offeredName: 'Nusrat Jahan' }, EVAL_CATALOG),
+    ).toMatchObject({ offeredName: 'Nusrat Jahan' });
+    expect(extractionContext(emptySlots(), EVAL_CATALOG)).not.toHaveProperty('offeredName');
   });
 });

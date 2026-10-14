@@ -55,7 +55,9 @@ phrased replies.
   `ref`, `productQuery` is null unless the customer switched product, and
   then names only the product they want ("not katan, jamdani" gives
   "jamdani"); `variantQuery` follows the same rule. It also returns
-  `deliveryArea`.
+  `deliveryArea`. While a profile name is offered, the prompt shows it as
+  `offeredName`, and a reply agreeing to it ("yes", "ji", "হ্যাঁ") returns it as
+  `customerName`.
 - **`item-merge.ts`** (pure). `mergeItems` applies the list: a `ref` with null
   product words keeps its ids; any product words drop both ids and match from
   scratch; variant words drop only the variant. A bad or reused `ref` starts
@@ -74,7 +76,8 @@ phrased replies.
   under <name>? If not, type the name to use." (Bangla draft "অর্ডারটি কি
   <name> নামে হবে? না হলে নামটি লিখে দিন।"), never phrased, with the name as
   one quick reply. Tapping it fills `customerName` from `offeredName` with no
-  LLM call; anything typed is read by extraction as before. With
+  LLM call. Anything typed is read by extraction, which sees the offer, so a
+  typed "yes" fills the offered name and another name replaces it. With
   no profile name, the ask is the phrased one. With
   nothing missing it quotes every line (`quoteFor`) and moves to
   `awaiting_confirmation` with `revision + 1`. `factsOf` gives phrasing the
@@ -349,7 +352,8 @@ In `apps/api/src/modules/conversations/assistant/__tests__/` unless noted.
   reason in both languages.
 - **`assistant-turn.service.spec.ts`** (DB): the photo first; candidates and a
   tap with no LLM call; the profile name offered as a quick reply and a tap
-  filling it with no LLM call, a typed name, no offer without a profile name,
+  filling it with no LLM call, a typed name, a typed "yes" with the offer in
+  the extraction context, no offer without a profile name,
   a name tap with nothing offered read as a message, and no other merchant's
   customer's name; an unoffered tap read as a message; the card's
   revision in its buttons; a card tap routed to Confirm.
@@ -379,9 +383,10 @@ In `apps/api/src/modules/conversations/assistant/__tests__/` unless noted.
 
 ## Follow-ups
 
-- A typed "yes" to the profile-name offer is not read as accepting it:
-  extraction does not see the offer, so the name is asked again. Passing
-  `offeredName` in the extraction context would let it fill the name.
+- Run the live extraction model on typed agreements to the profile-name
+  offer ("yes", "ji", "হ্যাঁ", "ঠিক আছে"), and on replies that only look like
+  one, and record the result here. The specs fake extraction, so only the
+  prompt covers it today.
 - A native-speaker review of the Bangla card labels and sentences
   (`summary-card.ts`, `assistant-fallbacks.ts`).
 - Run `catalog-match.live-eval.spec.ts` with the live model and record the

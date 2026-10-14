@@ -471,7 +471,11 @@ function record<T>(result: LlmResult<T>, calls: LlmCallRecord[]): T | 'failed' {
   return result.ok ? result.value : 'failed';
 }
 
-/** The collected items as extraction sees them: the catalog's names once matched, beside the customer's words. */
+/**
+ * The collected items as extraction sees them: the catalog's names once
+ * matched, beside the customer's words. The offered profile name lets a typed
+ * "yes" confirm it.
+ */
 export function extractionContext(slots: CollectedSlots, catalog: CatalogView): ExtractionContext {
   return {
     items: slots.items.map((item, ref) => {
@@ -490,6 +494,7 @@ export function extractionContext(slots: CollectedSlots, catalog: CatalogView): 
     ...(slots.customerName === undefined ? {} : { customerName: slots.customerName }),
     ...(slots.phone === undefined ? {} : { phone: slots.phone }),
     ...(slots.deliveryAddress === undefined ? {} : { deliveryAddress: slots.deliveryAddress }),
+    ...(slots.offeredName === undefined ? {} : { offeredName: slots.offeredName }),
   };
 }
 
