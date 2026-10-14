@@ -46,6 +46,8 @@ strings.
 - `OrderListItem`: reference, number, year, source, status, payment status
   and method, `customer { id, name, phone }` as placed, `firstItem` and
   `itemCount`, total, currency and `placedAt`.
+- `OrderDetail` also carries `entrySource` (`ad`, `link`, `get_started`,
+  `organic` or null). The dashboard does not show it yet.
 - `OrderSummary`: `counts` per tab under the list's `q`, `from` and `to`, so
   the tabs agree with the table. The cards ignore those filters:
   `awaitingConfirmation` (orders in `new`), `toShip { confirmed, packed }`,
@@ -136,7 +138,11 @@ strings.
   summary card. They go through the same `createInTransaction`, inside the
   assistant's transaction, with `source = assistant`, the conversation's id, a
   null actor, and the idempotency key `assistant:<conversationId>:<revision>`,
-  so one card makes at most one order.
+  so one card makes at most one order. They also carry the conversation's
+  `entry_source` (`ad`, `link`, `get_started` or `organic`), how the customer
+  reached the shop for this order
+  ([phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md#entry-sources));
+  an order the seller adds has `entry_source = null`.
 - **An ordered product cannot be deleted** (`409 PRODUCT_IN_USE`), because
   order lines keep foreign keys to the product and variant. The seller
   archives it instead.
@@ -152,7 +158,8 @@ number to a yearly sequence, renumbering existing orders within their year by
 
 - `order`: `year`, `number` (`UNIQUE (merchant_id, year, number)`),
   `reference` (unique per shop), `customer_id`, `conversation_id` (nullable),
-  `source`, `status`, `payment_status`, `payment_method`, `subtotal`,
+  `source`, `entry_source` (null for a seller's order; migration `0038`),
+  `status`, `payment_status`, `payment_method`, `subtotal`,
   `delivery_fee`, `total`, `currency`, the delivery copy (`customer_name`,
   `phone`, `delivery_address`, `delivery_area`, `delivery_everywhere_else`,
   `delivery_time`), `delivery_charge_id`, `tracking_number`, `notes`

@@ -4,8 +4,9 @@ Where each phase of [11 · AI implementation](README.md) stands against its
 "Done when" list. Update this page in the same change that moves a phase,
 and tick an item only once it has been run, not when the code merely exists.
 
-**As of Oct 13, 2026:** 2 of 9 phases built. Both wait on one manual run on
-the dev Page with a real `LLM_API_KEY`. Phases 3 to 9 are not started. The MVP
+**As of Oct 14, 2026:** 3 of 9 phases built. Phases 1 and 2 wait on one manual
+run each on the dev Page with a real `LLM_API_KEY`; phase 3 waits on three.
+Phases 4 to 9 are not started. The MVP
 ends Dec 11; App Review is due by Oct 18.
 
 ## Summary
@@ -14,7 +15,7 @@ ends Dec 11; App Review is due by Oct 18.
 | --- | ----------------------------------------------------------------------------- | ----------- | --------- | --------------------------------------------------------- |
 | 1   | [Foundation](phase-1-foundation/README.md)                                    | Built       | 3 of 4    | Manual run on the dev Page, with a good key and a bad one |
 | 2   | [Catalog matching, Confirm, orders](phase-2-catalog-confirm-orders/README.md) | Built       | 3 of 4    | Manual run from "I want the red saree" to a drafted order |
-| 3   | [Entry points](phase-3-entry-points/README.md)                                | Not started | 0 of 3    | Start after phases 1 and 2 pass their manual runs         |
+| 3   | [Entry points](phase-3-entry-points/README.md)                                | Built       | 1 of 4    | Three manual runs on the dev Page, after phases 1 and 2   |
 | 4   | [Non-text events](phase-4-non-text-events/README.md)                          | Not started | 0 of 2    |                                                           |
 | 5   | [Shared posts and ads](phase-5-shared-posts/README.md)                        | Not started | 0 of 2    | Needs `pages_read_engagement` from App Review             |
 | 6   | [Product photos](phase-6-product-photos/README.md)                            | Not started | 0 of 2    |                                                           |
@@ -25,7 +26,7 @@ ends Dec 11; App Review is due by Oct 18.
 ```mermaid
 flowchart LR
     p1["✅ 1 · Foundation"]:::built --> p2["✅ 2 · Matching, Confirm, orders"]:::built
-    p2 --> p3["3 · Entry points"]:::todo
+    p2 --> p3["✅ 3 · Entry points"]:::built
     p3 --> p4["4 · Non-text events"]:::todo
     p4 --> p5["5 · Shared posts"]:::todo
     p5 --> p6["6 · Product photos"]:::todo
@@ -44,10 +45,14 @@ first, from 9 backwards, if the schedule slips. Phases 1 and 2 cannot be cut.
 ## Phase checklists
 
 Copied from each phase's "Done when". The automated checks were last run on
-Oct 13, 2026: `pnpm --filter @app/shared build`, `pnpm typecheck`,
-`pnpm lint` and `pnpm test` all pass (120 suites, 1,244 tests). The two
-skipped suites are opt-in: the matcher sweep (`MATCH_SWEEP=1`) and the
-live-model eval (`LLM_EVAL=1` with `LLM_API_KEY`).
+Oct 14, 2026: `pnpm --filter @app/shared build`, `pnpm typecheck`,
+`pnpm lint`, `pnpm format:check` and `pnpm test` pass (132 suites, 1,403
+tests; 2 suites and 2 tests skipped), and `db:verify-rls` reports 22 tenant
+tables protected. `format:check` also lists the local `.superpowers/`
+workspace, which is not committed; every other file passes. The two skipped
+suites are opt-in: the matcher sweep (`MATCH_SWEEP=1`) and the live-model eval
+(`LLM_EVAL=1` with `LLM_API_KEY`). The database suites ran against the test
+database, phase 3's among them.
 
 ### 1 · Foundation
 
@@ -75,11 +80,18 @@ live-model eval (`LLM_EVAL=1` with `LLM_API_KEY`).
 
 ### 3 · Entry points
 
+- [x] Shared build, typecheck, lint and tests pass; the new database suites
+      ran; migrations `0038` to `0040`, which `db:verify-rls` checks.
 - [ ] Scanning a product's QR code on a phone opens Messenger, and the
       assistant asks for that product's variant.
 - [ ] Get Started → category → product → confirmed order works on the dev
       Page.
 - [ ] A test ad referral maps to a product after the seller assigns it.
+
+The three manual items follow the phase 1 and 2 manual runs; nothing was run
+on the dev Page in this change. The browser check of the new screens
+(Welcome screen, Click-to-Messenger ads, the product's Messenger link card,
+including 375 px overflow and a real QR scan) was not run either.
 
 ### 4 · Non-text events
 

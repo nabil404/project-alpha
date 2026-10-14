@@ -246,8 +246,10 @@ read therefore does not rely on bypassing row-level security. The migrating
 role does still need to be a superuser or hold `SET` membership in
 `app_page_resolver`, because `ALTER FUNCTION … OWNER TO` requires it. Call it
 through `resolvePageMerchant()`
-(`src/modules/conversations/ingest/page-merchant.ts`). Do **not** write a policy
-that permits reads when no context is set.
+(`src/modules/conversations/ingest/page-merchant.ts`). A worker job that must
+list every connected shop before any context exists uses
+`app_connected_merchants()` (migration `0040`), built the same way. Do **not**
+write a policy that permits reads when no context is set.
 
 ### Authoring the policies
 
@@ -371,8 +373,10 @@ the two-merchant repository tests are for.
   load-bearing: any middleware that reparses or re-stringifies the body breaks
   verification. The comparison uses
   `timingSafeEqual` against a length check — keep it that way.
-- `parseInboundJobs` turns a customer's text into a `customer-message` job and
-  an echo (`is_echo`) into a `page-echo` job. The ingest drops an echo carrying
+- `parseInboundJobs` turns a customer's text into a `customer-message` job, a
+  button tap into a `customer-postback`, a standalone `referral` event into a
+  `customer-referral`, and an echo (`is_echo`) into a `page-echo` job. A
+  message or postback may carry a `referral` (a product link or an ad). The ingest drops an echo carrying
   our `META_APP_ID` (our own send, already stored by the sender); any other
   echo is the seller replying from Facebook's inbox, stored as `sender = seller`,
   and **pauses the bot** rather than being customer input.

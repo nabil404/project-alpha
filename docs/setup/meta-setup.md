@@ -254,8 +254,16 @@ internet over HTTPS, so locally you need a tunnel to your machine.
    The AI phases add fields. Each is subscribed by the app itself once its
    phase adds it to `PAGE_WEBHOOK_FIELDS` in
    [`meta-graph.client.ts`](../../apps/api/src/modules/messenger/page/meta-graph.client.ts);
-   Pages connected before then must be connected again. Tick the same fields
-   here so the dashboard's **Test** buttons work.
+   Pages connected before then must be connected again, except for
+   `messaging_referrals` (below). Tick the same fields here so the dashboard's
+   **Test** buttons work.
+
+   `messaging_referrals` ([phase 11.3](../features/11-ai-implementation/phase-3-entry-points/README.md))
+   is already in `PAGE_WEBHOOK_FIELDS`, so tick it too. Pages connected before
+   it was added are re-subscribed by the worker the first time it starts on a
+   build that has it (a one-off job, `resubscribe-pages-v1`), which also sets
+   their Messenger Profile; sellers do not reconnect. A later field that needs
+   the same treatment bumps that job id.
 
    | Field                 | Phase                                                                                                                                                              | Delivers                                               |
    | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
@@ -282,8 +290,10 @@ it as a secret: never commit it, paste it in an issue, or log it.
 
 From [phase 11.3](../features/11-ai-implementation/phase-3-entry-points/README.md)
 on, the app sets the Page's Get Started button, ice breakers, persistent menu
-and greeting itself, through the Page token, when the Page connects and when
-the seller changes them. Nothing is configured in the dashboard. To see what a
+and greeting itself, through the Page token, when the Page connects, when the
+seller changes the welcome screen (**Settings → Messenger**), or changes the
+shop's country. Nothing is configured in the Meta dashboard. Disconnecting a
+Page clears it again, best effort. To see what a
 Page has, open the [Graph API Explorer](https://developers.facebook.com/tools/explorer/),
 pick the Messenger app and the Page, and run
 `GET /me/messenger_profile?fields=get_started,ice_breakers,persistent_menu,greeting`.
