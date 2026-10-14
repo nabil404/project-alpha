@@ -163,6 +163,16 @@ function decide(input: TurnInput): TurnDecision {
     if (entry.kind === 'last_order') {
       return { state: input.state, slots, reply: { kind: 'last_order', order: entry.order } };
     }
+    if (
+      entry.kind === 'product' &&
+      slots.items.length >= MAX_ORDER_ITEMS &&
+      !slots.items.some(
+        (item) => item.productId === entry.productId && item.variantId === undefined,
+      )
+    ) {
+      // No room for another item: the seller answers, nothing is added or shown.
+      return handOff(slots, 'awaiting_seller');
+    }
     if (entry.kind === 'browse' || !findProduct(catalog, entry.productId)) {
       const categoryId = entry.kind === 'browse' ? entry.categoryId : null;
       const reply = browseReply(catalog, categoryId, input.language, input.delivery.currency);
@@ -465,8 +475,8 @@ function remapLastAsked(
 
 /**
  * A product chosen from a carousel, a link or an ad: a new item, unless the
- * same product is already waiting for its variant. At the item limit the list
- * is left alone, and the reply asks as it would for a typed eleventh item.
+ * same product is already waiting for its variant. The item limit is checked
+ * before this runs.
  */
 function addProduct(
   slots: CollectedSlots,
@@ -476,7 +486,6 @@ function addProduct(
     (item) => item.productId === productId && item.variantId === undefined,
   );
   if (open >= 0) return { slots, item: open };
-  if (slots.items.length >= MAX_ORDER_ITEMS) return { slots, item: slots.items.length - 1 };
   return { slots: { ...slots, items: [...slots.items, { productId }] }, item: slots.items.length };
 }
 

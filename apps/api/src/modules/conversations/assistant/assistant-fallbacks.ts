@@ -17,10 +17,10 @@ type FallbackKey =
   | 'handoff'
   | 'handoff_awaiting_seller';
 
-/** The shop's country picks the fallback language: Bangladesh answers in Bangla. */
 /** The BCP-47 locale each reply language formats money in. */
 export const LOCALES: Record<ReplyLanguage, string> = { bn: 'bn-BD', en: 'en-US' };
 
+/** The shop's country picks the fallback language: Bangladesh answers in Bangla. */
 export function languageFor(country: string): ReplyLanguage {
   return country === 'BD' ? 'bn' : 'en';
 }

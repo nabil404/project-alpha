@@ -1165,6 +1165,39 @@ describe('entry triggers', () => {
     expect(decision.slots).toEqual(before);
   });
 
+  it('hands off at the item limit for a new product, adding nothing and sending no image', () => {
+    const full = Array.from({ length: 10 }, () => ({
+      productId: lungi.id,
+      variantId: lungi.variants[0]!.id,
+      quantity: 1,
+    }));
+    const before = slots({ items: full });
+    const decision = decideTurn(
+      base({ state: 'collecting_details', slots: before, trigger: product(jamdani.id) }),
+    );
+    expect(decision.reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
+    expect(decision.image).toBeUndefined();
+    expect(decision.slots.items).toEqual(full);
+  });
+
+  it.each([
+    ['browse', { kind: 'browse' as const, categoryId: null }],
+    ['last_order', { kind: 'last_order' as const, order: null }],
+  ])('a %s entry keeps the card valid', (_name, entry) => {
+    const quote = { revision: 4 } as never;
+    const before = slots({
+      revision: 4,
+      quote,
+      items: [{ productId: lungi.id, variantId: lungi.variants[0]!.id, quantity: 1 }],
+    });
+    const decision = decideTurn(
+      base({ state: 'awaiting_confirmation', slots: before, trigger: { kind: 'entry', entry } }),
+    );
+    expect(decision.state).toBe('awaiting_confirmation');
+    expect(decision.slots.quote).toBe(quote);
+    expect(decision.slots.revision).toBe(4);
+  });
+
   it('hands off when browsing finds nothing available', () => {
     const decision = decideTurn(base({ catalog: { products: [], categories: [] } }));
     expect(decision.reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
