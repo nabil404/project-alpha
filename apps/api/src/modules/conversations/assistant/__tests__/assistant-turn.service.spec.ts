@@ -660,6 +660,107 @@ describeDb('AssistantTurnService (app_runtime)', () => {
       expect((await conversationRow(convo.id))?.collectedSlots).toMatchObject({ items: [] });
     });
 
+    describe('the profile name', () => {
+      /** A thread whose one item is complete, so the name is asked for next. */
+      const nameNext = async (profileName: string | null, psid?: string) => {
+        const { product: row, variant } = await product('Turnservice Gamcha');
+        const made = await thread(t.merchantA, {
+          state: 'collecting_details',
+          collectedSlots: {
+            items: [{ productId: row.id, variantId: variant.id, quantity: 1 }],
+            revision: 0,
+          },
+        });
+        await t.db
+          .update(schema.customer)
+          .set({ name: profileName, ...(psid ? { psid } : {}) })
+          .where(eq(schema.customer.id, made.customer.id));
+        llm.intent = ok({ intent: 'other', confidence: 0.9 }, 'classify');
+        return made;
+      };
+
+      it('offers it as a quick reply, and a tap fills the name with no LLM call', async () => {
+        const { convo, job } = await nameNext('Nusrat Jahan');
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual(['classify', 'extract']);
+        const offer = rich.at(-1);
+        expect(offer).toMatchObject({ kind: 'quick_replies', payloads: ['name:profile'] });
+        expect(offer?.text).toBe('অর্ডারটি কি Nusrat Jahan নামে হবে? না হলে নামটি লিখে দিন।');
+        expect((await conversationRow(convo.id))?.collectedSlots).toMatchObject({
+          offeredName: 'Nusrat Jahan',
+          lastAsked: { slot: 'customerName', times: 1 },
+        });
+        expect((await conversationRow(convo.id))?.collectedSlots).not.toHaveProperty(
+          'customerName',
+        );
+
+        llm.calls = [];
+        const tap = await tapped(convo.id, 'name:profile');
+        await expect(service().run({ ...job, triggerMessageId: tap.id })).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        const slots = (await conversationRow(convo.id))?.collectedSlots;
+        expect(slots).toMatchObject({
+          customerName: 'Nusrat Jahan',
+          lastAsked: { slot: 'phone', times: 1 },
+        });
+        expect(slots).not.toHaveProperty('offeredName');
+        expect(rich.at(-1)?.kind).toBe('text');
+      });
+
+      it('reads a typed name instead of the offer', async () => {
+        const { convo, job } = await nameNext('Nusrat Jahan');
+        await service().run(job);
+
+        llm.extraction = ok({ ...NOTHING, customerName: 'Nusrat Begum' }, 'extract');
+        const typed = await seedMessage(t.db, t.merchantA, convo.id, {
+          sentAt: new Date(),
+          text: 'Nusrat Begum',
+        });
+        await service().run({ ...job, triggerMessageId: typed.id });
+
+        const slots = (await conversationRow(convo.id))?.collectedSlots;
+        expect(slots).toMatchObject({ customerName: 'Nusrat Begum' });
+        expect(slots).not.toHaveProperty('offeredName');
+      });
+
+      it('asks as before, phrased, when Facebook shared no name', async () => {
+        const { convo, job } = await nameNext(null);
+
+        await service().run(job);
+
+        expect(llm.calls).toEqual(['classify', 'extract', 'phrase']);
+        expect(rich.at(-1)?.kind).toBe('text');
+        expect((await conversationRow(convo.id))?.collectedSlots).not.toHaveProperty('offeredName');
+      });
+
+      it('reads a name tap with nothing offered as an ordinary message', async () => {
+        const { convo, job } = await nameNext('Nusrat Jahan');
+        const tap = await tapped(convo.id, 'name:profile');
+
+        await service().run({ ...job, triggerMessageId: tap.id });
+
+        expect(llm.calls).toContain('classify');
+        expect((await conversationRow(convo.id))?.collectedSlots).not.toHaveProperty(
+          'customerName',
+        );
+      });
+
+      it("never offers another merchant's customer's name", async () => {
+        const psid = `psid-shared-${Date.now()}`;
+        await seedCustomer(t.db, t.merchantB, { psid, name: 'Shop B Customer' });
+        const { convo, job } = await nameNext(null, psid);
+
+        await service().run(job);
+
+        expect(rich.at(-1)?.payloads).toEqual([]);
+        expect(sent.at(-1)?.text).not.toContain('Shop B Customer');
+        expect((await conversationRow(convo.id))?.collectedSlots).not.toHaveProperty('offeredName');
+      });
+    });
+
     describe('entry triggers', () => {
       /** A tap row after the thread's first message, with the text Meta or the ingest stored. */
       const entryTap = async (

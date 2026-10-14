@@ -92,6 +92,7 @@ describe('assistant payloads', () => {
       { kind: 'change', conversationId, revision: 0 },
       { kind: 'pick', slot: 'product', id: P1 },
       { kind: 'pick', slot: 'variant', id: V1 },
+      { kind: 'name' },
     ] as const) {
       expect(parsePayload(encodePayload(payload))).toEqual(payload);
     }

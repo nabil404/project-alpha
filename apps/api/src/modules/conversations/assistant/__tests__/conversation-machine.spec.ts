@@ -12,6 +12,7 @@ import type { CatalogView, DeliveryArea } from '../catalog-match';
 import {
   decideTurn,
   shouldExtract,
+  validNameTap,
   validPick,
   type ActiveState,
   type DeliveryView,
@@ -98,6 +99,7 @@ const turn = (overrides: Partial<TurnInput> = {}): TurnInput => ({
   language: 'en',
   catalog: EVAL_CATALOG,
   delivery: DELIVERY,
+  profileName: null,
   ...overrides,
 });
 
@@ -1072,6 +1074,7 @@ describe('entry triggers', () => {
     language: 'en',
     catalog: { ...EVAL_CATALOG, categories: [] },
     delivery: DELIVERY,
+    profileName: null,
     ...overrides,
   });
   const product = (productId: string) => ({
@@ -1214,5 +1217,84 @@ describe('entry triggers', () => {
     expect(
       decideTurn(base({ trigger: { kind: 'entry', entry: { kind: 'human' } } })).reply,
     ).toEqual({ kind: 'handoff', reason: 'request_human' });
+  });
+});
+
+describe('the profile name', () => {
+  const item = { productQuery: 'jamdani', productId: jamdani.id, variantId: RED.id, quantity: 1 };
+  const named = (overrides: Partial<TurnInput> = {}) =>
+    turn({
+      state: 'collecting_details',
+      slots: slots({ items: [item] }),
+      profileName: 'Rahim Uddin',
+      ...overrides,
+    });
+
+  it('is offered, never filled, when the name is next', () => {
+    const decision = decideTurn(named());
+    expect(decision.reply).toMatchObject({
+      kind: 'ask_slot',
+      slot: 'customerName',
+      offeredName: 'Rahim Uddin',
+    });
+    expect(decision.slots.customerName).toBeUndefined();
+    expect(decision.slots.offeredName).toBe('Rahim Uddin');
+  });
+
+  it('fills the name when tapped, then asks for the phone with no offer', () => {
+    const offered = decideTurn(named());
+    const name = validNameTap(offered.slots)!;
+    const tapped = decideTurn(named({ slots: offered.slots, trigger: { kind: 'name', name } }));
+    expect(tapped.slots.customerName).toBe('Rahim Uddin');
+    expect(tapped.slots.offeredName).toBeUndefined();
+    expect(tapped.reply).toMatchObject({ kind: 'ask_slot', slot: 'phone' });
+    expect(tapped.reply).not.toHaveProperty('offeredName');
+  });
+
+  it('takes a typed name instead of the offer', () => {
+    const offered = decideTurn(named());
+    const typed = decideTurn(
+      named({ slots: offered.slots, trigger: message({ ...nothing, customerName: 'Karim' }) }),
+    );
+    expect(typed.slots.customerName).toBe('Karim');
+    expect(typed.slots.offeredName).toBeUndefined();
+  });
+
+  it('offers it again when the reply named no one', () => {
+    const offered = decideTurn(named());
+    const again = decideTurn(named({ slots: offered.slots, trigger: message(nothing) }));
+    expect(again.reply).toMatchObject({ slot: 'customerName', offeredName: 'Rahim Uddin' });
+    expect(again.slots.customerName).toBeUndefined();
+    expect(again.slots.lastAsked).toMatchObject({ slot: 'customerName', times: 2 });
+  });
+
+  it.each([null, '   '])('asks as before without a profile name (%p)', (profileName) => {
+    const decision = decideTurn(named({ profileName }));
+    expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'customerName' });
+    expect(decision.reply).not.toHaveProperty('offeredName');
+    expect(decision.slots.offeredName).toBeUndefined();
+  });
+
+  it('is not offered while an item is still being asked for', () => {
+    const decision = decideTurn(named({ slots: slots() }));
+    expect(decision.reply).toMatchObject({ slot: 'product' });
+    expect(decision.slots.offeredName).toBeUndefined();
+  });
+
+  it('is not offered when the name is already known', () => {
+    const decision = decideTurn(named({ slots: slots({ items: [item], customerName: 'Karim' }) }));
+    expect(decision.reply).toMatchObject({ slot: 'phone' });
+    expect(decision.slots.offeredName).toBeUndefined();
+  });
+
+  it('confirms nothing that was not offered', () => {
+    expect(validNameTap(slots())).toBeNull();
+  });
+
+  it('is dropped on a hand-off', () => {
+    const offered = decideTurn(named());
+    const handed = decideTurn(named({ slots: offered.slots, trigger: message('failed') }));
+    expect(handed.reply).toEqual({ kind: 'handoff', reason: 'llm_failed' });
+    expect(handed.slots.offeredName).toBeUndefined();
   });
 });

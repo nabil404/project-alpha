@@ -12,7 +12,8 @@ export interface Outgoing {
 
 /**
  * The turn's reply as Messenger messages. An ask with candidates carries them
- * as quick replies whose payload names the candidate; a summary is the card
+ * as quick replies whose payload names the candidate, and an ask for the
+ * name offers the profile name as one; a summary is the card
  * with Confirm and Change buttons for its revision, after its item lines when
  * the card alone would be too long. `notice` puts a fixed line before the
  * summary.
@@ -99,6 +100,17 @@ export function outgoingFor(
             title: choice.title,
             payload: encodePayload({ kind: 'pick', slot, id: choice.id }),
           })),
+        },
+      },
+    ];
+  }
+  if (reply.kind === 'ask_slot' && reply.offeredName !== undefined) {
+    return [
+      {
+        text,
+        content: {
+          kind: 'quick_replies',
+          options: [{ title: reply.offeredName, payload: encodePayload({ kind: 'name' }) }],
         },
       },
     ];

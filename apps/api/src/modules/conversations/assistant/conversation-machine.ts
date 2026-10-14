@@ -82,6 +82,8 @@ export type TurnTrigger =
       extracted: ExtractedOrder | 'failed' | 'skipped';
     }
   | { kind: 'pick'; pick: ItemPick }
+  /** A tap on the profile name the last ask offered. */
+  | { kind: 'name'; name: string }
   | { kind: 'entry'; entry: Entry };
 
 export interface TurnInput {
@@ -94,6 +96,8 @@ export interface TurnInput {
   language: ReplyLanguage;
   catalog: CatalogView;
   delivery: DeliveryView;
+  /** The name on the customer's Facebook profile; null when Facebook shared none. */
+  profileName: string | null;
 }
 
 export interface TurnDecision {
@@ -122,6 +126,11 @@ export function validPick(
   const offered = slots.offered;
   if (!offered || offered.slot !== tap.slot || !offered.ids.includes(tap.id)) return null;
   return { slot: tap.slot, item: offered.item, id: tap.id };
+}
+
+/** The name a name tap confirms: the one the last ask offered, or null when it offered none. */
+export function validNameTap(slots: CollectedSlots): string | null {
+  return slots.offeredName ?? null;
 }
 
 export { LOCALES };
@@ -206,6 +215,8 @@ function decide(input: TurnInput): TurnDecision {
   } else if (trigger.kind === 'pick') {
     slots = applyPick(slots, trigger.pick);
     picked.push(trigger.pick.item);
+  } else if (trigger.kind === 'name') {
+    slots = { ...slots, customerName: trigger.name };
   } else if (trigger.entry.kind === 'product') {
     const added = addProduct(slots, trigger.entry.productId);
     slots = added.slots;
@@ -243,6 +254,7 @@ function decide(input: TurnInput): TurnDecision {
       revision: quote.revision,
       quote,
       offered: undefined,
+      offeredName: undefined,
       lastAsked: undefined,
     };
     return {
@@ -274,11 +286,14 @@ function decide(input: TurnInput): TurnDecision {
           ids: choices.map((choice) => choice.id),
         }
       : undefined;
+  // Offered, never filled: the name goes on the parcel, and profile names are often nicknames.
+  const offeredName = missing.slot === 'customerName' ? words(input.profileName) : undefined;
   const reason: AskReason | undefined =
     problem?.reason ?? (invalidPhone && missing.slot === 'phone' ? 'invalid_phone' : undefined);
   const asked: CollectedSlots = {
     ...slots,
     offered,
+    offeredName,
     lastAsked: { slot: missing.slot, item, times },
   };
 
@@ -292,6 +307,7 @@ function decide(input: TurnInput): TurnDecision {
       intent,
       ...(reason === undefined ? {} : { reason }),
       ...(offered ? { choices } : {}),
+      ...(offeredName === undefined ? {} : { offeredName }),
       facts: factsOf(asked, input, { problem }),
     },
     ...withImage(image),
@@ -696,7 +712,7 @@ function words(value: string | null): string | undefined {
 export function handOff(slots: CollectedSlots, reason: HandoffReason): TurnDecision {
   return {
     state: 'handed_off',
-    slots: { ...slots, lastAsked: undefined, offered: undefined },
+    slots: { ...slots, lastAsked: undefined, offered: undefined, offeredName: undefined },
     reply: { kind: 'handoff', reason },
   };
 }
