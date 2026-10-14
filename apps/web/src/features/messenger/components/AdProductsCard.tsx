@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { AdProduct } from '@app/shared';
 
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { Select, type SelectOption } from '@/components/ui/select';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useProductList } from '@/features/catalog';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useFormatters } from '@/lib/format';
@@ -12,8 +12,7 @@ import { useToast } from '@/lib/toast';
 import { useAdProducts, useMapAdProduct } from '../ads-queries';
 
 const sectionClass = 'flex flex-col rounded-lg border border-border bg-surface shadow-card';
-const rowGrid =
-  'sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_4rem_minmax(0,16rem)] sm:items-start sm:gap-4';
+const PRODUCT_LIMIT = 100;
 
 /** Ads that opened a chat, and the product each one sells. */
 export function AdProductsCard() {
@@ -24,7 +23,7 @@ export function AdProductsCard() {
   const ads = useAdProducts();
   const map = useMapAdProduct();
   // Archived products are left out; a draft is listed so it can be mapped ahead of publishing.
-  const products = useProductList({ filter: 'all', page: 1, limit: 100 });
+  const products = useProductList({ filter: 'all', page: 1, limit: PRODUCT_LIMIT });
 
   const catalog = useMemo(
     () => (products.data?.data ?? []).map(({ id, name, status }) => ({ id, name, status })),
@@ -41,8 +40,8 @@ export function AdProductsCard() {
   const rows = ads.data.data;
   const needing = rows.filter((ad) => ad.product === null).length;
 
-  const optionsFor = (ad: AdProduct): SelectOption[] => {
-    const options: SelectOption[] = [
+  const optionsFor = (ad: AdProduct): ComboboxOption[] => {
+    const options: ComboboxOption[] = [
       { value: '', label: t('messenger.ads.noProduct') },
       ...catalog.map((product) => ({
         value: product.id,
@@ -65,19 +64,22 @@ export function AdProductsCard() {
   const choose = (ad: AdProduct, productId: string) => {
     if (productId === (ad.product?.id ?? '')) return;
     const picked = catalog.find((product) => product.id === productId);
-    map.mutate(
-      { id: ad.id, product: picked ?? null },
-      { onSuccess: () => toast.success(t('messenger.ads.saved')) },
+    // mutateAsync per call: mutate's own callbacks fire only for the latest call.
+    map.mutateAsync({ id: ad.id, product: picked ?? null }).then(
+      () => toast.success(t('messenger.ads.saved')),
+      (error: unknown) => toast.error(forError(error)),
     );
   };
 
   const picker = (ad: AdProduct) => (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <Select
+      <Combobox
         aria-label={t('messenger.ads.productFor', { adId: ad.adId })}
         value={ad.product?.id ?? ''}
         onValueChange={(productId) => choose(ad, productId)}
         options={optionsFor(ad)}
+        searchPlaceholder={t('messenger.ads.searchProducts')}
+        emptyText={t('messenger.ads.noMatch')}
         disabled={products.isPending}
       />
       {ad.product?.status === 'draft' && (
@@ -117,40 +119,58 @@ export function AdProductsCard() {
             {t('messenger.ads.empty')}
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            <div
-              aria-hidden
-              className={`hidden px-3 text-small font-medium text-ink-muted ${rowGrid}`}
-            >
-              <span>{t('messenger.ads.adId')}</span>
-              <span>{t('messenger.ads.firstSeen')}</span>
-              <span>{t('messenger.ads.chats')}</span>
-              <span>{t('messenger.ads.product')}</span>
-            </div>
-            <ul className="flex flex-col gap-3 sm:gap-2">
+          <>
+            <table className="hidden w-full table-fixed border-collapse sm:table">
+              <thead>
+                <tr className="text-left text-small font-medium text-ink-muted">
+                  <th scope="col" className="px-3 pb-2 font-medium">
+                    {t('messenger.ads.adId')}
+                  </th>
+                  <th scope="col" className="w-28 px-3 pb-2 font-medium">
+                    {t('messenger.ads.firstSeen')}
+                  </th>
+                  <th scope="col" className="w-20 px-3 pb-2 font-medium">
+                    {t('messenger.ads.chats')}
+                  </th>
+                  <th scope="col" className="w-64 px-3 pb-2 font-medium">
+                    {t('messenger.ads.product')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((ad) => (
+                  <tr key={ad.id} className="align-top">
+                    <td className="px-3 py-1 pt-3.5 font-mono text-small break-all">{ad.adId}</td>
+                    <td className="px-3 py-1 pt-3.5 text-small text-ink-muted">
+                      {formatDate(ad.firstSeenAt, 'dayMonth')}
+                    </td>
+                    <td className="px-3 py-1 pt-3.5 text-small">{ad.chatCount}</td>
+                    <td className="px-3 py-1">{picker(ad)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <ul className="flex flex-col gap-3 sm:hidden">
               {rows.map((ad) => (
-                <li
-                  key={ad.id}
-                  className={`flex flex-col gap-2 rounded-md border border-border p-3 sm:border-0 sm:p-0 sm:px-3 ${rowGrid}`}
-                >
-                  <span className="min-w-0 font-mono text-small break-all sm:pt-2.5">
-                    {ad.adId}
-                  </span>
-                  <span className="text-small text-ink-muted sm:hidden">
+                <li key={ad.id} className="flex flex-col gap-2 rounded-md border border-border p-3">
+                  <span className="min-w-0 font-mono text-small break-all">{ad.adId}</span>
+                  <span className="text-small text-ink-muted">
                     {t('messenger.ads.chatsSince', {
                       count: ad.chatCount,
                       date: formatDate(ad.firstSeenAt, 'dayMonth'),
                     })}
                   </span>
-                  <span className="hidden text-small text-ink-muted sm:block sm:pt-2.5">
-                    {formatDate(ad.firstSeenAt, 'dayMonth')}
-                  </span>
-                  <span className="hidden text-small sm:block sm:pt-2.5">{ad.chatCount}</span>
                   {picker(ad)}
                 </li>
               ))}
             </ul>
-          </div>
+          </>
+        )}
+
+        {(products.data?.pagination.total ?? 0) > PRODUCT_LIMIT && (
+          <p className="text-small text-ink-muted">
+            {t('messenger.ads.limited', { count: PRODUCT_LIMIT })}
+          </p>
         )}
 
         <p className="text-small text-ink-muted">{t('messenger.ads.hint')}</p>
