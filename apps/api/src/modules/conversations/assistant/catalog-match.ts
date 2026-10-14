@@ -1,8 +1,10 @@
-import { toLatinDigits, type Product, type Variant } from '@app/shared';
+import { toLatinDigits, type Category, type Product, type Variant } from '@app/shared';
 
 /** The sellable catalog as the assistant sees it: active products, live variants. */
 export interface CatalogView {
   products: Product[];
+  /** Live categories, for browsing; matching ignores them. */
+  categories: Category[];
 }
 
 export type ProductMatch =

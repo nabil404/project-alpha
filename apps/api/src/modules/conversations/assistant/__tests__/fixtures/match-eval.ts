@@ -120,7 +120,7 @@ export const EVAL_PRODUCTS = [
   product('rosewater', 'Rose Water', ['গোলাপ জল', 'golap jol']),
 ];
 
-export const EVAL_CATALOG: CatalogView = { products: EVAL_PRODUCTS };
+export const EVAL_CATALOG: CatalogView = { products: EVAL_PRODUCTS, categories: [] };
 
 export type ProductKey = (typeof EVAL_PRODUCTS)[number]['key'];
 

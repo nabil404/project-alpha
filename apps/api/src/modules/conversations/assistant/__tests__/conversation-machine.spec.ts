@@ -381,7 +381,7 @@ describe('decideTurn: products and variants', () => {
     };
     const decision = decideTurn(
       turn({
-        catalog: { products: [soldOut] },
+        catalog: { products: [soldOut], categories: [] },
         trigger: message({ ...nothing, items: [said({ productQuery: 'lungi', quantity: 1 })] }),
       }),
     );
@@ -418,7 +418,7 @@ describe('decideTurn: products and variants', () => {
     };
     const decision = decideTurn(
       turn({
-        catalog: { products: [held] },
+        catalog: { products: [held], categories: [] },
         trigger: message({ ...nothing, items: [said({ productQuery: 'lungi', quantity: 1 })] }),
       }),
     );
@@ -438,7 +438,7 @@ describe('decideTurn: products and variants', () => {
     };
     const decision = decideTurn(
       turn({
-        catalog: { products: [mostlyHeld] },
+        catalog: { products: [mostlyHeld], categories: [] },
         trigger: message({ ...nothing, items: [said({ productQuery: 'lungi', quantity: 2 })] }),
       }),
     );
@@ -469,7 +469,7 @@ describe('decideTurn: products and variants', () => {
     };
     const decision = decideTurn(
       turn({
-        catalog: { products: [held] },
+        catalog: { products: [held], categories: [] },
         trigger: message({ ...nothing, items: [said({ productQuery: 'panjabi' })] }),
       }),
     );
@@ -485,7 +485,7 @@ describe('decideTurn: products and variants', () => {
       turn({
         state: 'collecting_details',
         slots: slots({ items: [{ productQuery: 'lungi', productId: kajal.id, quantity: 1 }] }),
-        catalog: { products: [lungi] },
+        catalog: { products: [lungi], categories: [] },
         trigger: message(nothing, asked('other')),
       }),
     );
@@ -685,7 +685,7 @@ describe('decideTurn: several items', () => {
     it('asks Kurti or Kurti Set for "kurti" on a picked Kurti Set', () => {
       const kurti = productByKey('kurti');
       const set = { ...kurti, id: '00000000-0000-4000-8999-0000000000c1', name: 'Kurti Set' };
-      const catalog = { products: [...EVAL_PRODUCTS, set] };
+      const catalog = { products: [...EVAL_PRODUCTS, set], categories: [] };
       const decision = decideTurn(
         turn({
           state: 'collecting_details',
@@ -880,6 +880,7 @@ describe('decideTurn: the summary', () => {
     });
     const catalog: CatalogView = {
       products: [withCharge(lungi, 9_000), withCharge(kajal, 7_000)],
+      categories: [],
     };
     expect(complete({ catalog }).slots.quote?.deliveryFee).toBe(9_000);
   });
@@ -1024,7 +1025,7 @@ describe('decideTurn: the photo', () => {
     const withCover: Product = { ...lungi, images: [COVER], coverImageId: COVER.id };
     const decision = decideTurn(
       turn({
-        catalog: { products: [withCover] },
+        catalog: { products: [withCover], categories: [] },
         trigger: message({ ...nothing, items: [said({ productQuery: 'lungi' })] }),
       }),
     );
@@ -1033,7 +1034,7 @@ describe('decideTurn: the photo', () => {
       turn({
         state: 'collecting_details',
         slots: decision.slots,
-        catalog: { products: [withCover] },
+        catalog: { products: [withCover], categories: [] },
         trigger: message(nothing, asked('other')),
       }),
     );
@@ -1051,7 +1052,7 @@ describe('decideTurn: the photo', () => {
     };
     const decision = decideTurn(
       turn({
-        catalog: { products: [withImages] },
+        catalog: { products: [withImages], categories: [] },
         trigger: message({
           ...nothing,
           items: [said({ productQuery: 'jamdani', variantQuery: 'red' })],
@@ -1059,5 +1060,126 @@ describe('decideTurn: the photo', () => {
       }),
     );
     expect(decision.image).toBe(OWN.url);
+  });
+});
+
+describe('entry triggers', () => {
+  const base = (overrides: Partial<TurnInput> = {}): TurnInput => ({
+    state: 'browsing',
+    slots: slots(),
+    trigger: { kind: 'entry', entry: { kind: 'browse', categoryId: null } },
+    country: 'BD',
+    language: 'en',
+    catalog: { ...EVAL_CATALOG, categories: [] },
+    delivery: DELIVERY,
+    ...overrides,
+  });
+  const product = (productId: string) => ({
+    kind: 'entry' as const,
+    entry: { kind: 'product' as const, productId },
+  });
+
+  it('appends a chosen product and asks for its variant', () => {
+    const cover = {
+      id: '00000000-0000-4000-8000-00000000c003',
+      url: 'https://cdn.example/j.jpg',
+      thumbnailUrl: 'https://cdn.example/j.jpg',
+      position: 0,
+      width: 10,
+      height: 10,
+    };
+    const withCover: Product = { ...jamdani, images: [cover], coverImageId: cover.id };
+    const catalog = { products: [withCover, lungi], categories: [] };
+    const decision = decideTurn(base({ catalog, trigger: product(jamdani.id) }));
+    expect(decision.slots.items).toEqual([expect.objectContaining({ productId: jamdani.id })]);
+    expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'variant', item: 0 });
+    expect(decision.image).toBe(cover.url);
+  });
+
+  it('adds a referred product after the items already collected', () => {
+    const decision = decideTurn(
+      base({
+        state: 'collecting_details',
+        slots: slots({
+          items: [{ productId: lungi.id, variantId: lungi.variants[0]!.id, quantity: 1 }],
+        }),
+        trigger: product(jamdani.id),
+      }),
+    );
+    expect(decision.slots.items.map((item) => item.productId)).toEqual([lungi.id, jamdani.id]);
+  });
+
+  it('does not add the same product twice while its variant is still open', () => {
+    const decision = decideTurn(
+      base({ slots: slots({ items: [{ productId: jamdani.id }] }), trigger: product(jamdani.id) }),
+    );
+    expect(decision.slots.items).toHaveLength(1);
+  });
+
+  it('a product entry from a card bumps the revision and drops the quote', () => {
+    const decided = decideTurn(
+      base({
+        state: 'awaiting_confirmation',
+        slots: slots({
+          revision: 4,
+          quote: { revision: 4 } as never,
+          items: [{ productId: lungi.id, variantId: lungi.variants[0]!.id, quantity: 1 }],
+        }),
+        trigger: product(jamdani.id),
+      }),
+    );
+    expect(decided.state).toBe('collecting_details');
+    expect(decided.slots.revision).toBe(5);
+    expect(decided.slots.quote).toBeUndefined();
+  });
+
+  it('ignores a product that is not sellable and shows the categories', () => {
+    const decision = decideTurn(base({ trigger: product('00000000-0000-4000-8000-0000000000ff') }));
+    expect(decision.slots.items).toEqual([]);
+    expect(decision.reply.kind).toMatch(/^browse_/);
+  });
+
+  it('a chosen product with nothing available asks with product_out_of_stock', () => {
+    const empty = { ...jamdani, variants: jamdani.variants.map((v) => ({ ...v, available: 0 })) };
+    const catalog = { products: [empty, lungi], categories: [] };
+    const decision = decideTurn(base({ catalog, trigger: product(empty.id) }));
+    expect(decision.reply).toMatchObject({
+      kind: 'ask_slot',
+      slot: 'product',
+      reason: 'product_out_of_stock',
+    });
+  });
+
+  it('a single-variant product goes straight to quantity', () => {
+    const single = { ...lungi, variants: [lungi.variants[0]!] };
+    const decision = decideTurn(
+      base({ catalog: { products: [single], categories: [] }, trigger: product(single.id) }),
+    );
+    expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'quantity' });
+  });
+
+  it('browsing changes neither state nor slots', () => {
+    const before = slots({ items: [{ productId: lungi.id }] });
+    const decision = decideTurn(base({ state: 'collecting_details', slots: before }));
+    expect(decision.state).toBe('collecting_details');
+    expect(decision.slots).toEqual(before);
+  });
+
+  it('hands off when browsing finds nothing available', () => {
+    const decision = decideTurn(base({ catalog: { products: [], categories: [] } }));
+    expect(decision.reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
+  });
+
+  it('answers My last order with the facts it was given', () => {
+    const order = { reference: 'ORD-2026-00481', status: 'packed' as const, total: '৳4,560' };
+    expect(
+      decideTurn(base({ trigger: { kind: 'entry', entry: { kind: 'last_order', order } } })).reply,
+    ).toEqual({ kind: 'last_order', order });
+  });
+
+  it('hands off on Talk to a person', () => {
+    expect(
+      decideTurn(base({ trigger: { kind: 'entry', entry: { kind: 'human' } } })).reply,
+    ).toEqual({ kind: 'handoff', reason: 'request_human' });
   });
 });
