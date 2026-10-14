@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { phoneSchema } from './auth';
+import { entrySourceSchema } from './conversation';
 import {
   pageNumber,
   pagePaginationSchema,
@@ -229,6 +230,8 @@ export const orderDetailSchema = z.object({
   /** Opaque. Send it back with a change; a change from an older read is refused with ORDER_STALE. */
   version: z.string().min(1),
   source: orderSourceSchema,
+  /** How the customer reached the shop for this order; null for an order the seller added. */
+  entrySource: entrySourceSchema.nullable(),
   status: orderStatusSchema,
   /** Where the order can go from here; empty once it is done. */
   nextStatuses: z.array(orderStatusSchema),
