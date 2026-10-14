@@ -4,6 +4,7 @@ import type {
   ConversationCounts,
   ConversationFilter,
   ConversationState,
+  EntrySource,
   MessageSender,
 } from '@app/shared';
 import { and, desc, eq, exists, ilike, or, sql, type SQL } from 'drizzle-orm';
@@ -264,6 +265,7 @@ export class ConversationRepository {
       state?: ConversationState;
       handedOffAt?: Date | null;
       collectedSlots?: CollectedSlots;
+      entrySource?: EntrySource;
     },
   ): Promise<ConversationRow | null> {
     const [row] = await executor
