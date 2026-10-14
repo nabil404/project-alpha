@@ -1,4 +1,4 @@
-import { parseInboundJobs } from '../webhook-payload';
+import { parseInboundJobs, parseReferral } from '../webhook-payload';
 
 describe('parseInboundJobs', () => {
   it('maps a customer message to a job keyed by the Meta message ID', () => {
@@ -197,6 +197,86 @@ describe('parseInboundJobs', () => {
           },
         ],
       }),
+    ).toEqual([]);
+  });
+});
+
+const PRODUCT = '8f3c2a1e-0000-4000-8000-000000000001';
+const page = (messaging: unknown[]) => ({ object: 'page', entry: [{ id: 'page-1', messaging }] });
+
+describe('referrals', () => {
+  it('reads a product link from a new chat’s first message', () => {
+    const [job] = parseInboundJobs(
+      page([
+        {
+          sender: { id: 'psid-1' },
+          timestamp: 1,
+          message: {
+            mid: 'mid-1',
+            text: 'hi',
+            referral: { ref: `p_${PRODUCT}`, source: 'SHORTLINK', type: 'OPEN_THREAD' },
+          },
+        },
+      ]) as never,
+    );
+    expect(job).toMatchObject({
+      kind: 'customer-message',
+      referral: { kind: 'link', productId: PRODUCT },
+    });
+  });
+
+  it('reads an ad from Get Started', () => {
+    const [job] = parseInboundJobs(
+      page([
+        {
+          sender: { id: 'psid-1' },
+          timestamp: 2,
+          postback: {
+            title: 'Get Started',
+            payload: 'start',
+            referral: { source: 'ADS', type: 'OPEN_THREAD', ad_id: '1202' },
+          },
+        },
+      ]) as never,
+    );
+    expect(job).toMatchObject({
+      kind: 'customer-postback',
+      payload: 'start',
+      referral: { kind: 'ad', adId: '1202' },
+    });
+  });
+
+  it('turns a standalone referral into a job whose id survives redelivery', () => {
+    const event = {
+      sender: { id: 'psid-1' },
+      timestamp: 3,
+      referral: { ref: `p_${PRODUCT}`, source: 'SHORTLINK', type: 'OPEN_THREAD' },
+    };
+    const [first] = parseInboundJobs(page([event]) as never);
+    const [again] = parseInboundJobs(page([event]) as never);
+    expect(first).toMatchObject({
+      kind: 'customer-referral',
+      senderPsid: 'psid-1',
+      referral: { kind: 'link', productId: PRODUCT },
+    });
+    expect(first?.messageId).toMatch(/^rf-[0-9a-f]{64}$/);
+    expect(again?.messageId).toBe(first?.messageId);
+  });
+
+  it.each([
+    [{ ref: 'summer-sale', source: 'SHORTLINK' }],
+    [{ ref: `p_${PRODUCT}x`, source: 'SHORTLINK' }],
+    [{ source: 'ADS' }],
+    [{ source: 'ADS', ad_id: '' }],
+  ])('treats %j as organic', (raw) => {
+    expect(parseReferral(raw)).toBeNull();
+  });
+
+  it('drops a standalone referral that names nothing we use', () => {
+    expect(
+      parseInboundJobs(
+        page([{ sender: { id: 'psid-1' }, timestamp: 4, referral: { ref: 'promo' } }]) as never,
+      ),
     ).toEqual([]);
   });
 });

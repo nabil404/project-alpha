@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
-import type { InboundMessageJob } from '../queue/queue.constants';
+import { parseProductRef } from '@app/shared';
+import type { InboundMessageJob, Referral } from '../queue/queue.constants';
+
+export interface RawReferral {
+  ref?: string;
+  source?: string;
+  type?: string;
+  ad_id?: string;
+}
 
 export interface MetaWebhookBody {
   object?: string;
@@ -15,8 +23,10 @@ export interface MetaWebhookBody {
         is_echo?: boolean;
         app_id?: number | string;
         quick_reply?: { payload?: string };
+        referral?: RawReferral;
       };
-      postback?: { mid?: string; title?: string; payload?: string };
+      postback?: { mid?: string; title?: string; payload?: string; referral?: RawReferral };
+      referral?: RawReferral;
     }[];
   }[];
 }
@@ -31,6 +41,11 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
     const pageId = entry.id;
     if (!pageId) continue;
     for (const event of entry.messaging ?? []) {
+      const standalone = referralJob(pageId, event);
+      if (standalone) {
+        jobs.push(standalone);
+        continue;
+      }
       const postback = postbackJob(pageId, event);
       if (postback) {
         jobs.push(postback);
@@ -68,6 +83,7 @@ export function parseInboundJobs(body: MetaWebhookBody): InboundMessageJob[] {
         text,
         sentAt,
         ...(payload ? { payload } : {}),
+        ...withReferral(parseReferral(event.message?.referral)),
       });
     }
   }
@@ -97,6 +113,41 @@ function postbackJob(pageId: string, event: MessagingEvent): InboundMessageJob |
     senderPsid,
     text: event.postback.title || payload,
     payload,
+    sentAt,
+    ...withReferral(parseReferral(event.postback.referral)),
+  };
+}
+
+/** A product link or an ad; null for anything else, which the chat treats as organic. */
+export function parseReferral(raw: RawReferral | undefined): Referral | null {
+  if (!raw) return null;
+  if (raw.source === 'ADS' && typeof raw.ad_id === 'string' && raw.ad_id) {
+    return { kind: 'ad', adId: raw.ad_id };
+  }
+  const productId = typeof raw.ref === 'string' ? parseProductRef(raw.ref) : null;
+  return productId ? { kind: 'link', productId } : null;
+}
+
+const withReferral = (referral: Referral | null) => (referral ? { referral } : {});
+
+/**
+ * A returning customer opened a link or an ad: no message, no postback. The
+ * id is derived from the event, so a redelivery stays a no-op.
+ */
+function referralJob(pageId: string, event: MessagingEvent): InboundMessageJob | null {
+  const senderPsid = event.sender?.id;
+  if (event.message || event.postback || !senderPsid) return null;
+  const referral = parseReferral(event.referral);
+  if (!referral) return null;
+  const sentAt = event.timestamp ?? Date.now();
+  const key = referral.kind === 'ad' ? `ad:${referral.adId}` : `link:${referral.productId}`;
+  return {
+    kind: 'customer-referral',
+    messageId: `rf-${createHash('sha256').update(`${senderPsid}|${sentAt}|${key}`).digest('hex')}`,
+    pageId,
+    senderPsid,
+    text: '',
+    referral,
     sentAt,
   };
 }
