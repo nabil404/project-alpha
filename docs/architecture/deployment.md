@@ -294,7 +294,9 @@ aws ssm put-parameter --name /social-glider/dev/env --type SecureString \
 ```
 
 Optional keys are the same as in `environments/.env.example`: `META_APP_ID`,
-`GOOGLE_*`, `FACEBOOK_*`, `LOG_LEVEL`, `WORKER_CONCURRENCY` and `SENTRY_DSN`.
+`GOOGLE_*`, `FACEBOOK_*`, `LOG_LEVEL`, `WORKER_CONCURRENCY` and `SENTRY_DSN`,
+plus `LANGSMITH_*` in dev and stage only. Never put `LANGSMITH_API_KEY` in
+prod's parameter: traces carry customer chats ([LLM setup](../setup/llm-setup.md#tracing-with-langsmith)).
 You don't need `DATABASE_URL`, `REDIS_URL` or `APP_URL`; `docker/compose.yml`
 derives them.
 

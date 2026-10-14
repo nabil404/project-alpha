@@ -85,6 +85,33 @@ Store with the other secrets ([deployment](../architecture/deployment.md)).
 3. Set a wrong key and send another message: the conversation goes to
    `handed_off` and the customer gets the fixed hand-off reply.
 
+## Tracing with LangSmith
+
+Development and stage can send every LLM call to
+[LangSmith](https://smith.langchain.com), with its prompt, output, model,
+tokens and latency, to debug prompts. **Never set it in production.** A trace
+holds the whole chat, with customers' names, phones and addresses, and the
+[tech stack](../architecture/tech-stack.md#principles) keeps that data in our own
+database. Only test conversations may reach LangSmith.
+
+```dotenv
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=social-glider-dev
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+```
+
+1. In LangSmith, create an API key under **Settings → API Keys**. Give each
+   environment its own project, such as `social-glider-dev` and
+   `social-glider-stage`.
+2. Set `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT`. For an EU-region
+   workspace, set `LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com`.
+3. Restart the API and the worker, then send a test message. The project shows
+   one run per call, named `classify`, `extract` or `phrase`.
+
+Without the key nothing is traced: each call turns AI SDK telemetry off. The
+worker flushes pending traces when it shuts down. `llm_call` stays the record
+of cost per conversation, and LangSmith adds the content.
+
 ## Troubleshooting
 
 | Symptom                                               | Cause and fix                                                                                                                                |
@@ -99,3 +126,4 @@ Store with the other secrets ([deployment](../architecture/deployment.md)).
 Never commit the key, paste it into an issue, or log it: the pino redact list
 covers `*.apiKey`. If it leaks, revoke it in the dashboard, create a new one,
 update `LLM_API_KEY` everywhere it is set, and restart the API and worker.
+`LANGSMITH_API_KEY` is handled the same way.

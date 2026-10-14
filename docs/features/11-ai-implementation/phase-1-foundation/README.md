@@ -48,17 +48,20 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
 
 ## Scope
 
-- **Dependencies** (`apps/api`): `ai` 7.x and `@ai-sdk/openai`.
+- **Dependencies** (`apps/api`): `ai` 7.x, `@ai-sdk/openai` and `langsmith`.
 - **Config** (`src/modules/config/env.schema.ts`, set up as in
   [LLM setup](../../../setup/llm-setup.md)):
 
-  | Variable               | Default       | Notes                                                     |
-  | ---------------------- | ------------- | --------------------------------------------------------- |
-  | `LLM_PROVIDER`         | `openai`      | The only value accepted                                   |
-  | `LLM_MODEL_ROUTING`    | `gpt-6-luna`  | OpenAI's efficient tier: intent and phrasing              |
-  | `LLM_MODEL_EXTRACTION` | `gpt-6.1-sol` | The mid tier: extraction                                  |
-  | `LLM_TIMEOUT_MS`       | `15000`       | An `AbortSignal.timeout` on each call                     |
-  | `LLM_API_KEY`          | none          | Without it no turn is queued. `*.apiKey` is pino-redacted |
+  | Variable               | Default             | Notes                                                     |
+  | ---------------------- | ------------------- | --------------------------------------------------------- |
+  | `LLM_PROVIDER`         | `openai`            | The only value accepted                                   |
+  | `LLM_MODEL_ROUTING`    | `gpt-6-luna`        | OpenAI's efficient tier: intent and phrasing              |
+  | `LLM_MODEL_EXTRACTION` | `gpt-6.1-sol`       | The mid tier: extraction                                  |
+  | `LLM_TIMEOUT_MS`       | `15000`             | An `AbortSignal.timeout` on each call                     |
+  | `LLM_API_KEY`          | none                | Without it no turn is queued. `*.apiKey` is pino-redacted |
+  | `LANGSMITH_API_KEY`    | none                | Traces every call to LangSmith. Dev and stage only        |
+  | `LANGSMITH_PROJECT`    | `social-glider-dev` | The LangSmith project                                     |
+  | `LANGSMITH_ENDPOINT`   | US API              | The EU region's URL for an EU workspace                   |
 
 - **`src/modules/llm/`**: `LlmClient` with `classifyIntent(history)`,
   `extractOrder(history, slots)` and `phraseReply(request, history)`,
@@ -68,6 +71,11 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   billed tokens on a failure too when the provider reported them. Message
   text is never logged. Provider token `LLM`, so tests inject a fake; one
   prompt file per call in `prompts/`.
+- **Tracing.** With `LANGSMITH_API_KEY` set, `LlmModule` passes
+  `LangSmithTelemetry` to every `generateText` call, named by its purpose.
+  Without it, each call sets `isEnabled: false`, so a globally registered
+  integration sees nothing either. Traces hold the full chat, so the key is
+  never set in production ([LLM setup](../../../setup/llm-setup.md#tracing-with-langsmith)).
 - **Cost tracking.** `llm_call` (`schema/assistant.ts`): `merchant_id`,
   `conversation_id`, `purpose` (`classify`, `extract`, `phrase`), `model`,
   input and output tokens, `latency_ms`, `outcome` (`ok`, `timeout`,
@@ -171,6 +179,8 @@ old Claude model ids would make every call fail and every turn hand off.
 - A turn is lost if Redis refuses the queue add after the ingest committed.
 - `llm_call` has no `(merchant_id, conversation_id)` index.
 - A native-speaker review of the Bangla fallbacks.
+- LangSmith runs carry no conversation id, so one turn's three calls are
+  separate traces rather than one tree.
 
 ## Tests
 
@@ -182,7 +192,8 @@ In `conversations/assistant/__tests__/` unless noted.
 - `reply-check.spec.ts`: an invented price or quantity is rejected in Latin
   and Bangla digits; allowed facts pass; URLs and long replies are rejected.
 - `llm/__tests__/llm.client.spec.ts`: the AI SDK's mock model; timeout,
-  invalid JSON and provider errors give `ok: false`.
+  invalid JSON and provider errors give `ok: false`; each call reaches the
+  telemetry integration under its purpose, and none does without one.
 - `assistant-turn.service.spec.ts`: an LLM failure hands off with a reply; a
   paused chat or stale trigger makes no LLM call; a takeover mid-turn is
   caught by the step 5 re-check; a Graph failure gives `failed` and
