@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, type SchemaObject } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   adProductListResponseSchema,
   adProductSchema,
@@ -12,10 +12,8 @@ import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../../common/tenant.guard';
 import { ZodValidationPipe } from '../../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../../openapi/api-coded-error';
+import { openApiSchema } from '../../../openapi/openapi-schema';
 import { AdProductsService } from './ad-products.service';
-
-const json = (schema: z.ZodType, io: 'input' | 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
 
@@ -31,7 +29,7 @@ export class AdProductsController {
     summary: 'List click-to-Messenger ads seen in chats',
     description: 'Newest first. `product` is null until the seller maps the ad.',
   })
-  @ApiOkResponse({ schema: json(adProductListResponseSchema, 'output') })
+  @ApiOkResponse({ schema: openApiSchema(adProductListResponseSchema) })
   list(@Req() request: TenantRequest): Promise<AdProductListResponse> {
     return this.ads.list(tenantScope(request));
   }
@@ -41,8 +39,8 @@ export class AdProductsController {
     summary: 'Map an ad to a product, or unmap it',
     description: 'A null `productId` unmaps. A Draft product is allowed; an archived one is not.',
   })
-  @ApiBody({ schema: json(updateAdProductSchema, 'input') })
-  @ApiOkResponse({ schema: json(adProductSchema, 'output') })
+  @ApiBody({ schema: openApiSchema(updateAdProductSchema, 'input') })
+  @ApiOkResponse({ schema: openApiSchema(adProductSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['AD_PRODUCT_NOT_FOUND', 'PRODUCT_NOT_FOUND'])
   @ApiCodedError(409, ['AD_PRODUCT_ARCHIVED'])

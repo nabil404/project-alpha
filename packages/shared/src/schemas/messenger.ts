@@ -6,20 +6,24 @@ import { productStatusSchema } from './catalog';
  * A seller's connected Facebook Page as the API returns it. The Page access
  * token never leaves the server, so it has no field here.
  */
-export const facebookPageSchema = z.object({
-  id: z.string().uuid(),
-  /** Facebook's own id for the Page. */
-  pageId: z.string().min(1),
-  name: z.string(),
-  botEnabled: z.boolean(),
-  connectedAt: z.string().datetime(),
-});
+export const facebookPageSchema = z
+  .object({
+    id: z.string().uuid(),
+    /** Facebook's own id for the Page. */
+    pageId: z.string().min(1),
+    name: z.string(),
+    botEnabled: z.boolean(),
+    connectedAt: z.string().datetime(),
+  })
+  .meta({ id: 'FacebookPage' });
 export type FacebookPage = z.infer<typeof facebookPageSchema>;
 
 /** GET /messenger/page: a shop has at most one Page, or none yet. */
-export const facebookPageResponseSchema = z.object({
-  page: facebookPageSchema.nullable(),
-});
+export const facebookPageResponseSchema = z
+  .object({
+    page: facebookPageSchema.nullable(),
+  })
+  .meta({ id: 'FacebookPageResponse' });
 export type FacebookPageResponse = z.infer<typeof facebookPageResponseSchema>;
 
 /**
@@ -34,24 +38,30 @@ export const facebookPageCandidateSchema = z.object({
 });
 export type FacebookPageCandidate = z.infer<typeof facebookPageCandidateSchema>;
 
-export const facebookPageCandidatesResponseSchema = z.object({
-  pages: z.array(facebookPageCandidateSchema),
-});
+export const facebookPageCandidatesResponseSchema = z
+  .object({
+    pages: z.array(facebookPageCandidateSchema),
+  })
+  .meta({ id: 'FacebookPageCandidatesResponse' });
 export type FacebookPageCandidatesResponse = z.infer<typeof facebookPageCandidatesResponseSchema>;
 
 /** POST /messenger/page/authorizations: where to send the browser next. */
-export const facebookAuthorizationSchema = z.object({
-  url: z.string().url(),
-});
+export const facebookAuthorizationSchema = z
+  .object({
+    url: z.string().url(),
+  })
+  .meta({ id: 'FacebookAuthorization' });
 export type FacebookAuthorization = z.infer<typeof facebookAuthorizationSchema>;
 
 /** PUT /messenger/page: connect one of the candidates. Facebook Page ids are numeric strings. */
-export const connectFacebookPageSchema = z.object({
-  pageId: z
-    .string()
-    .trim()
-    .regex(/^\d{1,32}$/),
-});
+export const connectFacebookPageSchema = z
+  .object({
+    pageId: z
+      .string()
+      .trim()
+      .regex(/^\d{1,32}$/),
+  })
+  .meta({ id: 'ConnectFacebookPage' });
 export type ConnectFacebookPageInput = z.infer<typeof connectFacebookPageSchema>;
 
 /**
@@ -116,7 +126,8 @@ export const welcomeScreenInputSchema = z
     greeting: z.string().trim().min(1).superRefine(maxChars(GREETING_MAX, greetingAsSent)),
     iceBreakers: z.array(iceBreakerSchema).max(ICE_BREAKERS_MAX),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'WelcomeScreenInput' });
 export type WelcomeScreenInput = z.infer<typeof welcomeScreenInputSchema>;
 
 export const profileSyncSchema = z.object({
@@ -126,28 +137,37 @@ export const profileSyncSchema = z.object({
 });
 export type ProfileSync = z.infer<typeof profileSyncSchema>;
 
-export const welcomeScreenSchema = welcomeScreenInputSchema.extend({
-  /** True while the seller has never saved: the values are the defaults for the shop's language. */
-  isDefault: z.boolean(),
-  profileSync: profileSyncSchema,
-});
+export const welcomeScreenSchema = welcomeScreenInputSchema
+  .extend({
+    /** True while the seller has never saved: the values are the defaults for the shop's language. */
+    isDefault: z.boolean(),
+    profileSync: profileSyncSchema,
+  })
+  .meta({ id: 'WelcomeScreen' });
 export type WelcomeScreen = z.infer<typeof welcomeScreenSchema>;
 
 /** An ad seen in a referral, and the product it sells once the seller maps it. */
-export const adProductSchema = z.object({
-  id: z.string().uuid(),
-  adId: z.string().min(1),
-  firstSeenAt: z.string().datetime(),
-  lastSeenAt: z.string().datetime(),
-  chatCount: z.number().int().nonnegative(),
-  product: z
-    .object({ id: z.string().uuid(), name: z.string(), status: productStatusSchema })
-    .nullable(),
-});
+export const adProductSchema = z
+  .object({
+    id: z.string().uuid(),
+    adId: z.string().min(1),
+    firstSeenAt: z.string().datetime(),
+    lastSeenAt: z.string().datetime(),
+    chatCount: z.number().int().nonnegative(),
+    product: z
+      .object({ id: z.string().uuid(), name: z.string(), status: productStatusSchema })
+      .nullable(),
+  })
+  .meta({ id: 'AdProduct' });
 export type AdProduct = z.infer<typeof adProductSchema>;
 
-export const adProductListResponseSchema = z.object({ data: z.array(adProductSchema) });
+export const adProductListResponseSchema = z
+  .object({ data: z.array(adProductSchema) })
+  .meta({ id: 'AdProductListResponse' });
 export type AdProductListResponse = z.infer<typeof adProductListResponseSchema>;
 
-export const updateAdProductSchema = z.object({ productId: z.string().uuid().nullable() }).strict();
+export const updateAdProductSchema = z
+  .object({ productId: z.string().uuid().nullable() })
+  .strict()
+  .meta({ id: 'UpdateAdProduct' });
 export type UpdateAdProduct = z.infer<typeof updateAdProductSchema>;

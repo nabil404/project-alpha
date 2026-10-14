@@ -1,19 +1,16 @@
 import { Body, Controller, Get, Put, Req, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, type SchemaObject } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   welcomeScreenInputSchema,
   welcomeScreenSchema,
   type WelcomeScreen,
   type WelcomeScreenInput,
 } from '@app/shared';
-import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../../common/tenant.guard';
 import { ZodValidationPipe } from '../../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../../openapi/api-coded-error';
+import { openApiSchema } from '../../../openapi/openapi-schema';
 import { WelcomeScreenService } from './welcome-screen.service';
-
-const json = (schema: z.ZodType, io: 'input' | 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 /** The shop comes from the session, never the request. */
 @ApiTags('Settings')
@@ -28,7 +25,7 @@ export class WelcomeScreenController {
     description:
       "Greeting and ice breakers, the defaults for the shop's language until saved, and whether the Page has the latest.",
   })
-  @ApiOkResponse({ schema: json(welcomeScreenSchema, 'output') })
+  @ApiOkResponse({ schema: openApiSchema(welcomeScreenSchema) })
   get(@Req() request: TenantRequest): Promise<WelcomeScreen> {
     return this.welcome.get(tenantScope(request));
   }
@@ -39,8 +36,8 @@ export class WelcomeScreenController {
     description:
       'Saves at once; the Page is updated in the background, so `profileSync.status` is `pending` until it is.',
   })
-  @ApiBody({ schema: json(welcomeScreenInputSchema, 'input') })
-  @ApiOkResponse({ schema: json(welcomeScreenSchema, 'output') })
+  @ApiBody({ schema: openApiSchema(welcomeScreenInputSchema, 'input') })
+  @ApiOkResponse({ schema: openApiSchema(welcomeScreenSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   update(
     @Req() request: TenantRequest,

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Auth } from '../modules/auth/auth.module';
 import { ERROR_RESPONSE_SCHEMA } from './api-coded-error';
 import { mergeAuthDocument, SESSION_COOKIE_SCHEME } from './merge-auth-document';
+import { openApiComponents } from './openapi-schema';
 
 export const OPENAPI_UI_PATH = 'api/docs';
 export const OPENAPI_JSON_PATH = 'api/docs/openapi.json';
@@ -41,7 +42,11 @@ export async function setupOpenApi(app: INestApplication, auth: Auth): Promise<v
   const document = SwaggerModule.createDocument(app, config);
   document.components = {
     ...document.components,
-    schemas: { ...document.components?.schemas, [ERROR_RESPONSE_SCHEMA]: errorResponseSchema() },
+    schemas: {
+      ...document.components?.schemas,
+      ...openApiComponents(),
+      [ERROR_RESPONSE_SCHEMA]: errorResponseSchema(),
+    },
   };
 
   const merged = mergeAuthDocument(

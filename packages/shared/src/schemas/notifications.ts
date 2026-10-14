@@ -7,14 +7,16 @@ import { z } from 'zod';
  */
 
 /** GET and PATCH /settings/notifications. */
-export const notificationSettingsSchema = z.object({
-  /** An email for every order the assistant drafts. */
-  newOrder: z.boolean(),
-  /** An email when a chat is handed to the seller and nobody has replied in 10 minutes. */
-  customerWaiting: z.boolean(),
-  /** An email at 9:00 shop time with yesterday's orders and revenue. */
-  dailySummary: z.boolean(),
-});
+export const notificationSettingsSchema = z
+  .object({
+    /** An email for every order the assistant drafts. */
+    newOrder: z.boolean(),
+    /** An email when a chat is handed to the seller and nobody has replied in 10 minutes. */
+    customerWaiting: z.boolean(),
+    /** An email at 9:00 shop time with yesterday's orders and revenue. */
+    dailySummary: z.boolean(),
+  })
+  .meta({ id: 'NotificationSettings' });
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 
 export const NOTIFICATION_DEFAULTS: NotificationSettings = {
@@ -27,5 +29,8 @@ export const NOTIFICATION_DEFAULTS: NotificationSettings = {
 export type NotificationKind = keyof NotificationSettings;
 
 /** PATCH /settings/notifications. Omit a switch to leave it alone. */
-export const updateNotificationSettingsSchema = notificationSettingsSchema.partial().strict();
+export const updateNotificationSettingsSchema = notificationSettingsSchema
+  .partial()
+  .strict()
+  .meta({ id: 'UpdateNotificationSettings' });
 export type UpdateNotificationSettings = z.infer<typeof updateNotificationSettingsSchema>;

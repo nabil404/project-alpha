@@ -18,7 +18,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import {
   categoryWithCountSchema,
@@ -32,12 +31,11 @@ import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { CategoriesService } from './categories.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
-const json = (schema: z.ZodType, io: 'input' | 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
-const categoryJson = json(categoryWithCountSchema, 'output');
+const categoryJson = openApiSchema(categoryWithCountSchema);
 
 /** The merchant always comes from the session via TenantGuard, never the request. */
 @ApiTags('Categories')
@@ -65,7 +63,7 @@ export class CategoriesController {
     summary: 'Create a category',
     description: 'The name is trimmed and must not match another live category, ignoring case.',
   })
-  @ApiBody({ schema: json(createCategorySchema, 'input') })
+  @ApiBody({ schema: openApiSchema(createCategorySchema, 'input') })
   @ApiCreatedResponse({ description: 'The category.', schema: categoryJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(409, ['CATEGORY_NAME_TAKEN'])
@@ -81,7 +79,7 @@ export class CategoriesController {
     summary: 'Rename a category',
     description: 'The name is trimmed and must not match another live category, ignoring case.',
   })
-  @ApiBody({ schema: json(updateCategorySchema, 'input') })
+  @ApiBody({ schema: openApiSchema(updateCategorySchema, 'input') })
   @ApiOkResponse({ description: 'The category.', schema: categoryJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CATEGORY_NOT_FOUND'])

@@ -33,26 +33,28 @@ export const timeZoneSchema = code(isTimeZone);
 export const dateFormatSchema = z.enum(DATE_FORMATS);
 
 /** GET and PATCH /settings/general. */
-export const generalSettingsSchema = z.object({
-  name: z.string(),
-  /** Null until the seller uploads one. */
-  logo: z.string().nullable(),
-  /** E.164, e.g. "+8801812000000". */
-  contactPhone: z.string().nullable(),
-  pickupAddress: z.string().nullable(),
-  /** ISO 3166-1 alpha-2. */
-  country: z.string(),
-  /** ISO 4217. */
-  currency: z.string(),
-  /** IANA zone id. */
-  timeZone: z.string(),
-  dateFormat: dateFormatSchema,
-  /**
-   * True once the shop has taken an order: from then on the currency is
-   * fixed, because every order and price is stored in it.
-   */
-  currencyLocked: z.boolean(),
-});
+export const generalSettingsSchema = z
+  .object({
+    name: z.string(),
+    /** Null until the seller uploads one. */
+    logo: z.string().nullable(),
+    /** E.164, e.g. "+8801812000000". */
+    contactPhone: z.string().nullable(),
+    pickupAddress: z.string().nullable(),
+    /** ISO 3166-1 alpha-2. */
+    country: z.string(),
+    /** ISO 4217. */
+    currency: z.string(),
+    /** IANA zone id. */
+    timeZone: z.string(),
+    dateFormat: dateFormatSchema,
+    /**
+     * True once the shop has taken an order: from then on the currency is
+     * fixed, because every order and price is stored in it.
+     */
+    currencyLocked: z.boolean(),
+  })
+  .meta({ id: 'GeneralSettings' });
 export type GeneralSettings = z.infer<typeof generalSettingsSchema>;
 
 /**
@@ -70,7 +72,8 @@ export const updateGeneralSettingsSchema = z
     timeZone: timeZoneSchema.optional(),
     dateFormat: dateFormatSchema.optional(),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'UpdateGeneralSettings' });
 export type UpdateGeneralSettings = z.infer<typeof updateGeneralSettingsSchema>;
 export type UpdateGeneralSettingsInput = z.input<typeof updateGeneralSettingsSchema>;
 
@@ -80,9 +83,11 @@ export const LOGO_MIN_SIDE = AVATAR_MIN_SIDE;
 export const LOGO_ACCEPTED_TYPES = AVATAR_ACCEPTED_TYPES;
 
 /** PUT and DELETE /settings/general/logo. `null` once the logo is removed. */
-export const shopLogoSchema = z.object({
-  logo: z.string().nullable(),
-});
+export const shopLogoSchema = z
+  .object({
+    logo: z.string().nullable(),
+  })
+  .meta({ id: 'ShopLogo' });
 export type ShopLogo = z.infer<typeof shopLogoSchema>;
 
 /**
@@ -111,11 +116,14 @@ export const updateAccountPreferencesSchema = z
   .object({
     locale: dashboardLocaleSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .meta({ id: 'UpdateAccountPreferences' });
 export type UpdateAccountPreferences = z.infer<typeof updateAccountPreferencesSchema>;
 
-export const accountPreferencesSchema = z.object({
-  /** Null: follow the shop's country. */
-  locale: dashboardLocaleSchema.nullable(),
-});
+export const accountPreferencesSchema = z
+  .object({
+    /** Null: follow the shop's country. */
+    locale: dashboardLocaleSchema.nullable(),
+  })
+  .meta({ id: 'AccountPreferences' });
 export type AccountPreferences = z.infer<typeof accountPreferencesSchema>;

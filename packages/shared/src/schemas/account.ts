@@ -28,9 +28,11 @@ export const changePasswordSchema = z.object({
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 /** PUT and DELETE /account/avatar. `null` once the photo is removed. */
-export const accountAvatarSchema = z.object({
-  image: z.string().nullable(),
-});
+export const accountAvatarSchema = z
+  .object({
+    image: z.string().nullable(),
+  })
+  .meta({ id: 'AccountAvatar' });
 export type AccountAvatar = z.infer<typeof accountAvatarSchema>;
 
 /**
@@ -38,12 +40,14 @@ export type AccountAvatar = z.infer<typeof accountAvatarSchema>;
  * token or IP address. `lastActiveAt` moves only when Better Auth refreshes
  * the session, about once a day, so it is shown to the day.
  */
-export const deviceSessionSchema = z.object({
-  id: z.string(),
-  browser: z.string().nullable(),
-  os: z.string().nullable(),
-  createdAt: z.string().datetime(),
-  lastActiveAt: z.string().datetime(),
-  current: z.boolean(),
-});
+export const deviceSessionSchema = z
+  .object({
+    id: z.string(),
+    browser: z.string().nullable(),
+    os: z.string().nullable(),
+    createdAt: z.string().datetime(),
+    lastActiveAt: z.string().datetime(),
+    current: z.boolean(),
+  })
+  .meta({ id: 'DeviceSession' });
 export type DeviceSession = z.infer<typeof deviceSessionSchema>;

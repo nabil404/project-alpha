@@ -1,19 +1,16 @@
 import { Body, Controller, Get, Put, Req, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, type SchemaObject } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   deliverySettingsSchema,
   saveDeliverySettingsSchema,
   type DeliverySettings,
   type SaveDeliverySettings,
 } from '@app/shared';
-import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { DeliverySettingsService } from './delivery-settings.service';
-
-const json = (schema: z.ZodType, io: 'input' | 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 /** The merchant always comes from the session via TenantGuard, never the request. */
 @ApiTags('Settings')
@@ -28,7 +25,7 @@ export class DeliverySettingsController {
     description:
       'Areas in the order listed. `everywhereElse` is null until the first save. Amounts are minor units of `currency`.',
   })
-  @ApiOkResponse({ schema: json(deliverySettingsSchema, 'output') })
+  @ApiOkResponse({ schema: openApiSchema(deliverySettingsSchema) })
   get(@Req() request: TenantRequest): Promise<DeliverySettings> {
     return this.delivery.get(tenantScope(request).merchantId);
   }
@@ -39,8 +36,8 @@ export class DeliverySettingsController {
     description:
       'The whole page. A row with an `id` is updated, one without is added, and a named row left out is removed with its product charges; orders delivered there keep its name and estimate. Area names are trimmed and must differ ignoring case.',
   })
-  @ApiBody({ schema: json(saveDeliverySettingsSchema, 'input') })
-  @ApiOkResponse({ schema: json(deliverySettingsSchema, 'output') })
+  @ApiBody({ schema: openApiSchema(saveDeliverySettingsSchema, 'input') })
+  @ApiOkResponse({ schema: openApiSchema(deliverySettingsSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['DELIVERY_CHARGE_NOT_FOUND'])
   save(

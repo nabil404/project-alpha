@@ -21,7 +21,6 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import {
   createProductSchema,
@@ -47,12 +46,11 @@ import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { ProductsService } from './products.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
-const json = (schema: z.ZodType, io: 'input' | 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
-const productJson = json(productSchema, 'output');
+const productJson = openApiSchema(productSchema);
 
 /** The merchant always comes from the session via TenantGuard, never the request. */
 @ApiTags('Products')
@@ -67,7 +65,7 @@ export class ProductsController {
     description:
       'Options and variants come in one document; photos are added afterwards through the image routes.',
   })
-  @ApiBody({ schema: json(createProductSchema, 'input') })
+  @ApiBody({ schema: openApiSchema(createProductSchema, 'input') })
   @ApiCreatedResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CATEGORY_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
@@ -96,7 +94,7 @@ export class ProductsController {
   })
   @ApiOkResponse({
     description: 'A page of products.',
-    schema: json(productListResponseSchema, 'output'),
+    schema: openApiSchema(productListResponseSchema),
   })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   list(
@@ -111,7 +109,7 @@ export class ProductsController {
     summary: 'Count products per filter',
     description: 'For the filter chips and the stock banner. Ignores search and category.',
   })
-  @ApiOkResponse({ description: 'Counts per filter.', schema: json(productCountsSchema, 'output') })
+  @ApiOkResponse({ description: 'Counts per filter.', schema: openApiSchema(productCountsSchema) })
   counts(@Req() request: TenantRequest): Promise<ProductCounts> {
     return this.products.counts(tenantScope(request).merchantId);
   }
@@ -134,7 +132,7 @@ export class ProductsController {
     description:
       "Replaces the product's fields, options and variants with the document, in one transaction. Options, values and variants left out are removed (variants archived). `version` must be the one last read, or the save is refused with PRODUCT_STALE.",
   })
-  @ApiBody({ schema: json(saveProductSchema, 'input') })
+  @ApiBody({ schema: openApiSchema(saveProductSchema, 'input') })
   @ApiOkResponse({ description: 'The saved product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, [
@@ -159,7 +157,7 @@ export class ProductsController {
     description:
       'Changes only the fields sent, such as the status. `categoryIds`, when sent, replaces the links.',
   })
-  @ApiBody({ schema: json(updateProductSchema, 'input') })
+  @ApiBody({ schema: openApiSchema(updateProductSchema, 'input') })
   @ApiOkResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
@@ -177,7 +175,7 @@ export class ProductsController {
     description:
       "Changes a live variant's SKU, price, stock or image without the whole document. Its option values change only through a save. Bumps the product's version.",
   })
-  @ApiBody({ schema: json(updateVariantSchema, 'input') })
+  @ApiBody({ schema: openApiSchema(updateVariantSchema, 'input') })
   @ApiOkResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'VARIANT_NOT_FOUND', 'PRODUCT_IMAGE_NOT_FOUND'])

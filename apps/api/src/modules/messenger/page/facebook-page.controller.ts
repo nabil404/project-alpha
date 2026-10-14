@@ -24,7 +24,6 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
-  type SchemaObject,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Response } from 'express';
@@ -42,21 +41,18 @@ import {
   type FacebookPageCandidatesResponse,
   type FacebookPageResponse,
 } from '@app/shared';
-import { z } from 'zod';
 import { isCodedErrorBody } from '../../../common/errors/index';
 import { TenantGuard, type TenantRequest } from '../../../common/tenant.guard';
 import { ZodValidationPipe } from '../../../common/zod-validation.pipe';
 import { AppConfig } from '../../config/app.config';
 import { ApiCodedError } from '../../../openapi/api-coded-error';
+import { openApiSchema } from '../../../openapi/openapi-schema';
 import { FacebookPageService, type PageConnectOwner } from './facebook-page.service';
 import { PAGE_CONNECT_COOKIE, PAGE_CONNECT_TTL_MS, readCookie } from './page-connect-flow';
 
 /** The controller's own path; the flow cookie is scoped to it and sent nowhere else. */
 export const PAGE_ROUTE = 'messenger/page';
 export const PAGE_CONNECT_CALLBACK_PATH = `/api/v1/${PAGE_ROUTE}/oauth/callback`;
-
-const schemaOf = (schema: z.ZodType, io: 'input' | 'output' = 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 function ownerOf(request: TenantRequest): PageConnectOwner {
   const userId = request.session?.user.id;
@@ -101,7 +97,7 @@ export class FacebookPageController {
     summary: "The shop's Facebook Page",
     description: '`page` is null until one is connected.',
   })
-  @ApiOkResponse({ schema: schemaOf(facebookPageResponseSchema) })
+  @ApiOkResponse({ schema: openApiSchema(facebookPageResponseSchema) })
   async get(@Req() request: TenantRequest): Promise<FacebookPageResponse> {
     return { page: await this.pages.get(ownerOf(request)) };
   }
@@ -113,7 +109,7 @@ export class FacebookPageController {
     description:
       'Sets a short-lived, encrypted flow cookie and answers the Facebook Login dialog URL to send the browser to. Facebook redirects back to `GET /messenger/page/oauth/callback`.',
   })
-  @ApiCreatedResponse({ schema: schemaOf(facebookAuthorizationSchema) })
+  @ApiCreatedResponse({ schema: openApiSchema(facebookAuthorizationSchema) })
   @ApiCodedError(503, ['MESSENGER_NOT_CONFIGURED'])
   authorize(
     @Req() request: TenantRequest,
@@ -167,7 +163,7 @@ export class FacebookPageController {
     summary: 'Pages the seller can connect',
     description: 'The Pages granted on Facebook in this connection flow. Needs the flow cookie.',
   })
-  @ApiOkResponse({ schema: schemaOf(facebookPageCandidatesResponseSchema) })
+  @ApiOkResponse({ schema: openApiSchema(facebookPageCandidatesResponseSchema) })
   @ApiCodedError(400, ['FACEBOOK_AUTH_EXPIRED', 'FACEBOOK_AUTH_FAILED'])
   @ApiCodedError(503, ['MESSENGER_NOT_CONFIGURED', 'FACEBOOK_UNAVAILABLE'])
   async candidates(@Req() request: TenantRequest): Promise<FacebookPageCandidatesResponse> {
@@ -185,8 +181,8 @@ export class FacebookPageController {
     description:
       "Connects one of the candidates, or refreshes the token of the shop's current Page. A shop has one Page: connecting a different one needs a disconnect first. Needs the flow cookie, and ends the flow.",
   })
-  @ApiBody({ schema: schemaOf(connectFacebookPageSchema, 'input') })
-  @ApiOkResponse({ schema: schemaOf(facebookPageSchema) })
+  @ApiBody({ schema: openApiSchema(connectFacebookPageSchema, 'input') })
+  @ApiOkResponse({ schema: openApiSchema(facebookPageSchema) })
   @ApiCodedError(400, [
     'VALIDATION_FAILED',
     'FACEBOOK_AUTH_EXPIRED',

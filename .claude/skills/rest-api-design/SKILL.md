@@ -113,19 +113,28 @@ routes are merged in from its `openAPI()` plugin by `mergeAuthDocument`.
 
 - **Every route is annotated:** `@ApiTags` on the controller, and
   `@ApiOperation({ summary })` plus a success response on each handler.
-- **Zod schemas document themselves.** Pass the shared schema to the parameter
-  decorator and to the response. `@nestjs/swagger` converts it through Standard
-  Schema, so there is no hand-written JSON Schema and no DTO class:
+- **Zod schemas document themselves.** Pass the shared schema through
+  `openApiSchema()` (`src/openapi/openapi-schema.ts`) to `@ApiBody` (with
+  `'input'`) and to the response. There is no hand-written JSON Schema and no
+  DTO class:
 
   ```ts
   @Post()
-  @ApiCreatedResponse({ standardSchema: productSchema })
+  @ApiBody({ schema: openApiSchema(createProductSchema, 'input') })
+  @ApiCreatedResponse({ schema: openApiSchema(productSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
-  create(
-    @Body({ schema: createProductSchema, pipes: [new ZodValidationPipe(createProductSchema)] })
-    body: CreateProduct,
-  ) {}
+  create(@Body(new ZodValidationPipe(createProductSchema)) body: CreateProduct) {}
   ```
+
+- **A documented schema carries a name.** End its definition in
+  `@app/shared` with `.meta({ id: 'CreateProduct' })`, the export name without
+  `Schema`. It is then listed under Schemas and referenced by `$ref`; without
+  an id it is inlined into the route. Name a nested object schema too once
+  more than one named schema embeds it. An id whose input and output shapes
+  differ (a `.default()`, a transform) throws at boot; give the input its own
+  schema and id. Avoid Better Auth's names (`User`, `Session`, `Account`,
+  `Organization`, `Member`, `Invitation`, `Verification`); `mergeAuthDocument`
+  throws on a clash.
 
 - **Errors use `@ApiCodedError(status, codes)`** (`src/openapi/api-coded-error.ts`),
   which references the `ErrorResponse` component derived from the shared

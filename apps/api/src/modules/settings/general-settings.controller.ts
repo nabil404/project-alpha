@@ -12,14 +12,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import {
-  ApiBody,
-  ApiConsumes,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-  type SchemaObject,
-} from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   generalSettingsSchema,
@@ -30,17 +23,14 @@ import {
   type ShopLogo,
   type UpdateGeneralSettings,
 } from '@app/shared';
-import { z } from 'zod';
 import { CodedValidationException } from '../../common/errors/coded-exceptions';
 import { ImageUploadInterceptor } from '../../common/image-upload.interceptor';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ApiCodedError } from '../../openapi/api-coded-error';
+import { openApiSchema } from '../../openapi/openapi-schema';
 import { GeneralSettingsService } from './general-settings.service';
 import { ShopLogoService } from './logo/shop-logo.service';
-
-const json = (schema: z.ZodType, io: 'input' | 'output') =>
-  z.toJSONSchema(schema, { target: 'openapi-3.0', io }) as SchemaObject;
 
 const LogoUploadInterceptor = ImageUploadInterceptor({
   maxBytes: LOGO_MAX_BYTES,
@@ -65,7 +55,7 @@ export class GeneralSettingsController {
     description:
       'A shop that has never saved its region reads as the default one (Bangladesh). Codes only: the dashboard localizes country and currency names itself.',
   })
-  @ApiOkResponse({ schema: json(generalSettingsSchema, 'output') })
+  @ApiOkResponse({ schema: openApiSchema(generalSettingsSchema) })
   get(@Req() request: TenantRequest): Promise<GeneralSettings> {
     return this.settings.get(tenantScope(request).merchantId);
   }
@@ -76,8 +66,8 @@ export class GeneralSettingsController {
     description:
       "Omit a field to leave it alone; a blank phone or address clears it. The phone is normalized to E.164. Choosing a country changes nothing else on its own - send the currency, time zone and date format it suggests too. The currency is fixed once the shop has an order; before that, changing it keeps every price's number and nothing is converted.",
   })
-  @ApiBody({ schema: json(updateGeneralSettingsSchema, 'input') })
-  @ApiOkResponse({ schema: json(generalSettingsSchema, 'output') })
+  @ApiBody({ schema: openApiSchema(updateGeneralSettingsSchema, 'input') })
+  @ApiOkResponse({ schema: openApiSchema(generalSettingsSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(409, ['CURRENCY_LOCKED'])
   update(
@@ -104,7 +94,7 @@ export class GeneralSettingsController {
       properties: { file: { type: 'string', format: 'binary' } },
     },
   })
-  @ApiOkResponse({ description: 'The new logo URL.', schema: json(shopLogoSchema, 'output') })
+  @ApiOkResponse({ description: 'The new logo URL.', schema: openApiSchema(shopLogoSchema) })
   @ApiCodedError(400, ['VALIDATION_FAILED', 'LOGO_INVALID', 'LOGO_TOO_SMALL'])
   @ApiCodedError(413, ['LOGO_TOO_LARGE'])
   @ApiCodedError(415, ['LOGO_UNSUPPORTED_TYPE'])
@@ -124,7 +114,7 @@ export class GeneralSettingsController {
   @Delete('logo')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove the shop logo' })
-  @ApiOkResponse({ description: '`logo` is null.', schema: json(shopLogoSchema, 'output') })
+  @ApiOkResponse({ description: '`logo` is null.', schema: openApiSchema(shopLogoSchema) })
   removeLogo(@Req() request: TenantRequest): Promise<ShopLogo> {
     return this.logos.remove(tenantScope(request).merchantId);
   }
