@@ -1,5 +1,8 @@
 import {
+  describeZodIssue,
   encodePayload,
+  GREETING_MAX,
+  ICE_BREAKER_QUESTION_MAX,
   messengerProductLink,
   parsePayload,
   parseProductRef,
@@ -58,12 +61,41 @@ describe('welcomeScreenInputSchema', () => {
     expect(welcomeScreenInputSchema.safeParse({ ...valid, iceBreakers: long }).success).toBe(false);
   });
 
-  it('counts Bangla greeting length in characters', () => {
-    // 160 code points; several are combining vowel signs, still one code point each.
-    const greeting = 'আ'.repeat(160);
+  // Each emoji is one code point but two UTF-16 units, so `.max()` would reject 81 of them.
+  it('counts greeting length in code points, not UTF-16 units', () => {
+    const greeting = '\u{1F600}'.repeat(GREETING_MAX);
     expect(welcomeScreenInputSchema.safeParse({ ...valid, greeting }).success).toBe(true);
-    expect(welcomeScreenInputSchema.safeParse({ ...valid, greeting: `${greeting}আ` }).success).toBe(
-      false,
-    );
+    expect(
+      welcomeScreenInputSchema.safeParse({ ...valid, greeting: `${greeting}\u{1F600}` }).success,
+    ).toBe(false);
+  });
+
+  it('counts a question in code points, not UTF-16 units', () => {
+    const question = '\u{1F600}'.repeat(ICE_BREAKER_QUESTION_MAX);
+    const input = (q: string) => ({ ...valid, iceBreakers: [{ kind: 'ask', question: q }] });
+    expect(welcomeScreenInputSchema.safeParse(input(question)).success).toBe(true);
+    expect(welcomeScreenInputSchema.safeParse(input(`${question}\u{1F600}`)).success).toBe(false);
+  });
+
+  it('counts Bangla greeting length in characters', () => {
+    const greeting = '\u0986'.repeat(GREETING_MAX);
+    expect(welcomeScreenInputSchema.safeParse({ ...valid, greeting }).success).toBe(true);
+    expect(
+      welcomeScreenInputSchema.safeParse({ ...valid, greeting: `${greeting}\u0986` }).success,
+    ).toBe(false);
+  });
+
+  it('reports an over-long greeting and question as MAX_LENGTH with the limit', () => {
+    const greeting = welcomeScreenInputSchema.safeParse({ ...valid, greeting: 'x'.repeat(161) });
+    const question = welcomeScreenInputSchema.safeParse({
+      ...valid,
+      iceBreakers: [{ kind: 'ask', question: 'x'.repeat(81) }],
+    });
+    expect(greeting.error?.issues.map(describeZodIssue)).toEqual([
+      { code: 'MAX_LENGTH', params: { max: 160 } },
+    ]);
+    expect(question.error?.issues.map(describeZodIssue)).toEqual([
+      { code: 'MAX_LENGTH', params: { max: 80 } },
+    ]);
   });
 });
