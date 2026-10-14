@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
+import { toast } from 'sonner';
 import { messengerProductLink, type Product } from '@app/shared';
 
 import { Button } from '@/components/ui/button';
@@ -9,19 +10,32 @@ import { Input } from '@/components/ui/input';
 import { useFacebookPage } from '@/features/messenger/queries';
 import { useToast } from '@/lib/toast';
 
+/** A file-name-safe slug of the product name, or its id when nothing is left. */
+function fileSlug(product: Product): string {
+  const slug = product.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/g, '');
+  return slug || product.id;
+}
+
 /**
  * A link that opens Messenger with this product chosen, and its QR code.
  * Built in the browser from the connected Page's id, so nothing is stored.
  */
 export function MessengerLinkCard({ product }: { product: Product }) {
   const { t } = useTranslation('catalog');
-  const toast = useToast();
+  const appToast = useToast();
   const page = useFacebookPage();
   const pageId = page.data?.page?.pageId;
   const link = pageId ? messengerProductLink(pageId, product.id) : null;
   const [qr, setQr] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setQr(null);
     if (!link) return;
     let cancelled = false;
     QRCode.toDataURL(link, { width: 256, margin: 1, errorCorrectionLevel: 'M' })
@@ -38,17 +52,28 @@ export function MessengerLinkCard({ product }: { product: Product }) {
 
   const download = async () => {
     if (!link) return;
-    const url = await QRCode.toDataURL(link, { width: 1024, margin: 2 });
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${product.name}-messenger-qr.png`;
-    anchor.click();
+    try {
+      const url = await QRCode.toDataURL(link, { width: 1024, margin: 2 });
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `messenger-qr-${fileSlug(product)}.png`;
+      anchor.click();
+    } catch {
+      // Plain translated text: useToast().error expects an error value.
+      toast.error(t('messengerLink.downloadFailed'));
+    }
   };
 
   const copy = async () => {
     if (!link) return;
-    await navigator.clipboard.writeText(link);
-    toast.success(t('messengerLink.copied'));
+    try {
+      await navigator.clipboard.writeText(link);
+      appToast.success(t('messengerLink.copied'));
+    } catch {
+      // Denied permission or a non-secure context: leave the link selected.
+      inputRef.current?.select();
+      toast.error(t('messengerLink.copyFailed'));
+    }
   };
 
   return (
@@ -63,6 +88,7 @@ export function MessengerLinkCard({ product }: { product: Product }) {
         <>
           <div className="flex gap-2">
             <Input
+              ref={inputRef}
               readOnly
               value={link}
               aria-label={t('messengerLink.label')}
