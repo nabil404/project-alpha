@@ -10,6 +10,7 @@ import {
   type FacebookPageRow,
 } from '../../database/schema/index';
 import { withMerchant } from '../../database/with-merchant';
+import { MessengerProfileSync } from '../profile/messenger-profile.sync';
 import {
   facebookAuthCancelled,
   facebookAuthExpired,
@@ -23,6 +24,7 @@ import {
   messengerNotConfigured,
 } from './facebook-page-errors';
 import { FacebookPageRepository } from './facebook-page.repository';
+import { META_GRAPH, PAGE_CONNECT_REDIRECT_URI } from './facebook-page.tokens';
 import {
   GraphError,
   MESSAGING_TASK,
@@ -39,10 +41,7 @@ import {
   type PageConnectFlow,
 } from './page-connect-flow';
 
-/** Null when META_APP_ID is unset: connecting answers MESSENGER_NOT_CONFIGURED. */
-export const META_GRAPH = Symbol('META_GRAPH');
-/** Where Facebook sends the seller back to; must be listed in the Meta app's valid OAuth redirect URIs. */
-export const PAGE_CONNECT_REDIRECT_URI = Symbol('PAGE_CONNECT_REDIRECT_URI');
+export { META_GRAPH, PAGE_CONNECT_REDIRECT_URI };
 
 export type PageConnectOwner = TenantScope & FlowOwner;
 
@@ -68,6 +67,7 @@ export class FacebookPageService {
     private readonly crypto: CryptoService,
     @Inject(META_GRAPH) private readonly graph: MetaGraphClient | null,
     @Inject(PAGE_CONNECT_REDIRECT_URI) private readonly redirectUri: string,
+    private readonly profileSync: MessengerProfileSync,
   ) {}
 
   async get(scope: TenantScope): Promise<FacebookPage | null> {
@@ -172,15 +172,15 @@ export class FacebookPageService {
     await this.callGraph(() => graph.subscribeApp(page.id, page.accessToken));
     const accessToken = this.crypto.encrypt(page.accessToken);
 
+    let row: FacebookPageRow;
     try {
-      const row = await withMerchant(this.db, scope.merchantId, async (tx) => {
+      row = await withMerchant(this.db, scope.merchantId, async (tx) => {
         const existing = await this.pages.findForMerchant(tx, scope, { lock: true });
         if (existing && existing.pageId !== page.id) throw facebookPageAlreadyConnected();
         return existing
           ? this.pages.update(tx, scope, existing.id, { name: page.name, accessToken })
           : this.pages.insert(tx, scope, { pageId: page.id, name: page.name, accessToken });
       });
-      return toFacebookPage(row);
     } catch (error) {
       // No unsubscribe here: when the Page is another shop's, that shop's
       // webhooks depend on the subscription we just re-confirmed.
@@ -189,6 +189,9 @@ export class FacebookPageService {
       if (constraint === FACEBOOK_PAGE_MERCHANT_UQ) throw facebookPageAlreadyConnected();
       throw error;
     }
+    // After the commit: the sync reads the row that transaction wrote.
+    await this.profileSync.request(scope.merchantId);
+    return toFacebookPage(row);
   }
 
   /**
@@ -201,6 +204,9 @@ export class FacebookPageService {
       this.pages.deleteForMerchant(tx, scope),
     );
     if (!row || !this.graph) return;
+
+    // While the token can still be decrypted; best effort, never blocks.
+    await this.profileSync.clear(scope, row.accessToken);
 
     try {
       await this.graph.unsubscribeApp(row.pageId, this.crypto.decrypt(row.accessToken));

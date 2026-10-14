@@ -13,6 +13,7 @@ import { StorageModule } from './modules/storage/storage.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { MessengerModule } from './modules/messenger/messenger.module';
+import { MessengerProfileModule } from './modules/messenger/profile/messenger-profile.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -70,6 +71,7 @@ import { serializeRequest } from './common/request-log';
     ProductsModule,
     HealthModule,
     MessengerModule,
+    MessengerProfileModule,
     ConversationsModule,
     CustomersModule,
     OrdersModule,

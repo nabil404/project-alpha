@@ -185,6 +185,23 @@ describeDb('MessengerProfileSync (app_runtime)', () => {
     expect(await pageOf(t.merchantA)).toMatchObject({ profileSyncError: 'graph_error' });
   });
 
+  it('records graph_error and retries when the token cannot be decrypted', async () => {
+    const good = (await pageOf(t.merchantA))?.accessToken ?? '';
+    const setToken = (accessToken: string) =>
+      t.db
+        .update(schema.facebookPage)
+        .set({ accessToken, profileSyncError: null })
+        .where(eq(schema.facebookPage.merchantId, t.merchantA));
+    await setToken('not-a-ciphertext');
+    try {
+      await expect(sync.run({ merchantId: t.merchantA })).rejects.toThrow();
+      expect(await pageOf(t.merchantA)).toMatchObject({ profileSyncError: 'graph_error' });
+      expect(graph.profiles).toEqual([]);
+    } finally {
+      await setToken(good);
+    }
+  });
+
   it('re-subscribes the Page’s webhooks when asked', async () => {
     await sync.run({ merchantId: t.merchantA, resubscribe: true });
     expect(graph.subscribed).toEqual([pageA]);

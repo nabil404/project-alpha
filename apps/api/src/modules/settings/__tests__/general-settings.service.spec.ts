@@ -10,9 +10,11 @@ import {
   seedVariant,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
-import { seedCustomer } from '../../database/__tests__/conversation-seeds';
+import { seedCustomer, seedFacebookPage } from '../../database/__tests__/conversation-seeds';
 import { seedOrder } from '../../database/__tests__/order-seeds';
 import * as schema from '../../database/schema/index';
+import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
+import type { MessengerProfileSync } from '../../messenger/profile/messenger-profile.sync';
 import { GeneralSettingsService } from '../general-settings.service';
 import { MerchantSettingsRepository } from '../merchant-settings.repository';
 import { seedRegionFromPhone } from '../region-from-phone';
@@ -31,18 +33,32 @@ function codeOf(error: unknown): unknown {
 }
 
 // Runs as app_runtime, so row-level security applies exactly as in the api.
+class FakeProfileSync {
+  requested: string[] = [];
+  async request(merchantId: string) {
+    this.requested.push(merchantId);
+  }
+}
+
 describeDb('GeneralSettingsService', () => {
   let t: CatalogTestDb;
   let runtime: ReturnType<typeof openRuntimeDb>;
   let service: GeneralSettingsService;
+  let profileSync: FakeProfileSync;
 
   beforeAll(async () => {
     t = await openCatalogTestDb();
     runtime = openRuntimeDb();
+  });
+
+  beforeEach(() => {
+    profileSync = new FakeProfileSync();
     service = new GeneralSettingsService(
       runtime.db,
       new MerchantSettingsRepository(),
       new ShopProfileRepository(),
+      new FacebookPageRepository(),
+      profileSync as unknown as MessengerProfileSync,
     );
   });
 
@@ -64,6 +80,7 @@ describeDb('GeneralSettingsService', () => {
       await t.db
         .delete(schema.merchantSettings)
         .where(eq(schema.merchantSettings.merchantId, merchantId));
+      await t.db.delete(schema.facebookPage).where(eq(schema.facebookPage.merchantId, merchantId));
     }
   });
 
@@ -244,6 +261,34 @@ describeDb('GeneralSettingsService', () => {
       ),
     ).resolves.toEqual({ code: '23514', constraint: 'merchant_settings_contact_phone_ck' });
   });
+  describe("the Messenger Profile follows the shop's language", () => {
+    it('re-syncs the profile when the country changes the language', async () => {
+      await seedFacebookPage(t.db, t.merchantA);
+      await service.update(t.merchantA, { country: 'US' });
+      expect(profileSync.requested).toEqual([t.merchantA]);
+    });
+
+    it('does not re-sync for a change that keeps the language', async () => {
+      await seedFacebookPage(t.db, t.merchantA);
+      await service.update(t.merchantA, { country: 'US' });
+      profileSync.requested = [];
+      await service.update(t.merchantA, { country: 'IN', contactPhone: '+8801712345678' });
+      await service.update(t.merchantA, { contactPhone: '+8801712345679' });
+      expect(profileSync.requested).toEqual([]);
+    });
+
+    it('does not re-sync a shop without a Page', async () => {
+      await service.update(t.merchantA, { country: 'US' });
+      expect(profileSync.requested).toEqual([]);
+    });
+
+    it('does not re-sync a shop that never saved settings and changes only its name', async () => {
+      await seedFacebookPage(t.db, t.merchantA);
+      await service.update(t.merchantA, { name: 'New name' });
+      expect(profileSync.requested).toEqual([]);
+    });
+  });
+
   describe('seedRegionFromPhone', () => {
     it("sets the region from the number's country", async () => {
       await expect(seedRegionFromPhone(runtime.db, t.merchantA, '+442071838750')).resolves.toBe(

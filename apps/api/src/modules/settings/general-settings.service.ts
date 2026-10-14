@@ -7,9 +7,12 @@ import {
   type UpdateGeneralSettings,
 } from '@app/shared';
 import { CodedConflictException } from '../../common/errors/coded-exceptions';
+import { languageFor } from '../conversations/assistant/assistant-fallbacks';
 import type { TenantScope } from '../database/base.repository';
 import { DATABASE, type Database } from '../database/database.module';
 import { withMerchant } from '../database/with-merchant';
+import { FacebookPageRepository } from '../messenger/page/facebook-page.repository';
+import { MessengerProfileSync } from '../messenger/profile/messenger-profile.sync';
 import {
   MerchantSettingsRepository,
   type MerchantSettingsValues,
@@ -71,6 +74,8 @@ export class GeneralSettingsService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: MerchantSettingsRepository,
     private readonly profiles: ShopProfileRepository,
+    private readonly pages: FacebookPageRepository,
+    private readonly profileSync: MessengerProfileSync,
   ) {}
 
   get(merchantId: string): Promise<GeneralSettings> {
@@ -83,8 +88,12 @@ export class GeneralSettingsService {
     });
   }
 
-  update(merchantId: string, input: UpdateGeneralSettings): Promise<GeneralSettings> {
-    return withMerchant(this.db, merchantId, async (tx) => {
+  /**
+   * The Page's greeting and ice breakers default to the shop's language, so a
+   * country that changes it asks for a profile sync, after the commit.
+   */
+  async update(merchantId: string, input: UpdateGeneralSettings): Promise<GeneralSettings> {
+    const { result, languageChanged } = await withMerchant(this.db, merchantId, async (tx) => {
       const scope: TenantScope = { merchantId };
       const { name, ...changes } = input;
       const current = await this.settings.lockOrCreate(tx, scope, defaultMerchantSettings());
@@ -105,7 +114,18 @@ export class GeneralSettingsService {
       const row =
         Object.keys(changes).length > 0 ? await this.settings.update(tx, scope, changes) : current;
       if (name !== undefined) await this.profiles.rename(tx, scope, name);
-      return toGeneralSettings(await this.profiles.find(tx, scope), row, locked);
+      return {
+        result: toGeneralSettings(await this.profiles.find(tx, scope), row, locked),
+        languageChanged: languageFor(current.country) !== languageFor(row.country),
+      };
     });
+
+    if (languageChanged) {
+      const page = await withMerchant(this.db, merchantId, (tx) =>
+        this.pages.findForMerchant(tx, { merchantId }),
+      );
+      if (page) await this.profileSync.request(merchantId);
+    }
+    return result;
   }
 }

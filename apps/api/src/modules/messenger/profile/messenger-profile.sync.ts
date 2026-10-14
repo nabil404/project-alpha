@@ -15,7 +15,7 @@ import {
 } from '../../queue/queue.constants';
 import { MerchantSettingsRepository } from '../../settings/merchant-settings.repository';
 import { FacebookPageRepository } from '../page/facebook-page.repository';
-import { META_GRAPH } from '../page/facebook-page.service';
+import { META_GRAPH } from '../page/facebook-page.tokens';
 import { GraphError, MetaGraphClient } from '../page/meta-graph.client';
 import { buildMessengerProfile } from './messenger-profile';
 import { defaultWelcome, readIceBreakers } from './welcome-defaults';
@@ -74,8 +74,8 @@ export class MessengerProfileSync {
       iceBreakers: readIceBreakers(read.settings?.iceBreakers) ?? defaults.iceBreakers,
       language,
     });
-    const token = this.crypto.decrypt(read.page.accessToken);
     try {
+      const token = this.crypto.decrypt(read.page.accessToken);
       if (resubscribe) await this.graph.subscribeApp(read.page.pageId, token);
       await this.graph.setMessengerProfile(token, body);
     } catch (error) {

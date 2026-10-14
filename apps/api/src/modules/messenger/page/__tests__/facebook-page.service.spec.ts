@@ -19,12 +19,29 @@ import {
   type MetaGraphClient,
 } from '../meta-graph.client';
 import { openFlow, sealFlow } from '../page-connect-flow';
+import type { MessengerProfileSync } from '../../profile/messenger-profile.sync';
 
 const crypto = new CryptoService({
   get: () => Buffer.alloc(32, 7).toString('base64'),
 } as unknown as AppConfig);
 
 const REDIRECT_URI = 'https://shop.test/api/v1/messenger/page/oauth/callback';
+
+/** What the service did, in order, across the fakes. */
+let calls: string[] = [];
+
+class FakeProfileSync {
+  requested: string[] = [];
+  cleared: string[] = [];
+  async request(merchantId: string) {
+    calls.push('requestProfile');
+    this.requested.push(merchantId);
+  }
+  async clear({ merchantId }: { merchantId: string }, encryptedToken: string) {
+    calls.push('clearProfile');
+    this.cleared.push(`${merchantId}:${crypto.decrypt(encryptedToken)}`);
+  }
+}
 
 /** Facebook as the service sees it: the seller's Pages and what our app did to them. */
 class FakeGraph {
@@ -68,6 +85,7 @@ class FakeGraph {
   }
   async unsubscribeApp(pageId: string, token: string) {
     this.fail();
+    calls.push('unsubscribeApp');
     this.unsubscribed.push({ pageId, token });
   }
 
@@ -81,6 +99,7 @@ describeDb('FacebookPageService', () => {
   let runtime: { db: Database; close(): Promise<void> };
   let graph: FakeGraph;
   let service: FacebookPageService;
+  let profileSync: FakeProfileSync;
   const ownerA = (): PageConnectOwner => ({ merchantId: t.merchantA, userId: 'user-a' });
   const ownerB = (): PageConnectOwner => ({ merchantId: t.merchantB, userId: 'user-b' });
 
@@ -109,6 +128,8 @@ describeDb('FacebookPageService', () => {
     await t.db.delete(schema.facebookPage).where(eq(schema.facebookPage.merchantId, t.merchantA));
     await t.db.delete(schema.facebookPage).where(eq(schema.facebookPage.merchantId, t.merchantB));
     graph = new FakeGraph();
+    profileSync = new FakeProfileSync();
+    calls = [];
     graph.addPage('1001', 'Rahim Kitchen');
     graph.addPage('1002', 'Rahim Sweets');
     // As app_runtime, so row-level security applies exactly as in production.
@@ -118,6 +139,7 @@ describeDb('FacebookPageService', () => {
       crypto,
       graph as unknown as MetaGraphClient,
       REDIRECT_URI,
+      profileSync as unknown as MessengerProfileSync,
     );
   });
 
@@ -235,6 +257,21 @@ describeDb('FacebookPageService', () => {
       await expect(service.get(ownerA())).resolves.toEqual(page);
     });
 
+    it('requests a profile sync after connecting', async () => {
+      await service.connect(ownerA(), authorized(ownerA()), '1001');
+      expect(profileSync.requested).toEqual([t.merchantA]);
+    });
+
+    it('requests no sync when the connect is refused', async () => {
+      await service.connect(ownerA(), authorized(ownerA()), '1001');
+      profileSync.requested = [];
+      await expectCoded(
+        service.connect(ownerA(), authorized(ownerA()), '1002'),
+        'FACEBOOK_PAGE_ALREADY_CONNECTED',
+      );
+      expect(profileSync.requested).toEqual([]);
+    });
+
     it('refreshes the name and token on a reconnect of the same Page', async () => {
       const first = await service.connect(ownerA(), authorized(ownerA()), '1001');
       graph.addPage('1001', 'Rahim Kitchen BD');
@@ -303,6 +340,14 @@ describeDb('FacebookPageService', () => {
       expect(graph.unsubscribed).toEqual([{ pageId: '1001', token: 'page-token-1001' }]);
     });
 
+    it('clears the profile with the stored token, before unsubscribing', async () => {
+      await service.connect(ownerA(), authorized(ownerA()), '1001');
+      calls = [];
+      await service.disconnect(ownerA());
+      expect(calls).toEqual(['clearProfile', 'unsubscribeApp']);
+      expect(profileSync.cleared).toEqual([`${t.merchantA}:page-token-1001`]);
+    });
+
     it('still forgets the Page when Facebook cannot be reached', async () => {
       await service.connect(ownerA(), authorized(ownerA()), '1001');
       graph.failWith = new GraphError(503, undefined, 'down');
@@ -322,6 +367,7 @@ describeDb('FacebookPageService', () => {
       crypto,
       null,
       REDIRECT_URI,
+      profileSync as unknown as MessengerProfileSync,
     );
     expect(() => unconfigured.start(ownerA())).toThrow(
       expect.objectContaining({

@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
-import { FacebookPageModule } from '../page/facebook-page.module';
 import { QueueModule } from '../../queue/queue.module';
+import { FacebookPageModule } from '../page/facebook-page.module';
+import { MerchantSettingsRepository } from '../../settings/merchant-settings.repository';
 import { MessengerProfileProcessor } from './messenger-profile.processor';
+import { WelcomeScreenController } from './welcome-screen.controller';
+import { WelcomeScreenService } from './welcome-screen.service';
 
 /**
  * The Messenger Profile, live in the API and the worker. MessengerProfileSync
@@ -12,6 +15,8 @@ import { MessengerProfileProcessor } from './messenger-profile.processor';
  */
 @Module({
   imports: [FacebookPageModule],
+  controllers: [WelcomeScreenController],
+  providers: [WelcomeScreenService, MerchantSettingsRepository],
   exports: [FacebookPageModule],
 })
 export class MessengerProfileModule {}
