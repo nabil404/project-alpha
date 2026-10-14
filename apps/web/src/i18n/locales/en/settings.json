@@ -127,6 +127,27 @@
     "title": "Settings"
   },
   "messenger": {
+    "ads": {
+      "adId": "Ad ID",
+      "archivedHint": "This product is archived, so the ad starts a normal chat.",
+      "archivedOption": "{{name}} (archived)",
+      "chats": "Chats",
+      "chatsSince": "{{count}} chats · {{date}}",
+      "description": "Ads that brought customers to your chat. Pick the product each ad sells, and the assistant starts with it next time.",
+      "draftHint": "Draft products are skipped until you publish them. The ad starts a normal chat until then.",
+      "draftOption": "{{name}} (Draft)",
+      "empty": "No ads yet. When someone messages you from an ad, it shows up here.",
+      "firstSeen": "First seen",
+      "hint": "Find an ad's ID in Ads Manager. Until it has a product, an ad starts a normal chat. A product that is no longer Published is skipped the same way.",
+      "loadFailed": "Couldn't load the products.",
+      "needsProduct_one": "{{count}} needs a product",
+      "needsProduct_other": "{{count}} need a product",
+      "noProduct": "No product (normal chat)",
+      "product": "Product",
+      "productFor": "Product for ad {{adId}}",
+      "saved": "Ad updated.",
+      "title": "Click-to-Messenger ads"
+    },
     "choose": {
       "cancel": "Cancel",
       "connect": "Connect",
@@ -175,6 +196,38 @@
     "notConnected": {
       "body": "The assistant can't read or answer Messenger chats until you connect one.",
       "title": "No Facebook Page connected."
+    },
+    "welcome": {
+      "add": "Add question",
+      "alwaysThere": "Always there, in your shop's language",
+      "cancel": "Cancel",
+      "chatMenu": "Chat menu",
+      "chatMenuLines": "Browse products · My last order · Talk to a person",
+      "count": "{{count}} / {{max}}",
+      "description": "What a customer sees in Messenger before their first message. Saving updates your Page on Facebook.",
+      "does": {
+        "ask": "The assistant answers like a typed question.",
+        "browse": "Opens your product categories."
+      },
+      "failed": {
+        "graph_error": "Facebook didn't accept the update. Try again in a moment.",
+        "token_invalid": "Facebook no longer accepts this Page's connection. Reconnect the Page, then try again."
+      },
+      "getStarted": "Get Started button",
+      "getStartedHint": "Opens your product categories.",
+      "greeting": "Greeting",
+      "greetingHint": "Shown above the Get Started button. {first_name} becomes the customer's first name.",
+      "lastUpdated": "Last updated on Facebook {{date}}",
+      "live": "Live on your Page",
+      "question": "Question {{number}}",
+      "questions": "Questions customers can tap",
+      "questionsLimit": "up to {{max}}",
+      "removeQuestion": "Remove question {{number}}",
+      "retry": "Retry",
+      "save": "Save and update Page",
+      "saved": "Welcome screen saved. Updating your Page…",
+      "title": "Welcome screen",
+      "updating": "Updating your Page…"
     }
   },
   "nav": {
