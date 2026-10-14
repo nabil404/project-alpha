@@ -9,6 +9,7 @@ import {
   describeDb,
   openCatalogTestDb,
   openRuntimeDb,
+  seedProduct,
   type CatalogTestDb,
 } from '../../../database/__tests__/catalog-test-db';
 import { randomPageId, seedFacebookPage } from '../../../database/__tests__/conversation-seeds';
@@ -16,15 +17,19 @@ import {
   ASSISTANT_TURN_RETRY,
   type CustomerMessageJob,
   type CustomerPostbackJob,
+  type CustomerReferralJob,
   type PageEchoJob,
 } from '../../../queue/queue.constants';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { GraphError, type MetaGraphClient } from '../../../messenger/page/meta-graph.client';
 import { ConversationRepository } from '../../conversation.repository';
+import { REFERRAL_TEXT } from '../../assistant/assistant-fallbacks';
 import { PROFILE_REFRESH_MS } from '../../conversation-rules';
 import { CustomerRepository } from '../../customer.repository';
 import type { ConversationEvent } from '../../events/conversation-event';
 import type { ConversationEventsPublisher } from '../../events/conversation-events.publisher';
+import { AdProductRepository } from '../../../messenger/ads/ad-product.repository';
+import { MerchantSettingsRepository } from '../../../settings/merchant-settings.repository';
 import { MessageRepository } from '../../message.repository';
 import { CustomerProfileReader } from '../../profiles/customer-profile.reader';
 import { InboundMessageIngest } from '../inbound-message.ingest';
@@ -120,6 +125,8 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
       new CustomerRepository(),
       new ConversationRepository(),
       new MessageRepository(),
+      new AdProductRepository(),
+      new MerchantSettingsRepository(),
       publisher as unknown as ConversationEventsPublisher,
       turns as unknown as Queue,
     );
@@ -552,5 +559,119 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
       expect((await threadOf(psid))!.conversation.state).toBe('browsing');
       expect(turns.added).toHaveLength(1);
     });
+  });
+
+  const PRODUCT = randomUUID();
+  const referralJob = (overrides: Partial<CustomerReferralJob> = {}): CustomerReferralJob => ({
+    kind: 'customer-referral',
+    messageId: `rf-${randomUUID()}`,
+    pageId: pageA,
+    senderPsid: `psid-${randomUUID()}`,
+    text: '',
+    referral: { kind: 'link', productId: PRODUCT },
+    sentAt: Date.parse('2026-10-14T09:00:00Z'),
+    ...overrides,
+  });
+
+  it('stores a standalone product link as a customer row carrying the ref payload, and queues at once', async () => {
+    const job = referralJob();
+    await expect(ingest.handle(job)).resolves.toBe('stored');
+
+    const thread = await threadOf(job.senderPsid);
+    expect(thread?.conversation.entrySource).toBe('link');
+    expect(await messagesOf(thread!.conversation.id)).toMatchObject([
+      { sender: 'customer', payload: `ref:product:${PRODUCT}`, text: REFERRAL_TEXT.bn.link },
+    ]);
+    expect(turns.added).toHaveLength(1);
+    expect(turns.added[0]?.opts).toMatchObject({ delay: 0 });
+  });
+
+  it('records an unmapped ad and starts an organic chat marked as from an ad', async () => {
+    const adId = `ad-${randomUUID()}`;
+    const job = customerMessage({ referral: { kind: 'ad', adId }, text: 'price?' });
+    await ingest.handle(job);
+
+    const thread = await threadOf(job.senderPsid);
+    expect(thread?.conversation.entrySource).toBe('ad');
+    expect(await messagesOf(thread!.conversation.id)).toMatchObject([
+      { text: 'price?', payload: null },
+    ]);
+    const [ad] = await t.db.select().from(schema.adProduct).where(eq(schema.adProduct.adId, adId));
+    expect(ad).toMatchObject({ merchantId: t.merchantA, chatCount: 1, productId: null });
+  });
+
+  it('turns a mapped ad into the product it sells', async () => {
+    const adId = `ad-${randomUUID()}`;
+    const product = await seedProduct(t.db, t.merchantA, { name: 'Jamdani saree' });
+    await t.db
+      .insert(schema.adProduct)
+      .values({ merchantId: t.merchantA, pageId: pageA, adId, productId: product.id });
+    const job = customerMessage({ referral: { kind: 'ad', adId } });
+    await ingest.handle(job);
+
+    const thread = await threadOf(job.senderPsid);
+    expect(await messagesOf(thread!.conversation.id)).toMatchObject([
+      { payload: `ref:product:${product.id}` },
+    ]);
+  });
+
+  it('counts a redelivered ad referral once', async () => {
+    const adId = `ad-${randomUUID()}`;
+    const job = customerMessage({ referral: { kind: 'ad', adId } });
+    await expect(ingest.handle(job)).resolves.toBe('stored');
+    await expect(ingest.handle(job)).resolves.toBe('duplicate');
+    const [ad] = await t.db.select().from(schema.adProduct).where(eq(schema.adProduct.adId, adId));
+    expect(ad?.chatCount).toBe(1);
+  });
+
+  it('marks Get Started without a referral as get_started', async () => {
+    const job: CustomerPostbackJob = {
+      kind: 'customer-postback',
+      messageId: `mid-${randomUUID()}`,
+      pageId: pageA,
+      senderPsid: `psid-${randomUUID()}`,
+      text: 'Get Started',
+      payload: 'start',
+      sentAt: Date.parse('2026-10-14T09:00:00Z'),
+    };
+    await ingest.handle(job);
+    const thread = await threadOf(job.senderPsid);
+    expect(thread?.conversation.entrySource).toBe('get_started');
+    expect(await messagesOf(thread!.conversation.id)).toMatchObject([{ payload: 'start' }]);
+  });
+
+  it('stores a referral on a handed-off chat and queues nothing', async () => {
+    const job = referralJob();
+    await ingest.handle(customerMessage({ senderPsid: job.senderPsid }));
+    const thread = await threadOf(job.senderPsid);
+    await t.db
+      .update(schema.conversation)
+      .set({ state: 'handed_off' })
+      .where(eq(schema.conversation.id, thread!.conversation.id));
+    turns.added = [];
+
+    await ingest.handle(job);
+    expect((await threadOf(job.senderPsid))?.conversation.entrySource).toBe('link');
+    expect(turns.added).toEqual([]);
+  });
+
+  it('resets the entry source when a confirmed chat starts its next order', async () => {
+    const job = referralJob();
+    await ingest.handle(job);
+    const thread = await threadOf(job.senderPsid);
+    await t.db
+      .update(schema.conversation)
+      .set({ state: 'confirmed' })
+      .where(eq(schema.conversation.id, thread!.conversation.id));
+
+    await ingest.handle(customerMessage({ senderPsid: job.senderPsid, text: 'one more please' }));
+    expect((await threadOf(job.senderPsid))?.conversation.entrySource).toBe('organic');
+  });
+
+  it('never records another shop’s ad on this shop', async () => {
+    const adId = `ad-${randomUUID()}`;
+    await ingest.handle(customerMessage({ pageId: pageB, referral: { kind: 'ad', adId } }));
+    const rows = await t.db.select().from(schema.adProduct).where(eq(schema.adProduct.adId, adId));
+    expect(rows.map((row) => row.merchantId)).toEqual([t.merchantB]);
   });
 });

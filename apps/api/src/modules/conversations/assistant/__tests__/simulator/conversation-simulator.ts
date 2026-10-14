@@ -44,6 +44,7 @@ import { CustomerRepository } from '../../../customer.repository';
 import type { ConversationEventsPublisher } from '../../../events/conversation-events.publisher';
 import { InboundMessageIngest } from '../../../ingest/inbound-message.ingest';
 import { InboundMessageProcessor } from '../../../ingest/inbound-message.processor';
+import { AdProductRepository } from '../../../../messenger/ads/ad-product.repository';
 import { MessageRepository } from '../../../message.repository';
 import { OutboundMessageSender } from '../../../outbound-message.sender';
 import { CustomerProfileReader } from '../../../profiles/customer-profile.reader';
@@ -323,6 +324,8 @@ export class ConversationSimulator {
         new CustomerRepository(),
         conversations,
         messages,
+        new AdProductRepository(),
+        settings,
         publisher,
         this.turns as unknown as Queue,
       ),

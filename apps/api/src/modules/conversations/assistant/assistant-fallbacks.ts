@@ -22,6 +22,12 @@ export function languageFor(country: string): ReplyLanguage {
   return country === 'BD' ? 'bn' : 'en';
 }
 
+/** The customer's side of a standalone referral, stored as their message. Draft Bangla, to be reviewed. */
+export const REFERRAL_TEXT: Record<ReplyLanguage, { link: string; ad: string }> = {
+  bn: { link: 'একটি পণ্যের লিংক থেকে এসেছেন', ad: 'একটি বিজ্ঞাপন থেকে এসেছেন' },
+  en: { link: 'Opened a link to a product', ad: 'Came from an ad' },
+};
+
 /** The facts, and the item the slot is asked for. */
 interface Asked {
   facts: ReplyFacts;
