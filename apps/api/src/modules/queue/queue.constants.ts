@@ -140,3 +140,19 @@ export interface AssistantTurnJob {
   /** Our message row id of the customer message that queued the turn. */
   triggerMessageId: string;
 }
+
+/**
+ * The Page's Messenger Profile (Get Started, greeting, ice breakers, menu).
+ * The API and the worker enqueue SYNC_PROFILE_JOB; only the worker processes
+ * it, and only the worker adds RESUBSCRIBE_PAGES_JOB, once per deploy.
+ */
+export const MESSENGER_PROFILE_QUEUE = 'messenger-profile';
+export const SYNC_PROFILE_JOB = 'sync-profile';
+export const RESUBSCRIBE_PAGES_JOB = 'resubscribe-pages';
+
+/** Carries no settings: the job reads the shop's latest when it runs. */
+export interface SyncProfileJob {
+  merchantId: string;
+  /** Also re-subscribe the Page's webhooks, for Pages connected before a field was added. */
+  resubscribe?: boolean;
+}

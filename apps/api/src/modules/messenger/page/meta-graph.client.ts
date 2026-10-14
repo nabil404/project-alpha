@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { PROFILE_FIELDS, type MessengerProfileBody } from '../profile/messenger-profile';
 
 /**
  * What the Page connection flow asks Facebook for. `pages_show_list` lists the
@@ -217,6 +218,19 @@ export class MetaGraphClient {
   async unsubscribeApp(pageId: string, pageToken: string): Promise<void> {
     await this.request('DELETE', `/${encodeURIComponent(pageId)}/subscribed_apps`, {
       token: pageToken,
+    });
+  }
+
+  /** The Page's Messenger Profile: Get Started, greeting, ice breakers and menu. Replaces each field sent. */
+  async setMessengerProfile(pageToken: string, body: MessengerProfileBody): Promise<void> {
+    await this.request('POST', '/me/messenger_profile', { token: pageToken, json: body });
+  }
+
+  /** Removes our fields, so a disconnected Page keeps no dead buttons. */
+  async clearMessengerProfile(pageToken: string): Promise<void> {
+    await this.request('DELETE', '/me/messenger_profile', {
+      token: pageToken,
+      json: { fields: [...PROFILE_FIELDS] },
     });
   }
 
