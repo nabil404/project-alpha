@@ -1,5 +1,12 @@
 import { Logger } from '@nestjs/common';
-import { generateText, Output, RetryError, type LanguageModel } from 'ai';
+import {
+  generateText,
+  Output,
+  RetryError,
+  type LanguageModel,
+  type Telemetry,
+  type TelemetryOptions,
+} from 'ai';
 import {
   extractedOrderSchema,
   intentResultSchema,
@@ -27,6 +34,8 @@ export interface AiSdkLlmOptions {
   routing: Model;
   extraction: Model;
   timeoutMs: number;
+  /** Traces every call, named by its purpose; absent, telemetry is off for every call. */
+  telemetry?: Telemetry;
 }
 
 interface Tokens {
@@ -92,6 +101,7 @@ export class AiSdkLlmClient implements LlmClient {
         prompt: phraseReplyPrompt(request, history),
         abortSignal,
         maxRetries: 1,
+        telemetry: this.telemetry('phrase'),
       });
       return { value: result.text.trim(), tokens: result.usage };
     });
@@ -112,12 +122,18 @@ export class AiSdkLlmClient implements LlmClient {
         output: Output.object({ schema }),
         abortSignal,
         maxRetries: 1,
+        telemetry: this.telemetry(purpose),
       });
       // Again with Zod: strict JSON-schema mode can drop bounds such as confidence's 0..1.
       const parsed = schema.safeParse(result.output);
       if (!parsed.success) throw new InvalidOutput(result.usage);
       return { value: parsed.data as z.infer<S>, tokens: result.usage };
     });
+  }
+
+  private telemetry(purpose: LlmPurpose): TelemetryOptions {
+    const { telemetry } = this.options;
+    return telemetry ? { functionId: purpose, integrations: [telemetry] } : { isEnabled: false };
   }
 
   private async call<T>(

@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
+import { registerTelemetry, type Telemetry } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import { AiSdkLlmClient } from '../ai-sdk-llm.client';
 import type { ChatLine } from '../llm.types';
@@ -37,12 +38,20 @@ const client = (
   routing: string | Error | 'hang',
   extraction: string | Error | 'hang' = '{}',
   timeoutMs = 2_000,
+  telemetry?: Telemetry,
 ) =>
   new AiSdkLlmClient({
     routing: model('mock-routing', routing),
     extraction: model('mock-extraction', extraction),
     timeoutMs,
+    telemetry,
   });
+
+/** A telemetry integration that records the functionId of every call it sees. */
+function recorder(): Telemetry & { seen: (string | undefined)[] } {
+  const seen: (string | undefined)[] = [];
+  return { seen, onStart: (event) => void seen.push(event.functionId) };
+}
 
 const RED_SAREE = {
   ref: null,
@@ -60,6 +69,8 @@ const ORDER = JSON.stringify({
   deliveryArea: null,
   confidence: 0.92,
 });
+
+const INTENT = '{"intent":"order","confidence":0.9}';
 
 beforeAll(() => Logger.overrideLogger(false));
 
@@ -146,5 +157,22 @@ describe('AiSdkLlmClient', () => {
   it('gives up after the timeout', async () => {
     const result = await client('hang', '{}', 20).classifyIntent(history);
     expect(result).toMatchObject({ ok: false, reason: 'timeout' });
+  });
+
+  it('traces each call under its purpose when given telemetry', async () => {
+    const telemetry = recorder();
+    const traced = client(INTENT, ORDER, 2_000, telemetry);
+    await traced.classifyIntent(history);
+    await traced.extractOrder(history, { items: [] });
+    await traced.phraseReply({ instruction: 'greet', facts: {}, language: 'en' }, history);
+    expect(telemetry.seen).toEqual(['classify', 'extract', 'phrase']);
+  });
+
+  // Last: registerTelemetry is global and cannot be undone.
+  it('traces nothing without telemetry, even when an integration is registered globally', async () => {
+    const global = recorder();
+    registerTelemetry(global);
+    await client(INTENT).classifyIntent(history);
+    expect(global.seen).toHaveLength(0);
   });
 });

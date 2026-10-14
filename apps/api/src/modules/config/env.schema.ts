@@ -57,6 +57,15 @@ const envObject = z.object({
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   /** Optional: without it the worker stores messages but queues no assistant turns. */
   LLM_API_KEY: optional(z.string()),
+  /**
+   * Optional: traces every LLM call, prompt and output included, to LangSmith.
+   * Development and stage only: those traces hold customer chats, which in
+   * production must stay in our own database.
+   */
+  LANGSMITH_API_KEY: optional(z.string()),
+  LANGSMITH_PROJECT: z.string().min(1).default('social-glider-dev'),
+  /** The EU region is https://eu.api.smith.langchain.com. */
+  LANGSMITH_ENDPOINT: z.string().url().default('https://api.smith.langchain.com'),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   SENTRY_DSN: optional(z.string().url()),
