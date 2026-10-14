@@ -80,6 +80,7 @@ describe('matchProduct', () => {
         name,
         aliases: [],
       })),
+      categories: [],
     };
     const match = matchProduct(['saree'], many);
     expect(match.kind).toBe('some');
@@ -118,6 +119,7 @@ describe('matchProduct', () => {
           aliases: [],
         },
       ],
+      categories: [],
     };
 
     it.each([
@@ -227,6 +229,7 @@ describe('matchProduct', () => {
   it('matches only the products it is given', () => {
     const withoutLungi = {
       products: EVAL_CATALOG.products.filter((product) => product.id !== id('lungi')),
+      categories: [],
     };
     expect(matchProduct(['lungi'], withoutLungi)).toEqual({ kind: 'none' });
   });

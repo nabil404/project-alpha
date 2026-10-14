@@ -1,4 +1,4 @@
-import type { CustomerIntent, Quote, SlotName } from '@app/shared';
+import type { CustomerIntent, OrderStatus, Quote, SlotName } from '@app/shared';
 
 /** One item as the reply may speak of it: catalog names, formatted money. */
 export interface LineFacts {
@@ -70,4 +70,23 @@ export type ReplyIntent =
       facts: ReplyFacts;
     }
   | { kind: 'summary'; quote: Quote; facts: ReplyFacts }
+  | { kind: 'browse_categories'; choices: Choice[] }
+  | { kind: 'browse_products'; cards: ProductCard[]; more: boolean }
+  | { kind: 'last_order'; order: LastOrderFacts | null }
   | { kind: 'handoff'; reason: HandoffReason };
+
+/** One carousel card: a product with its lowest available price. */
+export interface ProductCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string | null;
+}
+
+/** The customer's most recent order, as the reply may state it. */
+export interface LastOrderFacts {
+  reference: string;
+  status: OrderStatus;
+  /** Formatted in the shop's currency. */
+  total: string;
+}

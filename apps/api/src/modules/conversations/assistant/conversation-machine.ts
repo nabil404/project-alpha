@@ -4,6 +4,7 @@ import {
   emptySlots,
   formatMinorUnitsTrimmed,
   hasCollectedAnything,
+  MAX_ORDER_ITEMS,
   MAX_QUICK_REPLIES,
   nextMissingSlot,
   parseCustomerPhone,
@@ -18,7 +19,7 @@ import {
   type Quote,
   type Variant,
 } from '@app/shared';
-import type { ReplyLanguage } from './assistant-fallbacks';
+import { LOCALES, type ReplyLanguage } from './assistant-fallbacks';
 import {
   matchArea,
   matchProduct,
@@ -26,11 +27,13 @@ import {
   type CatalogView,
   type DeliveryArea,
 } from './catalog-match';
+import { browseReply } from './entry-replies';
 import { mergeItems, mergeSameVariant } from './item-merge';
 import type {
   AskReason,
   Choice,
   HandoffReason,
+  LastOrderFacts,
   LineFacts,
   ReplyFacts,
   ReplyIntent,
@@ -64,6 +67,13 @@ export interface ItemPick {
   id: string;
 }
 
+/** A tap on the welcome screen, a carousel card, a link or an ad: no reading needed. */
+export type Entry =
+  | { kind: 'browse'; categoryId: string | 'other' | null }
+  | { kind: 'product'; productId: string }
+  | { kind: 'last_order'; order: LastOrderFacts | null }
+  | { kind: 'human' };
+
 /** What started the turn: a message the LLM read, or a tap that needs no reading. */
 export type TurnTrigger =
   | {
@@ -71,7 +81,8 @@ export type TurnTrigger =
       classified: IntentResult | 'failed';
       extracted: ExtractedOrder | 'failed' | 'skipped';
     }
-  | { kind: 'pick'; pick: ItemPick };
+  | { kind: 'pick'; pick: ItemPick }
+  | { kind: 'entry'; entry: Entry };
 
 export interface TurnInput {
   state: ActiveState;
@@ -113,7 +124,7 @@ export function validPick(
   return { slot: tap.slot, item: offered.item, id: tap.id };
 }
 
-export const LOCALES: Record<ReplyLanguage, string> = { bn: 'bn-BD', en: 'en-US' };
+export { LOCALES };
 
 /** Slots written by an older shape, or by hand, read as nothing collected rather than failing the turn. */
 export function readSlots(value: unknown): CollectedSlots {
@@ -146,6 +157,21 @@ function decide(input: TurnInput): TurnDecision {
   let invalidPhone = false;
   const picked: number[] = [];
 
+  if (trigger.kind === 'entry') {
+    const { entry } = trigger;
+    if (entry.kind === 'human') return handOff(slots, 'request_human');
+    if (entry.kind === 'last_order') {
+      return { state: input.state, slots, reply: { kind: 'last_order', order: entry.order } };
+    }
+    if (entry.kind === 'browse' || !findProduct(catalog, entry.productId)) {
+      const categoryId = entry.kind === 'browse' ? entry.categoryId : null;
+      const reply = browseReply(catalog, categoryId, input.language, input.delivery.currency);
+      // Nothing available at all: the seller answers.
+      if (reply.kind === 'handoff') return handOff(slots, reply.reason);
+      return { state: input.state, slots, reply };
+    }
+  }
+
   if (trigger.kind === 'message') {
     const { classified, extracted } = trigger;
     if (classified === 'failed' || extracted === 'failed') return handOff(slots, 'llm_failed');
@@ -167,9 +193,13 @@ function decide(input: TurnInput): TurnDecision {
     }
     if (classified.intent === 'ask_question') return handOff(slots, 'question');
     intent = classified.intent;
-  } else {
+  } else if (trigger.kind === 'pick') {
     slots = applyPick(slots, trigger.pick);
     picked.push(trigger.pick.item);
+  } else if (trigger.entry.kind === 'product') {
+    const added = addProduct(slots, trigger.entry.productId);
+    slots = added.slots;
+    picked.push(added.item);
   }
 
   const resolved = resolveItems(slots.items, catalog, picked);
@@ -431,6 +461,23 @@ function remapLastAsked(
   if (last?.item === undefined || last.item >= to.length) return last;
   const item = to[last.item];
   return item === undefined ? undefined : { ...last, item };
+}
+
+/**
+ * A product chosen from a carousel, a link or an ad: a new item, unless the
+ * same product is already waiting for its variant. At the item limit the list
+ * is left alone, and the reply asks as it would for a typed eleventh item.
+ */
+function addProduct(
+  slots: CollectedSlots,
+  productId: string,
+): { slots: CollectedSlots; item: number } {
+  const open = slots.items.findIndex(
+    (item) => item.productId === productId && item.variantId === undefined,
+  );
+  if (open >= 0) return { slots, item: open };
+  if (slots.items.length >= MAX_ORDER_ITEMS) return { slots, item: slots.items.length - 1 };
+  return { slots: { ...slots, items: [...slots.items, { productId }] }, item: slots.items.length };
 }
 
 function applyPick(slots: CollectedSlots, pick: ItemPick): CollectedSlots {

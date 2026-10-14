@@ -18,6 +18,9 @@ type FallbackKey =
   | 'handoff_awaiting_seller';
 
 /** The shop's country picks the fallback language: Bangladesh answers in Bangla. */
+/** The BCP-47 locale each reply language formats money in. */
+export const LOCALES: Record<ReplyLanguage, string> = { bn: 'bn-BD', en: 'en-US' };
+
 export function languageFor(country: string): ReplyLanguage {
   return country === 'BD' ? 'bn' : 'en';
 }
@@ -121,6 +124,9 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
         reply.reason === 'awaiting_seller' ? sentences.handoff_awaiting_seller : sentences.handoff;
       return say({ facts: { items: [] }, item: undefined });
     }
+    // Task 7 stopgap: the entry replies have no fallback text yet.
+    default:
+      return sentences.handoff({ facts: { items: [] }, item: undefined });
   }
 }
 
