@@ -8,6 +8,7 @@ import {
   describeDb,
   openCatalogTestDb,
   openRuntimeDb,
+  seedCategory,
   seedImage,
   seedProduct,
   seedVariant,
@@ -19,7 +20,13 @@ import {
   seedFacebookPage,
   seedMessage,
 } from '../../../database/__tests__/conversation-seeds';
-import type { LlmClient, LlmPurpose, LlmResult } from '../../../llm/llm.types';
+import type {
+  ChatLine,
+  ExtractionContext,
+  LlmClient,
+  LlmPurpose,
+  LlmResult,
+} from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import {
   GraphError,
@@ -27,6 +34,8 @@ import {
   type MetaGraphClient,
 } from '../../../messenger/page/meta-graph.client';
 import type { NotificationsService } from '../../../notifications/notifications.service';
+import { seedOrder } from '../../../database/__tests__/order-seeds';
+import { OrdersRepository } from '../../../orders/orders.repository';
 import { productsService } from '../../../products/__tests__/products-service.fixture';
 import { DeliveryChargesRepository } from '../../../settings/delivery-charges.repository';
 import { MerchantSettingsRepository } from '../../../settings/merchant-settings.repository';
@@ -35,7 +44,7 @@ import { ConversationsService } from '../../conversations.service';
 import type { ConversationEventsPublisher } from '../../events/conversation-events.publisher';
 import { MessageRepository } from '../../message.repository';
 import { OutboundMessageSender } from '../../outbound-message.sender';
-import { fallbackText } from '../assistant-fallbacks';
+import { fallbackText, REFERRAL_TEXT } from '../assistant-fallbacks';
 import { AssistantTurnService, extractionContext } from '../assistant-turn.service';
 import { LlmCallRepository } from '../llm-call.repository';
 import { EVAL_CATALOG, productByKey } from './fixtures/match-eval';
@@ -76,13 +85,15 @@ class FakeLlm implements LlmClient {
   extraction: LlmResult<ExtractedOrder> = ok(NOTHING, 'extract');
   phrase: LlmResult<string> = ok('Which product would you like?', 'phrase');
   calls: LlmPurpose[] = [];
+  extractContexts: ExtractionContext[] = [];
   onClassify: () => Promise<void> = async () => undefined;
   async classifyIntent() {
     this.calls.push('classify');
     await this.onClassify();
     return this.intent;
   }
-  async extractOrder() {
+  async extractOrder(_history: ChatLine[], context: ExtractionContext) {
+    this.extractContexts.push(context);
     this.calls.push('extract');
     return this.extraction;
   }
@@ -100,7 +111,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
   let llm: FakeLlm;
   let sent: { psid: string; text: string }[];
   let rich: {
-    kind: 'image' | 'quick_replies' | 'card' | 'text';
+    kind: 'image' | 'quick_replies' | 'card' | 'carousel' | 'text';
     text: string;
     payloads: string[];
   }[];
@@ -127,6 +138,8 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     sendButtonTemplate: (_token: string, psid: string, text: string, buttons: GraphOption[]) =>
       send('card', psid, text, buttons),
     sendImage: (_token: string, psid: string, url: string) => send('image', psid, url),
+    sendGenericTemplate: (_token: string, psid: string, cards: { title: string }[]) =>
+      send('carousel', psid, cards.map((card) => card.title).join(', ')),
   } as unknown as MetaGraphClient;
 
   const service = (client: LlmClient | null = llm) => {
@@ -164,6 +177,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
           return 'ordered';
         },
       } as unknown as OrderConfirmationService,
+      new OrdersRepository(),
     );
   };
 
@@ -642,6 +656,111 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
       expect(llm.calls).toContain('classify');
       expect((await conversationRow(convo.id))?.collectedSlots).toMatchObject({ items: [] });
+    });
+
+    describe('entry triggers', () => {
+      /** A tap row after the thread's first message, with the text Meta or the ingest stored. */
+      const entryTap = async (text: string, payload: string) => {
+        const made = await thread();
+        const tap = await seedMessage(t.db, t.merchantA, made.convo.id, {
+          sentAt: new Date(),
+          text,
+          payload,
+        });
+        return { ...made, job: { ...made.job, triggerMessageId: tap.id } };
+      };
+      /** Two live categories with a sellable product each, so browsing offers a choice. */
+      const twoCategories = async () => {
+        for (const name of ['Turnservice Sarees', 'Turnservice Kurtis']) {
+          const category = await seedCategory(t.db, t.merchantA, { name });
+          const { product: row } = await product(`${name} item`);
+          await t.db
+            .insert(schema.productCategory)
+            .values({ merchantId: t.merchantA, productId: row.id, categoryId: category.id });
+        }
+      };
+      const slotsOf = async (id: string) => (await conversationRow(id))?.collectedSlots;
+
+      it('answers Get Started with the categories and never calls the LLM', async () => {
+        await twoCategories();
+        const { job } = await entryTap('Get Started', 'start');
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        expect(rich.map((entry) => entry.kind)).toEqual(['quick_replies']);
+      });
+
+      it('answers a ref to an archived product with categories and collects nothing', async () => {
+        const archived = await seedProduct(t.db, t.merchantA, {
+          name: 'Turnservice Old saree',
+          status: 'archived',
+        });
+        const { convo, job } = await entryTap(REFERRAL_TEXT.bn.link, `ref:product:${archived.id}`);
+
+        await service().run(job);
+
+        expect(llm.calls).toEqual([]);
+        expect(rich[0]?.kind).toBe('quick_replies');
+        expect(await slotsOf(convo.id)).toMatchObject({ items: [] });
+      });
+
+      it('collects the product of a link opened on its own, and asks for its variant', async () => {
+        const jamdani = await seedProduct(t.db, t.merchantA, {
+          name: 'Turnservice Jamdani',
+          status: 'active',
+        });
+        for (const name of ['Red', 'Blue']) {
+          await seedVariant(t.db, t.merchantA, jamdani.id, { name, price: 450_000, stock: 5 });
+        }
+        const { convo, job } = await entryTap(REFERRAL_TEXT.bn.link, `ref:product:${jamdani.id}`);
+
+        await service().run(job);
+
+        expect(llm.calls).toEqual([]);
+        expect(await slotsOf(convo.id)).toMatchObject({ items: [{ productId: jamdani.id }] });
+        expect(rich.at(-1)?.kind).toBe('quick_replies');
+      });
+
+      it('runs the LLM on a ref that came with typed text, the item already collected', async () => {
+        const { product: saree } = await product('Turnservice Typed Saree');
+        llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
+        const { job } = await entryTap('how much is this?', `ref:product:${saree.id}`);
+
+        await service().run(job);
+
+        expect(llm.calls).toContain('classify');
+        expect(llm.extractContexts.at(-1)?.items).toEqual([
+          expect.objectContaining({ product: 'Turnservice Typed Saree' }),
+        ]);
+      });
+
+      it('answers My last order with the newest order', async () => {
+        const { customer, job } = await entryTap('My last order', 'menu:last-order');
+        await seedOrder(t.db, t.merchantA, customer.id, {
+          reference: 'ORD-2026-00481',
+          status: 'packed',
+          placedAt: new Date(Date.now() - 1_000),
+        });
+        await seedOrder(t.db, t.merchantA, customer.id, {
+          reference: 'ORD-2025-00001',
+          placedAt: new Date(Date.now() - 86_400_000),
+        });
+
+        await service().run(job);
+
+        expect(llm.calls).toEqual([]);
+        expect(sent).toHaveLength(1);
+        expect(sent[0]?.text).toContain('ORD-2026-00481');
+      });
+
+      it('hands off on the human menu item without the LLM', async () => {
+        const { job } = await entryTap('Talk to a person', 'menu:human');
+
+        await expect(service().run(job)).resolves.toBe('handed_off');
+
+        expect(llm.calls).toEqual([]);
+      });
     });
 
     it('sends the summary as a card whose buttons carry its revision, never phrased', async () => {
