@@ -86,26 +86,28 @@ export const ICE_BREAKERS_MAX = 4;
 export const ICE_BREAKER_QUESTION_MAX = 80;
 
 /** Code points, as Meta counts them; `.max()` would count UTF-16 units. */
-const maxChars = (max: number) => (value: string) => [...value].length <= max;
+const maxChars = (max: number) => (value: string, ctx: z.RefinementCtx) => {
+  if ([...value].length > max) {
+    ctx.addIssue({
+      code: 'too_big',
+      origin: 'string',
+      maximum: max,
+      inclusive: true,
+      input: value,
+    });
+  }
+};
 
 export const iceBreakerSchema = z.object({
   /** `browse` opens the categories; `ask` is answered by the assistant like a typed question. */
   kind: z.enum(['browse', 'ask']),
-  question: z
-    .string()
-    .trim()
-    .min(1)
-    .refine(maxChars(ICE_BREAKER_QUESTION_MAX), { params: { code: 'TOO_LONG' } }),
+  question: z.string().trim().min(1).superRefine(maxChars(ICE_BREAKER_QUESTION_MAX)),
 });
 export type IceBreaker = z.infer<typeof iceBreakerSchema>;
 
 export const welcomeScreenInputSchema = z
   .object({
-    greeting: z
-      .string()
-      .trim()
-      .min(1)
-      .refine(maxChars(GREETING_MAX), { params: { code: 'TOO_LONG' } }),
+    greeting: z.string().trim().min(1).superRefine(maxChars(GREETING_MAX)),
     iceBreakers: z.array(iceBreakerSchema).max(ICE_BREAKERS_MAX),
   })
   .strict();
