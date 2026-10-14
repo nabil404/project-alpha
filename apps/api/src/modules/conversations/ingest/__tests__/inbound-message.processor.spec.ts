@@ -73,6 +73,45 @@ describe('InboundMessageProcessor', () => {
     expect(handled).toEqual([postback, quickReply]);
   });
 
+  it('hands a standalone referral and a message that carries one to the ingest intact', async () => {
+    const { processor, handled } = recordingProcessor();
+    const productId = '8f3c2a1e-0000-4000-8000-000000000001';
+    const standalone: InboundMessageJob = {
+      kind: 'customer-referral',
+      messageId: 'rf-1',
+      pageId: '1',
+      senderPsid: 'psid-1',
+      text: '',
+      referral: { kind: 'link', productId },
+      sentAt: 0,
+    };
+    const withLink: InboundMessageJob = { ...data, referral: { kind: 'ad', adId: '1202' } };
+
+    await processor.process(jobOf(INBOUND_MESSAGE_JOB, standalone));
+    await processor.process(jobOf(INBOUND_MESSAGE_JOB, withLink));
+
+    expect(handled).toEqual([standalone, withLink]);
+  });
+
+  it('fails a malformed referral once instead of retrying it', async () => {
+    const { processor, handled } = recordingProcessor();
+    for (const referral of [
+      { kind: 'link', productId: 'not-a-uuid' },
+      { kind: 'ad', adId: '' },
+      { kind: 'other' },
+    ]) {
+      await expect(
+        processor.process(jobOf(INBOUND_MESSAGE_JOB, { ...data, referral })),
+      ).rejects.toBeInstanceOf(UnrecoverableError);
+    }
+    await expect(
+      processor.process(
+        jobOf(INBOUND_MESSAGE_JOB, { ...data, kind: 'customer-referral', text: '' }),
+      ),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(handled).toEqual([]);
+  });
+
   it('reads a job queued before messages had a kind as a customer message', async () => {
     const { processor, handled } = recordingProcessor();
     const legacy = {
