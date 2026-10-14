@@ -46,7 +46,7 @@ first, from 9 backwards, if the schedule slips. Phases 1 and 2 cannot be cut.
 
 Copied from each phase's "Done when". The automated checks were last run on
 Oct 14, 2026: `pnpm --filter @app/shared build`, `pnpm typecheck`,
-`pnpm lint`, `pnpm format:check` and `pnpm test` pass (132 suites, 1,403
+`pnpm lint`, `pnpm format:check` and `pnpm test` pass (133 suites, 1,412
 tests; 2 suites and 2 tests skipped), and `db:verify-rls` reports 22 tenant
 tables protected. `format:check` also lists the local `.superpowers/`
 workspace, which is not committed; every other file passes. The two skipped

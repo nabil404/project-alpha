@@ -27,11 +27,13 @@ payloads and runs through the existing assistant turn, so the gate, the
 - **The turn** reads the tap as an entry (`entryIn`) and calls `decideTurn`
   with an `entry` trigger. **An entry makes no LLM call**: the reply is a fixed
   template per language (`fallbackText`), like a pick tap.
-- **One exception:** a `ref` that arrives with words of the customer's own
-  ("how much is this one" typed into an `m.me` link's message). The product is
-  added first, then the normal LLM turn runs on the text with that item
-  collected. A bare referral, whose stored line is a fixed sentence, takes the
-  no-LLM path.
+- **One exception:** a referral that arrives with words of the customer's
+  own ("how much is this one" typed into an `m.me` link's message). The ingest
+  decides this, not the turn: only a typed message stores `ref-typed`. The
+  product is added first, then the normal LLM turn runs on the text with that
+  item collected, and the product's photo is sent before the reply. If the
+  order is already at `MAX_ORDER_ITEMS`, the turn hands off without the LLM. A
+  bare referral or a Get Started tap stores `ref` and takes the no-LLM path.
 - **A handed-off or paused chat** stores the row and its source and replies
   with nothing, as for any message.
 
@@ -41,7 +43,8 @@ payloads and runs through the existing assistant turn, so the gate, the
 
 - **Payloads** (`packages/shared/src/schemas/assistant-payload.ts`) gain
   `start`, `browse`, `browse:cat:<id|other>`, `choose:product:<id>`,
-  `ref:product:<id>`, `menu:last-order` and `menu:human`. An ice breaker of
+  `ref:product:<id>`, `ref-typed:product:<id>`, `menu:last-order` and
+  `menu:human`. An ice breaker of
   kind `ask` sends `ask`, which is deliberately **not** parsed, so it runs as
   an ordinary message whose text is the question.
 - **`entry_source`** (`ad`, `link`, `get_started`, `organic`; shared
@@ -71,17 +74,23 @@ payloads and runs through the existing assistant turn, so the gate, the
   merchant transaction:
   - **A link** stores `ref:product:<id>` as given; the turn validates it.
   - **An ad** upserts `ad_product` (`recordSeen`: insert, or bump
-    `last_seen_at` and `chat_count`). A mapped ad stores `ref:product:<id>`;
-    an unmapped one stores no product and the chat is organic apart from
-    `entry_source = ad`. `recordSeen` runs before the message insert, and a
-    duplicate delivery throws to roll the count back, so a redelivery does not
-    double-count.
+    `last_seen_at` and `chat_count`). A mapped ad stores `ref:product:<id>`.
+    An unmapped one stores no product: on a message the chat is organic apart
+    from `entry_source = ad`. `recordSeen` runs before the message insert, and
+    a duplicate delivery throws to roll the count back, so a redelivery does
+    not double-count.
+  - **Typed or not** is decided here. A product referral on a typed message
+    (`customer-message`) stores `ref-typed:product:<id>` and keeps the message
+    text. On a postback or a standalone referral it stores `ref:product:<id>`.
   - **Get Started** stores `start` and `entry_source = get_started`. With a
-    referral on the postback it stores the `ref:` payload instead.
+    referral on the postback it stores the `ref:` payload instead, and the
+    source comes from the referral.
   - **A standalone referral** stores a customer row whose text is a fixed
     line in the shop's language (`REFERRAL_TEXT`: "Opened a link to a product"
-    or "Came from an ad").
-  - A referral on a message keeps the message text.
+    or "Came from an ad"). With no usable product (an unmapped ad) it stores
+    `browse`, so the turn answers with the categories rather than running the
+    LLM on a line the customer never wrote; `entry_source` still comes from
+    the referral.
 
 ### Browsing
 
@@ -103,7 +112,8 @@ changes neither `state` nor the slots.
 
 ### Product entry
 
-A `choose` or `ref` payload runs `decideTurn` with a `product` entry:
+A `choose` or `ref` payload runs `decideTurn` with a `product` entry
+(`ref-typed` too, before the LLM turn; see [Flow](#flow)):
 
 - The id must be in the sellable catalog, which proves the product is active
   and belongs to this merchant. If it is not, the entry is ignored and the
@@ -145,7 +155,8 @@ is sent every time, so a resend is idempotent.
 - **When it runs:** after Page connect and reconnect, a Welcome screen save, a
   General settings save that changes the country (and so the language), and
   the one-off backfill.
-- **Retries and errors.** Three attempts with backoff. Graph error 190 or a 401
+- **Retries and errors.** Three attempts, with exponential backoff from 10 s
+  (10 s, then 20 s) to ride out a short Graph outage. Graph error 190 or a 401
   records `token_invalid` and is not retried; any other failure records
   `graph_error` and retries. Decrypting the token is inside the same try. The
   token is never logged.
@@ -161,8 +172,11 @@ is sent every time, so a resend is idempotent.
   completion, so it runs once. It lists every connected shop through
   `app_connected_merchants()` and queues a profile sync with `resubscribe`
   for each, which re-posts `subscribed_apps` (a replace, so idempotent) before
-  setting the profile. Sellers do not reconnect. **To run it again** for a
-  new field, bump the id (`-v2`).
+  setting the profile. Sellers do not reconnect. It has five attempts with
+  exponential backoff from 30 s, so a blip at deploy does not strand Pages; a
+  job that still fails is dropped after the queue's 24 h `removeOnFail` and
+  re-added by the next boot. **To run it again** for a new field, bump the id
+  (`-v2`).
 
 ### Welcome screen and ads (API)
 
@@ -224,7 +238,11 @@ Migrations `0038` to `0040`; `db:verify-rls` passes.
 - **Settings › Messenger › Welcome screen** (`WelcomeScreenCard`): a form on
   the shared schema with counters, up to four questions (each Browse or Ask)
   and **Save and update Page**. While the sync is `pending`, the query polls
-  every 3 s for at most 60 s, then shows "Updating…" until a reload. A failed
+  every 3 s for at most 60 s after a save in this tab, or after the card
+  first saw it pending (a Page connect, or a sync queued elsewhere), then
+  shows "Updating…" until a reload. The help text under an Ask question says
+  it is sent as the customer's question and the seller is notified if the
+  assistant cannot answer it ([Follow-ups](#follow-ups)). A failed
   sync shows a banner with Retry; `token_invalid` asks the seller to reconnect.
   The greeting field left the Replies card.
 - **Settings › Messenger › Click-to-Messenger ads** (`AdProductsCard`): a
@@ -232,7 +250,9 @@ Migrations `0038` to `0040`; `db:verify-rls` passes.
   picker that saves at once with an optimistic update, and unmaps with a null.
   A Draft product shows a note that the assistant ignores it until Published.
   The picker lists the newest 100 non-archived products and says so when there
-  are more ([Follow-ups](#follow-ups)).
+  are more ([Follow-ups](#follow-ups)). A mapped product missing from that
+  list (archived since, or older than the newest 100) is still named in its
+  row, labelled by its status: plain when active, "(Draft)" or "(archived)".
 - **Product page › Messenger link** (`MessengerLinkCard`): the link
   `https://m.me/<pageId>?ref=p_<productId>` (`m.me` accepts the numeric Page
   id), **Copy**, a QR code and **Download QR** (PNG). The QR is drawn in the
@@ -296,8 +316,17 @@ See the MVP [rules](../../../mvp/01-messenger-to-order/rules.md).
   a product entry ignores another shop's or an archived id, appends, does not
   duplicate, gives `revision + 1` from a card, hands off at 10 items;
   `lastOrder` with and without an order; `human`; the carousel's template.
-- **`assistant-turn.service.spec.ts`** (DB): a `ref` with text runs extraction
-  with the item collected; entry triggers make no LLM call (the mock throws).
+- **`inbound-message.ingest.spec.ts`** also pins typed or not: a message with
+  a link or a mapped ad stores `ref-typed:`, a Get Started postback with a
+  link stores `ref:` from the link, and an unmapped standalone ad stores
+  `browse` from the ad.
+- **`assistant-turn.service.spec.ts`** (DB): a `ref-typed` runs extraction
+  with the item collected and sends the product's photo first, and hands off
+  without the LLM at 10 items; Get Started carrying a `ref` asks the variant
+  with the photo and no LLM call; a `browse` from an unmapped ad answers with
+  the categories; entry triggers make no LLM call.
+- **`messenger-profile.processor.spec.ts`**: the resubscribe job's fixed id and
+  retries.
 - **`messenger-profile.spec.ts`**, **`messenger-profile.sync.spec.ts`**
   (`messenger/profile/__tests__/`), `profile-sync-of.spec.ts`: the body per
   language; the sync twice sends the same body; 190 records `token_invalid`
@@ -323,8 +352,11 @@ See the MVP [rules](../../../mvp/01-messenger-to-order/rules.md).
   `DELETE` instead (noted in `buildMessengerProfile`).
 - A shop with more than 100 products cannot map an ad to a product beyond the
   newest 100 from the dashboard. Add a server-search variant of the Combobox.
-- An ad mapped to a product outside the fetched 100 shows no matching option
-  in its row.
+- **Known limit: Ask ice breakers mostly hand off.** The default questions
+  ("What is the delivery charge?", "How do I pay?") are kept because the spec
+  lists them, but they classify as `ask_question`, which hands off to the
+  seller. The dashboard copy says so. Answering shop questions from settings
+  is later work.
 - `MessengerLinkCard` imports `sonner` directly for two plain-text failure
   toasts, since `lib/toast` has no plain-message error path.
 - A native-speaker review of the Bangla menu labels, browse text and default
