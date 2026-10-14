@@ -30,13 +30,20 @@ export class MessengerProfileProcessor extends WorkerHost implements OnApplicati
    * Pages connected before messaging_referrals was added still have the old
    * field list. Runs once: its id is fixed, so BullMQ ignores the add while the
    * last one is retained. Bump the job id (e.g. -v2) to run it again for a new
-   * webhook field.
+   * webhook field. Five attempts from 30 s (about 7.5 min in all) ride out a
+   * Redis or database blip at deploy; a job that still fails is dropped after
+   * the queue's 24 h `removeOnFail` and re-added by the next boot.
    */
   async onApplicationBootstrap(): Promise<void> {
     await this.queue.add(
       RESUBSCRIBE_PAGES_JOB,
       {},
-      { jobId: 'resubscribe-pages-v1', removeOnComplete: false },
+      {
+        jobId: 'resubscribe-pages-v1',
+        removeOnComplete: false,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 30_000 },
+      },
     );
   }
 
