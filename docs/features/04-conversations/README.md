@@ -348,6 +348,39 @@ migrating role must be a superuser or hold `SET` membership in
 - Code: `apps/web/src/features/conversations/` and
   `apps/web/src/routes/_app/conversations/`.
 
+## Tests
+
+In `apps/api/src/modules/conversations/`. Specs marked (DB) need the test
+database, and `redis-connections.spec.ts` needs `TEST_REDIS_URL`.
+
+| Spec                                                       | Covers                                                                                             |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `__tests__/conversations.e2e.spec.ts` (DB)                 | The routes over HTTP: list, cursor paging, filters and counts, one thread                          |
+| `__tests__/conversation-guards.e2e.spec.ts` (DB)           | The routes behind the real guards; a session with no active merchant is refused                    |
+| `__tests__/conversation-events.e2e.spec.ts` (DB)           | `GET /events`: only the merchant's own ids; the oldest of six streams is evicted                   |
+| `__tests__/read-repositories.spec.ts` (DB)                 | List order, cursor paging without gaps, filter chips, literal search including Bangla, two shops   |
+| `__tests__/ingest-repositories.spec.ts` (DB)               | Customer and conversation upserts, profile reads, one person messaging two shops                   |
+| `__tests__/send-reply.service.spec.ts` (DB)                | A seller reply: sent and pausing, the 24-hour window, a Messenger refusal as `502`, a changed Page |
+| `__tests__/outbound-message.sender.spec.ts` (DB)           | Staging and sending assistant replies, quick replies, cards and images                             |
+| `__tests__/message-claim.spec.ts` (DB)                     | `claimForResend`: another merchant's reply is never claimed; the lease clock                       |
+| `__tests__/delete-message.spec.ts` (DB)                    | Deleting an undelivered reply, the preview moving back, another conversation or shop as missing    |
+| `__tests__/conversation-rules.spec.ts`                     | Message previews (emoji and Bangla safe) and state rules                                           |
+| `__tests__/conversation-schemas.spec.ts`                   | Query strings, blank search, limits, reply trimming to Messenger's length                          |
+| `__tests__/cursor.spec.ts`                                 | The opaque, URL-safe cursor and refusing one the API did not issue                                 |
+| `events/__tests__/conversation-events.hub.spec.ts`         | Per-merchant delivery, one Redis connection, malformed events dropped                              |
+| `events/__tests__/conversation-events.publisher.spec.ts`   | Publishing JSON on the channel; a failure never reaches the caller                                 |
+| `events/__tests__/event-stream.spec.ts`                    | Retry hint, ids only, pings, ending at session expiry, on shutdown and on eviction                 |
+| `events/__tests__/redis-connections.spec.ts` (Redis)       | Publisher to subscriber over a real Redis; a failed connect leaves no client reconnecting          |
+| `ingest/__tests__/inbound-message.ingest.spec.ts` (DB)     | Storing messages and echoes, redelivery as a no-op, skipping our own echoes                        |
+| `ingest/__tests__/inbound-message.processor.spec.ts`       | Handing each job kind to the ingest                                                                |
+| `profiles/__tests__/customer-profile-refresh.spec.ts` (DB) | The daily refresh: due customers only, keeping known names on failure, stopping after failures     |
+| `profiles/__tests__/profile-refresh.processor.spec.ts`     | The refresh job and its scheduler                                                                  |
+
+The assistant's specs are on the
+[phase 11.1](../11-ai-implementation/phase-1-foundation/README.md#tests) and
+[phase 11.2](../11-ai-implementation/phase-2-catalog-confirm-orders/README.md#tests)
+pages.
+
 ## Follow-ups
 
 - Show the customer's order list beside the thread; today only the latest

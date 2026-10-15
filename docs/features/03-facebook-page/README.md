@@ -140,10 +140,12 @@ routes send it in the envelope with the status shown.
 - **Conversations survive a disconnect.** They key on Facebook's Page id
   ([Conversations](../04-conversations/README.md#rules)), so reconnecting the
   same Page brings its threads back.
-- **Webhook fields** subscribed on connect: `messages`, `messaging_postbacks`,
-  `message_echoes` and `messaging_referrals`
-  ([webhook](../04-conversations/README.md#webhook)). A Page connected before
-  `messaging_referrals` was added is re-subscribed by a one-off worker job.
+- **Webhook fields** subscribed on connect: `PAGE_WEBHOOK_FIELDS` in
+  `meta-graph.client.ts`, which is `messages`, `messaging_postbacks`,
+  `message_echoes`, `messaging_referrals`, `message_reactions` and
+  `message_edits` ([webhook](../04-conversations/README.md#webhook)). A Page
+  connected before a field was added is re-subscribed by a one-off worker job
+  (`resubscribe-pages`).
 - **Messenger Profile columns.** `facebook_page` also holds
   `profile_sync_requested_at`, `profile_synced_at` and `profile_sync_error`
   (`token_invalid` or `graph_error`), which the welcome screen's status reads.

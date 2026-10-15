@@ -141,7 +141,7 @@ strings.
   so one card makes at most one order. They also carry the conversation's
   `entry_source` (`ad`, `link`, `get_started` or `organic`), how the customer
   reached the shop for this order
-  ([phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md#entry-sources));
+  ([phase 11.3](../11-ai-implementation/phase-3-entry-points/README.md#payloads-and-entry-sources));
   an order the seller adds has `entry_source = null`.
 - **An ordered product cannot be deleted** (`409 PRODUCT_IN_USE`), because
   order lines keep foreign keys to the product and variant. The seller

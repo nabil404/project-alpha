@@ -334,8 +334,9 @@ the two-merchant repository tests are for.
 - **`WORKER_CONCURRENCY` must stay at or below `DATABASE_POOL_MAX`** (defaults
   5 and 10). Concurrency above the pool size just queues workers on connections
   and makes lock timeouts fire. The variable is validated but not yet passed to
-  any processor: they run at BullMQ's default concurrency of 1. Wire it through
-  `@Processor`'s options when a queue needs more.
+  any processor. The assistant processor runs at a fixed `ASSISTANT_CONCURRENCY`
+  of 4 (`queue.constants.ts`); the others run at BullMQ's default of 1. Wire it
+  through `@Processor`'s options when a queue needs more.
 - Retry and backoff defaults are set once in
   `src/modules/queue/queue.module.ts` — configure there, not per `add()` call.
 - **A job carries a Page id, not a merchant.** Resolve the merchant from the

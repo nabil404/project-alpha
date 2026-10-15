@@ -19,7 +19,7 @@ static/          Privacy policy, terms, data deletion (Meta App Review)
 ```bash
 pnpm install
 cp environments/.env.example environments/.env      # then fill in the secrets
-pnpm dev:up                                 # Postgres and Redis
+pnpm dev:up                                 # Postgres, Redis and Mailpit
 pnpm --filter @app/shared build
 pnpm --filter api db:migrate                # apply migrations
 pnpm dev                                    # api on :3000, web on :5173
