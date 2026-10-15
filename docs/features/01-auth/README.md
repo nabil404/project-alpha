@@ -300,8 +300,8 @@ The e2e and organization specs need Postgres and are skipped unless
   bad one (`/?error=…`) lands on sign-in with an error banner.
 - **Terms and privacy pages.** Sign-up requires agreeing, and
   `apps/web/src/features/auth/legal.ts` links `/terms` and `/privacy`. Caddy
-  routes them to `/legal/*.html`, which do not exist yet, and the server does
-  not record the agreement.
+  serves them from `static/` as `/legal/*.html`, but each page is only a
+  placeholder, and the server does not record the agreement.
 - **Shop name and phone for social sign-ups.** The shop is named after the
   seller and uses the default region, Bangladesh, until its first save in
   Settings – General.
