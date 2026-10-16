@@ -93,6 +93,7 @@ describe('assistant payloads', () => {
       { kind: 'pick', slot: 'product', id: P1 },
       { kind: 'pick', slot: 'variant', id: V1 },
       { kind: 'name' },
+      { kind: 'not_it' },
     ] as const) {
       expect(parsePayload(encodePayload(payload))).toEqual(payload);
     }
@@ -107,6 +108,7 @@ describe('assistant payloads', () => {
       `confirm:not-a-uuid:1`,
       `pick:size:${P1}`,
       `pick:product:${P1}:extra`,
+      'photo:yes',
     ]) {
       expect(parsePayload(text)).toBeNull();
     }

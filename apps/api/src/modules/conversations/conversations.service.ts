@@ -36,6 +36,8 @@ import { decodeCursor, encodeCursor, type CursorKey } from './cursor';
 import { ConversationEventsPublisher } from './events/conversation-events.publisher';
 import { MessageRepository } from './message.repository';
 import { OutboundMessageSender } from './outbound-message.sender';
+import type { MessageRow } from '../database/schema/index';
+import { ObjectStorage } from '../storage/object-storage';
 
 /**
  * The seller's side of Messenger conversations. Every read and write runs in
@@ -53,6 +55,7 @@ export class ConversationsService {
     @Inject(META_GRAPH) private readonly graph: MetaGraphClient | null,
     private readonly events: ConversationEventsPublisher,
     private readonly outbound: OutboundMessageSender,
+    private readonly storage: ObjectStorage,
   ) {}
 
   async list(scope: TenantScope, query: ListConversationsQuery): Promise<ConversationListResponse> {
@@ -100,7 +103,7 @@ export class ConversationsService {
     const page = rows.slice(0, query.limit);
     const oldest = page.at(-1);
     return {
-      data: [...page].reverse().map(toMessage),
+      data: [...page].reverse().map((row) => this.toMessage(row)),
       pagination: {
         prevCursor:
           rows.length > query.limit && oldest
@@ -234,7 +237,11 @@ export class ConversationsService {
 
     const final = await this.outbound.deliver(scope, { ...pending, content: { kind: 'text' } });
     if (final.status === 'failed') throw messengerSendFailed();
-    return toMessage(final);
+    return this.toMessage(final);
+  }
+
+  private toMessage(row: MessageRow): Message {
+    return toMessage(row, (key) => this.storage.publicUrl(key));
   }
 }
 

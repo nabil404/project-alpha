@@ -31,6 +31,12 @@ const BECAUSE: Record<AskReason, string> = {
     'Ask whether they mean the product shown as a button under your message, from the post they shared.',
   shared_post_unknown:
     'Say you could not open the post they shared, and ask them to type the name of the product.',
+  // A photo's asks are fixed lines too.
+  photo: 'Ask whether the product shown under your message is the one in their photo.',
+  photo_unknown:
+    'Say you could not tell which product is in their photo, and ask them to type its name.',
+  photo_unreadable: 'Say you could not open their photo, and ask them to type the product name.',
+  photo_rejected: 'Ask them to type the name of the product they are looking for.',
 };
 
 /** The facts as the phrasing call sees them; the phone in its readable international form. */

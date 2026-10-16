@@ -6,15 +6,16 @@ bound by its [rules](../../mvp/01-messenger-to-order/rules.md). This page is the
 index; each phase has its own page with goal, scope, tests and a definition of
 done.
 
-**Status (Oct 2026):** phases 1 to 5 are built: a customer's message gets
+**Status (Oct 2026):** phases 1 to 6 are built: a customer's message gets
 an assistant reply or a hand-off with a fixed reply, products and variants
 are matched in code, the summary card's Confirm button creates one
 `source = assistant` order per card, and a conversation can start from Get
 Started, the menu, a product's `m.me` link or QR code, a mapped
 click-to-Messenger ad, or a shared post. Stickers, reactions, edits and
-locations are handled without confirming anything. The live runs of phases 1
-to 5 on the dev Page are still to be done by the maintainer. Phases 6 to 9
-are not started.
+locations are handled without confirming anything, and a customer's photo is
+matched to the catalog and offered for them to confirm. The live runs of
+phases 1 to 6 on the dev Page are still to be done by the maintainer. Phases 7
+to 9 are not started.
 [Progress](progress.md) tracks each phase's "Done when" list and App Review.
 
 ## Phases

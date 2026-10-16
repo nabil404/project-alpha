@@ -205,4 +205,60 @@ describe('outgoingFor', () => {
       ]);
     });
   });
+
+  it("asks Yes or No about a photo's one match, Yes naming it", () => {
+    const reply: ReplyIntent = {
+      kind: 'ask_slot',
+      slot: 'product',
+      item: 0,
+      intent: 'order',
+      reason: 'photo',
+      choices: [{ id: RED, title: 'Red Saree' }],
+      facts: { items: [] },
+    };
+
+    expect(outgoingFor(reply, 'Is it this one: Red Saree?', options)).toEqual([
+      {
+        text: 'Is it this one: Red Saree?',
+        content: {
+          kind: 'quick_replies',
+          options: [
+            { title: 'Yes', payload: `pick:product:${RED}` },
+            { title: 'No', payload: 'photo:no' },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("sends a photo's several matches as a carousel after the question", () => {
+    const card = (subtitle: string) => ({
+      subtitle,
+      imageUrl: 'https://media.example.test/m/a.jpg',
+    });
+    const reply: ReplyIntent = {
+      kind: 'ask_slot',
+      slot: 'product',
+      item: 0,
+      intent: 'order',
+      reason: 'photo',
+      choices: [
+        { id: RED, title: 'Red Saree', card: card('From ৳2,500') },
+        { id: BLUE, title: 'Blue Saree', card: card('From ৳2,800') },
+      ],
+      facts: { items: [] },
+    };
+
+    const [question, carousel] = outgoingFor(reply, 'Is it one of these?', options);
+
+    expect(question).toEqual({ text: 'Is it one of these?', content: { kind: 'text' } });
+    expect(carousel?.text).toBe('Red Saree (From ৳2,500), Blue Saree (From ৳2,800)');
+    expect(carousel?.content).toMatchObject({
+      kind: 'carousel',
+      cards: [
+        { title: 'Red Saree', button: { title: 'This one', payload: `pick:product:${RED}` } },
+        { title: 'Blue Saree', button: { title: 'This one', payload: `pick:product:${BLUE}` } },
+      ],
+    });
+  });
 });

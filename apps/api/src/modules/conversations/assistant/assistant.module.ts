@@ -9,6 +9,7 @@ import { DeliveryChargesRepository } from '../../settings/delivery-charges.repos
 import { QueueModule } from '../../queue/queue.module';
 import { SettingsModule } from '../../settings/settings.module';
 import { ConversationsModule } from '../conversations.module';
+import { CustomerPhotosModule } from '../photos/customer-photos.module';
 import { AssistantTurnProcessor } from './assistant-turn.processor';
 import { AssistantTurnService } from './assistant-turn.service';
 import { LlmCallRepository } from './llm-call.repository';
@@ -22,6 +23,7 @@ import { OrderConfirmationService } from './order-confirmation.service';
     FacebookPageModule,
     ProductPostsModule,
     ConversationsModule,
+    CustomerPhotosModule,
     SettingsModule,
     NotificationsModule,
     ProductsModule,

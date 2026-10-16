@@ -21,11 +21,14 @@ import {
   ASSISTANT_TURN_DELAY_MS,
   ASSISTANT_TURN_JOB,
   ASSISTANT_TURN_RETRY,
+  CUSTOMER_PHOTO_QUEUE,
+  STORE_PHOTO_JOB,
   type AssistantTurnJob,
   type CustomerEditJob,
   type CustomerReactionJob,
   type CustomerUnsendJob,
   type InboundMessageJob,
+  type StorePhotoJob,
 } from '../../queue/queue.constants';
 import { customJobId } from '../../queue/job-id';
 import { defaultMerchantSettings } from '../../settings/general-settings.service';
@@ -125,6 +128,7 @@ export class InboundMessageIngest {
     private readonly settings: MerchantSettingsRepository,
     private readonly events: ConversationEventsPublisher,
     @InjectQueue(ASSISTANT_QUEUE) private readonly assistantTurns: Queue,
+    @InjectQueue(CUSTOMER_PHOTO_QUEUE) private readonly photoCopies: Queue,
   ) {}
 
   async handle(job: InboundMessageJob): Promise<IngestOutcome> {
@@ -257,6 +261,11 @@ export class InboundMessageIngest {
       conversationId: written.conversationId,
       kind: 'message',
     });
+    // Meta's link expires: every customer photo is copied, whether or not a turn reads it.
+    if (sender === 'customer' && written.kind === 'image') {
+      const data: StorePhotoJob = { merchantId, messageId: written.messageId };
+      await this.photoCopies.add(STORE_PHOTO_JOB, data, { jobId: `ph-${written.messageId}` });
+    }
     // A reaction asks nothing, except on the summary card, where it is pointed to Confirm.
     const reactionWanted = written.kind !== 'reaction' || written.state === 'awaiting_confirmation';
     if (

@@ -28,7 +28,7 @@ import {
   type CatalogView,
   type DeliveryArea,
 } from './catalog-match';
-import { browseReply } from './entry-replies';
+import { browseReply, cardOf } from './entry-replies';
 import { mergeItems, mergeSameVariant } from './item-merge';
 import type {
   AskReason,
@@ -725,6 +725,84 @@ export function decideSharedPost(
   input: Omit<TurnInput, 'trigger'>,
   productIds: readonly string[],
 ): TurnDecision {
+  return offerProducts(input, productIds, { found: 'shared_post', none: 'shared_post_unknown' });
+}
+
+/** What the vision call made of the customer's photos, its ids already checked against the shortlist. */
+export type PhotoOutcome =
+  | { kind: 'matched'; productIds: readonly string[] }
+  /** Not downloaded or not an image we can read. */
+  | { kind: 'unreadable' };
+
+/**
+ * A photo match is a suggestion, as a shared post's is: nothing fills a slot
+ * until the customer taps it. One match is sent with its cover and asked
+ * "Is it this one?" with Yes and No; several are a carousel. None, or a photo
+ * we could not open, asks for the name, and the next miss hands off.
+ */
+export function decidePhoto(
+  input: Omit<TurnInput, 'trigger'>,
+  outcome: PhotoOutcome,
+): TurnDecision {
+  const productIds = outcome.kind === 'matched' ? outcome.productIds : [];
+  const decision = offerProducts(input, productIds, {
+    found: 'photo',
+    none: outcome.kind === 'matched' ? 'photo_unknown' : 'photo_unreadable',
+  });
+  if (decision.reply.kind !== 'ask_slot' || !decision.reply.choices) return decision;
+  const choices = decision.reply.choices;
+  if (choices.length === 1) {
+    const image = coverOf(findProduct(input.catalog, choices[0]!.id)!);
+    return image === undefined ? decision : { ...decision, image };
+  }
+  const withCards = choices.map((choice): Choice => {
+    const card = cardOf(
+      findProduct(input.catalog, choice.id)!,
+      input.language,
+      input.delivery.currency,
+    );
+    return { ...choice, card: { subtitle: card.subtitle, imageUrl: card.imageUrl } };
+  });
+  return { ...decision, reply: { ...decision.reply, choices: withCards } };
+}
+
+/**
+ * "No" to the one product offered: ask for its name, and the next miss hands
+ * off. Null when no product is on offer (a stale tap), so the words are read
+ * instead.
+ */
+export function decideNotIt(input: Omit<TurnInput, 'trigger'>): TurnDecision | null {
+  const offered = input.slots.offered;
+  if (offered?.slot !== 'product') return null;
+  const asked: CollectedSlots = {
+    ...input.slots,
+    offered: undefined,
+    lastAsked: { slot: 'product', item: offered.item, times: MAX_ASKS - 1 },
+  };
+  return {
+    state: hasCollectedAnything(asked) ? 'collecting_details' : 'browsing',
+    slots: asked,
+    reply: {
+      kind: 'ask_slot',
+      slot: 'product',
+      item: offered.item,
+      intent: 'order',
+      reason: 'photo_rejected',
+      facts: factsOf(asked, input),
+    },
+  };
+}
+
+/**
+ * Up to three sellable candidates offered for a new item, or, with none, the
+ * ask for its name one short of the hand-off. Leaving the summary card
+ * retires its quote.
+ */
+function offerProducts(
+  input: Omit<TurnInput, 'trigger'>,
+  productIds: readonly string[],
+  reasons: { found: AskReason; none: AskReason },
+): TurnDecision {
   const { slots, catalog } = input;
   if (slots.items.length >= MAX_ORDER_ITEMS) return handOff(slots, 'awaiting_seller');
   const choices = productIds
@@ -753,11 +831,16 @@ export function decideSharedPost(
       slot: 'product',
       item,
       intent: 'order',
-      reason: choices.length > 0 ? 'shared_post' : 'shared_post_unknown',
+      reason: choices.length > 0 ? reasons.found : reasons.none,
       ...(choices.length > 0 ? { choices } : {}),
       facts: factsOf(asked, input),
     },
   };
+}
+
+/** The product's cover photo, the one its carousel card and "Is it this one?" show. */
+function coverOf(product: Product): string | undefined {
+  return product.images.find((image) => image.id === product.coverImageId)?.url;
 }
 
 export function handOff(slots: CollectedSlots, reason: HandoffReason): TurnDecision {

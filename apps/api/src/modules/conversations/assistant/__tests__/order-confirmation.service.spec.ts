@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
 import { createProductSchema, emptySlots, type CollectedSlots } from '@app/shared';
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../../common/crypto.service';
@@ -655,6 +656,7 @@ describeDb('OrderConfirmationService (app_runtime)', () => {
       null,
       publisher,
       {} as unknown as OutboundMessageSender,
+      new InMemoryObjectStorage(),
     );
     await conversations.update({ merchantId: t.merchantA }, convo.id, { botPaused: true });
     await conversations.update({ merchantId: t.merchantA }, convo.id, { botPaused: false });

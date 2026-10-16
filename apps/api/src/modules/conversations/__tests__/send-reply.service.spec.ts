@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../common/crypto.service';
 import type { AppConfig } from '../../config/app.config';
@@ -69,6 +70,7 @@ describeDb('ConversationsService.send (app_runtime)', () => {
         withGraph,
         publisher,
       ),
+      new InMemoryObjectStorage(),
     );
   };
   const threadFor = async (

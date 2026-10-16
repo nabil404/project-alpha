@@ -42,8 +42,11 @@ import { fallbackText, languageFor, type ReplyLanguage } from './assistant-fallb
 import { toChatLines } from './assistant-history';
 import { matchProduct, type CatalogView } from './catalog-match';
 import {
+  decideNotIt,
+  decidePhoto,
   decideSharedPost,
   decideTurn,
+  handOff,
   isActiveState,
   LOCALES,
   readSlots,
@@ -64,7 +67,16 @@ import { outgoingFor } from './outgoing';
 import { phraseRequestFor } from './reply-phrasing';
 import { askedAt, turnGate, type TurnGate } from './turn-gate';
 import { decideNonText } from './non-text-turn';
+import {
+  matchedProductIds,
+  MAX_PHOTOS_PER_TURN,
+  photoMatchRequest,
+  photosIn,
+  photoShortlist,
+  VISION_CALLS_PER_DAY,
+} from './photo-turn';
 import { isEmojiOnly, readDetails } from '../message-content';
+import { CustomerPhotoStore } from '../photos/customer-photo.store';
 
 /** Messages read for a turn; the phrasing call sees the last PHRASE_HISTORY of them. */
 const HISTORY_LIMIT = 20;
@@ -106,6 +118,7 @@ export class AssistantTurnService {
     private readonly orders: OrdersRepository,
     private readonly sharedPosts: SharedPostResolver,
     private readonly productPosts: ProductPostRepository,
+    private readonly photos: CustomerPhotoStore,
   ) {}
 
   async run({
@@ -170,8 +183,10 @@ export class AssistantTurnService {
     const pick = pickIn(read.recent, triggerMessageId, turn.slots);
     const name = tap?.kind === 'name' ? validNameTap(turn.slots) : null;
     let entry = entryIn(tap);
+    const notIt = tap?.kind === 'not_it' ? decideNotIt(turn) : null;
     // A shared post resolves, most exact first, before any LLM call (phase 5).
-    const share = nonText || pick || name || entry ? null : shareIn(read.recent, triggerMessageId);
+    const share =
+      nonText || pick || name || entry || notIt ? null : shareIn(read.recent, triggerMessageId);
     let shareDecision: TurnDecision | null = null;
     let suggestion: { productId: string; post: PostDetails } | null = null;
     if (share) {
@@ -196,14 +211,26 @@ export class AssistantTurnService {
         }
       }
     }
+    // A photo is matched to the catalog by the vision call, and only ever suggested (phase 6).
+    const photos =
+      nonText || pick || name || entry || notIt || share
+        ? null
+        : photosIn(read.recent, triggerMessageId);
+    const photoDecision = photos
+      ? await this.readPhotos(scope, conversationId, photos, turn, calls)
+      : null;
     // A ref that arrived with words of the customer's own is a message with a product attached.
     const typedRef = entry?.kind === 'product' && entry.via === 'ref-typed';
     let decision: TurnDecision;
     let phrased = false;
     if (nonText) {
       decision = nonText;
+    } else if (notIt) {
+      decision = notIt;
     } else if (shareDecision) {
       decision = shareDecision;
+    } else if (photoDecision) {
+      decision = photoDecision;
     } else if (pick) {
       decision = decideTurn({ ...turn, trigger: { kind: 'pick', pick } });
     } else if (name !== null) {
@@ -370,6 +397,44 @@ export class AssistantTurnService {
         handedOffAt: at,
       });
       return at;
+    });
+  }
+
+  /**
+   * The burst's photos matched to the catalog: copied to our bucket if the
+   * copy job has not done it yet, then one vision call over a shortlist of
+   * the shop's own products. No transaction is open across either.
+   */
+  private async readPhotos(
+    scope: TenantScope,
+    conversationId: string,
+    burst: { messageIds: string[]; words: string },
+    turn: Omit<TurnInput, 'trigger'>,
+    calls: LlmCallRecord[],
+  ): Promise<TurnDecision> {
+    const urls: string[] = [];
+    for (const messageId of burst.messageIds) {
+      const copies = await this.photos.ensureStored(scope, messageId);
+      for (const photo of copies?.photos ?? []) if (photo.ok) urls.push(photo.url);
+    }
+    const photos = urls.slice(0, MAX_PHOTOS_PER_TURN);
+    if (photos.length === 0) return decidePhoto(turn, { kind: 'unreadable' });
+    if (!this.llm) return handOff(turn.slots, 'llm_failed');
+    const since = new Date(Date.now() - 24 * 3_600 * 1_000);
+    const made = await withMerchant(this.db, scope.merchantId, (tx) =>
+      this.llmCalls.countSince(tx, scope, conversationId, 'vision_match', since),
+    );
+    if (made >= VISION_CALLS_PER_DAY) return handOff(turn.slots, 'unreadable');
+    const shortlist = photoShortlist(turn.catalog, burst.words);
+    if (shortlist.length === 0) return decidePhoto(turn, { kind: 'matched', productIds: [] });
+    const matched = record(
+      await this.llm.matchProductPhoto(photoMatchRequest(photos, shortlist, burst.words)),
+      calls,
+    );
+    if (matched === 'failed') return handOff(turn.slots, 'llm_failed');
+    return decidePhoto(turn, {
+      kind: 'matched',
+      productIds: matchedProductIds(matched, shortlist),
     });
   }
 

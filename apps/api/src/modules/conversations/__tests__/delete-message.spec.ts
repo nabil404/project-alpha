@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
 import { eq, sql } from 'drizzle-orm';
 import { CryptoService } from '../../../common/crypto.service';
 import type { AppConfig } from '../../config/app.config';
@@ -51,6 +52,7 @@ describeDb('deleting a reply that was not delivered (app_runtime, two merchants)
         null,
         publisher,
       ),
+      new InMemoryObjectStorage(),
     );
   };
 

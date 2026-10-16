@@ -13,6 +13,10 @@ type FallbackKey =
   | 'ask_product_out_of_stock'
   | 'ask_product_shared_post'
   | 'ask_product_shared_post_unknown'
+  | 'ask_product_photo'
+  | 'ask_product_photo_unknown'
+  | 'ask_product_photo_unreadable'
+  | 'ask_product_photo_rejected'
   | 'ask_variant_not_found'
   | 'ask_variant_choose'
   | 'ask_variant_out_of_stock'
@@ -37,6 +41,12 @@ export function languageFor(country: string): ReplyLanguage {
 export const REFERRAL_TEXT: Record<ReplyLanguage, { link: string; ad: string }> = {
   bn: { link: 'একটি পণ্যের লিংক থেকে এসেছেন', ad: 'একটি বিজ্ঞাপন থেকে এসেছেন' },
   en: { link: 'Opened a link to a product', ad: 'Came from an ad' },
+};
+
+/** The quick replies under "Is it this one?" for a photo's one match. Draft Bangla, to be reviewed. */
+export const PHOTO_BUTTONS: Record<ReplyLanguage, { yes: string; no: string; choose: string }> = {
+  bn: { yes: 'হ্যাঁ', no: 'না', choose: 'এটিই' },
+  en: { yes: 'Yes', no: 'No', choose: 'This one' },
 };
 
 /** Fixed lines for entry replies; never phrased by the LLM. Draft Bangla, to be reviewed. */
@@ -124,6 +134,15 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
     },
     ask_product_shared_post_unknown: () =>
       'দুঃখিত, পোস্টটি খুলতে পারিনি। কোন পণ্যটির কথা বলছেন? পণ্যের নামটি লিখুন, প্লিজ।',
+    ask_product_photo: (asked) => {
+      const name = onlyChoice(asked);
+      return name ? `এটি কি ${name}?` : 'এগুলোর মধ্যে কোনটি?';
+    },
+    ask_product_photo_unknown: () =>
+      'দুঃখিত, ছবি দেখে পণ্যটি চিনতে পারিনি। পণ্যের নামটি লিখে দেবেন, প্লিজ?',
+    ask_product_photo_unreadable: () =>
+      'দুঃখিত, ছবিটি খুলতে পারিনি। পণ্যের নামটি লিখে দেবেন, প্লিজ?',
+    ask_product_photo_rejected: () => 'ঠিক আছে। কোন পণ্যটি খুঁজছেন? নামটি লিখে দিন, প্লিজ।',
     ask_variant: (asked) => `${nameOf(asked)} - কোনটি নেবেন?`,
     ask_variant_not_found: (asked) => `${nameOf(asked)} - এগুলোর মধ্যে কোনটি নেবেন?`,
     ask_variant_choose: (asked) => `${nameOf(asked)} - কোনটি নেবেন?`,
@@ -160,6 +179,16 @@ const FALLBACKS: Record<ReplyLanguage, Record<FallbackKey, (asked: Asked) => str
     },
     ask_product_shared_post_unknown: () =>
       "Sorry, I couldn't open that post. Which product is it about? Please type its name.",
+    ask_product_photo: (asked) => {
+      const name = onlyChoice(asked);
+      return name ? `Is it this one: ${name}?` : 'Is it one of these?';
+    },
+    ask_product_photo_unknown: () =>
+      "Sorry, I couldn't tell which product is in the photo. Could you type its name?",
+    ask_product_photo_unreadable: () =>
+      "Sorry, I couldn't open that photo. Could you type the product's name?",
+    ask_product_photo_rejected: () =>
+      'Okay. Which product are you looking for? Please type its name.',
     ask_variant: (asked) => `Which ${nameOf(asked)} would you like?`,
     ask_variant_not_found: (asked) =>
       `We have these ${nameOf(asked)} options. Which one would you like?`,
@@ -196,6 +225,10 @@ const REASON_KEYS: Partial<Record<`${SlotName}:${AskReason}`, FallbackKey>> = {
   'product:product_out_of_stock': 'ask_product_out_of_stock',
   'product:shared_post': 'ask_product_shared_post',
   'product:shared_post_unknown': 'ask_product_shared_post_unknown',
+  'product:photo': 'ask_product_photo',
+  'product:photo_unknown': 'ask_product_photo_unknown',
+  'product:photo_unreadable': 'ask_product_photo_unreadable',
+  'product:photo_rejected': 'ask_product_photo_rejected',
   'variant:not_found': 'ask_variant_not_found',
   'variant:choose': 'ask_variant_choose',
   'variant:out_of_stock': 'ask_variant_out_of_stock',

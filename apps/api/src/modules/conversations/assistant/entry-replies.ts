@@ -67,7 +67,8 @@ function bucketsOf(catalog: CatalogView, products: Product[], language: ReplyLan
   return buckets;
 }
 
-function cardOf(product: Product, language: ReplyLanguage, currency: string): ProductCard {
+/** A product as a carousel card: its cover and its lowest available price. */
+export function cardOf(product: Product, language: ReplyLanguage, currency: string): ProductCard {
   const lowest = Math.min(
     ...product.variants.filter((variant) => variant.available > 0).map((variant) => variant.price),
   );

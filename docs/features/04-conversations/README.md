@@ -75,6 +75,12 @@ is the recipient. [Message flow](message-flow.md#a-customer-message) draws the s
   a `customer-message` with `text: ''` and its attachments; reactions, edits
   and unsends have job kinds of their own. Deliveries and reads make no job,
   and neither does a seller's echo without text.
+- **Photos** ([AI phase 6](../11-ai-implementation/phase-6-product-photos/README.md)).
+  After the ingest stores a customer's photo, in any state, it queues
+  `store-photo` on `customer-photos` (job id `ph-<message id>`), which copies
+  it from Meta's expiring link to `c/<merchant>/<message id>-<n>.jpg` and
+  records the key in `details`. Before the summary card the assistant
+  matches the photo to the catalog.
 - **Shared posts** ([AI phase 5](../11-ai-implementation/phase-5-shared-posts/README.md)).
   A `post`, `share` or `fallback` attachment, and a Facebook link typed into
   the words, add `links[]` to the `customer-message` job. With no words the
@@ -336,8 +342,10 @@ migrating role must be a superuser or hold `SET` membership in
   header, with a back link and breadcrumb. While the order is drafted,
   `ChatOrderBanner` above the reply box ("Order drafted · ৳3,260") opens it.
 - **Non-text messages.** A sticker, photo, video or audio clip renders from
-  Meta's link, and a file as a link; Meta's links expire, so each falls back
-  to naming what was sent ("Sent a photo"), in the seller's chosen language. A location shows its coordinates and an OpenStreetMap
+  Meta's link, and a file as a link; a photo we copied renders from our
+  bucket instead, so it outlives Meta's link. Meta's links expire, so each
+  of the others falls back to naming what was sent ("Sent a photo"), in the
+  seller's chosen language. A location shows its coordinates and an OpenStreetMap
   link. A reaction is pinned to the corner of the message it answers, as in
   Messenger: the newest standing one shows, and one taken back disappears.
   A reaction whose message is not loaded stays a line in the thread. A

@@ -54,3 +54,23 @@ export const extractedOrderSchema = z.object({
   confidence: z.number().min(0).max(1),
 });
 export type ExtractedOrder = z.infer<typeof extractedOrderSchema>;
+
+/** Candidates a photo match may return; code offers at most this many too. */
+export const MAX_PHOTO_MATCHES = 3;
+
+/**
+ * Output shape for matchProductPhoto(). Each match names a candidate by the
+ * number it was shown with, never by a catalog id; code maps the numbers back
+ * and drops any it did not show. Empty when no candidate is the product.
+ */
+export const photoMatchSchema = z.object({
+  matches: z
+    .array(
+      z.object({
+        candidate: z.number().int().positive(),
+        confidence: z.number().min(0).max(1),
+      }),
+    )
+    .max(MAX_PHOTO_MATCHES),
+});
+export type PhotoMatch = z.infer<typeof photoMatchSchema>;

@@ -3,7 +3,7 @@ import { isEmojiOnly, type MessageDetails } from '../message-content';
 import { handOff, type ActiveState, type TurnDecision } from './conversation-machine';
 import type { Notice } from './reply-intent';
 
-/** Files the assistant cannot read. A photo is read from phase 6; until then the seller looks. */
+/** Files the assistant cannot read. A photo is read by the vision call (phase 6). */
 const UNREADABLE: ReadonlySet<MessageKind> = new Set(['video', 'audio', 'file', 'other']);
 
 /** Reactions that read as a yes: the ones a customer might mean as "confirm". */
@@ -37,6 +37,8 @@ export function decideNonText({
 }): TurnDecision | 'silent' | null {
   // A shared post is resolved to a product by the turn, in any state.
   if (trigger.kind === 'share') return null;
+  // Before the card a photo is matched to the catalog by the turn; on it, it is no confirmation.
+  if (trigger.kind === 'image' && state !== 'awaiting_confirmation') return null;
   if (trigger.kind === 'text' && !isEmojiOnly(trigger.text)) return null;
   const say = (notice: Notice): TurnDecision => ({
     state,
@@ -56,8 +58,6 @@ export function decideNonText({
       return say('type_please');
     case 'location':
       return say(slots.deliveryAddress === undefined ? 'location_write_address' : 'location_seen');
-    case 'image':
-      return handOff(slots, 'unreadable');
     default:
       // A second file in a row after "text only" means they need a person.
       return previousKind !== null && UNREADABLE.has(previousKind)

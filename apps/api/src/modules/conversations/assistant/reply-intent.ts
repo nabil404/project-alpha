@@ -54,12 +54,22 @@ export type AskReason =
   /** A shared post's caption or an earlier suggestion named these: "Do you mean …?" */
   | 'shared_post'
   /** A shared post we could not read: which product is it? */
-  | 'shared_post_unknown';
+  | 'shared_post_unknown'
+  /** The vision call matched the customer's photo to these: "Is it this one?" */
+  | 'photo'
+  /** No candidate, or none sure enough: which product is it? */
+  | 'photo_unknown'
+  /** The photo could not be downloaded or read. */
+  | 'photo_unreadable'
+  /** The customer said No to the one match. */
+  | 'photo_rejected';
 
-/** A candidate offered as a quick reply. */
+/** A candidate offered as a quick reply, or as a carousel card when it carries a card. */
 export interface Choice {
   id: string;
   title: string;
+  /** A photo match's cover and lowest price, for its carousel card. */
+  card?: { subtitle: string; imageUrl: string | null };
 }
 
 /** What the turn says, decided by code. The LLM only words it, and never the summary. */

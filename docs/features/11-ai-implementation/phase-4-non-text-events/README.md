@@ -96,14 +96,14 @@ holds `decideNonText()`, a pure function the turn calls before any LLM call.
 Its fixed lines are `notice` replies in `assistant-fallbacks.ts`, which change
 neither the state nor the slots:
 
-| Trigger                   | `awaiting_confirmation`                                                           | Before the card                                                                           |
-| ------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Words                     | the LLM, as before                                                                | the LLM, as before                                                                        |
-| Reaction                  | `use_confirm` if it reads as a yes (`like`, `love`, 👍 ❤️ 😍 🥰 👌), else nothing | nothing (`silent`)                                                                        |
-| Sticker, emoji-only text  | `use_confirm`                                                                     | `type_please`                                                                             |
-| Location                  | `use_confirm`                                                                     | `location_write_address`, or `location_seen` once an address is collected                 |
-| Photo                     | `use_confirm`                                                                     | hand-off (`unreadable`) until [phase 6](../phase-6-product-photos/README.md) reads photos |
-| Video, audio, file, other | `use_confirm`                                                                     | `text_only`; a second in a row hands off (`unreadable`)                                   |
+| Trigger                   | `awaiting_confirmation`                                                           | Before the card                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Words                     | the LLM, as before                                                                | the LLM, as before                                                                                 |
+| Reaction                  | `use_confirm` if it reads as a yes (`like`, `love`, 👍 ❤️ 😍 🥰 👌), else nothing | nothing (`silent`)                                                                                 |
+| Sticker, emoji-only text  | `use_confirm`                                                                     | `type_please`                                                                                      |
+| Location                  | `use_confirm`                                                                     | `location_write_address`, or `location_seen` once an address is collected                          |
+| Photo                     | `use_confirm`                                                                     | left to the turn, which matches it to the catalog ([phase 6](../phase-6-product-photos/README.md)) |
+| Video, audio, file, other | `use_confirm`                                                                     | `text_only`; a second in a row hands off (`unreadable`)                                            |
 
 - **The gate.** `turnGate()` reads a message's `kind` and `edited_at`. A
   reaction never makes a message's turn stale (only a newer reaction makes a
@@ -148,8 +148,8 @@ customer's latest-conversation card all use it.
   configured, so a pin never fills the address: the assistant asks for a
   written one and the seller sees the pin. The "Deliver to this location?"
   consent flow is not built ([Follow-ups](#follow-ups)).
-- **A photo hands off.** "The assistant reads text and photos" holds because
-  the seller reads the photo until phase 6 does.
+- **A photo hands off** until [phase 6](../phase-6-product-photos/README.md),
+  which now matches it to the catalog before the card.
 - **A file twice in a row is "insisting".** Simple to read from the thread,
   and it needs no counter in the slots.
 - **No words stored for non-text messages.** The language is each seller's
@@ -211,7 +211,8 @@ its message's duplicate.
   reverse-geocoded label, once a geocoding provider is chosen.
 - Whether Messenger sends unsends at all, and in what shape; check on the dev
   Page.
-- Meta's attachment links expire. Photos are copied to R2 in phase 6; stickers,
+- Meta's attachment links expire. Photos are copied to R2
+  ([phase 6](../phase-6-product-photos/README.md#copying-the-photo)); stickers,
   video, audio and files are not.
 - A seller's own sticker or photo from Facebook's inbox is still dropped, and
   so does not pause the assistant.

@@ -14,6 +14,8 @@ const history: ChatLine[] = [{ from: 'customer', text: 'I want the red saree, 2 
 function model(modelId: string, answer: string | Error | 'hang') {
   return new MockLanguageModelV4({
     modelId,
+    // As OpenAI's: an https image is sent as its link, never downloaded by the SDK.
+    supportedUrls: { 'image/*': [/^https:\/\//] },
     doGenerate: async ({ abortSignal }) => {
       if (answer === 'hang') {
         return new Promise((_, reject) =>
@@ -174,5 +176,53 @@ describe('AiSdkLlmClient', () => {
     registerTelemetry(global);
     await client(INTENT).classifyIntent(history);
     expect(global.seen).toHaveLength(0);
+  });
+
+  describe('matchProductPhoto', () => {
+    const request = {
+      photos: ['https://media.example.test/c/org/m1-0.jpg'],
+      candidates: [
+        { number: 1, name: 'Jamdani Saree', imageUrl: 'https://media.example.test/m/a-thumb.jpg' },
+      ],
+      words: 'do you have this?',
+    };
+
+    it('asks the extraction model with each image as a url, and reads the matches', async () => {
+      const extraction = model(
+        'mock-extraction',
+        '{"matches":[{"candidate":1,"confidence":0.83}]}',
+      );
+      const llm = new AiSdkLlmClient({
+        routing: model('mock-routing', '{}'),
+        extraction,
+        timeoutMs: 2_000,
+      });
+
+      const result = await llm.matchProductPhoto(request);
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: { matches: [{ candidate: 1, confidence: 0.83 }] },
+        usage: { purpose: 'vision_match', model: 'mock-extraction' },
+      });
+      const prompt = extraction.doGenerateCalls[0]!.prompt;
+      const parts: { type: string; data?: unknown }[] = prompt.flatMap((message) =>
+        Array.isArray(message.content) ? (message.content as { type: string }[]) : [],
+      );
+      const files = parts.filter((part) => part.type === 'file');
+      expect(files).toHaveLength(2);
+      expect(files.map((part) => part.data)).toEqual([
+        expect.objectContaining({ type: 'url' }),
+        expect.objectContaining({ type: 'url' }),
+      ]);
+    });
+
+    it('reads a confidence out of bounds as invalid output', async () => {
+      const result = await client(
+        '{}',
+        '{"matches":[{"candidate":1,"confidence":7}]}',
+      ).matchProductPhoto(request);
+      expect(result).toMatchObject({ ok: false, reason: 'invalid_output' });
+    });
   });
 });

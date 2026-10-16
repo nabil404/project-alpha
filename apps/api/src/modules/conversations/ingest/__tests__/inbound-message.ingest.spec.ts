@@ -78,6 +78,7 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
   let graph: FakeGraph;
   let publisher: FakePublisher;
   let turns: FakeQueue;
+  let photoCopies: FakeQueue;
   let ingest: InboundMessageIngest;
 
   const customerMessage = (overrides: Partial<CustomerMessageJob> = {}): CustomerMessageJob => ({
@@ -131,6 +132,7 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
       new MerchantSettingsRepository(),
       publisher as unknown as ConversationEventsPublisher,
       turns as unknown as Queue,
+      photoCopies as unknown as Queue,
     );
 
   beforeAll(async () => {
@@ -147,6 +149,7 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
     graph = new FakeGraph();
     publisher = new FakePublisher();
     turns = new FakeQueue();
+    photoCopies = new FakeQueue();
     ingest = makeIngest();
   });
 
@@ -775,6 +778,45 @@ describeDb('InboundMessageIngest (app_runtime)', () => {
         lastMessageKind: 'sticker',
       });
       expect(turns.added).toHaveLength(1);
+    });
+
+    it('queues a copy of every customer photo, once, even on a handed-off chat', async () => {
+      const first = customerMessage();
+      await ingest.handle(first);
+      const thread = await threadOf(first.senderPsid);
+      await t.db
+        .update(schema.conversation)
+        .set({ state: 'handed_off' })
+        .where(eq(schema.conversation.id, thread!.conversation.id));
+      const photo = customerMessage({
+        senderPsid: first.senderPsid,
+        text: '',
+        attachments: [{ type: 'image', url: 'https://scontent.xx.fbcdn.net/p.jpg' }],
+      });
+
+      expect(await ingest.handle(photo)).toBe('stored');
+      expect(await ingest.handle(photo)).toBe('duplicate');
+
+      const stored = (await messagesOf(thread!.conversation.id)).find((m) => m.kind === 'image');
+      expect(photoCopies.added).toEqual([
+        {
+          name: 'store-photo',
+          data: { merchantId: t.merchantA, messageId: stored!.id },
+          opts: { jobId: `ph-${stored!.id}` },
+        },
+      ]);
+      expect(turns.added).toHaveLength(1);
+    });
+
+    it('queues no photo copy for a sticker or for words', async () => {
+      await ingest.handle(customerMessage());
+      await ingest.handle(
+        customerMessage({
+          text: '',
+          attachments: [{ type: 'sticker', url: 'https://cdn.example/s.png', stickerId: '1' }],
+        }),
+      );
+      expect(photoCopies.added).toEqual([]);
     });
 
     it('stores a shared post as a share with its links, and asks the assistant', async () => {
