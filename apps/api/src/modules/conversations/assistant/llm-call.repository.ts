@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { and, count, eq, gte } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../../database/base.repository';
 import { llmCall } from '../../database/schema/index';
-import type { LlmCallRecord } from '../../llm/llm.types';
+import type { LlmCallRecord, LlmPurpose } from '../../llm/llm.types';
 
 @Injectable()
 export class LlmCallRepository {
@@ -16,5 +17,27 @@ export class LlmCallRepository {
     await executor
       .insert(llmCall)
       .values(calls.map((call) => ({ ...call, merchantId, conversationId })));
+  }
+
+  /** How many calls for this purpose the conversation made since `since`, failed ones included. */
+  async countSince(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    conversationId: string,
+    purpose: LlmPurpose,
+    since: Date,
+  ): Promise<number> {
+    const [row] = await executor
+      .select({ calls: count() })
+      .from(llmCall)
+      .where(
+        and(
+          eq(llmCall.merchantId, merchantId),
+          eq(llmCall.conversationId, conversationId),
+          eq(llmCall.purpose, purpose),
+          gte(llmCall.createdAt, since),
+        ),
+      );
+    return Number(row?.calls ?? 0);
   }
 }

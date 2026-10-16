@@ -2,10 +2,29 @@ import type { MessageKind } from '@app/shared';
 import { z } from 'zod';
 import type { InboundAttachment } from '../queue/queue.constants';
 
+/** Why a customer's photo was not copied: see downloadPhoto and normalizeProductImage. */
+export const PHOTO_FAILURES = [
+  'timeout',
+  'too_large',
+  'not_allowed',
+  'unreadable',
+  'failed',
+] as const;
+export type PhotoFailure = (typeof PHOTO_FAILURES)[number];
+
 /** The `message.details` column: what a message without words carried. */
 export const messageDetailsSchema = z.object({
   attachments: z
-    .array(z.object({ url: z.string().nullable(), stickerId: z.string().nullable().optional() }))
+    .array(
+      z.object({
+        url: z.string().nullable(),
+        stickerId: z.string().nullable().optional(),
+        /** Our copy of a photo in object storage; Meta's link expires. */
+        key: z.string().optional(),
+        /** Why the photo could not be copied; it is not tried again. */
+        failed: z.enum(PHOTO_FAILURES).optional(),
+      }),
+    )
     .optional(),
   location: z.object({ lat: z.number(), long: z.number() }).optional(),
   /** Posts and links shared or pasted; see SharedLink. */

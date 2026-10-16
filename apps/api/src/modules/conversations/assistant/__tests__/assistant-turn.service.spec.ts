@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
-import { emptySlots, MAX_ORDER_ITEMS, type ExtractedOrder, type IntentResult } from '@app/shared';
+import {
+  emptySlots,
+  encodePayload,
+  MAX_ORDER_ITEMS,
+  type CollectedSlots,
+  type ExtractedOrder,
+  type IntentResult,
+  type PhotoMatch,
+} from '@app/shared';
+import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
 import { CryptoService } from '../../../../common/crypto.service';
 import type { AppConfig } from '../../../config/app.config';
@@ -27,6 +36,7 @@ import type {
   LlmClient,
   LlmPurpose,
   LlmResult,
+  PhotoMatchRequest,
 } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { ProductPostRepository } from '../../../messenger/posts/product-post.repository';
@@ -49,6 +59,11 @@ import { ConversationsService } from '../../conversations.service';
 import type { ConversationEventsPublisher } from '../../events/conversation-events.publisher';
 import { MessageRepository } from '../../message.repository';
 import { OutboundMessageSender } from '../../outbound-message.sender';
+import { CustomerPhotoStore } from '../../photos/customer-photo.store';
+import type { DownloadResult } from '../../photos/photo-download';
+import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
+import { MAX_ASKS } from '../conversation-machine';
+import { VISION_CALLS_PER_DAY } from '../photo-turn';
 import { fallbackText, REFERRAL_TEXT } from '../assistant-fallbacks';
 import { AssistantTurnService, extractionContext } from '../assistant-turn.service';
 import { LlmCallRepository } from '../llm-call.repository';
@@ -108,6 +123,14 @@ class FakeLlm implements LlmClient {
     this.calls.push('phrase');
     return this.phrase;
   }
+  photo: (request: PhotoMatchRequest) => LlmResult<PhotoMatch> = () =>
+    ok({ matches: [] }, 'vision_match');
+  photoRequests: PhotoMatchRequest[] = [];
+  async matchProductPhoto(request: PhotoMatchRequest) {
+    this.calls.push('vision_match');
+    this.photoRequests.push(request);
+    return this.photo(request);
+  }
 }
 
 describeDb('AssistantTurnService (app_runtime)', () => {
@@ -126,6 +149,9 @@ describeDb('AssistantTurnService (app_runtime)', () => {
   let notifyFailures: number;
   let handoffs: { merchantId: string; conversationId: string; at: Date }[];
   let cardTaps: CardTap[];
+  let photoStorage: InMemoryObjectStorage;
+  let download: (url: string | null) => Promise<DownloadResult>;
+  let jpeg: Buffer;
   /** Posts Graph can read, by Graph id; any other read fails as a missing permission. */
   const graphPosts = new Map<string, GraphPost>();
 
@@ -197,6 +223,9 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         Promise.reject(new Error('no short links in this spec')),
       ),
       new ProductPostRepository(),
+      new CustomerPhotoStore(runtime.db, new MessageRepository(), photoStorage, (url) =>
+        download(url),
+      ),
     );
   };
 
@@ -233,6 +262,11 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     Logger.overrideLogger(false);
     t = await openCatalogTestDb();
     runtime = openRuntimeDb();
+    jpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: '#c00' },
+    })
+      .jpeg()
+      .toBuffer();
     pageA = (await seedFacebookPage(t.db, t.merchantA, { accessToken: crypto.encrypt('token-A') }))
       .pageId;
     pageB = (await seedFacebookPage(t.db, t.merchantB, { accessToken: crypto.encrypt('token-B') }))
@@ -250,6 +284,8 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     sent = [];
     rich = [];
     cardTaps = [];
+    photoStorage = new InMemoryObjectStorage();
+    download = async () => ({ ok: true, body: jpeg });
     graphFails = false;
     handoffs = [];
     notifyFailures = 0;
@@ -444,6 +480,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
       null,
       publisher,
       {} as unknown as OutboundMessageSender,
+      new InMemoryObjectStorage(),
     );
 
     await conversations.update({ merchantId: t.merchantA }, convo.id, { botPaused: false });
@@ -1349,6 +1386,268 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         { from: 'assistant', text: 'Which product would you like?' },
       ]);
       expect((await messagesOf(convo.id)).filter((m) => m.sender === 'assistant')).toHaveLength(2);
+    });
+  });
+
+  describe('product photos', () => {
+    const PHOTO_URL = 'https://scontent.xx.fbcdn.net/v/photo.jpg';
+    /** A sellable product with a cover photo, one variant. */
+    const withCover = async (name: string, merchantId = t.merchantA) => {
+      const row = await seedProduct(t.db, merchantId, { name, status: 'active' });
+      await seedVariant(t.db, merchantId, row.id, { price: 250_000, stock: 4 });
+      const image = await seedImage(t.db, merchantId, row.id);
+      await t.db
+        .update(schema.product)
+        .set({ coverImageId: image.id })
+        .where(eq(schema.product.id, row.id));
+      return row;
+    };
+    /** An answered conversation, then a photo: the burst is the photo alone. */
+    const photo = async () => {
+      const made = await thread();
+      await seedMessage(t.db, t.merchantA, made.convo.id, {
+        sender: 'assistant',
+        sentAt: new Date(Date.now() - 800),
+        text: 'Hello!',
+      });
+      const sent = await seedMessage(t.db, t.merchantA, made.convo.id, {
+        sentAt: new Date(Date.now() - 500),
+        kind: 'image',
+        text: '',
+        details: { attachments: [{ url: PHOTO_URL }] },
+      });
+      return { ...made, photoId: sent.id, job: { ...made.job, triggerMessageId: sent.id } };
+    };
+    /** The model names these products, by the numbers it was shown them with. */
+    const modelPicks = (...names: string[]) => {
+      llm.photo = (request) =>
+        ok(
+          {
+            matches: names.map((name) => ({
+              candidate: request.candidates.find((candidate) => candidate.name === name)!.number,
+              confidence: 0.9,
+            })),
+          },
+          'vision_match',
+        );
+    };
+    const slotsOf = async (id: string) =>
+      (await conversationRow(id))?.collectedSlots as CollectedSlots | undefined;
+    const tap = async (conversationId: string, text: string, payload: string) =>
+      seedMessage(t.db, t.merchantA, conversationId, { sentAt: new Date(), text, payload });
+
+    it('asks "Is it this one?" with the cover, Yes and No, and fills nothing yet', async () => {
+      const kurti = await withCover('Photo Block Print Kurti');
+      modelPicks('Photo Block Print Kurti');
+      const { convo, job, photoId } = await photo();
+
+      await expect(service().run(job)).resolves.toBe('replied');
+
+      expect(llm.calls).toEqual(['vision_match']);
+      expect(rich.map((entry) => entry.kind)).toEqual(['image', 'quick_replies']);
+      expect(rich[0]?.text).toContain('/m/');
+      expect(rich[1]?.payloads).toEqual([
+        encodePayload({ kind: 'pick', slot: 'product', id: kurti.id }),
+        encodePayload({ kind: 'not_it' }),
+      ]);
+      expect(sent.at(-1)?.text).toBe(
+        fallbackText(
+          {
+            kind: 'ask_slot',
+            slot: 'product',
+            item: 0,
+            intent: 'order',
+            reason: 'photo',
+            choices: [{ id: kurti.id, title: kurti.name }],
+            facts: { items: [] },
+          },
+          'bn',
+        ),
+      );
+      expect(await slotsOf(convo.id)).toMatchObject({
+        items: [],
+        offered: { slot: 'product', item: 0, ids: [kurti.id] },
+      });
+      expect(await llmCallsOf(convo.id)).toEqual([
+        expect.objectContaining({ purpose: 'vision_match', outcome: 'ok' }),
+      ]);
+      // Our copy, not Meta's link, is what the model read and what the seller sees.
+      const key = `c/${t.merchantA}/${photoId}-0.jpg`;
+      expect(photoStorage.objects.has(key)).toBe(true);
+      expect(llm.photoRequests[0]?.photos).toEqual([photoStorage.publicUrl(key)]);
+      const [row] = await t.db.select().from(schema.message).where(eq(schema.message.id, photoId));
+      expect(row?.details).toEqual({ attachments: [{ url: PHOTO_URL, key }] });
+    });
+
+    it('fills the product only when the customer taps Yes', async () => {
+      const kurti = await withCover('Photo Yes Kurti');
+      modelPicks('Photo Yes Kurti');
+      const { convo, job } = await photo();
+      await service().run(job);
+      const yes = await tap(
+        convo.id,
+        'হ্যাঁ',
+        encodePayload({ kind: 'pick', slot: 'product', id: kurti.id }),
+      );
+
+      await service().run({ ...job, triggerMessageId: yes.id });
+
+      expect(await slotsOf(convo.id)).toMatchObject({ items: [{ productId: kurti.id }] });
+    });
+
+    it('offers several matches as a carousel', async () => {
+      await withCover('Photo Carousel Saree One');
+      await withCover('Photo Carousel Saree Two');
+      modelPicks('Photo Carousel Saree One', 'Photo Carousel Saree Two');
+      const { convo, job } = await photo();
+
+      await service().run(job);
+
+      expect(rich.map((entry) => entry.kind)).toEqual(['text', 'carousel']);
+      expect(rich[1]?.text).toBe('Photo Carousel Saree One, Photo Carousel Saree Two');
+      expect((await slotsOf(convo.id))?.offered?.ids).toHaveLength(2);
+    });
+
+    it('discards a candidate number it was never shown, and asks for the name', async () => {
+      await withCover('Photo Discard Panjabi');
+      llm.photo = () => ok({ matches: [{ candidate: 999, confidence: 0.99 }] }, 'vision_match');
+      const { convo, job } = await photo();
+
+      await service().run(job);
+
+      expect(rich.map((entry) => entry.kind)).toEqual(['text']);
+      expect(await slotsOf(convo.id)).toMatchObject({
+        lastAsked: { slot: 'product', item: 0, times: MAX_ASKS - 1 },
+      });
+      expect((await slotsOf(convo.id))?.offered).toBeUndefined();
+    });
+
+    it('asks for the name when the only match is not sure enough', async () => {
+      await withCover('Photo Unsure Lehenga');
+      llm.photo = (request) =>
+        ok(
+          { matches: [{ candidate: request.candidates[0]!.number, confidence: 0.3 }] },
+          'vision_match',
+        );
+      const { convo, job } = await photo();
+
+      await service().run(job);
+
+      expect((await slotsOf(convo.id))?.offered).toBeUndefined();
+      expect(sent.at(-1)?.text).toContain('ছবি দেখে');
+    });
+
+    it('asks for the name after No, and hands off on a second miss', async () => {
+      await withCover('Photo No Kameez');
+      modelPicks('Photo No Kameez');
+      const { convo, job } = await photo();
+      await service().run(job);
+
+      const no = await tap(convo.id, 'না', encodePayload({ kind: 'not_it' }));
+      await expect(service().run({ ...job, triggerMessageId: no.id })).resolves.toBe('replied');
+      expect(sent.at(-1)?.text).toBe(
+        fallbackText(
+          {
+            kind: 'ask_slot',
+            slot: 'product',
+            intent: 'order',
+            reason: 'photo_rejected',
+            facts: { items: [] },
+          },
+          'bn',
+        ),
+      );
+      expect(await slotsOf(convo.id)).toMatchObject({
+        lastAsked: { slot: 'product', item: 0, times: MAX_ASKS - 1 },
+      });
+      expect((await slotsOf(convo.id))?.offered).toBeUndefined();
+
+      llm.intent = ok({ intent: 'order', confidence: 0.9 }, 'classify');
+      llm.extraction = ok(
+        {
+          ...NOTHING,
+          items: [
+            {
+              ref: null,
+              productQuery: 'zzqx nothing like it',
+              productQueryAlt: null,
+              variantQuery: null,
+              variantQueryAlt: null,
+              quantity: null,
+            },
+          ],
+        },
+        'extract',
+      );
+      const typed = await seedMessage(t.db, t.merchantA, convo.id, {
+        sentAt: new Date(Date.now() + 1_000),
+        text: 'zzqx nothing like it',
+      });
+      await expect(service().run({ ...job, triggerMessageId: typed.id })).resolves.toBe(
+        'handed_off',
+      );
+      expect(await conversationRow(convo.id)).toMatchObject({ state: 'handed_off' });
+    });
+
+    it.each(['timeout', 'too_large'] as const)(
+      'answers a %s download with the fixed line and no model call',
+      async (reason) => {
+        await withCover('Photo Download Fail Shawl');
+        download = async () => ({ ok: false, reason });
+        const { convo, job, photoId } = await photo();
+
+        await expect(service().run(job)).resolves.toBe('replied');
+
+        expect(llm.calls).toEqual([]);
+        expect(sent.at(-1)?.text).toContain('ছবিটি খুলতে পারিনি');
+        expect(await conversationRow(convo.id)).toMatchObject({ state: 'browsing' });
+        const [row] = await t.db
+          .select()
+          .from(schema.message)
+          .where(eq(schema.message.id, photoId));
+        expect(row?.details).toEqual({ attachments: [{ url: PHOTO_URL, failed: reason }] });
+      },
+    );
+
+    it("never shows another merchant's products to the model", async () => {
+      const mine = await withCover('Photo Tenant Mine');
+      const theirs = await withCover('Photo Tenant Theirs', t.merchantB);
+      const { job } = await photo();
+
+      await service().run(job);
+
+      const names = llm.photoRequests[0]!.candidates.map((candidate) => candidate.name);
+      expect(names).toContain(mine.name);
+      expect(names).not.toContain(theirs.name);
+    });
+
+    it('hands off when the vision call fails', async () => {
+      await withCover('Photo Llm Fail Dupatta');
+      llm.photo = () => failed('vision_match');
+      const { convo, job } = await photo();
+
+      await expect(service().run(job)).resolves.toBe('handed_off');
+      expect(await llmCallsOf(convo.id)).toEqual([
+        expect.objectContaining({ purpose: 'vision_match', outcome: 'timeout' }),
+      ]);
+    });
+
+    it("hands the photos to the seller past the conversation's daily cap", async () => {
+      await withCover('Photo Cap Scarf');
+      const { convo, job } = await photo();
+      await t.db.insert(schema.llmCall).values(
+        Array.from({ length: VISION_CALLS_PER_DAY }, () => ({
+          merchantId: t.merchantA,
+          conversationId: convo.id,
+          purpose: 'vision_match' as const,
+          model: 'fake',
+          latencyMs: 1,
+          outcome: 'ok' as const,
+        })),
+      );
+
+      await expect(service().run(job)).resolves.toBe('handed_off');
+      expect(llm.calls).toEqual([]);
     });
   });
 });

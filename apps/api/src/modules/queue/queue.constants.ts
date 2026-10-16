@@ -209,6 +209,18 @@ export interface AssistantTurnJob {
  * it, and only the worker adds RESUBSCRIBE_PAGES_JOB. That runs once; bump the
  * job id (e.g. -v2) to run it again for a new webhook field.
  */
+export const CUSTOMER_PHOTO_QUEUE = 'customer-photos';
+export const STORE_PHOTO_JOB = 'store-photo';
+/** Downloads wait on Meta's CDN, not the database; a few at once keep a slow one from holding the rest. */
+export const CUSTOMER_PHOTO_CONCURRENCY = 2;
+
+/** Copy a customer's photo message into our bucket; the job id is `ph-` plus the message id. */
+export interface StorePhotoJob {
+  merchantId: string;
+  /** Our message row id. */
+  messageId: string;
+}
+
 export const MESSENGER_PROFILE_QUEUE = 'messenger-profile';
 export const SYNC_PROFILE_JOB = 'sync-profile';
 export const RESUBSCRIBE_PAGES_JOB = 'resubscribe-pages';

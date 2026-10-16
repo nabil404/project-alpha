@@ -1,7 +1,7 @@
-import type { ExtractedOrder, IntentResult } from '@app/shared';
+import type { ExtractedOrder, IntentResult, PhotoMatch } from '@app/shared';
 
 /** What each call was for; one row per call in llm_call. */
-export const LLM_PURPOSES = ['classify', 'extract', 'phrase'] as const;
+export const LLM_PURPOSES = ['classify', 'extract', 'phrase', 'vision_match'] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
 export const LLM_OUTCOMES = ['ok', 'timeout', 'provider_error', 'invalid_output'] as const;
@@ -62,8 +62,21 @@ export interface ExtractionContext {
   offeredName?: string;
 }
 
+/**
+ * A customer's photos and the products they may show. Every url is our own
+ * bucket's; each candidate is shown with its number, which is all a match may
+ * name.
+ */
+export interface PhotoMatchRequest {
+  photos: string[];
+  candidates: { number: number; name: string; imageUrl: string }[];
+  /** What the customer typed beside the photo, if anything. */
+  words?: string;
+}
+
 export interface LlmClient {
   classifyIntent(history: ChatLine[]): Promise<LlmResult<IntentResult>>;
   extractOrder(history: ChatLine[], context: ExtractionContext): Promise<LlmResult<ExtractedOrder>>;
   phraseReply(request: PhraseRequest, history: ChatLine[]): Promise<LlmResult<string>>;
+  matchProductPhoto(request: PhotoMatchRequest): Promise<LlmResult<PhotoMatch>>;
 }

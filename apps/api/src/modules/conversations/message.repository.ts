@@ -209,6 +209,34 @@ export class MessageRepository {
     return row ?? null;
   }
 
+  /** A message by our id, locked when asked, so a details write never loses a concurrent one. */
+  async findById(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+    { lock = false }: { lock?: boolean } = {},
+  ): Promise<MessageRow | null> {
+    const query = executor
+      .select()
+      .from(message)
+      .where(and(eq(message.merchantId, merchantId), eq(message.id, id)));
+    const [row] = lock ? await query.for('update') : await query;
+    return row ?? null;
+  }
+
+  /** Replaces what a message without words carried: a photo's copy, once stored. */
+  async setDetails(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    id: string,
+    details: MessageDetails,
+  ): Promise<void> {
+    await executor
+      .update(message)
+      .set({ details })
+      .where(and(eq(message.merchantId, merchantId), eq(message.id, id)));
+  }
+
   /** The conversation's newest message, for the list columns after a delete. */
   async latest(
     executor: Executor,

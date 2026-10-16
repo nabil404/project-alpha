@@ -10,12 +10,18 @@ import {
 import {
   extractedOrderSchema,
   intentResultSchema,
+  photoMatchSchema,
   type ExtractedOrder,
   type IntentResult,
+  type PhotoMatch,
 } from '@app/shared';
 import type { z } from 'zod';
 import { CLASSIFY_INTENT_SYSTEM } from './prompts/classify-intent';
 import { EXTRACT_ORDER_SYSTEM, extractOrderPrompt } from './prompts/extract-order';
+import {
+  MATCH_PRODUCT_PHOTO_SYSTEM,
+  matchProductPhotoContent,
+} from './prompts/match-product-photo';
 import { PHRASE_REPLY_SYSTEM, phraseReplyPrompt } from './prompts/phrase-reply';
 import { transcript } from './prompts/transcript';
 import type {
@@ -25,6 +31,7 @@ import type {
   LlmFailure,
   LlmPurpose,
   LlmResult,
+  PhotoMatchRequest,
   PhraseRequest,
 } from './llm.types';
 
@@ -104,6 +111,25 @@ export class AiSdkLlmClient implements LlmClient {
         telemetry: this.telemetry('phrase'),
       });
       return { value: result.text.trim(), tokens: result.usage };
+    });
+  }
+
+  /** The larger model: it reads images, and a wrong match costs more than the call. */
+  matchProductPhoto(request: PhotoMatchRequest): Promise<LlmResult<PhotoMatch>> {
+    const model = this.options.extraction;
+    return this.call('vision_match', model, async (abortSignal) => {
+      const result = await generateText({
+        model,
+        system: MATCH_PRODUCT_PHOTO_SYSTEM,
+        messages: [{ role: 'user', content: matchProductPhotoContent(request) }],
+        output: Output.object({ schema: photoMatchSchema }),
+        abortSignal,
+        maxRetries: 1,
+        telemetry: this.telemetry('vision_match'),
+      });
+      const parsed = photoMatchSchema.safeParse(result.output);
+      if (!parsed.success) throw new InvalidOutput(result.usage);
+      return { value: parsed.data, tokens: result.usage };
     });
   }
 

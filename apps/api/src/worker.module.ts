@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { AssistantModule } from './modules/conversations/assistant/assistant.module';
+import { CustomerPhotosModule } from './modules/conversations/photos/customer-photos.module';
 import { ConversationIngestModule } from './modules/conversations/ingest/conversation-ingest.module';
 import { CustomerProfilesModule } from './modules/conversations/profiles/customer-profiles.module';
 import { MessengerProfileWorkerModule } from './modules/messenger/profile/messenger-profile.module';
@@ -16,6 +17,7 @@ import { StorageMaintenanceModule } from './modules/products/images/storage-main
     AppModule,
     StorageMaintenanceModule,
     ConversationIngestModule,
+    CustomerPhotosModule,
     CustomerProfilesModule,
     NotificationsWorkerModule,
     AssistantModule,

@@ -106,7 +106,7 @@ LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 2. Set `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT`. For an EU-region
    workspace, set `LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com`.
 3. Restart the API and the worker, then send a test message. The project shows
-   one run per call, named `classify`, `extract` or `phrase`.
+   one run per call, named `classify`, `extract`, `phrase` or `vision_match`.
 
 Without the key nothing is traced: each call turns AI SDK telemetry off. The
 worker flushes pending traces when it shuts down. `llm_call` stays the record

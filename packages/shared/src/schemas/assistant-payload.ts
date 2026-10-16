@@ -10,6 +10,8 @@ export type AssistantPayload =
   | { kind: 'confirm'; conversationId: string; revision: number }
   | { kind: 'change'; conversationId: string; revision: number }
   | { kind: 'pick'; slot: 'product' | 'variant'; id: string }
+  /** "No" to the one product a photo was matched to. */
+  | { kind: 'not_it' }
   /** The customer's Facebook profile name, offered as the name for the order. */
   | { kind: 'name' }
   | { kind: 'start' }
@@ -39,6 +41,8 @@ export function encodePayload(payload: AssistantPayload): string {
       return `${payload.kind}:${payload.conversationId}:${payload.revision}`;
     case 'pick':
       return `pick:${payload.slot}:${payload.id}`;
+    case 'not_it':
+      return 'photo:no';
     case 'name':
       return 'name:profile';
     case 'start':
@@ -64,6 +68,7 @@ export function parsePayload(text: string): AssistantPayload | null {
   }
   const pick = PICK.exec(text);
   if (pick) return { kind: 'pick', slot: pick[1] as 'product' | 'variant', id: pick[2] as string };
+  if (text === 'photo:no') return { kind: 'not_it' };
   if (text === 'name:profile') return { kind: 'name' };
   if (text === 'start') return { kind: 'start' };
   if (text === 'browse') return { kind: 'browse', categoryId: null };

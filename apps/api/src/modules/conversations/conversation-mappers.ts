@@ -40,14 +40,20 @@ export function toConversationDetail(
   };
 }
 
-export function toMessage(row: MessageRow): Message {
+/**
+ * A message as the dashboard shows it. A photo we copied shows from our
+ * bucket (`photoUrl` turns its key into a link), since Meta's link expires.
+ */
+export function toMessage(row: MessageRow, photoUrl: (key: string) => string): Message {
   const details = readDetails(row.details);
   return {
     id: row.id,
     sender: row.sender,
     kind: row.kind,
     text: row.text,
-    attachments: (details.attachments ?? []).map(({ url }) => ({ url: safeUrl(url) })),
+    attachments: (details.attachments ?? []).map(({ url, key }) => ({
+      url: key === undefined ? safeUrl(url) : photoUrl(key),
+    })),
     location: details.location ?? null,
     links: (details.links ?? []).map(({ url, title }) => ({ url: safeUrl(url), title })),
     reaction: details.reaction

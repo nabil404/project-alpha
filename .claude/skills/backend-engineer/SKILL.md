@@ -396,8 +396,8 @@ The strictest rules in the project. The LLM is a parser, not the driver.
   only ever quotes prices, variants, stock and delivery charges _from the
   catalog_. It never invents a discount or availability.
 - **Structured JSON output with Zod schemas from `@app/shared`**, behind
-  `LlmClient` (`apps/api/src/modules/llm/`): `classifyIntent`, `extractOrder`
-  and `phraseReply`, which never throw and return `{ ok, … }`; schemas in
+  `LlmClient` (`apps/api/src/modules/llm/`): `classifyIntent`, `extractOrder`,
+  `phraseReply` and `matchProductPhoto`, which never throw and return `{ ok, … }`; schemas in
   `packages/shared/src/schemas/llm.ts`. Provider: OpenAI through the AI SDK; provider and model come from env — `LLM_PROVIDER`,
   `LLM_MODEL_ROUTING`, `LLM_MODEL_EXTRACTION` — with the smaller model for
   intent and routing and the larger one only for extraction.

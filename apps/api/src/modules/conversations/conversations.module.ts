@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CryptoService } from '../../common/crypto.service';
 import { FacebookPageModule } from '../messenger/page/facebook-page.module';
+import { StorageModule } from '../storage/storage.module';
 import { ConversationRepository } from './conversation.repository';
 import { ConversationsController } from './conversations.controller';
 import { ConversationsService } from './conversations.service';
@@ -14,7 +15,7 @@ import { OutboundMessageSender } from './outbound-message.sender';
  * ingest (ConversationIngestModule) shares.
  */
 @Module({
-  imports: [FacebookPageModule, ConversationEventsModule],
+  imports: [FacebookPageModule, ConversationEventsModule, StorageModule],
   controllers: [ConversationsController],
   providers: [
     CryptoService,

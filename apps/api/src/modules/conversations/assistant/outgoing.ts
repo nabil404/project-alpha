@@ -1,6 +1,6 @@
 import { encodePayload } from '@app/shared';
 import type { OutboundContent } from '../outbound-message.sender';
-import { ENTRY_TEXT, type ReplyLanguage } from './assistant-fallbacks';
+import { ENTRY_TEXT, PHOTO_BUTTONS, type ReplyLanguage } from './assistant-fallbacks';
 import type { ReplyIntent } from './reply-intent';
 import { summaryMessages } from './summary-card';
 
@@ -12,7 +12,8 @@ export interface Outgoing {
 
 /**
  * The turn's reply as Messenger messages. An ask with candidates carries them
- * as quick replies whose payload names the candidate, and an ask for the
+ * as quick replies whose payload names the candidate; a photo's one match is
+ * Yes and No instead, and its several are a carousel. An ask for the
  * name offers the profile name as one; a summary is the card
  * with Confirm and Change buttons for its revision, after its item lines when
  * the card alone would be too long. `notice` puts a fixed line before the
@@ -88,6 +89,44 @@ export function outgoingFor(
     return reply.more
       ? [carousel, { text: ENTRY_TEXT[language].more, content: { kind: 'text' } }]
       : [carousel];
+  }
+  if (reply.kind === 'ask_slot' && reply.reason === 'photo' && reply.choices?.length === 1) {
+    const buttons = PHOTO_BUTTONS[language];
+    return [
+      {
+        text,
+        content: {
+          kind: 'quick_replies',
+          options: [
+            {
+              title: buttons.yes,
+              payload: encodePayload({ kind: 'pick', slot: 'product', id: reply.choices[0]!.id }),
+            },
+            { title: buttons.no, payload: encodePayload({ kind: 'not_it' }) },
+          ],
+        },
+      },
+    ];
+  }
+  const cards = reply.kind === 'ask_slot' ? reply.choices : undefined;
+  if (cards && cards.length > 0 && cards.every((choice) => choice.card)) {
+    const choices = cards;
+    const carousel: Outgoing = {
+      text: choices.map((choice) => `${choice.title} (${choice.card!.subtitle})`).join(', '),
+      content: {
+        kind: 'carousel',
+        cards: choices.map((choice) => ({
+          title: choice.title,
+          subtitle: choice.card!.subtitle,
+          imageUrl: choice.card!.imageUrl,
+          button: {
+            title: PHOTO_BUTTONS[language].choose,
+            payload: encodePayload({ kind: 'pick', slot: 'product', id: choice.id }),
+          },
+        })),
+      },
+    };
+    return [{ text, content: { kind: 'text' } }, carousel];
   }
   if (reply.kind === 'ask_slot' && reply.choices && reply.choices.length > 0) {
     const slot = reply.slot === 'variant' ? 'variant' : 'product';

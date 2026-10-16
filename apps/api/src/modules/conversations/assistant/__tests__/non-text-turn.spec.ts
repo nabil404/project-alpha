@@ -102,9 +102,12 @@ describe('decideNonText', () => {
     });
   });
 
-  it('hands a photo to the seller until photos are read', () => {
-    expect(decide('browsing', 'image')).toMatchObject({ state: 'handed_off' });
-  });
+  it.each(['browsing', 'collecting_details'] as const)(
+    'leaves a photo in %s to the turn, which matches it to the catalog',
+    (state) => {
+      expect(decide(state, 'image')).toBeNull();
+    },
+  );
 });
 
 describe('isEmojiOnly', () => {

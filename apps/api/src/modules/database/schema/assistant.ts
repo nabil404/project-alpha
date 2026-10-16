@@ -3,7 +3,7 @@ import { createdAt, id, merchantId, merchantIsolation, oneOf } from './columns';
 import { conversation } from './conversations';
 
 /** Literal copies of llm.types (drizzle-kit loads this file on its own); llm-call.repository.spec keeps them equal. */
-export const LLM_CALL_PURPOSES = ['classify', 'extract', 'phrase'] as const;
+export const LLM_CALL_PURPOSES = ['classify', 'extract', 'phrase', 'vision_match'] as const;
 export const LLM_CALL_OUTCOMES = ['ok', 'timeout', 'provider_error', 'invalid_output'] as const;
 
 /**

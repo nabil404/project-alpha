@@ -4,6 +4,7 @@ import { AppConfigModule } from '../config/config.module';
 import { AppConfig } from '../config/app.config';
 import {
   ASSISTANT_QUEUE,
+  CUSTOMER_PHOTO_QUEUE,
   MESSENGER_PROFILE_QUEUE,
   MESSENGER_QUEUE,
   NOTIFICATIONS_QUEUE,
@@ -33,6 +34,7 @@ import {
       { name: NOTIFICATIONS_QUEUE },
       { name: ASSISTANT_QUEUE },
       { name: MESSENGER_PROFILE_QUEUE },
+      { name: CUSTOMER_PHOTO_QUEUE },
     ),
   ],
   exports: [BullModule],

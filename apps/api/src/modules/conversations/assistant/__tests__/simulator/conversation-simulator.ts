@@ -6,6 +6,7 @@ import {
   type CustomerIntent,
   type ExtractedItem,
   type ExtractedOrder,
+  type PhotoMatch,
   type IntentResult,
 } from '@app/shared';
 import type { Job, Queue } from 'bullmq';
@@ -39,6 +40,7 @@ import {
 } from '../../../../queue/queue.constants';
 import { DeliveryChargesRepository } from '../../../../settings/delivery-charges.repository';
 import { MerchantSettingsRepository } from '../../../../settings/merchant-settings.repository';
+import { InMemoryObjectStorage } from '../../../../storage/__tests__/in-memory-object-storage';
 import { ConversationRepository } from '../../../conversation.repository';
 import { CustomerRepository } from '../../../customer.repository';
 import type { ConversationEventsPublisher } from '../../../events/conversation-events.publisher';
@@ -49,6 +51,7 @@ import { ProductPostRepository } from '../../../../messenger/posts/product-post.
 import { SharedPostResolver } from '../../../../messenger/posts/shared-post.resolver';
 import { MessageRepository } from '../../../message.repository';
 import { OutboundMessageSender } from '../../../outbound-message.sender';
+import { CustomerPhotoStore } from '../../../photos/customer-photo.store';
 import { CustomerProfileReader } from '../../../profiles/customer-profile.reader';
 import { AssistantTurnProcessor } from '../../assistant-turn.processor';
 import { AssistantTurnService } from '../../assistant-turn.service';
@@ -174,6 +177,11 @@ class ScriptedLlm implements LlmClient {
     this.calls.push('phrase');
     return { ok: false, reason: 'timeout', usage: this.usage('phrase') };
   }
+  /** The simulator sends no photos; a step that does sees no match. */
+  async matchProductPhoto(): Promise<LlmResult<PhotoMatch>> {
+    this.calls.push('vision_match');
+    return { ok: true, value: { matches: [] }, usage: this.usage('vision_match') };
+  }
 }
 
 /** Counts calls on the real client so the transcript can show them. */
@@ -191,6 +199,10 @@ class CountingLlm implements LlmClient {
   phraseReply(...args: Parameters<LlmClient['phraseReply']>) {
     this.calls.push('phrase');
     return this.inner.phraseReply(...args);
+  }
+  matchProductPhoto(...args: Parameters<LlmClient['matchProductPhoto']>) {
+    this.calls.push('vision_match');
+    return this.inner.matchProductPhoto(...args);
   }
 }
 
@@ -330,6 +342,7 @@ export class ConversationSimulator {
         settings,
         publisher,
         this.turns as unknown as Queue,
+        { add: async () => undefined } as unknown as Queue,
       ),
     );
     this.assistant = new AssistantTurnProcessor(
@@ -351,6 +364,10 @@ export class ConversationSimulator {
           Promise.reject(new Error('the simulator follows no links')),
         ),
         new ProductPostRepository(),
+        new CustomerPhotoStore(runtime, messages, new InMemoryObjectStorage(), async () => ({
+          ok: false,
+          reason: 'not_allowed',
+        })),
       ),
     );
   }
