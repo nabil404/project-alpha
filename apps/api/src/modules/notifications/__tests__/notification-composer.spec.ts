@@ -15,6 +15,7 @@ import {
 } from '../../database/__tests__/conversation-seeds';
 import { seedOrder } from '../../database/__tests__/order-seeds';
 import * as schema from '../../database/schema/index';
+import { seedProduct, seedVariant } from '../../database/__tests__/catalog-test-db';
 import { NotificationPreferencesRepository } from '../../settings/notification-preferences.repository';
 import { ShopProfileRepository } from '../../settings/shop-profile.repository';
 import { NotificationComposer } from '../notification-composer';
@@ -94,6 +95,9 @@ describeDb('NotificationComposer', () => {
       await t.db
         .delete(schema.merchantSettings)
         .where(eq(schema.merchantSettings.merchantId, merchantId));
+      await t.db
+        .delete(schema.productImport)
+        .where(eq(schema.productImport.merchantId, merchantId));
     }
   });
 
@@ -284,6 +288,90 @@ describeDb('NotificationComposer', () => {
       await seedMember(t.merchantA, { dailySummary: true });
 
       await expect(composer.dailySummary(t.merchantA, '2026-10-06')).resolves.toEqual([]);
+    });
+  });
+
+  describe('importFinished', () => {
+    const endRun = async (
+      status: 'finished' | 'stopped' | 'failed',
+      errorCode: string | null = null,
+    ) => {
+      const finishedAt = new Date('2026-10-21T08:00:00Z');
+      const [run] = await t.db
+        .insert(schema.productImport)
+        .values({
+          merchantId: t.merchantA,
+          source: 'facebook_posts',
+          since: '2026-07-21',
+          until: '2026-10-21',
+          status,
+          errorCode,
+          drafts: 2,
+          finishedAt,
+        })
+        .returning();
+      // One draft still needs a price, the other is ready.
+      const unpriced = await seedProduct(t.db, t.merchantA, { status: 'draft' });
+      await seedVariant(t.db, t.merchantA, unpriced.id, { price: null, stock: null });
+      const priced = await seedProduct(t.db, t.merchantA, { status: 'draft' });
+      await seedVariant(t.db, t.merchantA, priced.id, { stock: null });
+      await t.db.insert(schema.productImportPost).values({
+        merchantId: t.merchantA,
+        importId: run!.id,
+        postId: '1_1',
+        result: 'draft',
+        productIds: [unpriced.id, priced.id],
+      });
+      return { run: run!, finishedAt };
+    };
+
+    it('mails every member by default, with the drafts and what needs info', async () => {
+      const owner = await seedMember(t.merchantA);
+      await seedMember(t.merchantA, { importFinished: false });
+      const { run, finishedAt } = await endRun('finished');
+
+      const emails = await composer.importFinished(t.merchantA, run.id, finishedAt);
+
+      expect(emails.map((email) => email.message.to)).toEqual([owner]);
+      expect(emails[0]!.message.subject).toBe(
+        "Rahim's Kitchen: your import from Facebook finished",
+      );
+      expect(emails[0]!.message.text).toContain('It made 2 draft products; 1 still needs a price.');
+      expect(emails[0]!.message.text).toContain(`${APP_URL}/catalog/imports/${run.id}`);
+    });
+
+    it('says a run was stopped, and why one failed', async () => {
+      await seedMember(t.merchantA);
+      const stopped = await endRun('stopped');
+      const [stoppedEmail] = await composer.importFinished(
+        t.merchantA,
+        stopped.run.id,
+        stopped.finishedAt,
+      );
+      expect(stoppedEmail!.message.subject).toContain('stopped');
+
+      const failed = await endRun('failed', 'FACEBOOK_PERMISSION_MISSING');
+      const [failedEmail] = await composer.importFinished(
+        t.merchantA,
+        failed.run.id,
+        failed.finishedAt,
+      );
+      expect(failedEmail!.message.subject).toContain('failed');
+      expect(failedEmail!.message.text).toContain('Reconnect the Page');
+    });
+
+    it('stays quiet about an end the run has moved on from', async () => {
+      await seedMember(t.merchantA);
+      const { run } = await endRun('stopped');
+      // Resumed since, and running again: that end is no longer the run's.
+      await t.db
+        .update(schema.productImport)
+        .set({ status: 'running', finishedAt: null })
+        .where(eq(schema.productImport.id, run.id));
+
+      await expect(
+        composer.importFinished(t.merchantA, run.id, new Date('2026-10-21T08:00:00Z')),
+      ).resolves.toEqual([]);
     });
   });
 });

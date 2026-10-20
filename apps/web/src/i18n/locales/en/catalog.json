@@ -179,6 +179,7 @@
     },
     "moreCategories": "Also in {{list}}",
     "noOptions": "No options",
+    "noValue": "—",
     "pagination": {
       "perPageLabel": "Products per page",
       "showing_one": "Showing {{from}}–{{to}} of {{count}} product",

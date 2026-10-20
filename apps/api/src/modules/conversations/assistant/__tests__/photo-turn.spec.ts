@@ -1,4 +1,4 @@
-import type { Product } from '@app/shared';
+import type { SellableProduct } from '@app/shared';
 import type { MessageRow } from '../../../database/schema/index';
 import type { CatalogView } from '../catalog-match';
 import {
@@ -14,7 +14,7 @@ import { EVAL_PRODUCTS, productByKey } from './fixtures/match-eval';
 const SAREES = '00000000-0000-4000-8000-0000000000a1';
 
 /** The eval product with a cover photo, in the sarees category when asked. */
-function covered(product: Product, categoryIds: string[] = []): Product {
+function covered(product: SellableProduct, categoryIds: string[] = []): SellableProduct {
   const imageId = `00000000-0000-4000-8000-${product.id.slice(-12)}`;
   return {
     ...product,

@@ -8,11 +8,13 @@ import {
   DAILY_SUMMARY_JOB,
   DAILY_SUMMARY_SCAN_JOB,
   EVENT_JOB_RETENTION,
+  IMPORT_FINISHED_JOB,
   NOTIFICATIONS_QUEUE,
   ORDER_DRAFTED_JOB,
   SEND_EMAIL_JOB,
   type CustomerWaitingJob,
   type DailySummaryJob,
+  type ImportFinishedJob,
   type OrderDraftedJob,
 } from '../queue/queue.constants';
 import { NotificationComposer, type NotificationEmail } from './notification-composer';
@@ -89,6 +91,11 @@ export class NotificationsProcessor extends WorkerHost implements OnApplicationB
       case DAILY_SUMMARY_JOB: {
         const { merchantId, day } = job.data as DailySummaryJob;
         return this.queueEmails(job, await this.composer.dailySummary(merchantId, day));
+      }
+      case IMPORT_FINISHED_JOB: {
+        const { merchantId, importId, endedAt } = job.data as ImportFinishedJob;
+        const emails = await this.composer.importFinished(merchantId, importId, new Date(endedAt));
+        return this.queueEmails(job, emails);
       }
       case SEND_EMAIL_JOB:
         // Throws on failure, so BullMQ retries this one message.

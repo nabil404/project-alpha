@@ -1,10 +1,21 @@
-import { toLatinDigits, type Category, type Product, type Variant } from '@app/shared';
+import {
+  toLatinDigits,
+  type Category,
+  type SellableProduct,
+  type SellableVariant,
+} from '@app/shared';
 
 /** The sellable catalog as the assistant sees it: active products, live variants. */
 export interface CatalogView {
-  products: Product[];
+  products: SellableProduct[];
   /** Live categories, for browsing; matching ignores them. */
   categories: Category[];
+}
+
+/** What matching a product by name reads: the import matches drafts and archived products too. */
+export type NamedProduct = Pick<SellableProduct, 'id' | 'name' | 'aliases' | 'options'>;
+export interface NamedCatalog {
+  products: readonly NamedProduct[];
 }
 
 export type ProductMatch =
@@ -174,7 +185,7 @@ function forms(queries: readonly (string | undefined)[]): (readonly string[])[] 
  */
 function withoutValueWords(
   query: readonly string[],
-  product: Product,
+  product: NamedProduct,
   t: MatchThresholds,
 ): readonly string[] {
   const values = product.options.flatMap((option) =>
@@ -188,7 +199,7 @@ function withoutValueWords(
 /** Each product's score for the customer's words; only `t.word` matters here. */
 export function productScores(
   queries: readonly (string | undefined)[],
-  catalog: CatalogView,
+  catalog: NamedCatalog,
   t: MatchThresholds,
 ): { id: string; score: number }[] {
   const written = forms(queries);
@@ -206,7 +217,7 @@ export function productScores(
 /** Scores each product by its name and aliases against every form of the customer's words. */
 export function matchProduct(
   queries: readonly (string | undefined)[],
-  catalog: CatalogView,
+  catalog: NamedCatalog,
   t: MatchThresholds = MATCH_THRESHOLDS,
 ): ProductMatch {
   return decideProduct(productScores(queries, catalog, t), queries, catalog, t);
@@ -220,7 +231,7 @@ export function matchProduct(
 export function decideProduct(
   scored: { id: string; score: number }[],
   queries: readonly (string | undefined)[],
-  catalog: CatalogView,
+  catalog: NamedCatalog,
   t: MatchThresholds,
 ): ProductMatch {
   const result = decide(scored, t);
@@ -233,7 +244,7 @@ export function decideProduct(
   return { kind: 'some', productIds: [result, ...rivals].slice(0, MAX_CANDIDATES) };
 }
 
-const ownWords = (product: Product) => [product.name, ...product.aliases].flatMap(wordsOf);
+const ownWords = (product: NamedProduct) => [product.name, ...product.aliases].flatMap(wordsOf);
 
 /**
  * Other products that own a word the customer wrote, in either script, that
@@ -249,7 +260,7 @@ const ownWords = (product: Product) => [product.name, ...product.aliases].flatMa
  */
 function namedRivals(
   queries: readonly (string | undefined)[],
-  catalog: CatalogView,
+  catalog: NamedCatalog,
   winnerId: string,
   t: MatchThresholds,
 ): string[] {
@@ -341,7 +352,7 @@ function uncovered(
 }
 
 /** A variant's option values ("40", "White"), or its own name's parts when it has none. */
-export function variantValues(product: Product, variant: Variant): string[] {
+export function variantValues(product: SellableProduct, variant: SellableVariant): string[] {
   const values = new Map(
     product.options.flatMap((option) => option.values.map((value) => [value.id, value.value])),
   );
@@ -356,8 +367,8 @@ export function variantValues(product: Product, variant: Variant): string[] {
 /** The share of the variant's values the customer named, or its name's score if higher. */
 function variantScore(
   written: readonly (readonly string[])[],
-  product: Product,
-  variant: Variant,
+  product: SellableProduct,
+  variant: SellableVariant,
   t: MatchThresholds,
 ): number {
   const values = variantValues(product, variant).map(wordsOf);
@@ -375,7 +386,7 @@ function variantScore(
 /** Each variant's score for the customer's words; only `t.word` matters here. */
 export function variantScores(
   queries: readonly (string | undefined)[],
-  product: Product,
+  product: SellableProduct,
   t: MatchThresholds,
 ): { id: string; score: number }[] {
   const written = forms(queries);
@@ -393,7 +404,7 @@ export function variantScores(
  */
 export function matchVariant(
   queries: readonly (string | undefined)[],
-  product: Product,
+  product: SellableProduct,
   t: MatchThresholds = MATCH_THRESHOLDS,
 ): VariantMatch {
   const result = decide(variantScores(queries, product, t), t);

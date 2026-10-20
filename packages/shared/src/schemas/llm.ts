@@ -74,3 +74,33 @@ export const photoMatchSchema = z.object({
     .max(MAX_PHOTO_MATCHES),
 });
 export type PhotoMatch = z.infer<typeof photoMatchSchema>;
+
+/** Products one post may give; code keeps the first this many. */
+export const MAX_POST_PRODUCTS = 10;
+
+/**
+ * Output shape for extractProductsFromPost(). Names, descriptions and option
+ * values are the seller's own words; `aliases` are other ways customers
+ * write the name. `prices` holds one row per option-value combination the
+ * post prices (`values` empty for a product with no options), in major units
+ * exactly as the post shows them, or null when the post states no price.
+ * `category` names one of the shop's categories (`existing`) or suggests a
+ * new one. Code checks all of it before a draft is written.
+ */
+export const postProductsSchema = z.object({
+  kind: z.enum(['products', 'not_product']),
+  /** Why the post holds no product; null for `products`. */
+  reason: z.string().nullable(),
+  products: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string().nullable(),
+      aliases: z.array(z.string()),
+      options: z.array(z.object({ name: z.string(), values: z.array(z.string()) })),
+      prices: z.array(z.object({ values: z.array(z.string()), price: z.number() })).nullable(),
+      category: z.object({ kind: z.enum(['existing', 'suggested']), name: z.string() }).nullable(),
+    }),
+  ),
+});
+export type PostProducts = z.infer<typeof postProductsSchema>;
+export type PostProduct = PostProducts['products'][number];

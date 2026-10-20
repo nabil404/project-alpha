@@ -87,11 +87,17 @@ export const productVariant = pgTable(
      */
     name: text('name'),
     sku: text('sku').notNull(),
-    price: integer('price').notNull(),
-    stock: integer('stock').notNull().default(0),
+    /**
+     * Price and stock may be empty on a draft or archived product only: an
+     * active one needs both on every live variant. The service enforces it,
+     * because a check cannot see the product's status.
+     */
+    price: integer('price'),
+    stock: integer('stock'),
     /**
      * Units held by drafted (`new`) orders. What can still be sold is
-     * `stock - reserved`; orders move it, the seller never writes it.
+     * `stock - reserved`, an empty stock holding none; orders move it, the
+     * seller never writes it.
      */
     reserved: integer('reserved').notNull().default(0),
     isDefault: boolean('is_default').notNull().default(false),
@@ -117,7 +123,7 @@ export const productVariant = pgTable(
     check('product_variant_price_ck', sql`${t.price} >= 0`),
     check('product_variant_stock_ck', sql`${t.stock} >= 0`),
     check('product_variant_reserved_ck', sql`${t.reserved} >= 0`),
-    check('product_variant_reserved_stock_ck', sql`${t.reserved} <= ${t.stock}`),
+    check('product_variant_reserved_stock_ck', sql`${t.reserved} <= coalesce(${t.stock}, 0)`),
     check('product_variant_default_unnamed_ck', sql`${t.isDefault} = (${t.name} is null)`),
     uniqueIndex(VARIANT_SKU_LIVE_UIDX)
       .on(t.merchantId, t.sku)

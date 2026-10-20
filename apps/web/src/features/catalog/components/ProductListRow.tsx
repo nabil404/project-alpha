@@ -47,13 +47,13 @@ export function ProductListRow({
     return name ? [name] : [];
   });
 
+  // A draft may have no price yet; the list shows a dash for it.
+  const amount = (value: number | null) =>
+    value === null ? t('list.noValue') : formatAmount(value);
   const price =
     item.priceMin === item.priceMax
-      ? formatAmount(item.priceMin)
-      : t('list.priceRange', {
-          min: formatAmount(item.priceMin),
-          max: formatAmount(item.priceMax),
-        });
+      ? amount(item.priceMin)
+      : t('list.priceRange', { min: amount(item.priceMin), max: amount(item.priceMax) });
   const notes =
     single || item.available === 0
       ? []
@@ -183,6 +183,8 @@ function VariantRows({
   const { t } = useTranslation(['catalog', 'common']);
   const { formatAmount } = useFormatters();
   const [showAll, setShowAll] = useState(false);
+  const amount = (value: number | null) =>
+    value === null ? t('list.noValue') : formatAmount(value);
   const rowClass =
     'border-t border-dashed border-border bg-bg/40 shadow-[inset_3px_0_0_var(--color-border)]';
 
@@ -213,7 +215,7 @@ function VariantRows({
               <td className={columns.variants.cell} />
               <td className={columns.options.cell} />
               <td className={cn(variantCell, 'text-right text-body tabular-nums')}>
-                {formatAmount(variant.price)}
+                {amount(variant.price)}
               </td>
               <td className={cn(variantCell, 'text-right')}>
                 <StockFigure stock={variant.available} level={stockLevelOf(variant.available)} />

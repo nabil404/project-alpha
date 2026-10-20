@@ -15,6 +15,8 @@ export const notificationSettingsSchema = z
     customerWaiting: z.boolean(),
     /** An email at 9:00 shop time with yesterday's orders and revenue. */
     dailySummary: z.boolean(),
+    /** An email when an import from Facebook posts finishes, stops or fails. */
+    importFinished: z.boolean(),
   })
   .meta({ id: 'NotificationSettings' });
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
@@ -23,6 +25,7 @@ export const NOTIFICATION_DEFAULTS: NotificationSettings = {
   newOrder: true,
   customerWaiting: true,
   dailySummary: false,
+  importFinished: true,
 };
 
 /** One of the switches; what the sender asks for recipients of. */

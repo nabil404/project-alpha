@@ -231,3 +231,42 @@ export interface SyncProfileJob {
   /** Also re-subscribe the Page's webhooks, for Pages connected before a field was added. */
   resubscribe?: boolean;
 }
+
+/**
+ * Catalog imports from Facebook posts. The API enqueues; only the worker
+ * processes. IMPORT_RUN_JOB reads a whole run, `import-<runId>`;
+ * IMPORT_POST_JOB is one Import anyway, `import-post-<runId>-<postId>`. Both
+ * are removed when they end, so a resumed run or a second Import anyway can
+ * reuse the id; while one is queued or running, the same id is a no-op.
+ */
+export const IMPORTS_QUEUE = 'catalog-imports';
+export const IMPORT_RUN_JOB = 'import-run';
+export const IMPORT_POST_JOB = 'import-post';
+/**
+ * A run spends its time on Graph, Meta's CDN and the LLM, holding a
+ * connection only in each post's short write; two let one shop's year-long
+ * run leave room for another's.
+ */
+export const IMPORTS_CONCURRENCY = 2;
+export const IMPORT_JOB_RETENTION = { removeOnComplete: true, removeOnFail: true } as const;
+
+export interface ImportRunJob {
+  merchantId: string;
+  importId: string;
+}
+
+export interface ImportPostJob {
+  merchantId: string;
+  importId: string;
+  /** Our product_import_post row id. */
+  postId: string;
+}
+
+/** An import ended (finished, stopped or failed); `endedAt` is epoch ms, part of the job id. */
+export const IMPORT_FINISHED_JOB = 'import-finished';
+
+export interface ImportFinishedJob {
+  merchantId: string;
+  importId: string;
+  endedAt: number;
+}

@@ -6,7 +6,7 @@ import {
   type ExtractedItem,
   type ExtractedOrder,
   type IntentResult,
-  type Product,
+  type SellableProduct,
 } from '@app/shared';
 import type { CatalogView, DeliveryArea } from '../catalog-match';
 import {
@@ -71,7 +71,7 @@ const lungi = productByKey('lungi');
 const jamdani = productByKey('jamdani');
 const panjabi = productByKey('panjabi');
 const kajal = productByKey('kajal');
-const variantOf = (product: Product, name: string | null) =>
+const variantOf = (product: SellableProduct, name: string | null) =>
   product.variants.find((variant) => variant.name === name)!;
 const RED = variantOf(jamdani, 'Red');
 
@@ -377,7 +377,7 @@ describe('decideTurn: products and variants', () => {
   });
 
   it('asks for another product when no variant of it is in stock', () => {
-    const soldOut: Product = {
+    const soldOut: SellableProduct = {
       ...lungi,
       variants: [{ ...lungi.variants[0]!, stock: 0, available: 0, stockStatus: 'out_of_stock' }],
     };
@@ -412,7 +412,7 @@ describe('decideTurn: products and variants', () => {
   });
 
   it('treats reserved units as gone: a fully reserved product is out of stock', () => {
-    const held: Product = {
+    const held: SellableProduct = {
       ...lungi,
       variants: [
         { ...lungi.variants[0]!, stock: 3, reserved: 3, available: 0, stockStatus: 'out_of_stock' },
@@ -432,7 +432,7 @@ describe('decideTurn: products and variants', () => {
   });
 
   it('says how many are available, not how many are on hand', () => {
-    const mostlyHeld: Product = {
+    const mostlyHeld: SellableProduct = {
       ...lungi,
       variants: [
         { ...lungi.variants[0]!, stock: 5, reserved: 4, available: 1, stockStatus: 'in_stock' },
@@ -456,7 +456,7 @@ describe('decideTurn: products and variants', () => {
   it('offers no button for a variant whose units are all reserved', () => {
     // One in-stock variant stays sellable; every other is fully reserved.
     const kept = panjabi.variants.find((variant) => variant.stock > 0)!;
-    const held: Product = {
+    const held: SellableProduct = {
       ...panjabi,
       variants: panjabi.variants.map((variant) =>
         variant.id === kept.id
@@ -602,7 +602,7 @@ describe('decideTurn: several items', () => {
 
   describe('new words on a picked item', () => {
     const katan = productByKey('katan');
-    const picked = (product: Product, query: string) => {
+    const picked = (product: SellableProduct, query: string) => {
       const variant = product.variants[0]!;
       return slots({
         items: [
@@ -708,7 +708,7 @@ describe('decideTurn: several items', () => {
     });
 
     it('never keeps A when the customer asks for B instead, over every pair of products', () => {
-      const bangla = (product: Product) =>
+      const bangla = (product: SellableProduct) =>
         product.aliases.find((alias) => /\p{sc=Bengali}/u.test(alias))!;
       const kept: string[] = [];
       for (const a of EVAL_PRODUCTS) {
@@ -875,7 +875,7 @@ describe('decideTurn: the summary', () => {
   });
 
   it("charges the highest of the products' own charges for the area", () => {
-    const withCharge = (product: Product, charge: number): Product => ({
+    const withCharge = (product: SellableProduct, charge: number): SellableProduct => ({
       ...product,
       customDelivery: true,
       deliveryCharges: [{ deliveryChargeId: DHAKA.id, charge }],
@@ -1024,7 +1024,7 @@ describe('decideTurn: the photo', () => {
   const OWN = image('00000000-0000-4000-8000-00000000c002', 'https://cdn.example/red.jpg');
 
   it("sends the product's cover when a product is newly matched, and only then", () => {
-    const withCover: Product = { ...lungi, images: [COVER], coverImageId: COVER.id };
+    const withCover: SellableProduct = { ...lungi, images: [COVER], coverImageId: COVER.id };
     const decision = decideTurn(
       turn({
         catalog: { products: [withCover], categories: [] },
@@ -1044,7 +1044,7 @@ describe('decideTurn: the photo', () => {
   });
 
   it("prefers the matched variant's own image", () => {
-    const withImages: Product = {
+    const withImages: SellableProduct = {
       ...jamdani,
       images: [COVER, OWN],
       coverImageId: COVER.id,
@@ -1091,7 +1091,7 @@ describe('entry triggers', () => {
       width: 10,
       height: 10,
     };
-    const withCover: Product = { ...jamdani, images: [cover], coverImageId: cover.id };
+    const withCover: SellableProduct = { ...jamdani, images: [cover], coverImageId: cover.id };
     const catalog = { products: [withCover, lungi], categories: [] };
     const decision = decideTurn(base({ catalog, trigger: product(jamdani.id) }));
     expect(decision.slots.items).toEqual([expect.objectContaining({ productId: jamdani.id })]);

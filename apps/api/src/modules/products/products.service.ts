@@ -7,6 +7,8 @@ import {
   type ListProductsQuery,
   type Product,
   type ProductCounts,
+  type SellableProduct,
+  type SellableVariant,
   type ProductListResponse,
   type SaveProduct,
   type UpdateProduct,
@@ -30,6 +32,7 @@ import { EMPTY_PRODUCT_STATE, planProductDocument } from './options/product-docu
 import { ProductOptionsRepository } from './options/product-options.repository';
 import { ProductWriter } from './options/product-writer';
 import {
+  assertSellableWhenActive,
   assertStockCoversReserved,
   guardSku,
   productImageNotFound,
@@ -48,7 +51,7 @@ import { normalizeSku } from './sku';
 
 /** What the AI may quote from: nothing a seller has drafted, archived or deleted. */
 export interface SellableCatalog {
-  products: Product[];
+  products: SellableProduct[];
   categories: Category[];
 }
 
@@ -83,7 +86,7 @@ export class ProductsService {
       await this.writer.apply(tx, scope, row.id, planProductDocument(EMPTY_PRODUCT_STATE, doc));
       await this.writeDeliveryCharges(tx, scope, row.id, doc.customDelivery, doc.deliveryCharges);
       await this.linkCategories(tx, scope, row.id, doc.categoryIds);
-      return this.load(tx, scope, row.id);
+      return this.loadChecked(tx, scope, row.id);
     });
   }
 
@@ -99,6 +102,7 @@ export class ProductsService {
       const filters = {
         filter: query.filter,
         q: query.q,
+        importId: query.importId,
         categoryIds:
           query.categoryId === undefined
             ? undefined
@@ -196,7 +200,7 @@ export class ProductsService {
       await this.writer.apply(tx, scope, id, plan);
       await this.writeDeliveryCharges(tx, scope, id, doc.customDelivery, doc.deliveryCharges);
       await this.linkCategories(tx, scope, id, doc.categoryIds);
-      return this.load(tx, scope, id);
+      return this.loadChecked(tx, scope, id);
     });
   }
 
@@ -217,7 +221,7 @@ export class ProductsService {
         await this.writeDeliveryCharges(tx, scope, id, customDelivery, deliveryCharges ?? []);
       }
       if (categoryIds !== undefined) await this.linkCategories(tx, scope, id, categoryIds);
-      return this.load(tx, scope, id);
+      return this.loadChecked(tx, scope, id);
     });
   }
 
@@ -262,7 +266,7 @@ export class ProductsService {
         );
         await this.products.updateProduct(tx, scope, productId, {});
       }
-      return this.load(tx, scope, productId);
+      return this.loadChecked(tx, scope, productId);
     });
   }
 
@@ -294,7 +298,7 @@ export class ProductsService {
       const rows = await this.products.listSellable(tx, scope);
       const categories = await this.categories.listLive(tx, scope);
       return {
-        products: await this.assemble(tx, scope, rows),
+        products: (await this.assemble(tx, scope, rows)).map(toSellable),
         categories: categories.map(toCategory),
       };
     });
@@ -305,6 +309,24 @@ export class ProductsService {
     const row = await this.products.findProduct(tx, scope, id);
     if (!row) throw productNotFound(id);
     return this.assembleOne(tx, scope, row);
+  }
+
+  /**
+   * The product after a write, refused (rolling the write back) when it
+   * leaves the product active with a live variant missing a price or stock.
+   */
+  private async loadChecked(tx: Transaction, scope: TenantScope, id: string): Promise<Product> {
+    const product = await this.load(tx, scope, id);
+    assertSellableWhenActive(
+      product.status,
+      product.variants.map((variant) => ({
+        id: variant.id,
+        label: variant.name ?? product.name,
+        price: variant.price,
+        stock: variant.stock,
+      })),
+    );
+    return product;
   }
 
   private async assembleOne(
@@ -393,4 +415,17 @@ export class ProductsService {
     }
     await this.products.setCategories(tx, scope, productId, ids);
   }
+}
+
+/**
+ * An active product's variants always have a price and stock (the writes
+ * check it); one that somehow does not is left out rather than quoted.
+ */
+function toSellable(product: Product): SellableProduct {
+  return {
+    ...product,
+    variants: product.variants.filter(
+      (variant): variant is SellableVariant => variant.price !== null && variant.stock !== null,
+    ),
+  };
 }

@@ -4,6 +4,7 @@ import { AssistantModule } from './modules/conversations/assistant/assistant.mod
 import { CustomerPhotosModule } from './modules/conversations/photos/customer-photos.module';
 import { ConversationIngestModule } from './modules/conversations/ingest/conversation-ingest.module';
 import { CustomerProfilesModule } from './modules/conversations/profiles/customer-profiles.module';
+import { ImportsWorkerModule } from './modules/imports/imports-worker.module';
 import { MessengerProfileWorkerModule } from './modules/messenger/profile/messenger-profile.module';
 import { NotificationsWorkerModule } from './modules/notifications/notifications-worker.module';
 import { StorageMaintenanceModule } from './modules/products/images/storage-maintenance.module';
@@ -22,6 +23,7 @@ import { StorageMaintenanceModule } from './modules/products/images/storage-main
     NotificationsWorkerModule,
     AssistantModule,
     MessengerProfileWorkerModule,
+    ImportsWorkerModule,
   ],
 })
 export class WorkerModule {}

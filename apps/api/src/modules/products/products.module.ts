@@ -31,6 +31,14 @@ import { ProductsService } from './products.service';
     // Stateless; read here to check a product's own charges name the shop's areas.
     DeliveryChargesRepository,
   ],
-  exports: [ProductsService, ProductImagesService, ProductImageRepository],
+  // The import writes drafts with the same repositories and writer as the product routes.
+  exports: [
+    ProductsService,
+    ProductImagesService,
+    ProductImageRepository,
+    ProductsRepository,
+    ProductOptionsRepository,
+    ProductWriter,
+  ],
 })
 export class ProductsModule {}

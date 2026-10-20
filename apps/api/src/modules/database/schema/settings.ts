@@ -78,6 +78,8 @@ export const notificationPreference = pgTable(
     newOrder: boolean('new_order').notNull(),
     customerWaiting: boolean('customer_waiting').notNull(),
     dailySummary: boolean('daily_summary').notNull(),
+    /** Defaulted only so the column could be added to existing rows; writes always set it. */
+    importFinished: boolean('import_finished').notNull().default(true),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

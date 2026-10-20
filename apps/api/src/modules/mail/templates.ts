@@ -44,7 +44,7 @@ const settingsFooter = (setting: string) => [
   ),
 ];
 
-const [verifyHtml, resetHtml, existingHtml, newOrderHtml, waitingHtml, summaryHtml] =
+const [verifyHtml, resetHtml, existingHtml, newOrderHtml, waitingHtml, summaryHtml, importHtml] =
   await Promise.all([
     compileEmail<'url'>({
       preview: 'Confirm your email address to finish setting up your account.',
@@ -136,6 +136,21 @@ const [verifyHtml, resetHtml, existingHtml, newOrderHtml, waitingHtml, summaryHt
         button('View your orders', 'ordersUrl'),
       ],
       footer: settingsFooter('Daily summary'),
+    }),
+    compileEmail<
+      'headline' | 'body' | 'range' | 'drafts' | 'needsInfo' | 'importUrl' | 'settingsUrl'
+    >({
+      preview: '{body}',
+      card: [
+        heading('{headline}', { eyebrow: 'Import from Facebook · {range}', space: '24px' }),
+        stats([
+          { label: 'Drafts made', value: '{drafts}' },
+          { label: 'Need info', value: '{needsInfo}' },
+        ]),
+        paragraph('{body}'),
+        button('Open the import', 'importUrl'),
+      ],
+      footer: settingsFooter('Import finished'),
     }),
   ]);
 
@@ -311,6 +326,65 @@ ${settingsText('Daily summary', summary.settingsUrl)}
       revenue: summary.revenue,
       ordersUrl: summary.ordersUrl,
       settingsUrl: summary.settingsUrl,
+    }),
+  };
+}
+
+export interface ImportFinishedEmail {
+  shopName: string;
+  outcome: 'finished' | 'stopped' | 'failed';
+  /** The posts' dates, formatted for the shop, e.g. "21 Jul 2026 – 21 Oct 2026". */
+  range: string;
+  drafts: number;
+  /** Drafts still missing a price. */
+  needsInfo: number;
+  /** Why a failed run failed, in a sentence; ignored otherwise. */
+  failure: string;
+  importUrl: string;
+  settingsUrl: string;
+}
+
+/** An import from Facebook posts ended: finished, stopped by the seller, or failed. */
+export function importFinishedEmail(run: ImportFinishedEmail): MailContent {
+  const drafts = plural(run.drafts, 'draft product', 'draft products');
+  const needs = `${count.format(run.needsInfo)} still ${run.needsInfo === 1 ? 'needs' : 'need'} a price`;
+  const made = run.drafts === 0 ? 'No drafts were made.' : `It made ${drafts}; ${needs}.`;
+  const { subject, headline, body } = {
+    finished: {
+      subject: `${run.shopName}: your import from Facebook finished`,
+      headline: 'Your import finished',
+      body: `The import of ${run.shopName}'s posts from ${run.range} finished. ${made} Drafts are not offered to customers until you activate them.`,
+    },
+    stopped: {
+      subject: `${run.shopName}: your import from Facebook stopped`,
+      headline: 'Your import stopped',
+      body: `The import of ${run.shopName}'s posts from ${run.range} was stopped. ${made} You can resume it from the import's page.`,
+    },
+    failed: {
+      subject: `${run.shopName}: your import from Facebook failed`,
+      headline: 'Your import failed',
+      body: `The import of ${run.shopName}'s posts from ${run.range} failed: ${run.failure} ${made} The drafts it made are kept.`,
+    },
+  }[run.outcome];
+  return {
+    subject,
+    text: `${headline} · ${run.range}
+
+${body}
+
+Open the import: ${run.importUrl}
+
+${settingsText('Import finished', run.settingsUrl)}
+`,
+    html: importHtml({
+      subject,
+      headline,
+      body,
+      range: run.range,
+      drafts: count.format(run.drafts),
+      needsInfo: count.format(run.needsInfo),
+      importUrl: run.importUrl,
+      settingsUrl: run.settingsUrl,
     }),
   };
 }

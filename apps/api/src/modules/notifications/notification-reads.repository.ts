@@ -1,7 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { and, eq, gte, notInArray, sql } from 'drizzle-orm';
 import type { Executor, TenantScope } from '../database/base.repository';
-import { conversation, customer, merchantSettings, message, order } from '../database/schema/index';
+import {
+  conversation,
+  customer,
+  merchantSettings,
+  message,
+  order,
+  product,
+  productImport,
+  productImportPost,
+  productVariant,
+} from '../database/schema/index';
+import { liveVariant } from '../products/product-visibility';
 
 export interface DraftedOrder {
   id: string;
@@ -23,6 +34,17 @@ export interface ShopRegion {
   timeZone: string;
   dateFormat: (typeof merchantSettings.$inferSelect)['dateFormat'];
   currency: string;
+}
+
+export interface EndedImport {
+  status: (typeof productImport.$inferSelect)['status'];
+  errorCode: string | null;
+  since: string;
+  until: string;
+  drafts: number;
+  finishedAt: Date | null;
+  /** The run's drafts still missing a price. */
+  needsInfo: number;
 }
 
 export interface DayTotals {
@@ -141,5 +163,54 @@ export class NotificationReadsRepository {
         ),
       );
     return { orders: row?.orders ?? 0, revenue: row?.revenue ?? 0 };
+  }
+
+  async importRun(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    importId: string,
+  ): Promise<EndedImport | undefined> {
+    const unpriced = executor
+      .select({ one: sql`1` })
+      .from(productVariant)
+      .where(
+        and(
+          eq(productVariant.merchantId, product.merchantId),
+          eq(productVariant.productId, product.id),
+          liveVariant(),
+          sql`${productVariant.price} is null`,
+        ),
+      );
+    const needsInfo = executor
+      .select({ count: sql<number>`count(distinct ${product.id})::int`.as('count') })
+      .from(productImportPost)
+      .innerJoin(
+        product,
+        and(
+          eq(product.merchantId, productImportPost.merchantId),
+          sql`${product.id} = any(${productImportPost.productIds})`,
+        ),
+      )
+      .where(
+        and(
+          eq(productImportPost.merchantId, merchantId),
+          eq(productImportPost.importId, importId),
+          eq(product.status, 'draft'),
+          sql`exists ${unpriced}`,
+        ),
+      );
+    const [row] = await executor
+      .select({
+        status: productImport.status,
+        errorCode: productImport.errorCode,
+        since: productImport.since,
+        until: productImport.until,
+        drafts: productImport.drafts,
+        finishedAt: productImport.finishedAt,
+        needsInfo: sql<number>`(${needsInfo})`.mapWith(Number),
+      })
+      .from(productImport)
+      .where(and(eq(productImport.merchantId, merchantId), eq(productImport.id, importId)));
+    return row;
   }
 }

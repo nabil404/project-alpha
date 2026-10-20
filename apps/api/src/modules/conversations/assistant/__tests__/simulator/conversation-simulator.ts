@@ -184,6 +184,11 @@ class ScriptedLlm implements LlmClient {
     this.calls.push('vision_match');
     return { ok: true, value: { matches: [] }, usage: this.usage('vision_match') };
   }
+
+  /** The assistant never reads posts into products. */
+  extractProductsFromPost(): never {
+    throw new Error('The assistant never imports posts');
+  }
 }
 
 /** Counts calls on the real client so the transcript can show them. */
@@ -205,6 +210,11 @@ class CountingLlm implements LlmClient {
   matchProductPhoto(...args: Parameters<LlmClient['matchProductPhoto']>) {
     this.calls.push('vision_match');
     return this.inner.matchProductPhoto(...args);
+  }
+
+  extractProductsFromPost(...args: Parameters<LlmClient['extractProductsFromPost']>) {
+    this.calls.push('post_import');
+    return this.inner.extractProductsFromPost(...args);
   }
 }
 

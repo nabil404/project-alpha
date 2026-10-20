@@ -26,6 +26,45 @@ export const productInUse = (id: string) =>
     { id },
   );
 
+/** An active product needs a price on every live variant. */
+export const productPriceMissing = (variant: { id: string; name: string }) =>
+  new CodedConflictException(
+    'PRODUCT_PRICE_MISSING',
+    'An active product needs a price on every variant',
+    {
+      variantId: variant.id,
+      name: variant.name,
+    },
+  );
+
+/** An active product needs a stock on every live variant. */
+export const productStockMissing = (variant: { id: string; name: string }) =>
+  new CodedConflictException(
+    'PRODUCT_STOCK_MISSING',
+    'An active product needs a stock on every variant',
+    {
+      variantId: variant.id,
+      name: variant.name,
+    },
+  );
+
+/**
+ * Refuses an active product with a live variant missing a price or a stock.
+ * Draft and archived products may leave either empty. A check constraint
+ * cannot see the product's status, so every write that can make or keep a
+ * product active calls this with the variants as they will be.
+ */
+export function assertSellableWhenActive(
+  status: 'draft' | 'active' | 'archived',
+  variants: readonly { id: string; label: string; price: number | null; stock: number | null }[],
+): void {
+  if (status !== 'active') return;
+  const unpriced = variants.find((variant) => variant.price === null);
+  if (unpriced) throw productPriceMissing({ id: unpriced.id, name: unpriced.label });
+  const unstocked = variants.find((variant) => variant.stock === null);
+  if (unstocked) throw productStockMissing({ id: unstocked.id, name: unstocked.label });
+}
+
 /** The seller set a variant's stock below what drafted orders hold. */
 export const variantStockReserved = (variant: { id: string; name: string; reserved: number }) =>
   new CodedConflictException(
@@ -42,12 +81,13 @@ export const variantStockReserved = (variant: { id: string; name: string; reserv
  */
 export function assertStockCoversReserved(
   current: readonly { id: string; reserved: number; label: string }[],
-  next: readonly { id?: string | null; stock?: number }[],
+  next: readonly { id?: string | null; stock?: number | null }[],
 ): void {
   const byId = new Map(current.map((variant) => [variant.id, variant]));
   for (const { id, stock } of next) {
     const held = id ? byId.get(id) : undefined;
-    if (held && stock !== undefined && stock < held.reserved) {
+    // An empty stock holds nothing, so it cannot cover a reservation either.
+    if (held && stock !== undefined && (stock ?? 0) < held.reserved) {
       throw variantStockReserved({ id: held.id, name: held.label, reserved: held.reserved });
     }
   }

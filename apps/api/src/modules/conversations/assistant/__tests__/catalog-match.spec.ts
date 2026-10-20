@@ -6,7 +6,7 @@ import {
   similarity,
   type DeliveryArea,
 } from '../catalog-match';
-import type { Product } from '@app/shared';
+import type { SellableProduct } from '@app/shared';
 import { EVAL_CATALOG, EVAL_PRODUCTS, productByKey } from './fixtures/match-eval';
 
 /** Optimal string alignment distance: insertions, deletions, substitutions, adjacent swaps. */
@@ -34,7 +34,7 @@ const withinEdits = (a: string, b: string) => editDistance(a, b) <= 1;
 
 const id = (key: string) => productByKey(key).id;
 const productById = (productId: string) => EVAL_PRODUCTS.find((p) => p.id === productId)!;
-const own = (product: Product) =>
+const own = (product: SellableProduct) =>
   [product.name, ...product.aliases].flatMap((text) => normalize(text).split(' '));
 const variantNamed = (key: string, name: string) =>
   productByKey(key).variants.find((variant) => variant.name === name)!.id;

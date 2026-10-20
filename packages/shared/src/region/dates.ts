@@ -25,3 +25,14 @@ export function formatShopDate(
   const instant = new Date(value).getTime();
   return format(new TZDate(instant, timeZone), dateFormat, locale ? { locale } : {});
 }
+
+/** The shop's calendar day at `now`, as `yyyy-MM-dd`. */
+export function shopToday(timeZone: string, now: Date = new Date()): string {
+  return format(new TZDate(now.getTime(), timeZone), 'yyyy-MM-dd');
+}
+
+/** The instant a shop-local day (`yyyy-MM-dd`) begins in the shop's zone. */
+export function shopDayStart(day: string, timeZone: string): Date {
+  const [year, month, date] = day.split('-').map(Number) as [number, number, number];
+  return new Date(new TZDate(year, month - 1, date, timeZone).getTime());
+}

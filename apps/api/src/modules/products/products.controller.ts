@@ -69,7 +69,7 @@ export class ProductsController {
   @ApiCreatedResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['CATEGORY_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
-  @ApiCodedError(409, ['SKU_TAKEN'])
+  @ApiCodedError(409, ['SKU_TAKEN', 'PRODUCT_PRICE_MISSING', 'PRODUCT_STOCK_MISSING'])
   create(
     @Req() request: TenantRequest,
     @Body(new ZodValidationPipe(createProductSchema)) body: CreateProduct,
@@ -81,11 +81,12 @@ export class ProductsController {
   @ApiOperation({
     summary: 'List products',
     description:
-      "Newest first, a page at a time, with each product's live variants summed up. A product with one variant carries it as `variant`; the rest load through GET /products/:id. `all` and the stock filters leave archived products out. `q` matches the name, a tag or a SKU; `categoryId` keeps products in that category.",
+      "Newest first, a page at a time, with each product's live variants summed up. A product with one variant carries it as `variant`; the rest load through GET /products/:id. `all` and the stock filters leave archived products out. `q` matches the name, a tag or a SKU; `categoryId` keeps products in that category; `importId` keeps the products that import run made.",
   })
   @ApiQuery({ name: 'filter', required: false, enum: [...productListFilters] })
   @ApiQuery({ name: 'q', required: false, schema: { type: 'string', maxLength: 100 } })
   @ApiQuery({ name: 'categoryId', required: false, schema: { type: 'string', format: 'uuid' } })
+  @ApiQuery({ name: 'importId', required: false, schema: { type: 'string', format: 'uuid' } })
   @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1, default: 1 } })
   @ApiQuery({
     name: 'limit',
@@ -142,7 +143,13 @@ export class ProductsController {
     'CATEGORY_NOT_FOUND',
     'DELIVERY_CHARGE_NOT_FOUND',
   ])
-  @ApiCodedError(409, ['PRODUCT_STALE', 'SKU_TAKEN', 'VARIANT_STOCK_RESERVED'])
+  @ApiCodedError(409, [
+    'PRODUCT_STALE',
+    'SKU_TAKEN',
+    'VARIANT_STOCK_RESERVED',
+    'PRODUCT_PRICE_MISSING',
+    'PRODUCT_STOCK_MISSING',
+  ])
   save(
     @Req() request: TenantRequest,
     @Param('id', uuidParam) id: string,
@@ -161,6 +168,7 @@ export class ProductsController {
   @ApiOkResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND', 'DELIVERY_CHARGE_NOT_FOUND'])
+  @ApiCodedError(409, ['PRODUCT_PRICE_MISSING', 'PRODUCT_STOCK_MISSING'])
   update(
     @Req() request: TenantRequest,
     @Param('id', uuidParam) id: string,
@@ -179,7 +187,12 @@ export class ProductsController {
   @ApiOkResponse({ description: 'The product.', schema: productJson })
   @ApiCodedError(400, ['VALIDATION_FAILED'])
   @ApiCodedError(404, ['PRODUCT_NOT_FOUND', 'VARIANT_NOT_FOUND', 'PRODUCT_IMAGE_NOT_FOUND'])
-  @ApiCodedError(409, ['SKU_TAKEN', 'VARIANT_STOCK_RESERVED'])
+  @ApiCodedError(409, [
+    'SKU_TAKEN',
+    'VARIANT_STOCK_RESERVED',
+    'PRODUCT_PRICE_MISSING',
+    'PRODUCT_STOCK_MISSING',
+  ])
   updateVariant(
     @Req() request: TenantRequest,
     @Param('id', uuidParam) id: string,

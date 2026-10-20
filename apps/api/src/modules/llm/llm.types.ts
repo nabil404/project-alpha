@@ -1,7 +1,19 @@
-import type { AssistantTone, ExtractedOrder, IntentResult, PhotoMatch } from '@app/shared';
+import type {
+  AssistantTone,
+  ExtractedOrder,
+  IntentResult,
+  PhotoMatch,
+  PostProducts,
+} from '@app/shared';
 
 /** What each call was for; one row per call in llm_call. */
-export const LLM_PURPOSES = ['classify', 'extract', 'phrase', 'vision_match'] as const;
+export const LLM_PURPOSES = [
+  'classify',
+  'extract',
+  'phrase',
+  'vision_match',
+  'post_import',
+] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
 export const LLM_OUTCOMES = ['ok', 'timeout', 'provider_error', 'invalid_output'] as const;
@@ -76,9 +88,27 @@ export interface PhotoMatchRequest {
   words?: string;
 }
 
+/**
+ * One Facebook post to read into products. Every photo url is our own
+ * bucket's copy; the caption and category names are the seller's.
+ */
+export interface PostExtractionRequest {
+  caption: string | null;
+  photos: string[];
+  /** ISO 4217, for reading prices. */
+  currency: string;
+  /** Which scripts and languages the aliases should cover, from the shop's country. */
+  aliasLanguages: string;
+  /** The shop's live category names; only these may come back as `existing`. */
+  categories: string[];
+  /** The seller said the post does hold a product (Import anyway). */
+  hint?: boolean;
+}
+
 export interface LlmClient {
   classifyIntent(history: ChatLine[]): Promise<LlmResult<IntentResult>>;
   extractOrder(history: ChatLine[], context: ExtractionContext): Promise<LlmResult<ExtractedOrder>>;
   phraseReply(request: PhraseRequest, history: ChatLine[]): Promise<LlmResult<string>>;
   matchProductPhoto(request: PhotoMatchRequest): Promise<LlmResult<PhotoMatch>>;
+  extractProductsFromPost(request: PostExtractionRequest): Promise<LlmResult<PostProducts>>;
 }

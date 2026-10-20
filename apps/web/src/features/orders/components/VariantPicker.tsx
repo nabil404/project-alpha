@@ -116,6 +116,9 @@ function ProductOption({
   const lone = product.variant;
 
   if (lone) {
+    // A draft's variant with no price yet can't go on an order; the API refuses it too.
+    const price = lone.price;
+    if (price === null) return null;
     return (
       <li>
         <OptionButton
@@ -125,13 +128,13 @@ function ProductOption({
               variantId: lone.id,
               label: variantDisplayName(product.name, lone.name),
               sku: lone.sku,
-              price: lone.price,
+              price,
               available: lone.available,
             })
           }
           title={variantDisplayName(product.name, lone.name)}
           detail={t('items.optionDetail', {
-            price: formatMoney(lone.price),
+            price: formatMoney(price),
             available: lone.available,
           })}
         />
@@ -182,27 +185,31 @@ function ProductVariants({
   }
   return (
     <ul className="ml-6 flex flex-col">
-      {detail.data.variants.map((variant) => (
-        <li key={variant.id}>
-          <OptionButton
-            disabled={taken.has(variant.id)}
-            onClick={() =>
-              onPick({
-                variantId: variant.id,
-                label: variantDisplayName(product.name, variant.name),
-                sku: variant.sku,
-                price: variant.price,
+      {detail.data.variants.flatMap((variant) => {
+        const price = variant.price;
+        if (price === null) return [];
+        return [
+          <li key={variant.id}>
+            <OptionButton
+              disabled={taken.has(variant.id)}
+              onClick={() =>
+                onPick({
+                  variantId: variant.id,
+                  label: variantDisplayName(product.name, variant.name),
+                  sku: variant.sku,
+                  price,
+                  available: variant.available,
+                })
+              }
+              title={variant.name ?? product.name}
+              detail={t('items.optionDetail', {
+                price: formatMoney(price),
                 available: variant.available,
-              })
-            }
-            title={variant.name ?? product.name}
-            detail={t('items.optionDetail', {
-              price: formatMoney(variant.price),
-              available: variant.available,
-            })}
-          />
-        </li>
-      ))}
+              })}
+            />
+          </li>,
+        ];
+      })}
     </ul>
   );
 }

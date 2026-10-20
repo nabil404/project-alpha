@@ -19,6 +19,17 @@ export class LlmCallRepository {
       .values(calls.map((call) => ({ ...call, merchantId, conversationId })));
   }
 
+  /** An import run's calls, one per post read, written in that post's transaction. */
+  async insertForImport(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    importId: string,
+    calls: LlmCallRecord[],
+  ): Promise<void> {
+    if (calls.length === 0) return;
+    await executor.insert(llmCall).values(calls.map((call) => ({ ...call, merchantId, importId })));
+  }
+
   /** How many calls for this purpose the conversation made since `since`, failed ones included. */
   async countSince(
     executor: Executor,

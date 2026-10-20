@@ -84,8 +84,10 @@ strings.
   each product's revision, so an open product edit page sees the change.
 - **Items** change only while the order is `new` or `confirmed`
   (`409 ORDER_NOT_EDITABLE` after). A variant already on the order keeps its
-  name, SKU and price, even if archived since. A new variant must be live and
-  takes the catalog price. `unitPrice` overrides either. Each variant appears
+  name, SKU and price, even if archived since. A new variant must be live (not
+  archived, on a product that is not archived, with a price and a stock set)
+  and takes the catalog price; a draft's variant with either empty is
+  `VARIANT_NOT_FOUND`. `unitPrice` overrides either. Each variant appears
   once (`DUPLICATE`), on 1 to 50 lines.
 - **Delivery details** (name, phone, address, area, fee) change until the
   order ships. Payment, tracking number and the note change at any time. They

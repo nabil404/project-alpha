@@ -1,4 +1,4 @@
-import { formatMinorUnitsTrimmed, type Category, type Product } from '@app/shared';
+import { formatMinorUnitsTrimmed, type Category, type SellableProduct } from '@app/shared';
 import type { CatalogView } from '../catalog-match';
 import { browseReply, MAX_CAROUSEL_CARDS } from '../entry-replies';
 
@@ -12,7 +12,7 @@ const product = (
   name: string,
   categoryIds: string[],
   prices: { price: number; available: number }[],
-): Product => {
+): SellableProduct => {
   n += 1;
   const id = `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
   return {
@@ -50,7 +50,7 @@ const product = (
       optionValueIds: [],
     })),
     version: '1',
-  } as Product;
+  } as SellableProduct;
 };
 
 const jamdani = product(

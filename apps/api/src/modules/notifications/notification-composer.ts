@@ -12,7 +12,12 @@ import {
   type NotificationRecipient,
 } from '../settings/notification-preferences.repository';
 import { ShopProfileRepository } from '../settings/shop-profile.repository';
-import { customerWaitingEmail, dailySummaryEmail, orderDraftedEmail } from './notification-emails';
+import {
+  customerWaitingEmail,
+  dailySummaryEmail,
+  importFinishedEmail,
+  orderDraftedEmail,
+} from './notification-emails';
 import { NotificationReadsRepository, type ShopRegion } from './notification-reads.repository';
 import { dailySummaryDayDue } from './shop-clock';
 
@@ -146,6 +151,44 @@ export class NotificationComposer {
           }),
           orders: totals.orders,
           revenue: formatMinorUnits(totals.revenue, region.currency, EMAIL_LOCALE),
+        }),
+      );
+    });
+  }
+
+  /**
+   * Only while the run is still on the end this event reports: one resumed
+   * since, or ended again, has its own event.
+   */
+  importFinished(
+    merchantId: string,
+    importId: string,
+    endedAt: Date,
+  ): Promise<NotificationEmail[]> {
+    const scope: TenantScope = { merchantId };
+    return withMerchant(this.db, merchantId, async (tx) => {
+      const run = await this.reads.importRun(tx, scope, importId);
+      if (!run || run.finishedAt?.getTime() !== endedAt.getTime()) return [];
+      if (run.status !== 'finished' && run.status !== 'stopped' && run.status !== 'failed') {
+        return [];
+      }
+      const recipients = await this.preferences.recipients(tx, scope, 'importFinished');
+      if (recipients.length === 0) return [];
+      const region = this.regionOrDefault(await this.reads.region(tx, scope));
+      const day = (value: string) =>
+        formatShopDate(`${value}T12:00:00Z`, { dateFormat: region.dateFormat, timeZone: 'UTC' });
+      const shop = await this.shops.find(tx, scope);
+      return addressed(
+        recipients,
+        importFinishedEmail({
+          appUrl: this.appUrl,
+          shopName: shop.name,
+          importId,
+          outcome: run.status,
+          errorCode: run.errorCode,
+          range: `${day(run.since)} – ${day(run.until)}`,
+          drafts: run.drafts,
+          needsInfo: run.needsInfo,
         }),
       );
     });
