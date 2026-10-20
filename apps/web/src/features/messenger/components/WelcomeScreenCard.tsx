@@ -10,6 +10,7 @@ import {
 } from '@app/shared';
 
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { InfoTip } from '@/components/InfoTip';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -95,9 +96,13 @@ function WelcomeScreenForm({ welcome }: { welcome: WelcomeScreen }) {
           <div className="flex flex-col gap-6 p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
-                <h2 className="text-heading">{t('messenger.welcome.title')}</h2>
+                <div className="flex items-center gap-1">
+                  <h2 className="text-heading">{t('messenger.welcome.title')}</h2>
+                  <InfoTip label={t('messenger.welcome.editHereLabel')}>
+                    {t('messenger.welcome.editHere')}
+                  </InfoTip>
+                </div>
                 <p className="text-body text-ink-muted">{t('messenger.welcome.description')}</p>
-                <p className="text-small text-ink-muted">{t('messenger.welcome.editHere')}</p>
               </div>
               {profileSync.status === 'live' && (
                 <span className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-success-soft px-2.5 text-label text-success">
@@ -152,7 +157,7 @@ function WelcomeScreenForm({ welcome }: { welcome: WelcomeScreen }) {
                     </span>
                   </div>
                   <FormControl>
-                    <Textarea rows={3} {...field} />
+                    <Textarea rows={2} {...field} />
                   </FormControl>
                   <FormDescription>{t('messenger.welcome.greetingHint')}</FormDescription>
                   <FormMessage />
@@ -170,13 +175,19 @@ function WelcomeScreenForm({ welcome }: { welcome: WelcomeScreen }) {
 
               <ul className="flex flex-col gap-3">
                 {fields.map((row, index) => (
-                  <li key={row.key} className="flex flex-col gap-1.5">
+                  <li key={row.key}>
                     <FormField
                       control={form.control}
                       name={`iceBreakers.${index}.question`}
                       render={({ field }) => (
                         <FormItem>
                           <div className="flex items-start gap-1">
+                            <span
+                              aria-hidden
+                              className="hidden h-10 w-6 shrink-0 items-center justify-center text-small text-ink-muted sm:flex"
+                            >
+                              {index + 1}
+                            </span>
                             <FormControl>
                               <Input
                                 aria-label={t('messenger.welcome.question', { number: index + 1 })}
@@ -201,13 +212,6 @@ function WelcomeScreenForm({ welcome }: { welcome: WelcomeScreen }) {
                         </FormItem>
                       )}
                     />
-                    <p className="text-small text-ink-muted">
-                      {t(
-                        row.kind === 'browse'
-                          ? 'messenger.welcome.does.browse'
-                          : 'messenger.welcome.does.ask',
-                      )}
-                    </p>
                   </li>
                 ))}
               </ul>
@@ -222,26 +226,6 @@ function WelcomeScreenForm({ welcome }: { welcome: WelcomeScreen }) {
                   {t('messenger.welcome.add')}
                 </Button>
               )}
-            </div>
-
-            <div className="flex flex-col gap-3 rounded-md bg-surface-sunken p-4">
-              <h3 className="text-small font-medium text-ink-muted">
-                {t('messenger.welcome.alwaysThere')}
-              </h3>
-              <dl className="flex flex-col gap-2">
-                <div className="flex flex-col">
-                  <dt className="text-body font-medium">{t('messenger.welcome.getStarted')}</dt>
-                  <dd className="text-small text-ink-muted">
-                    {t('messenger.welcome.getStartedHint')}
-                  </dd>
-                </div>
-                <div className="flex flex-col">
-                  <dt className="text-body font-medium">{t('messenger.welcome.chatMenu')}</dt>
-                  <dd className="text-small text-ink-muted">
-                    {t('messenger.welcome.chatMenuLines')}
-                  </dd>
-                </div>
-              </dl>
             </div>
           </div>
 
