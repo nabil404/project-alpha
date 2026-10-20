@@ -44,7 +44,9 @@ customer has confirmed in Messenger and the seller confirms it again.
   product varies on up to 3 options (Size, Sleeve), each with ordered values;
   each variant is one combination of values, one per option, with its own
   SKU (unique per seller among live variants), price, stock count and
-  optional image. A product always has at least one live variant; one with
+  optional image. A draft or archived product may leave a variant's price or
+  stock empty; an active product needs both on every live variant. A product
+  always has at least one live variant; one with
   no options has a single unnamed default variant. A variant's name is the
   one the seller gives it, or else its values joined ("M / Short"); it is
   unique within the product and kept on archived variants for their orders.

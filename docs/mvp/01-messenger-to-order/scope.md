@@ -11,8 +11,10 @@
   `email`.
 - Product catalog: products (draft / active / archived), aliases, variants with
   SKUs, prices and stock counts, images, delivery charges, flat categories (a
-  product in several), CSV import. Sellers organize by category;
-  the AI browses by it.
+  product in several), CSV import, and import from the Page's own posts: on
+  demand, for a date range, as drafts the seller reviews
+  ([13 · Import from Facebook posts](../../features/13-facebook-post-import/README.md)).
+  Sellers organize by category; the AI browses by it.
 - AI: intent classification, product matching, slot-filling, confirmation,
   mid-flow edits. Built in phases:
   [11 · AI implementation](../../features/11-ai-implementation/README.md).
@@ -32,7 +34,7 @@
 - Seller dashboard: orders list and detail with transcript, status changes,
   edits, notes, Needs Attention queue, conversation viewer, bot on/off toggle,
   CSV export.
-- Email notifications for new orders and handoffs.
+- Email notifications for new orders, handoffs and finished imports.
 - Responsive web dashboard.
 
 ## Out of scope (Post-MVP Backlog)
