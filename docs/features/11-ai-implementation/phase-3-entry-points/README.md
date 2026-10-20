@@ -240,13 +240,15 @@ Migrations `0038` to `0040`; `db:verify-rls` passes.
   and **Save and update Page**. While the sync is `pending`, the query polls
   every 3 s for at most 60 s after a save in this tab, or after the card
   first saw it pending (a Page connect, or a sync queued elsewhere), then
-  shows "Updating…" until a reload. The help text under an Ask question says
-  it is sent as the customer's question and the seller is notified if the
-  assistant cannot answer it ([Follow-ups](#follow-ups)). A failed
+  shows "Updating…" until a reload. Questions carry no help text, and on
+  desktop each is numbered. Only the greeting keeps a hint, for
+  `{first_name}`. The card no longer lists Get Started and the chat menu,
+  which sellers cannot change. A failed
   sync shows a banner with Retry; `token_invalid` asks the seller to reconnect.
-  The greeting field left the Replies card. A line under the card's
-  description says Meta Business Suite doesn't show these settings, so they
-  are edited here. Checked on the dev Page (Oct 14, 2026): after a sync,
+  The greeting field left the Replies card. An info button beside the
+  card's title (`InfoTip`, a popover that opens on hover, keyboard focus or
+  a tap) says Meta Business Suite doesn't show these settings, so they are
+  edited here. Checked on the dev Page (Oct 14, 2026): after a sync,
   `GET /me/messenger_profile` returned our Get Started, ice breakers and menu,
   while Business Suite's **Inbox › Automations › Frequently asked questions**
   stayed off and empty, so it keeps its own record. Whether turning it on

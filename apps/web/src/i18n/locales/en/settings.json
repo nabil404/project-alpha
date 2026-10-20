@@ -203,23 +203,15 @@
     },
     "welcome": {
       "add": "Add question",
-      "alwaysThere": "Always there, in your shop's language",
       "cancel": "Cancel",
-      "chatMenu": "Chat menu",
-      "chatMenuLines": "Browse products · My last order · Talk to a person",
       "count": "{{count}} / {{max}}",
       "description": "What a customer sees in Messenger before their first message. Saving updates your Page on Facebook.",
-      "does": {
-        "ask": "Sent as the customer's question. If the assistant can't answer it, you're notified to reply.",
-        "browse": "Opens your product categories."
-      },
       "editHere": "Meta Business Suite doesn't show these settings, so edit them here. Turning on its Frequently asked questions may replace your questions until you save here again.",
+      "editHereLabel": "About editing these settings",
       "failed": {
         "graph_error": "Facebook didn't accept the update. Try again in a moment.",
         "token_invalid": "Facebook no longer accepts this Page's connection. Reconnect the Page, then try again."
       },
-      "getStarted": "Get Started button",
-      "getStartedHint": "Opens your product categories.",
       "greeting": "Greeting",
       "greetingHint": "Shown above the Get Started button. {first_name} becomes the customer's first name.",
       "lastUpdated": "Last updated on Facebook {{date}}",
