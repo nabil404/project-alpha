@@ -42,9 +42,10 @@ export class OrderCatalogRepository {
         productName: product.name,
         variantName: productVariant.name,
         sku: productVariant.sku,
-        price: productVariant.price,
-        available: sql<number>`${productVariant.stock} - ${productVariant.reserved}`,
-        live: sql<boolean>`${productVariant.archivedAt} is null and ${product.status} <> 'archived'`,
+        // A draft's variant may have no price or stock yet; it is not live until it has both.
+        price: sql<number>`coalesce(${productVariant.price}, 0)`,
+        available: sql<number>`coalesce(${productVariant.stock}, 0) - ${productVariant.reserved}`,
+        live: sql<boolean>`${productVariant.archivedAt} is null and ${product.status} <> 'archived' and ${productVariant.price} is not null and ${productVariant.stock} is not null`,
         productActive: sql<boolean>`${product.status} = 'active'`,
       })
       .from(productVariant)
@@ -87,7 +88,8 @@ export class OrderCatalogRepository {
   /**
    * Adds `stock` and `reserved` to the variant's counts together. Null, with
    * nothing changed, when that would leave less than nothing available or a
-   * negative reservation; otherwise the new counts.
+   * negative reservation, or the variant has no stock set; otherwise the new
+   * counts.
    */
   async adjustStock(
     executor: Executor,
@@ -108,7 +110,11 @@ export class OrderCatalogRepository {
           sql`${productVariant.reserved} + ${reserved} >= 0`,
         ),
       )
-      .returning({ stock: productVariant.stock, reserved: productVariant.reserved });
+      // The condition above is null, and so matches nothing, for an empty stock.
+      .returning({
+        stock: sql<number>`${productVariant.stock}`,
+        reserved: productVariant.reserved,
+      });
     return row ?? null;
   }
 }

@@ -15,9 +15,9 @@ import {
   type IntentResult,
   type MissingSlot,
   type OrderItemSlot,
-  type Product,
+  type SellableProduct,
   type Quote,
-  type Variant,
+  type SellableVariant,
 } from '@app/shared';
 import { LOCALES, type ReplyLanguage } from './assistant-fallbacks';
 import {
@@ -327,11 +327,11 @@ interface Problem {
   available?: number;
 }
 
-function findProduct(catalog: CatalogView, id: string | undefined): Product | undefined {
+function findProduct(catalog: CatalogView, id: string | undefined): SellableProduct | undefined {
   return id === undefined ? undefined : catalog.products.find((product) => product.id === id);
 }
 
-function inStockChoices(product: Product, variants: readonly Variant[]): Choice[] {
+function inStockChoices(product: SellableProduct, variants: readonly SellableVariant[]): Choice[] {
   return variants
     .filter((variant) => variant.available > 0)
     .slice(0, MAX_QUICK_REPLIES)
@@ -807,7 +807,7 @@ function offerProducts(
   if (slots.items.length >= MAX_ORDER_ITEMS) return handOff(slots, 'awaiting_seller');
   const choices = productIds
     .map((id) => findProduct(catalog, id))
-    .filter((product): product is Product => product !== undefined)
+    .filter((product): product is SellableProduct => product !== undefined)
     .filter((product) => product.variants.some((variant) => variant.available > 0))
     .slice(0, MAX_CANDIDATES)
     .map((product): Choice => ({ id: product.id, title: product.name }));
@@ -839,7 +839,7 @@ function offerProducts(
 }
 
 /** The product's cover photo, the one its carousel card and "Is it this one?" show. */
-function coverOf(product: Product): string | undefined {
+function coverOf(product: SellableProduct): string | undefined {
   return product.images.find((image) => image.id === product.coverImageId)?.url;
 }
 

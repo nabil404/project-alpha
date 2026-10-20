@@ -428,4 +428,93 @@ describe('MetaGraphClient', () => {
       );
     });
   });
+
+  describe('listPublishedPosts', () => {
+    const range = {
+      since: new Date('2026-07-01T00:00:00Z'),
+      until: new Date('2026-10-01T00:00:00Z'),
+    };
+
+    it("reads every photo of an album, leaves videos out, and returns the next page's cursor", async () => {
+      const { fn, calls } = fakeFetch({
+        body: {
+          data: [
+            {
+              id: '1_10',
+              message: 'New arrivals',
+              created_time: '2026-08-01T10:00:00+0000',
+              permalink_url: 'https://www.facebook.com/1/posts/10',
+              attachments: {
+                data: [
+                  {
+                    media_type: 'album',
+                    subattachments: {
+                      data: [
+                        {
+                          media_type: 'photo',
+                          media: { image: { src: 'https://cdn.test/a.jpg' } },
+                        },
+                        {
+                          media_type: 'video',
+                          media: { image: { src: 'https://cdn.test/v.jpg' } },
+                        },
+                        { media_type: 'photo', media: { image: { src: 'http://cdn.test/b.jpg' } } },
+                        {
+                          media_type: 'photo',
+                          media: { image: { src: 'https://cdn.test/c.jpg' } },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+            { id: '1_11', attachments: { data: [{ media_type: 'video', media: {} }] } },
+            { message: 'no id' },
+          ],
+          paging: { cursors: { after: 'AFTER' }, next: 'https://graph.facebook.com/next' },
+        },
+      });
+      const client = new MetaGraphClient(settings, fn);
+
+      const page = await client.listPublishedPosts('page-token', '1', {
+        ...range,
+        after: 'BEFORE',
+      });
+
+      expect(page).toEqual({
+        posts: [
+          {
+            id: '1_10',
+            message: 'New arrivals',
+            permalinkUrl: 'https://www.facebook.com/1/posts/10',
+            createdTime: '2026-08-01T10:00:00+0000',
+            photoUrls: ['https://cdn.test/a.jpg', 'https://cdn.test/c.jpg'],
+          },
+          { id: '1_11', message: null, permalinkUrl: null, createdTime: null, photoUrls: [] },
+        ],
+        after: 'AFTER',
+      });
+      const query = Object.fromEntries(calls[0]!.url.searchParams);
+      expect(calls[0]!.url.pathname).toBe('/v21.0/1/published_posts');
+      expect(query).toMatchObject({
+        since: String(range.since.getTime() / 1000),
+        until: String(range.until.getTime() / 1000),
+        limit: '25',
+        after: 'BEFORE',
+      });
+      expect(query.fields).toContain('subattachments.limit(20)');
+      expect(calls[0]!.authorization).toBe('Bearer page-token');
+    });
+
+    it('returns no cursor on the last page, even when Graph sends one', async () => {
+      const { fn } = fakeFetch({ body: { data: [], paging: { cursors: { after: 'END' } } } });
+      const client = new MetaGraphClient(settings, fn);
+
+      await expect(client.listPublishedPosts('page-token', '1', range)).resolves.toEqual({
+        posts: [],
+        after: null,
+      });
+    });
+  });
 });

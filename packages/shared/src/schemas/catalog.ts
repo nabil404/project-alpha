@@ -97,13 +97,13 @@ export const variantSchema = z.object({
    */
   name: z.string().min(1).nullable(),
   sku: z.string().min(1),
-  /** Minor units. */
-  price: z.number().int().nonnegative(),
-  /** Units on hand, as the seller counts them. */
-  stock: z.number().int().nonnegative(),
+  /** Minor units. Null only on a draft or archived product: an active one needs it. */
+  price: z.number().int().nonnegative().nullable(),
+  /** Units on hand, as the seller counts them. Null only on a draft or archived product. */
+  stock: z.number().int().nonnegative().nullable(),
   /** Units held by drafted orders. Never written. */
   reserved: z.number().int().nonnegative(),
-  /** `stock - reserved`: what the assistant and new orders can take. Never written. */
+  /** `stock - reserved`, an empty stock counting as 0: what the assistant and new orders can take. Never written. */
   available: z.number().int().nonnegative(),
   /** Derived from `available`; never written. */
   stockStatus: stockStatusSchema,
@@ -146,11 +146,20 @@ export const productSchema = z
   .meta({ id: 'Product' });
 export type Product = z.infer<typeof productSchema>;
 
+/**
+ * An active product's variant, which always has a price and a stock: what
+ * the assistant reads, so it can never quote an empty price.
+ */
+export type SellableVariant = Variant & { price: number; stock: number };
+export type SellableProduct = Omit<Product, 'variants'> & { variants: SellableVariant[] };
+
 const productNameSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().trim().max(5000).nullable();
 /** Blank or omitted: the API generates one. */
 const skuInputSchema = z.string().trim().max(64).optional();
 const moneySchema = z.number().int().nonnegative();
+/** A draft or archived product may leave a variant's price or stock empty; an active one may not. */
+const optionalMoneySchema = moneySchema.nullable();
 
 /** A product's own delivery charges, one per area at most. */
 const productDeliveryChargeList = z
@@ -176,7 +185,7 @@ const productDeliveryChargeList = z
     });
   });
 
-const stockSchema = z.number().int().nonnegative();
+const stockSchema = z.number().int().nonnegative().nullable();
 
 /** `categoryIds`, when present, replaces the product's links. */
 export const updateProductSchema = z
@@ -199,7 +208,7 @@ export type UpdateProduct = z.infer<typeof updateProductSchema>;
 export const updateVariantSchema = z
   .object({
     sku: z.string().trim().min(1).max(64).optional(),
-    price: moneySchema.optional(),
+    price: optionalMoneySchema.optional(),
     stock: stockSchema.optional(),
     /** One of the product's own images; null shows the product's cover. */
     imageId: z.string().uuid().nullable().optional(),
@@ -239,7 +248,7 @@ export const productVariantInputSchema = z
     name: z.string().trim().max(VARIANT_NAME_MAX_LENGTH).optional(),
     optionValues: z.array(optionValueTextSchema).max(PRODUCT_OPTION_MAX_COUNT).default([]),
     sku: skuInputSchema,
-    price: moneySchema,
+    price: optionalMoneySchema,
     stock: stockSchema.default(0),
     /** One of the product's own images; null shows the product's cover. */
     imageId: z.string().uuid().nullable().default(null),
@@ -420,8 +429,9 @@ export const stockLevels = ['in_stock', 'low_stock', 'out_of_stock'] as const;
 export const stockLevelSchema = z.enum(stockLevels);
 export type StockLevel = z.infer<typeof stockLevelSchema>;
 
-export function stockLevelOf(stock: number): StockLevel {
-  if (stock <= 0) return 'out_of_stock';
+/** An empty stock counts as out of stock. */
+export function stockLevelOf(stock: number | null): StockLevel {
+  if (stock === null || stock <= 0) return 'out_of_stock';
   return stock <= LOW_STOCK_THRESHOLD ? 'low_stock' : 'in_stock';
 }
 
@@ -457,6 +467,8 @@ export const listProductsQuerySchema = z.object({
   filter: productListFilterSchema.default('all'),
   q: productSearchTerm,
   categoryId: z.string().uuid().optional(),
+  /** Only the products this import run made, whatever their status now. */
+  importId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce
     .number()
@@ -474,10 +486,10 @@ export const productListVariantSchema = z.object({
   /** Null for the default variant of a product without options. */
   name: z.string().min(1).nullable(),
   sku: z.string().min(1),
-  /** Minor units. */
-  price: z.number().int().nonnegative(),
-  stock: z.number().int().nonnegative(),
-  /** `stock - reserved`. */
+  /** Minor units; null when the seller has not set it yet. */
+  price: z.number().int().nonnegative().nullable(),
+  stock: z.number().int().nonnegative().nullable(),
+  /** `stock - reserved`, an empty stock counting as 0. */
   available: z.number().int().nonnegative(),
   stockLevel: stockLevelSchema,
   /** Its own image, else the product's cover; null when the product has no photos. */
@@ -500,9 +512,9 @@ export const productListItemSchema = z.object({
   /** Option names in order ("Size", "Colour"); empty for a product without options. */
   optionNames: z.array(z.string().min(1)),
   variantCount: z.number().int().positive(),
-  /** Minor units, over live variants. */
-  priceMin: z.number().int().nonnegative(),
-  priceMax: z.number().int().nonnegative(),
+  /** Minor units, over live variants with a price; null when none has one. */
+  priceMin: z.number().int().nonnegative().nullable(),
+  priceMax: z.number().int().nonnegative().nullable(),
   /** Units left to sell (on hand less reserved) across live variants. */
   available: z.number().int().nonnegative(),
   lowVariantCount: z.number().int().nonnegative(),

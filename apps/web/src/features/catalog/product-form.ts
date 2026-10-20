@@ -85,8 +85,9 @@ export function toFormValues(product: Product): ProductFormValues {
         name,
         optionValues,
         sku: variant.sku,
-        price: variant.price,
-        stock: variant.stock,
+        // An imported draft may have none yet: the field reads empty until it is filled.
+        price: variant.price ?? Number.NaN,
+        stock: variant.stock ?? Number.NaN,
         imageId: variant.imageId,
       };
     }),

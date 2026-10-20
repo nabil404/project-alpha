@@ -22,6 +22,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { AccountModule } from './modules/account/account.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ImportsModule } from './modules/imports/imports.module';
 import { CryptoService } from './common/crypto.service';
 import { serializeRequest } from './common/request-log';
 
@@ -82,6 +83,7 @@ import { serializeRequest } from './common/request-log';
     AccountModule,
     SettingsModule,
     NotificationsModule,
+    ImportsModule,
   ],
   providers: [
     CryptoService,

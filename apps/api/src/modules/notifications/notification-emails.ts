@@ -1,6 +1,7 @@
 import {
   customerWaitingEmail as customerWaitingTemplate,
   dailySummaryEmail as dailySummaryTemplate,
+  importFinishedEmail as importFinishedTemplate,
   newOrderEmail,
   type MailContent,
 } from '../mail/templates';
@@ -61,6 +62,37 @@ export function dailySummaryEmail(input: {
     orderCount: input.orders,
     revenue: input.revenue,
     ordersUrl: `${input.appUrl}/orders`,
+    settingsUrl: settingsUrl(input.appUrl),
+  });
+}
+
+/** Why an import failed, as the email says it. */
+const IMPORT_FAILURES: Record<string, string> = {
+  FACEBOOK_PERMISSION_MISSING:
+    'Facebook no longer lets us read the Page’s posts. Reconnect the Page and try again.',
+  FACEBOOK_UNAVAILABLE: 'Facebook could not be reached. Try again later.',
+  IMPORT_NOT_AVAILABLE: 'The posts could not be read right now. Try again later.',
+};
+
+export function importFinishedEmail(input: {
+  appUrl: string;
+  shopName: string;
+  importId: string;
+  outcome: 'finished' | 'stopped' | 'failed';
+  errorCode: string | null;
+  /** The posts' dates, formatted for the shop. */
+  range: string;
+  drafts: number;
+  needsInfo: number;
+}): MailContent {
+  return importFinishedTemplate({
+    shopName: input.shopName,
+    outcome: input.outcome,
+    range: input.range,
+    drafts: input.drafts,
+    needsInfo: input.needsInfo,
+    failure: IMPORT_FAILURES[input.errorCode ?? ''] ?? IMPORT_FAILURES.IMPORT_NOT_AVAILABLE!,
+    importUrl: `${input.appUrl}/catalog/imports/${encodeURIComponent(input.importId)}`,
     settingsUrl: settingsUrl(input.appUrl),
   });
 }

@@ -19,7 +19,7 @@ feature's page in the same change as its code.
 | 10  | [Settings – Notifications](10-settings-notifications/README.md) | Built; the assistant reports drafted orders and hand-offs                                    |
 | 11  | [AI implementation](11-ai-implementation/README.md)             | Phases 1–6 built (the turn, Confirm, entry points, non-text, posts, photos); 7–9 not started |
 | 12  | [Settings – Order assistant](12-settings-assistant/README.md)   | Tone, default language and notes, API and page; the assistant uses tone and language         |
-| 13  | [Import from Facebook posts](13-facebook-post-import/README.md) | In MVP scope, not built: the design                                                          |
+| 13  | [Import from Facebook posts](13-facebook-post-import/README.md) | API and worker built; the dashboard screens are not                                          |
 
 ## Each page
 

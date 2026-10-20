@@ -11,13 +11,19 @@ import {
   extractedOrderSchema,
   intentResultSchema,
   photoMatchSchema,
+  postProductsSchema,
   type ExtractedOrder,
   type IntentResult,
   type PhotoMatch,
+  type PostProducts,
 } from '@app/shared';
 import type { z } from 'zod';
 import { CLASSIFY_INTENT_SYSTEM } from './prompts/classify-intent';
 import { EXTRACT_ORDER_SYSTEM, extractOrderPrompt } from './prompts/extract-order';
+import {
+  EXTRACT_PRODUCTS_FROM_POST_SYSTEM,
+  extractProductsFromPostContent,
+} from './prompts/extract-products-from-post';
 import {
   MATCH_PRODUCT_PHOTO_SYSTEM,
   matchProductPhotoContent,
@@ -33,6 +39,7 @@ import type {
   LlmResult,
   PhotoMatchRequest,
   PhraseRequest,
+  PostExtractionRequest,
 } from './llm.types';
 
 type Model = Exclude<LanguageModel, string>;
@@ -128,6 +135,25 @@ export class AiSdkLlmClient implements LlmClient {
         telemetry: this.telemetry('vision_match'),
       });
       const parsed = photoMatchSchema.safeParse(result.output);
+      if (!parsed.success) throw new InvalidOutput(result.usage);
+      return { value: parsed.data, tokens: result.usage };
+    });
+  }
+
+  /** The larger model: it reads the post's photos, prices written on them included. */
+  extractProductsFromPost(request: PostExtractionRequest): Promise<LlmResult<PostProducts>> {
+    const model = this.options.extraction;
+    return this.call('post_import', model, async (abortSignal) => {
+      const result = await generateText({
+        model,
+        system: EXTRACT_PRODUCTS_FROM_POST_SYSTEM,
+        messages: [{ role: 'user', content: extractProductsFromPostContent(request) }],
+        output: Output.object({ schema: postProductsSchema }),
+        abortSignal,
+        maxRetries: 1,
+        telemetry: this.telemetry('post_import'),
+      });
+      const parsed = postProductsSchema.safeParse(result.output);
       if (!parsed.success) throw new InvalidOutput(result.usage);
       return { value: parsed.data, tokens: result.usage };
     });

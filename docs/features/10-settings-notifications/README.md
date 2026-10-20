@@ -1,10 +1,13 @@
 # 10 · Settings – Notifications
 
 Which emails the signed-in person gets about the active shop: a new order the
-assistant drafted, a customer waiting for them, and a daily summary.
+assistant drafted, a customer waiting for them, a daily summary, and an
+import from Facebook posts that ended.
 
 **Status (Oct 2026):** built. The API stores the switches, the worker sends
-all three emails, and the page is at `/settings/notifications`. The assistant
+all four emails, and the page is at `/settings/notifications`. The page does
+not show the fourth switch, **Import finished**, yet
+([Follow-ups](#follow-ups)). The assistant
 reports hand-offs since
 [phase 11.1](../11-ai-implementation/phase-1-foundation/README.md) and
 drafted orders since
@@ -14,13 +17,13 @@ drafted orders since
 
 ## Routes (session + TenantGuard)
 
-| Route                                  | Request                                                      | Response                   | Errors                  |
-| -------------------------------------- | ------------------------------------------------------------ | -------------------------- | ----------------------- |
-| `GET /api/v1/settings/notifications`   | none                                                         | `NotificationSettings`     | none                    |
-| `PATCH /api/v1/settings/notifications` | any of `{ newOrder, customerWaiting, dailySummary }`, strict | 200 `NotificationSettings` | 400 `VALIDATION_FAILED` |
+| Route                                  | Request                                                                      | Response                   | Errors                  |
+| -------------------------------------- | ---------------------------------------------------------------------------- | -------------------------- | ----------------------- |
+| `GET /api/v1/settings/notifications`   | none                                                                         | `NotificationSettings`     | none                    |
+| `PATCH /api/v1/settings/notifications` | any of `{ newOrder, customerWaiting, dailySummary, importFinished }`, strict | 200 `NotificationSettings` | 400 `VALIDATION_FAILED` |
 
-`NotificationSettings` is `{ newOrder, customerWaiting, dailySummary }`, all
-booleans, in
+`NotificationSettings` is `{ newOrder, customerWaiting, dailySummary, importFinished }`,
+all booleans, in
 [`packages/shared/src/schemas/notifications.ts`](../../../packages/shared/src/schemas/notifications.ts)
 with `NOTIFICATION_DEFAULTS`.
 
@@ -31,7 +34,7 @@ with `NOTIFICATION_DEFAULTS`.
   session's active organization and the person from the session's user,
   never from the request.
 - **Defaults** apply until the first toggle: new order on, customer waiting
-  on, daily summary off. Reading never writes a row.
+  on, daily summary off, import finished on. Reading never writes a row.
 - **Each switch saves on its own.** `PATCH` writes only the switches it was
   sent, so two quick toggles cannot undo each other. The first write fills
   the rest from the defaults. An empty body changes nothing.
@@ -49,11 +52,12 @@ transaction under the shop's merchant context. It then queues one
 `send-email` job per recipient. A retried event therefore mails nobody twice,
 and a failed send retries alone. No mail call runs inside a transaction.
 
-| Email                    | Reported by                                                                          | Job id                                      | Sent if, when the job runs                                                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| New order drafted        | `NotificationsService.orderDrafted(merchantId, orderId)`, after the order commits    | `order-drafted-<orderId>`                   | The order exists and its `source` is `assistant`                                                                                                             |
-| Customer waiting for you | `NotificationsService.handedOff(merchantId, conversationId, at)`, delayed 10 minutes | `customer-waiting-<conversationId>-<at ms>` | The chat is still `handed_off`, `handed_off_at` still equals `at`, and no `seller` message (from the dashboard or Facebook's inbox) has been sent since `at` |
-| Daily summary            | The `daily-summary-scan` scheduler, every 15 minutes in UTC                          | `daily-summary-<merchantId>-<day>`          | The scan was scheduled for 9:00–9:14 in the shop's time zone, and the shop had an order that day that is not cancelled or returned                           |
+| Email                    | Reported by                                                                           | Job id                                      | Sent if, when the job runs                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| New order drafted        | `NotificationsService.orderDrafted(merchantId, orderId)`, after the order commits     | `order-drafted-<orderId>`                   | The order exists and its `source` is `assistant`                                                                                                             |
+| Customer waiting for you | `NotificationsService.handedOff(merchantId, conversationId, at)`, delayed 10 minutes  | `customer-waiting-<conversationId>-<at ms>` | The chat is still `handed_off`, `handed_off_at` still equals `at`, and no `seller` message (from the dashboard or Facebook's inbox) has been sent since `at` |
+| Daily summary            | The `daily-summary-scan` scheduler, every 15 minutes in UTC                           | `daily-summary-<merchantId>-<day>`          | The scan was scheduled for 9:00–9:14 in the shop's time zone, and the shop had an order that day that is not cancelled or returned                           |
+| Import finished          | `NotificationsService.importFinished(merchantId, importId, endedAt)`, when a run ends | `import-finished-<importId>-<endedAt ms>`   | The run is still `finished`, `stopped` or `failed`, and its `finished_at` still equals `endedAt`; a run resumed since has moved on from that end             |
 
 - **Job ids** come from the event, so reporting an event twice is a no-op
   while BullMQ keeps the job. Event jobs use `EVENT_JOB_RETENTION`, which
@@ -70,8 +74,13 @@ and a failed send retries alone. No mail call runs inside a transaction.
   still finds its shops. It reads each shop's time zone, and reads recipients
   only for shops at their 9:00. A shop with no settings row uses the default
   region.
-- **Emails** are in English. They link to the order, the conversation or the
-  orders list on `APP_URL`, and end with a link to these settings. Amounts
+- **The import email** says the posts' dates in the shop's date format, how
+  many drafts the run made and how many still need a price, or why it failed
+  (`FACEBOOK_PERMISSION_MISSING`, `FACEBOOK_UNAVAILABLE` or
+  `IMPORT_NOT_AVAILABLE`), and links to `/catalog/imports/:id`
+  ([Import from Facebook posts](../13-facebook-post-import/README.md#the-finished-email)).
+- **Emails** are in English. They link to the order, the conversation, the
+  import or the orders list on `APP_URL`, and end with a link to these settings. Amounts
   use the order's or the shop's currency, and the summary's date uses the
   shop's date format.
 
@@ -92,10 +101,12 @@ thumb when on.
 ## Data model
 
 `notification_preference`: primary key `(merchant_id, user_id)`, plus
-`new_order`, `customer_waiting` and `daily_summary`. `user_id` cascades from
-`user`. The columns have no defaults, because the repository writes
-`NOTIFICATION_DEFAULTS` itself. Migrations `0028_settings_notifications` and
-`0029_notification_preference_force_rls` create it. The customer-waiting
+`new_order`, `customer_waiting`, `daily_summary` and `import_finished`.
+`user_id` cascades from `user`. The columns have no defaults, because the
+repository writes `NOTIFICATION_DEFAULTS` itself; `import_finished` defaults
+to `true` only so migration `0049_product_import` could add it to existing
+rows. Migrations `0028_settings_notifications` and
+`0029_notification_preference_force_rls` create the table. The customer-waiting
 email also reads `conversation.handed_off_at`
 ([Conversations](../04-conversations/README.md#data-model)), from
 `0030_conversation_handed_off_at`. See
@@ -131,6 +142,8 @@ email also reads `conversation.handed_off_at`
 
 ## Follow-ups
 
+- The fourth switch, **Import finished**, on `/settings/notifications` and
+  the canvas's Notifications screens.
 - Send emails in the reader's language once the dashboard has more than
   English.
 - The daily summary is outside MVP 01's scope. It exists because the design

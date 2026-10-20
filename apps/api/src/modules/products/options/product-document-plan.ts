@@ -48,8 +48,9 @@ export interface PlannedVariant {
   name: string | null;
   /** Normalized. Null: generate one for a new variant, keep the current one for an existing variant. */
   sku: string | null;
-  price: number;
-  stock: number;
+  /** Null leaves it empty, which only a draft or archived product may. */
+  price: number | null;
+  stock: number | null;
   imageId: string | null;
   /** One per option, in order: indexes into plan.options and that option's values. */
   valueRefs: { option: number; value: number }[];

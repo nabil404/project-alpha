@@ -5,9 +5,11 @@ import {
   CUSTOMER_WAITING_DELAY_MS,
   CUSTOMER_WAITING_JOB,
   EVENT_JOB_RETENTION,
+  IMPORT_FINISHED_JOB,
   NOTIFICATIONS_QUEUE,
   ORDER_DRAFTED_JOB,
   type CustomerWaitingJob,
+  type ImportFinishedJob,
   type OrderDraftedJob,
 } from '../queue/queue.constants';
 
@@ -42,6 +44,18 @@ export class NotificationsService {
       ...EVENT_JOB_RETENTION,
       jobId: `customer-waiting-${conversationId}-${at.getTime()}`,
       delay: CUSTOMER_WAITING_DELAY_MS,
+    });
+  }
+
+  /**
+   * An import run ended at `endedAt`: finished, stopped or failed. A resumed
+   * run that ends again is a new event, so the id carries the end time.
+   */
+  async importFinished(merchantId: string, importId: string, endedAt: Date): Promise<void> {
+    const data: ImportFinishedJob = { merchantId, importId, endedAt: endedAt.getTime() };
+    await this.queue.add(IMPORT_FINISHED_JOB, data, {
+      ...EVENT_JOB_RETENTION,
+      jobId: `import-finished-${importId}-${endedAt.getTime()}`,
     });
   }
 }

@@ -81,16 +81,21 @@ describeDb('NotificationSettingsService', () => {
       newOrder: true,
       customerWaiting: true,
       dailySummary: true,
+      importFinished: true,
     });
-    await expect(service.update(scopeA(), userId, { newOrder: false })).resolves.toEqual({
+    await expect(
+      service.update(scopeA(), userId, { newOrder: false, importFinished: false }),
+    ).resolves.toEqual({
       newOrder: false,
       customerWaiting: true,
       dailySummary: true,
+      importFinished: false,
     });
     await expect(service.get(scopeA(), userId)).resolves.toEqual({
       newOrder: false,
       customerWaiting: true,
       dailySummary: true,
+      importFinished: false,
     });
   });
 

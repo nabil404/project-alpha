@@ -133,6 +133,24 @@ export class ProductPostRepository {
       );
   }
 
+  /**
+   * An import's link from a post to the one product it gave. A post that
+   * already has a row, linked or suggested, keeps it. False when it had one.
+   */
+  async linkIfFree(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    productId: string,
+    post: PostDetails,
+  ): Promise<boolean> {
+    const rows = await executor
+      .insert(productPost)
+      .values({ merchantId, productId, ...post, status: 'linked' })
+      .onConflictDoNothing({ target: [productPost.merchantId, productPost.postId] })
+      .returning({ id: productPost.id });
+    return rows.length > 0;
+  }
+
   /** The assistant's guess; a post with a row already, linked or suggested, keeps it. */
   async suggest(
     executor: Executor,

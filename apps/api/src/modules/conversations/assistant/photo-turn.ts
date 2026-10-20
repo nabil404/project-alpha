@@ -1,4 +1,4 @@
-import { MAX_PHOTO_MATCHES, type PhotoMatch, type Product } from '@app/shared';
+import { MAX_PHOTO_MATCHES, type PhotoMatch, type SellableProduct } from '@app/shared';
 import type { PhotoMatchRequest } from '../../llm/llm.types';
 import type { MessageRow } from '../../database/schema/index';
 import { isEmojiOnly } from '../message-content';
@@ -41,7 +41,7 @@ export function photosIn(
  * category the customer named when they named one, and any product their
  * words name first. The catalog is the turn's merchant's only.
  */
-export function photoShortlist(catalog: CatalogView, words: string): Product[] {
+export function photoShortlist(catalog: CatalogView, words: string): SellableProduct[] {
   const sellable = catalog.products.filter(
     (product) =>
       product.variants.some((variant) => variant.available > 0) && coverThumbnail(product),
@@ -69,7 +69,7 @@ export function photoShortlist(catalog: CatalogView, words: string): Product[] {
 /** The vision call's request: our copies of the photos, each candidate numbered from 1. */
 export function photoMatchRequest(
   photos: string[],
-  shortlist: Product[],
+  shortlist: SellableProduct[],
   words: string,
 ): PhotoMatchRequest {
   return {
@@ -88,7 +88,7 @@ export function photoMatchRequest(
  * dropped, as is anything below the confidence floor, and a product named
  * twice counts once.
  */
-export function matchedProductIds(match: PhotoMatch, shortlist: Product[]): string[] {
+export function matchedProductIds(match: PhotoMatch, shortlist: SellableProduct[]): string[] {
   const ids: string[] = [];
   const sure = match.matches
     .filter((entry) => entry.confidence >= CONFIDENCE_FLOOR)
@@ -100,6 +100,6 @@ export function matchedProductIds(match: PhotoMatch, shortlist: Product[]): stri
   return ids.slice(0, MAX_PHOTO_MATCHES);
 }
 
-function coverThumbnail(product: Product): string | undefined {
+function coverThumbnail(product: SellableProduct): string | undefined {
   return product.images.find((image) => image.id === product.coverImageId)?.thumbnailUrl;
 }

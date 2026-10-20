@@ -32,6 +32,11 @@ export function toProductImage(
   };
 }
 
+/** What can still be sold: an empty stock holds none, and reserves none either. */
+export function availableOf(row: Pick<VariantRow, 'stock' | 'reserved'>): number {
+  return (row.stock ?? 0) - row.reserved;
+}
+
 /** `optionValueIds` in the product's option order. */
 export function toVariant(row: VariantRow, optionValueIds: string[]): Variant {
   return {
@@ -41,8 +46,8 @@ export function toVariant(row: VariantRow, optionValueIds: string[]): Variant {
     price: row.price,
     stock: row.stock,
     reserved: row.reserved,
-    available: row.stock - row.reserved,
-    stockStatus: row.stock - row.reserved > 0 ? 'in_stock' : 'out_of_stock',
+    available: availableOf(row),
+    stockStatus: availableOf(row) > 0 ? 'in_stock' : 'out_of_stock',
     isDefault: row.isDefault,
     imageId: row.imageId,
     optionValueIds,
@@ -142,8 +147,8 @@ export function toProductListItem(
           sku: only.sku,
           price: only.price,
           stock: only.stock,
-          available: only.stock - only.reserved,
-          stockLevel: stockLevelOf(only.stock - only.reserved),
+          available: availableOf(only),
+          stockLevel: stockLevelOf(only.stock === null ? null : availableOf(only)),
           thumbnailUrl: thumbnail(only.imageId ?? row.coverImageId),
         }
       : null,

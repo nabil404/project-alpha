@@ -53,6 +53,14 @@
       "new": "New",
       "repeat": "Repeat"
     },
+    "importRun": {
+      "failed": "Failed",
+      "finished": "Finished",
+      "queued": "Queued",
+      "running": "Running",
+      "stopped": "Stopped",
+      "stopping": "Stopping"
+    },
     "intent": {
       "ask_question": "Question",
       "browse": "Browsing",

@@ -150,10 +150,23 @@ describeDb('Settings > Notifications over HTTP', () => {
     const agent = await verifiedSeller();
 
     const first = await agent.patch(ROUTE).send({ dailySummary: true }).expect(200);
-    expect(first.body).toEqual({ newOrder: true, customerWaiting: true, dailySummary: true });
+    expect(first.body).toEqual({
+      newOrder: true,
+      customerWaiting: true,
+      dailySummary: true,
+      importFinished: true,
+    });
 
-    const second = await agent.patch(ROUTE).send({ newOrder: false }).expect(200);
-    expect(second.body).toEqual({ newOrder: false, customerWaiting: true, dailySummary: true });
+    const second = await agent
+      .patch(ROUTE)
+      .send({ newOrder: false, importFinished: false })
+      .expect(200);
+    expect(second.body).toEqual({
+      newOrder: false,
+      customerWaiting: true,
+      dailySummary: true,
+      importFinished: false,
+    });
 
     const read = await agent.get(ROUTE).expect(200);
     expect(read.body).toEqual(second.body);

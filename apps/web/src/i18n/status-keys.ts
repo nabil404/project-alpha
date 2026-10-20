@@ -4,6 +4,7 @@ import type {
   ConversationState,
   CustomerIntent,
   CustomerStatus,
+  ImportRunStatus,
   MessageKind,
   MessageSender,
   MessageStatus,
@@ -130,6 +131,15 @@ export const customerStatusKeys = {
   new: 'status.customer.new',
 } as const satisfies Record<CustomerStatus, ParseKeys<'common'>>;
 
+export const importRunStatusKeys = {
+  queued: 'status.importRun.queued',
+  running: 'status.importRun.running',
+  stopping: 'status.importRun.stopping',
+  stopped: 'status.importRun.stopped',
+  finished: 'status.importRun.finished',
+  failed: 'status.importRun.failed',
+} as const satisfies Record<ImportRunStatus, ParseKeys<'common'>>;
+
 /** Read labels through this, never by hand-writing a status key at a call site. */
 export function useStatusLabels() {
   const { t } = useTranslation('common');
@@ -158,5 +168,6 @@ export function useStatusLabels() {
     },
     customerIntent: (intent: CustomerIntent): string => t(customerIntentKeys[intent]),
     customerStatus: (status: CustomerStatus): string => t(customerStatusKeys[status]),
+    importRunStatus: (status: ImportRunStatus): string => t(importRunStatusKeys[status]),
   };
 }

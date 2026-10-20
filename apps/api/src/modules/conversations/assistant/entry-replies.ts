@@ -1,4 +1,4 @@
-import { formatMinorUnitsTrimmed, MAX_QUICK_REPLIES, type Product } from '@app/shared';
+import { formatMinorUnitsTrimmed, MAX_QUICK_REPLIES, type SellableProduct } from '@app/shared';
 import { LOCALES, type ReplyLanguage } from './assistant-fallbacks';
 import type { CatalogView } from './catalog-match';
 import type { Choice, ProductCard, ReplyIntent } from './reply-intent';
@@ -14,11 +14,12 @@ const FROM: Record<ReplyLanguage, (price: string) => string> = {
   en: (price) => `From ${price}`,
 };
 
-const browsable = (product: Product) => product.variants.some((variant) => variant.available > 0);
+const browsable = (product: SellableProduct) =>
+  product.variants.some((variant) => variant.available > 0);
 
 interface Bucket {
   choice: Choice;
-  products: Product[];
+  products: SellableProduct[];
 }
 
 /**
@@ -52,7 +53,11 @@ export function browseReply(
   };
 }
 
-function bucketsOf(catalog: CatalogView, products: Product[], language: ReplyLanguage): Bucket[] {
+function bucketsOf(
+  catalog: CatalogView,
+  products: SellableProduct[],
+  language: ReplyLanguage,
+): Bucket[] {
   const buckets: Bucket[] = catalog.categories
     .map((category) => ({
       choice: { id: category.id, title: category.name },
@@ -68,7 +73,11 @@ function bucketsOf(catalog: CatalogView, products: Product[], language: ReplyLan
 }
 
 /** A product as a carousel card: its cover and its lowest available price. */
-export function cardOf(product: Product, language: ReplyLanguage, currency: string): ProductCard {
+export function cardOf(
+  product: SellableProduct,
+  language: ReplyLanguage,
+  currency: string,
+): ProductCard {
   const lowest = Math.min(
     ...product.variants.filter((variant) => variant.available > 0).map((variant) => variant.price),
   );

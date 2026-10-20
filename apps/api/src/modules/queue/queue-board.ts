@@ -7,6 +7,7 @@ import type { Queue } from 'bullmq';
 import type { Express as ExpressApp } from 'express';
 import {
   ASSISTANT_QUEUE,
+  IMPORTS_QUEUE,
   MESSENGER_PROFILE_QUEUE,
   MESSENGER_QUEUE,
   NOTIFICATIONS_QUEUE,
@@ -35,6 +36,7 @@ export function setupQueueBoard(app: INestApplication): void {
       NOTIFICATIONS_QUEUE,
       ASSISTANT_QUEUE,
       MESSENGER_PROFILE_QUEUE,
+      IMPORTS_QUEUE,
     ].map((name) => new BullMQAdapter(app.get<Queue>(getQueueToken(name)))),
     serverAdapter,
   });

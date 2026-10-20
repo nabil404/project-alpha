@@ -1,4 +1,4 @@
-import type { Product } from '@app/shared';
+import type { SellableProduct } from '@app/shared';
 import type { CatalogView } from '../../catalog-match';
 
 /**
@@ -25,7 +25,7 @@ function product(
   aliases: string[],
   options: OptionSpec[] = [],
   stock: (values: string[]) => number = () => 5,
-): Product & { key: string } {
+): SellableProduct & { key: string } {
   const p = (nextProduct += 1);
   let nextValue = 0;
   const builtOptions = options.map((option, o) => ({
@@ -124,7 +124,7 @@ export const EVAL_CATALOG: CatalogView = { products: EVAL_PRODUCTS, categories: 
 
 export type ProductKey = (typeof EVAL_PRODUCTS)[number]['key'];
 
-export function productByKey(key: string): Product {
+export function productByKey(key: string): SellableProduct {
   const found = EVAL_PRODUCTS.find((p) => p.key === key);
   if (!found) throw new Error(`no eval product ${key}`);
   return found;

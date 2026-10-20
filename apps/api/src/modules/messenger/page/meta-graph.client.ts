@@ -72,6 +72,26 @@ export interface GraphPost {
 /** How many of the Page's recent posts the picker lists. */
 export const PAGE_POSTS_LIMIT = 25;
 
+/** A Page post as an import reads it: every photo of an album, not only the first. */
+export interface GraphImportPost {
+  /** `<page id>_<post id>`. */
+  id: string;
+  message: string | null;
+  permalinkUrl: string | null;
+  createdTime: string | null;
+  /** https photo links, in the post's order; videos are left out. */
+  photoUrls: string[];
+}
+
+/** One page of a Page's published posts and the cursor of the page after it, null on the last. */
+export interface GraphPostPage {
+  posts: GraphImportPost[];
+  after: string | null;
+}
+
+/** Posts per page an import reads. */
+export const IMPORT_POSTS_PAGE_SIZE = 25;
+
 /**
  * Graph refused for want of a permission (10, 200 to 299) or a valid token
  * (190): the seller must reconnect the Page to grant it.
@@ -313,6 +333,47 @@ export class MetaGraphClient {
   }
 
   /**
+   * One page of the Page's published posts created between `since` and
+   * `until` (exclusive), newest first, from `after` on. Needs
+   * `pages_read_engagement`. Reels come from another edge and are not here.
+   */
+  async listPublishedPosts(
+    pageToken: string,
+    pageId: string,
+    range: { since: Date; until: Date; after?: string | null; limit?: number },
+  ): Promise<GraphPostPage> {
+    const query: Record<string, string> = {
+      fields: IMPORT_POST_FIELDS,
+      since: String(Math.floor(range.since.getTime() / 1000)),
+      until: String(Math.floor(range.until.getTime() / 1000)),
+      limit: String(range.limit ?? IMPORT_POSTS_PAGE_SIZE),
+    };
+    if (range.after) query.after = range.after;
+    const body = await this.request<{
+      data?: unknown[];
+      paging?: { cursors?: { after?: unknown }; next?: unknown };
+    }>('GET', `/${encodeURIComponent(pageId)}/published_posts`, { token: pageToken, query });
+    const after = body.paging?.cursors?.after;
+    return {
+      posts: (body.data ?? []).flatMap((entry) => {
+        const post = toGraphImportPost(entry);
+        return post ? [post] : [];
+      }),
+      // Graph sends a cursor on the last page too; only `next` says there is more.
+      after: typeof body.paging?.next === 'string' && typeof after === 'string' ? after : null,
+    };
+  }
+
+  /** One post by its Graph id, with every photo, as an import reads it. */
+  async getImportPost(pageToken: string, graphPostId: string): Promise<GraphImportPost | null> {
+    const body = await this.request<unknown>('GET', `/${encodeURIComponent(graphPostId)}`, {
+      token: pageToken,
+      query: { fields: IMPORT_POST_FIELDS },
+    });
+    return toGraphImportPost(body);
+  }
+
+  /**
    * A text reply inside the 24h window (`messaging_type: RESPONSE`). The caller
    * enforces the window; If Facebook refuses anyway, the call throws a GraphError.
    */
@@ -517,6 +578,40 @@ function toGraphPost(value: unknown): GraphPost | null {
     pictureUrl: picture?.startsWith('https://') ? picture : null,
     createdTime: text(body.created_time),
   };
+}
+
+const IMPORT_POST_FIELDS =
+  'id,message,created_time,permalink_url,attachments{media_type,media,subattachments.limit(20){media_type,media}}';
+
+function toGraphImportPost(value: unknown): GraphImportPost | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const body = value as Record<string, unknown>;
+  const text = (field: unknown) => (typeof field === 'string' && field ? field : null);
+  const id = text(body.id);
+  if (!id) return null;
+  const attachments = (body.attachments as { data?: unknown } | undefined)?.data;
+  return {
+    id,
+    message: text(body.message),
+    permalinkUrl: text(body.permalink_url),
+    createdTime: text(body.created_time),
+    photoUrls: [...new Set(Array.isArray(attachments) ? attachments.flatMap(photosOf) : [])],
+  };
+}
+
+/**
+ * The photos of one attachment: itself when it is a photo, its
+ * subattachments' photos when it is an album. A video's thumbnail is not a
+ * product photo, so videos give none.
+ */
+function photosOf(attachment: unknown): string[] {
+  if (typeof attachment !== 'object' || attachment === null) return [];
+  const entry = attachment as { media_type?: unknown; media?: unknown; subattachments?: unknown };
+  const children = (entry.subattachments as { data?: unknown } | undefined)?.data;
+  if (Array.isArray(children) && children.length > 0) return children.flatMap(photosOf);
+  if (entry.media_type !== 'photo' && entry.media_type !== 'album') return [];
+  const src = (entry.media as { image?: { src?: unknown } } | undefined)?.image?.src;
+  return typeof src === 'string' && src.startsWith('https://') ? [src] : [];
 }
 
 function toGraphPage(value: unknown): GraphPage | null {

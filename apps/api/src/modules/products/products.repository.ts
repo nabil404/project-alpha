@@ -4,7 +4,13 @@ import { LOW_STOCK_THRESHOLD, type ProductListFilter, type ProductStatus } from 
 import type { Executor, TenantScope } from '../database/base.repository';
 import { likePattern } from '../database/like-pattern';
 import { one } from '../database/rows';
-import { category, product, productCategory, productVariant } from '../database/schema/index';
+import {
+  category,
+  product,
+  productCategory,
+  productImportPost,
+  productVariant,
+} from '../database/schema/index';
 import { generateSku } from './sku';
 import { liveCategory } from '../categories/category-visibility';
 import { liveVariant, sellableProduct } from './product-visibility';
@@ -26,16 +32,18 @@ export interface NewVariantValues {
   name: string | null;
   /** Already normalized; null generates one. */
   sku: string | null;
-  price: number;
-  stock: number;
+  /** Null only while the product is a draft or archived; the service checks. */
+  price: number | null;
+  stock: number | null;
   imageId: string | null;
 }
 
 /** A product's live variants summed up, as the Products page lists it. */
 export interface ProductTotals {
   variantCount: number;
-  priceMin: number;
-  priceMax: number;
+  /** Over variants with a price; null when none has one. */
+  priceMin: number | null;
+  priceMax: number | null;
   available: number;
   lowCount: number;
   outCount: number;
@@ -51,6 +59,8 @@ export interface ProductListQuery {
   q?: string;
   /** A product in any of these matches; empty matches nothing. */
   categoryIds?: string[];
+  /** Only products this import run made or merged into. */
+  importId?: string;
   offset: number;
   limit: number;
 }
@@ -285,8 +295,8 @@ export class ProductsRepository {
     values: {
       name?: string | null;
       sku?: string;
-      price?: number;
-      stock?: number;
+      price?: number | null;
+      stock?: number | null;
       imageId?: string | null;
     },
   ): Promise<void> {
@@ -366,16 +376,16 @@ export class ProductsRepository {
   }
 }
 
-/** Per product: its live variants counted, priced and summed. */
+/** Per product: its live variants counted, priced and summed. An empty stock counts as none left. */
 function variantTotals(executor: Executor, { merchantId }: TenantScope) {
-  const available = sql`(${productVariant.stock} - ${productVariant.reserved})`;
+  const available = sql`(coalesce(${productVariant.stock}, 0) - ${productVariant.reserved})`;
   const low = sql`${available} > 0 and ${available} <= ${LOW_STOCK_THRESHOLD}`;
   return executor
     .select({
       productId: productVariant.productId,
       variantCount: sql<number>`count(*)::int`.as('variant_count'),
-      priceMin: sql<number>`min(${productVariant.price})::int`.as('price_min'),
-      priceMax: sql<number>`max(${productVariant.price})::int`.as('price_max'),
+      priceMin: sql<number | null>`min(${productVariant.price})::int`.as('price_min'),
+      priceMax: sql<number | null>`max(${productVariant.price})::int`.as('price_max'),
       available: sql<number>`coalesce(sum(${available}), 0)::int`.as('available_total'),
       lowCount: sql<number>`(count(*) filter (where ${low}))::int`.as('low_count'),
       outCount: sql<number>`(count(*) filter (where ${available} = 0))::int`.as('out_count'),
@@ -407,7 +417,7 @@ function stockCondition(
 function listConditions(
   executor: Executor,
   { merchantId }: TenantScope,
-  { filter, q, categoryIds }: Omit<ProductListQuery, 'offset' | 'limit'>,
+  { filter, q, categoryIds, importId }: Omit<ProductListQuery, 'offset' | 'limit'>,
   totals: VariantTotals,
 ): SQL | undefined {
   const conditions: (SQL | undefined)[] = [eq(product.merchantId, merchantId)];
@@ -458,6 +468,23 @@ function listConditions(
                 ),
               ),
           ),
+    );
+  }
+
+  if (importId !== undefined) {
+    conditions.push(
+      exists(
+        executor
+          .select({ one: sql`1` })
+          .from(productImportPost)
+          .where(
+            and(
+              eq(productImportPost.merchantId, merchantId),
+              eq(productImportPost.importId, importId),
+              sql`${product.id} = any(${productImportPost.productIds})`,
+            ),
+          ),
+      ),
     );
   }
 

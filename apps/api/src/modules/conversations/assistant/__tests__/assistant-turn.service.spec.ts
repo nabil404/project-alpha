@@ -138,6 +138,10 @@ class FakeLlm implements LlmClient {
     this.photoRequests.push(request);
     return this.photo(request);
   }
+
+  extractProductsFromPost(): never {
+    throw new Error('The assistant never imports posts');
+  }
 }
 
 describeDb('AssistantTurnService (app_runtime)', () => {

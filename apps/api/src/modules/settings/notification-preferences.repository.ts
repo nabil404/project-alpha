@@ -19,6 +19,7 @@ const switches = {
   newOrder: notificationPreference.newOrder,
   customerWaiting: notificationPreference.customerWaiting,
   dailySummary: notificationPreference.dailySummary,
+  importFinished: notificationPreference.importFinished,
 } as const;
 
 /**

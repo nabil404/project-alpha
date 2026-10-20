@@ -60,6 +60,10 @@ async function purge(db: Database, merchantIds: string[]): Promise<void> {
   // Conversations: messages cascade from their conversation, but delete them
   // explicitly so a failed test cannot leave a row holding the merchant.
   await db.delete(schema.llmCall).where(inArray(schema.llmCall.merchantId, merchantIds));
+  // Import posts cascade from their run.
+  await db
+    .delete(schema.productImport)
+    .where(inArray(schema.productImport.merchantId, merchantIds));
   await db.delete(schema.message).where(inArray(schema.message.merchantId, merchantIds));
   await db.delete(schema.conversation).where(inArray(schema.conversation.merchantId, merchantIds));
   await db.delete(schema.customer).where(inArray(schema.customer.merchantId, merchantIds));
