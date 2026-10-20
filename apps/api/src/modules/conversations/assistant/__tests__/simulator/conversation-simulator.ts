@@ -38,6 +38,8 @@ import {
   type AssistantTurnJob,
   type InboundMessageJob,
 } from '../../../../queue/queue.constants';
+import { AssistantSettingsRepository } from '../../../../settings/assistant-settings.repository';
+import { AssistantSettingsService } from '../../../../settings/assistant-settings.service';
 import { DeliveryChargesRepository } from '../../../../settings/delivery-charges.repository';
 import { MerchantSettingsRepository } from '../../../../settings/merchant-settings.repository';
 import { InMemoryObjectStorage } from '../../../../storage/__tests__/in-memory-object-storage';
@@ -267,7 +269,8 @@ export class ConversationSimulator {
             META_APP_ID: APP_ID,
             META_APP_SECRET: APP_SECRET,
             LLM_API_KEY: liveLlm ? process.env.LLM_API_KEY : 'scripted',
-          }) as Record<string, string | undefined>
+            ASSISTANT_LANGUAGES: ['en', 'bn'],
+          }) as Record<string, unknown>
         )[key],
     } as unknown as AppConfig;
     const record =
@@ -368,6 +371,8 @@ export class ConversationSimulator {
           ok: false,
           reason: 'not_allowed',
         })),
+
+        new AssistantSettingsService(runtime, new AssistantSettingsRepository(), config),
       ),
     );
   }

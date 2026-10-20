@@ -16,6 +16,7 @@ import {
   Truck,
   type LucideIcon,
 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/_app/settings')({
@@ -33,7 +34,7 @@ interface SettingsSection {
 const SECTIONS: readonly SettingsSection[] = [
   { id: 'general', label: 'nav.general', icon: Store, to: '/settings/general' },
   { id: 'messenger', label: 'nav.messenger', icon: MessageCircle, to: '/settings/messenger' },
-  { id: 'assistant', label: 'nav.assistant', icon: Bot },
+  { id: 'assistant', label: 'nav.assistant', icon: Bot, to: '/settings/assistant' },
   { id: 'delivery', label: 'nav.delivery', icon: Truck, to: '/settings/delivery' },
   {
     id: 'notifications',
@@ -55,6 +56,18 @@ function SettingsLayout() {
   const { t } = useTranslation('settings');
   const matchRoute = useMatchRoute();
   const current = SECTIONS.find(({ to }) => to && matchRoute({ to, fuzzy: true }));
+  const navRef = useRef<HTMLElement>(null);
+
+  // Below `lg` the menu scrolls sideways; bring the current section into view.
+  // Set scrollLeft rather than scrollIntoView, which would also scroll the page.
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+    const box = nav.getBoundingClientRect();
+    const item = active.getBoundingClientRect();
+    nav.scrollLeft += item.left - box.left - (box.width - item.width) / 2;
+  }, [current?.id]);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
@@ -82,6 +95,7 @@ function SettingsLayout() {
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         <nav
+          ref={navRef}
           aria-label={t('nav.label')}
           className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:-mx-8 sm:px-8 lg:mx-0 lg:w-60 lg:shrink-0 lg:flex-col lg:overflow-visible lg:px-0"
         >

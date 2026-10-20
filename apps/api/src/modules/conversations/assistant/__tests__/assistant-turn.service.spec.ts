@@ -37,6 +37,7 @@ import type {
   LlmPurpose,
   LlmResult,
   PhotoMatchRequest,
+  PhraseRequest,
 } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { ProductPostRepository } from '../../../messenger/posts/product-post.repository';
@@ -52,6 +53,8 @@ import type { NotificationsService } from '../../../notifications/notifications.
 import { seedOrder } from '../../../database/__tests__/order-seeds';
 import { OrdersRepository } from '../../../orders/orders.repository';
 import { productsService } from '../../../products/__tests__/products-service.fixture';
+import { AssistantSettingsRepository } from '../../../settings/assistant-settings.repository';
+import { AssistantSettingsService } from '../../../settings/assistant-settings.service';
 import { DeliveryChargesRepository } from '../../../settings/delivery-charges.repository';
 import { MerchantSettingsRepository } from '../../../settings/merchant-settings.repository';
 import { ConversationRepository } from '../../conversation.repository';
@@ -73,6 +76,8 @@ import type { CardTap, OrderConfirmationService } from '../order-confirmation.se
 const crypto = new CryptoService({
   get: () => Buffer.alloc(32, 7).toString('base64'),
 } as unknown as AppConfig);
+/** Arabic but not Urdu, to show a saved language the env no longer lists reads as `match`. */
+const assistantConfig = { get: () => ['en', 'bn', 'ar'] } as unknown as AppConfig;
 const usage = (purpose: LlmPurpose) => ({
   purpose,
   model: 'fake',
@@ -119,7 +124,9 @@ class FakeLlm implements LlmClient {
     this.calls.push('extract');
     return this.extraction;
   }
-  async phraseReply() {
+  phraseRequests: PhraseRequest[] = [];
+  async phraseReply(request: PhraseRequest) {
+    this.phraseRequests.push(request);
     this.calls.push('phrase');
     return this.phrase;
   }
@@ -226,6 +233,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
       new CustomerPhotoStore(runtime.db, new MessageRepository(), photoStorage, (url) =>
         download(url),
       ),
+      new AssistantSettingsService(runtime.db, new AssistantSettingsRepository(), assistantConfig),
     );
   };
 
@@ -405,6 +413,48 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     expect(handoffs).toEqual([
       { merchantId: t.merchantA, conversationId: convo.id, at: row?.handedOffAt },
     ]);
+  });
+
+  it("phrases in the shop's tone, falling back to its country's language", async () => {
+    const { job } = await thread();
+
+    await service().run(job);
+
+    expect(llm.phraseRequests).toMatchObject([{ tone: 'friendly', language: 'bn' }]);
+  });
+
+  it("phrases in the tone and default language the shop saved, and only that shop's", async () => {
+    await t.db
+      .insert(schema.assistantSettings)
+      .values({ merchantId: t.merchantB, tone: 'formal', defaultLanguage: 'ar', notes: '' });
+    try {
+      await service().run((await thread(t.merchantB)).job);
+      await service().run((await thread(t.merchantA)).job);
+
+      expect(llm.phraseRequests).toMatchObject([
+        { tone: 'formal', language: 'ar' },
+        { tone: 'friendly', language: 'bn' },
+      ]);
+    } finally {
+      await t.db
+        .delete(schema.assistantSettings)
+        .where(eq(schema.assistantSettings.merchantId, t.merchantB));
+    }
+  });
+
+  it("phrases in the country's language when the saved one is no longer supported", async () => {
+    await t.db
+      .insert(schema.assistantSettings)
+      .values({ merchantId: t.merchantB, tone: 'direct', defaultLanguage: 'ur', notes: '' });
+    try {
+      await service().run((await thread(t.merchantB)).job);
+
+      expect(llm.phraseRequests).toMatchObject([{ tone: 'direct', language: 'en' }]);
+    } finally {
+      await t.db
+        .delete(schema.assistantSettings)
+        .where(eq(schema.assistantSettings.merchantId, t.merchantB));
+    }
   });
 
   it('sends the fixed sentence when phrasing fails', async () => {

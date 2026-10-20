@@ -20,6 +20,7 @@ export const settingsKeys = {
   general: () => [...settingsKeys.all, 'general'] as const,
   delivery: () => [...settingsKeys.all, 'delivery'] as const,
   notifications: () => [...settingsKeys.all, 'notifications'] as const,
+  assistant: () => [...settingsKeys.all, 'assistant'] as const,
 };
 
 export const generalSettingsQueryOptions = () =>

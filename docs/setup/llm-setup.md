@@ -32,6 +32,7 @@ in every local `.env` and in Parameter Store before deploying. Update or unset `
 | `LLM_MODEL_EXTRACTION` | The mid-tier model: extracting order details on every mid-flow turn (collecting details or awaiting confirmation), and while browsing when the customer is ordering or editing; product photos in [phase 11.6](../features/11-ai-implementation/phase-6-product-photos/README.md) |
 | `LLM_TIMEOUT_MS`       | A timeout for each call, 15000 by default. A call that exceeds it counts as a failure and the conversation is handed off                                                                                                                                                          |
 | `LLM_API_KEY`          | The provider's API key. A secret                                                                                                                                                                                                                                                  |
+| `ASSISTANT_LANGUAGES`  | The default languages a seller may pick in [Settings – Order assistant](../features/12-settings-assistant/README.md), as ISO 639-1 codes, comma-separated. `en,bn` when unset or blank                                                                                            |
 
 Model IDs change as new models ship; check
 [OpenAI's models page](https://developers.openai.com/api/docs/models) before

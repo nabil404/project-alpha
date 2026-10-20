@@ -62,6 +62,24 @@
       "title": "Unlink {{name}}?"
     }
   },
+  "assistant": {
+    "voice": {
+      "defaultLanguage": "Default language",
+      "description": "The assistant replies in the customer's language and follows your tone.",
+      "matchCustomer": "Match the customer",
+      "notes": "Things the assistant should know",
+      "notesHint": "Short facts it can use when customers ask. Prices and stock come from Products.",
+      "notesPlaceholder": "We don't deliver on Fridays. Custom sizes take 5 extra days.",
+      "saved": "Assistant settings saved.",
+      "title": "How it talks",
+      "tone": "Tone",
+      "tones": {
+        "direct": "Short and direct",
+        "formal": "Formal",
+        "friendly": "Friendly and polite"
+      }
+    }
+  },
   "breadcrumb": {
     "label": "Breadcrumb"
   },

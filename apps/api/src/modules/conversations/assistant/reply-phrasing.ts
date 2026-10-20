@@ -1,4 +1,9 @@
-import { formatPhoneInternational, type SlotName } from '@app/shared';
+import {
+  formatPhoneInternational,
+  MATCH_CUSTOMER,
+  type AssistantSettings,
+  type SlotName,
+} from '@app/shared';
 import type { PhraseRequest } from '../../llm/llm.types';
 import type { ReplyLanguage } from './assistant-fallbacks';
 import type { AskReason, ReplyFacts, ReplyIntent } from './reply-intent';
@@ -46,10 +51,20 @@ function factValues(facts: ReplyFacts): Record<string, unknown> {
     : { ...facts, phone: formatPhoneInternational(facts.phone) };
 }
 
+/** How a phrased reply sounds: the seller's tone, and their default language over the country's. */
+export function phraseVoice(
+  settings: Pick<AssistantSettings, 'tone' | 'defaultLanguage'>,
+  countryLanguage: ReplyLanguage,
+): Pick<PhraseRequest, 'language' | 'tone'> {
+  const language =
+    settings.defaultLanguage === MATCH_CUSTOMER ? countryLanguage : settings.defaultLanguage;
+  return { language, tone: settings.tone };
+}
+
 /** What code decided, as an instruction. Hand-offs and the summary card are never phrased. */
 export function phraseRequestFor(
   reply: Extract<ReplyIntent, { kind: 'ask_slot' }>,
-  language: ReplyLanguage,
+  voice: Pick<PhraseRequest, 'language' | 'tone'>,
 ): PhraseRequest {
   // The item by name, never by number: a number the facts lack would fail checkReply.
   const item =
@@ -65,5 +80,5 @@ export function phraseRequestFor(
     .join(' ')
     .replaceAll('{item}', item)
     .replaceAll('{unavailable}', reply.facts.unavailable ?? '');
-  return { instruction, facts: factValues(reply.facts), language };
+  return { instruction, facts: factValues(reply.facts), ...voice };
 }
