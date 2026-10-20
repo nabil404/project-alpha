@@ -110,5 +110,12 @@ export default tseslint.config(
     files: ['apps/api/load/**/*.js'],
     languageOptions: { globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly' } },
   },
+  {
+    // Plain scripts for the legal pages, served as-is to the browser by Caddy.
+    files: ['static/**/*.js'],
+    languageOptions: {
+      globals: { document: 'readonly', localStorage: 'readonly', matchMedia: 'readonly' },
+    },
+  },
   prettier,
 );

@@ -1,0 +1,162 @@
+/*
+ * The legal pages, styled with the design system's tokens (docs/DESIGN.md).
+ * Caddy serves these files as plain HTML outside the SPA, so the tokens are
+ * copied from apps/web/src/index.css. If the two disagree, index.css wins;
+ * fix this file.
+ */
+
+@font-face {
+  font-family: 'Figtree Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url('/legal/figtree-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f5f2;
+  --surface: #ffffff;
+  --border: #e2e2dc;
+  --ink: #1b1c1e;
+  --ink-muted: #5c5e63;
+  --accent: #1f6b70;
+  --accent-hover: #185a5e;
+  --focus-ring: var(--accent);
+  --link: var(--accent);
+  --elevation-sm: 0 1px 2px rgb(20 21 23 / 0.05);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #131416;
+  --surface: #1b1c1f;
+  --border: #2c2e33;
+  --ink: #ececea;
+  --ink-muted: #a2a4aa;
+  --accent: #7fcacd;
+  --accent-hover: #9ad8da;
+  --focus-ring: var(--accent);
+  --link: var(--accent);
+  --elevation-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+html,
+body {
+  background-color: var(--bg);
+}
+
+body {
+  margin: 0;
+  padding: 48px 16px;
+  color: var(--ink);
+  font-family:
+    'Figtree Variable',
+    Figtree,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 15px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.page {
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.brand {
+  display: inline-block;
+  margin-bottom: 32px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  text-decoration: none;
+}
+
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--elevation-sm);
+  padding: 24px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 38px;
+  letter-spacing: -0.02em;
+}
+
+.effective {
+  margin: 8px 0 32px;
+  color: var(--ink-muted);
+}
+
+h2 {
+  margin: 48px 0 16px;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  margin: 24px 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+p,
+ul,
+ol {
+  margin: 0 0 16px;
+}
+
+ul,
+ol {
+  padding-left: 24px;
+}
+
+li + li {
+  margin-top: 4px;
+}
+
+a {
+  color: var(--link);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+footer {
+  margin-top: 24px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+footer a + a {
+  margin-left: 12px;
+}
+
+@media (min-width: 640px) {
+  body {
+    padding: 48px 32px;
+  }
+}

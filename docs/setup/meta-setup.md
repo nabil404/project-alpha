@@ -85,8 +85,9 @@ their Facebook sign-in identity.
 - The webhook needs a public HTTPS URL, even in development (see
   [step 8](#8-subscribe-the-messenger-webhook)).
 - Caddy serves the privacy, terms and data-deletion pages
-  ([`docker/Caddyfile`](../../docker/Caddyfile)); Meta requires them on both
-  apps before App Review.
+  ([`docker/Caddyfile`](../../docker/Caddyfile)) from `static/`; Meta requires
+  them on both apps before App Review. In development, the Vite dev server
+  serves them at the same paths, for example <http://localhost:5173/privacy>.
 
 ## Steps
 
