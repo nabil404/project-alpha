@@ -7,8 +7,8 @@ webhooks: [Meta setup](../../setup/meta-setup.md).
 - App Review for advanced access — submit by end of Week 4, one screencast per
   permission. Check names against Meta's current docs before submitting:
   - `pages_messaging` — the assistant's replies and the Confirm flow.
-  - `pages_read_engagement` — reading Page posts linked to products, and the
-    post picker.
+  - `pages_read_engagement` — reading Page posts linked to products, the
+    post picker, and importing products from the Page's posts.
   - `pages_read_user_content` — comments, mentions and visitor posts.
   - `pages_manage_engagement` — public replies to comments.
 
