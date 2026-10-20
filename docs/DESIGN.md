@@ -9,6 +9,10 @@ body copy follows, and nothing competes with the seller's orders.
   — every token below is defined there. If this document and `index.css`
   disagree, `index.css` wins; fix this document.
 
+The legal pages in `static/` (privacy, terms, data deletion) are plain HTML
+that Caddy serves outside the SPA. `static/legal.css` copies the tokens they
+use, and the Figtree font file sits next to it.
+
 ## Principles
 
 - **Quiet by default.** One hue, `accent` (a calm teal), used sparingly: the
@@ -42,9 +46,10 @@ today: **Light** (default) and **Dark**.
 ### Adding a theme
 
 1. Add a `[data-theme='<id>']` block to `apps/web/src/index.css` with a value
-   for **every** colour token and both elevation variables.
-2. Add the id to `THEMES` in `apps/web/src/lib/theme.ts` and to the `themes`
-   array in the `index.html` script.
+   for **every** colour token and both elevation variables. Add the same block,
+   with the tokens it uses, to `static/legal.css`.
+2. Add the id to `THEMES` in `apps/web/src/lib/theme.ts`, to the `themes`
+   array in the `index.html` script, and to the one in `static/theme.js`.
 3. Add a `theme.<id>` label to `apps/web/src/i18n/locales/en/common.json` and
    to `themeLabelKeys` in `ThemeSelect.tsx`.
 4. Check the contrast pairs below in the new theme before shipping.

@@ -43,6 +43,8 @@ feature page because no code exists yet:
 - **Overview page**: `/` redirects to `/orders` until it exists.
 - **Privacy policy, terms and data deletion** that Meta requires.
   `docker/Caddyfile` routes `/privacy`, `/terms` and `/data-deletion` to
-  `/legal/*.html`, served from `static/`, but those pages hold only a
-  placeholder, and there is no data deletion callback endpoint. The sign-up form links to `/terms` and
+  `/legal/*.html`, served from `static/`. The pages are written, but the
+  operator's legal name, contact email, postal address and country are still
+  `[PLACEHOLDER]`s, and there is no data deletion callback endpoint: deletion
+  is by email request. The sign-up form links to `/terms` and
   `/privacy` ([Auth](01-auth/README.md#not-yet-built)).

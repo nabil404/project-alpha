@@ -1,13 +1,59 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { readFile } from 'node:fs/promises';
+import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+
+const legalDir = fileURLToPath(new URL('../../static', import.meta.url));
+const legalPages: Record<string, string> = {
+  '/privacy': 'privacy.html',
+  '/terms': 'terms.html',
+  '/data-deletion': 'data-deletion.html',
+};
+const legalTypes: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
+};
+
+// Mirrors the legal-page routes in docker/Caddyfile, so /privacy, /terms and
+// /data-deletion (and their /legal/* assets) work on the dev server too.
+function legalPagesInDev(): Plugin {
+  return {
+    name: 'legal-pages-in-dev',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+        const name = legalPages[path] ?? (path.startsWith('/legal/') ? path.slice(7) : null);
+        const file = name ? resolve(legalDir, name) : null;
+        const type = file ? legalTypes[extname(file)] : undefined;
+        if (!file || !type || !file.startsWith(legalDir + sep)) return next();
+        try {
+          const body = await readFile(file);
+          res.setHeader('Content-Type', type);
+          res.end(body);
+        } catch {
+          next();
+        }
+      });
+    },
+  };
+}
 
 export default defineConfig({
   // The router plugin must come before react(): it writes src/routeTree.gen.ts
   // from the files in src/routes and splits each route into its own chunk.
-  plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
+  plugins: [
+    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+    legalPagesInDev(),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
