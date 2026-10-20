@@ -18,6 +18,7 @@ feature's page in the same change as its code.
 | 09  | [Settings – Delivery charges](09-settings-delivery/README.md)   | Built; the assistant quotes the fee                                                          |
 | 10  | [Settings – Notifications](10-settings-notifications/README.md) | Built; the assistant reports drafted orders and hand-offs                                    |
 | 11  | [AI implementation](11-ai-implementation/README.md)             | Phases 1–6 built (the turn, Confirm, entry points, non-text, posts, photos); 7–9 not started |
+| 12  | [Settings – Order assistant](12-settings-assistant/README.md)   | Tone, default language and notes, API and page; the assistant uses tone and language         |
 
 ## Each page
 

@@ -1,4 +1,4 @@
-import type { ExtractedOrder, IntentResult, PhotoMatch } from '@app/shared';
+import type { AssistantTone, ExtractedOrder, IntentResult, PhotoMatch } from '@app/shared';
 
 /** What each call was for; one row per call in llm_call. */
 export const LLM_PURPOSES = ['classify', 'extract', 'phrase', 'vision_match'] as const;
@@ -35,8 +35,10 @@ export interface ChatLine {
 export interface PhraseRequest {
   instruction: string;
   facts: Record<string, unknown>;
-  /** Used when the customer's own language is unclear. */
-  language: 'bn' | 'en';
+  /** ISO 639-1; used when the customer's own language is unclear. */
+  language: string;
+  /** The seller's choice in Settings > Order assistant. */
+  tone: AssistantTone;
 }
 
 /**

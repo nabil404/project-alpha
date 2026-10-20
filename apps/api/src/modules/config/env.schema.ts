@@ -67,6 +67,25 @@ const envObject = z.object({
   /** The EU region is https://eu.api.smith.langchain.com. */
   LANGSMITH_ENDPOINT: z.string().url().default('https://api.smith.langchain.com'),
 
+  /**
+   * The languages a seller may pick as the assistant's default, as ISO 639-1
+   * codes, comma-separated. A shop that saved one later removed replies as if
+   * it had picked "Match the customer".
+   */
+  ASSISTANT_LANGUAGES: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .default('en,bn')
+      .transform((value) => value.split(',').map((code) => code.trim()))
+      .pipe(
+        z
+          .array(z.string().regex(/^[a-z]{2}$/, 'ISO 639-1 codes, e.g. en,bn'))
+          .min(1)
+          .refine((codes) => new Set(codes).size === codes.length, 'each code once'),
+      ),
+  ),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   SENTRY_DSN: optional(z.string().url()),
 });

@@ -14,3 +14,5 @@ export {
   useUpdateNotificationSettings,
 } from './notification-queries';
 export { NotificationsCard } from './components/NotificationsCard';
+export { assistantSettingsQueryOptions, useUpdateAssistantSettings } from './assistant-queries';
+export { AssistantVoiceCard } from './components/AssistantVoiceCard';

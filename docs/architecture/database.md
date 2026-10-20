@@ -104,6 +104,7 @@ row from a non-superuser owner, and such a backfill would silently do nothing.
 | `notification_preference`                                                            | yes            | yes         | yes        | `notification_preference_merchant_isolation`                      |
 | `merchant_settings`                                                                  | yes            | yes         | yes        | `merchant_settings_merchant_isolation`                            |
 | `llm_call`                                                                           | yes            | yes         | yes        | `llm_call_merchant_isolation`                                     |
+| `assistant_settings`                                                                 | yes            | yes         | yes        | `assistant_settings_merchant_isolation`                           |
 | `ad_product_merchant_isolation`                                                      | `ad_product`   | `ALL`       | `public`   | same                                                              | same | Confines click-to-Messenger ads and the products they map to the current merchant. |
 | `product_post_merchant_isolation`                                                    | `product_post` | `ALL`       | `public`   | same                                                              | same | Confines Facebook posts linked or suggested for products to the current merchant.  |
 | `ad_product`                                                                         | yes            | yes         | yes        | `ad_product_merchant_isolation`                                   |
@@ -142,6 +143,7 @@ merchant. With no context set, both evaluate to `NULL` and nothing matches.
 | `notification_preference_merchant_isolation`      | `notification_preference`      | `ALL`    | `public`            | same                                   | same                                   | Confines each person's notification switches for a shop to that shop.                                                                           |
 | `merchant_settings_merchant_isolation`            | `merchant_settings`            | `ALL`    | `public`            | same                                   | same                                   | Confines the shop's region, contact details and free-delivery threshold to the current merchant.                                                |
 | `llm_call_merchant_isolation`                     | `llm_call`                     | `ALL`    | `public`            | same                                   | same                                   | Confines the assistant's LLM call log (model, tokens, latency, outcome) to the current merchant.                                                |
+| `assistant_settings_merchant_isolation`           | `assistant_settings`           | `ALL`    | `public`            | same                                   | same                                   | Confines the shop's assistant tone, default language and notes to the current merchant.                                                         |
 
 ## Triggers
 
@@ -193,48 +195,51 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 
 ## Check constraints
 
-| Constraint                                | Table                     | Rule                                                                                                                       |
-| ----------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `product_status_ck`                       | `product`                 | `status` in `draft`, `active`, `archived`.                                                                                 |
-| `product_revision_ck`                     | `product`                 | `revision >= 0`. `revision` is bumped by every write to the product's document and is its `version` on the wire.           |
-| `product_variant_price_ck`                | `product_variant`         | `price >= 0` (minor units).                                                                                                |
-| `product_variant_stock_ck`                | `product_variant`         | `stock >= 0`.                                                                                                              |
-| `product_variant_reserved_ck`             | `product_variant`         | `reserved >= 0`.                                                                                                           |
-| `product_variant_reserved_stock_ck`       | `product_variant`         | `reserved <= stock`: open orders never hold more than is on hand.                                                          |
-| `product_variant_default_unnamed_ck`      | `product_variant`         | `is_default` exactly when `name` is null: the default variant is the unnamed one.                                          |
-| `product_option_position_ck`              | `product_option`          | `position >= 0`.                                                                                                           |
-| `product_option_value_position_ck`        | `product_option_value`    | `position >= 0`.                                                                                                           |
-| `conversation_state_ck`                   | `conversation`            | `state` in `browsing`, `collecting_details`, `awaiting_confirmation`, `confirmed`, `handed_off`, `abandoned`.              |
-| `conversation_last_sender_ck`             | `conversation`            | `last_message_sender` in `customer`, `assistant`, `seller`.                                                                |
-| `conversation_last_kind_ck`               | `conversation`            | `last_message_kind` in the `message_kind_ck` list.                                                                         |
-| `conversation_entry_source_ck`            | `conversation`            | `entry_source` in `ad`, `link`, `get_started`, `organic`.                                                                  |
-| `message_sender_ck`                       | `message`                 | `sender` in `customer`, `assistant`, `seller`.                                                                             |
-| `message_status_ck`                       | `message`                 | `status` in `sending`, `sent`, `failed`.                                                                                   |
-| `message_kind_ck`                         | `message`                 | `kind` in `text`, `sticker`, `reaction`, `location`, `image`, `video`, `audio`, `file`, `share`, `other`.                  |
-| `order_status_ck`                         | `order`                   | `status` in `new`, `confirmed`, `packed`, `shipped`, `delivered`, `returned`, `cancelled`.                                 |
-| `order_source_ck`                         | `order`                   | `source` in `assistant`, `seller`.                                                                                         |
-| `order_entry_source_ck`                   | `order`                   | `entry_source` in `ad`, `link`, `get_started`, `organic`; null for an order the seller adds.                               |
-| `order_payment_status_ck`                 | `order`                   | `payment_status` in `unpaid`, `paid`, `refunded`.                                                                          |
-| `order_payment_method_ck`                 | `order`                   | `payment_method` in `cash_on_delivery`, `bank_transfer`, `mobile_wallet`.                                                  |
-| `order_currency_ck`                       | `order`                   | `currency` is three upper-case letters (ISO 4217 shape), copied from the shop's settings when the order is placed.         |
-| `order_revision_ck`                       | `order`                   | `revision >= 0`. Bumped by every write to the order; its `version` on the wire, as for products.                           |
-| `order_number_ck`                         | `order`                   | `number > 0`. `UNIQUE (merchant_id, year, number)`: each shop numbers from 1 each year; `UNIQUE (merchant_id, reference)`. |
-| `order_amounts_ck`                        | `order`                   | `subtotal >= 0`, `delivery_fee >= 0`, `total = subtotal + delivery_fee` (minor units).                                     |
-| `order_item_quantity_ck`                  | `order_item`              | `quantity > 0`.                                                                                                            |
-| `order_item_unit_price_ck`                | `order_item`              | `unit_price >= 0` (minor units).                                                                                           |
-| `order_event_type_ck`                     | `order_event`             | `type` in `created`, `status_changed`, `items_changed`, `delivery_changed`, `payment_changed`, `tracking_changed`.         |
-| `order_event_data_type_ck`                | `order_event`             | `data ->> 'type' = type`: the jsonb payload's discriminator matches the column (parsed with Zod on read).                  |
-| `delivery_charge_area_name_ck`            | `delivery_charge`         | `(area_name is null) = is_fallback`: only the everywhere-else row has no name.                                             |
-| `delivery_charge_charge_ck`               | `delivery_charge`         | `charge >= 0` (minor units).                                                                                               |
-| `product_delivery_charge_charge_ck`       | `product_delivery_charge` | `charge >= 0` (minor units).                                                                                               |
-| `merchant_settings_country_ck`            | `merchant_settings`       | `country` is two upper-case letters (ISO 3166 shape). `@app/shared` decides which codes exist.                             |
-| `merchant_settings_currency_ck`           | `merchant_settings`       | `currency` is three upper-case letters (ISO 4217 shape).                                                                   |
-| `merchant_settings_date_format_ck`        | `merchant_settings`       | `date_format` is one of the six `DATE_FORMATS` patterns.                                                                   |
-| `merchant_settings_contact_phone_ck`      | `merchant_settings`       | `contact_phone` is E.164: `+`, then 7 to 15 digits, not starting with 0.                                                   |
-| `merchant_settings_free_delivery_over_ck` | `merchant_settings`       | `free_delivery_over >= 0` (minor units); null always charges.                                                              |
-| `llm_call_purpose_ck`                     | `llm_call`                | `purpose` in `classify`, `extract`, `phrase`, `vision_match` (migration `0045`).                                           |
-| `llm_call_outcome_ck`                     | `llm_call`                | `outcome` in `ok`, `timeout`, `provider_error`, `invalid_output`.                                                          |
-| `product_post_status_ck`                  | `product_post`            | `status` in `linked`, `suggested`.                                                                                         |
+| Constraint                                | Table                     | Rule                                                                                                                                            |
+| ----------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `product_status_ck`                       | `product`                 | `status` in `draft`, `active`, `archived`.                                                                                                      |
+| `product_revision_ck`                     | `product`                 | `revision >= 0`. `revision` is bumped by every write to the product's document and is its `version` on the wire.                                |
+| `product_variant_price_ck`                | `product_variant`         | `price >= 0` (minor units).                                                                                                                     |
+| `product_variant_stock_ck`                | `product_variant`         | `stock >= 0`.                                                                                                                                   |
+| `product_variant_reserved_ck`             | `product_variant`         | `reserved >= 0`.                                                                                                                                |
+| `product_variant_reserved_stock_ck`       | `product_variant`         | `reserved <= stock`: open orders never hold more than is on hand.                                                                               |
+| `product_variant_default_unnamed_ck`      | `product_variant`         | `is_default` exactly when `name` is null: the default variant is the unnamed one.                                                               |
+| `product_option_position_ck`              | `product_option`          | `position >= 0`.                                                                                                                                |
+| `product_option_value_position_ck`        | `product_option_value`    | `position >= 0`.                                                                                                                                |
+| `conversation_state_ck`                   | `conversation`            | `state` in `browsing`, `collecting_details`, `awaiting_confirmation`, `confirmed`, `handed_off`, `abandoned`.                                   |
+| `conversation_last_sender_ck`             | `conversation`            | `last_message_sender` in `customer`, `assistant`, `seller`.                                                                                     |
+| `conversation_last_kind_ck`               | `conversation`            | `last_message_kind` in the `message_kind_ck` list.                                                                                              |
+| `conversation_entry_source_ck`            | `conversation`            | `entry_source` in `ad`, `link`, `get_started`, `organic`.                                                                                       |
+| `message_sender_ck`                       | `message`                 | `sender` in `customer`, `assistant`, `seller`.                                                                                                  |
+| `message_status_ck`                       | `message`                 | `status` in `sending`, `sent`, `failed`.                                                                                                        |
+| `message_kind_ck`                         | `message`                 | `kind` in `text`, `sticker`, `reaction`, `location`, `image`, `video`, `audio`, `file`, `share`, `other`.                                       |
+| `order_status_ck`                         | `order`                   | `status` in `new`, `confirmed`, `packed`, `shipped`, `delivered`, `returned`, `cancelled`.                                                      |
+| `order_source_ck`                         | `order`                   | `source` in `assistant`, `seller`.                                                                                                              |
+| `order_entry_source_ck`                   | `order`                   | `entry_source` in `ad`, `link`, `get_started`, `organic`; null for an order the seller adds.                                                    |
+| `order_payment_status_ck`                 | `order`                   | `payment_status` in `unpaid`, `paid`, `refunded`.                                                                                               |
+| `order_payment_method_ck`                 | `order`                   | `payment_method` in `cash_on_delivery`, `bank_transfer`, `mobile_wallet`.                                                                       |
+| `order_currency_ck`                       | `order`                   | `currency` is three upper-case letters (ISO 4217 shape), copied from the shop's settings when the order is placed.                              |
+| `order_revision_ck`                       | `order`                   | `revision >= 0`. Bumped by every write to the order; its `version` on the wire, as for products.                                                |
+| `order_number_ck`                         | `order`                   | `number > 0`. `UNIQUE (merchant_id, year, number)`: each shop numbers from 1 each year; `UNIQUE (merchant_id, reference)`.                      |
+| `order_amounts_ck`                        | `order`                   | `subtotal >= 0`, `delivery_fee >= 0`, `total = subtotal + delivery_fee` (minor units).                                                          |
+| `order_item_quantity_ck`                  | `order_item`              | `quantity > 0`.                                                                                                                                 |
+| `order_item_unit_price_ck`                | `order_item`              | `unit_price >= 0` (minor units).                                                                                                                |
+| `order_event_type_ck`                     | `order_event`             | `type` in `created`, `status_changed`, `items_changed`, `delivery_changed`, `payment_changed`, `tracking_changed`.                              |
+| `order_event_data_type_ck`                | `order_event`             | `data ->> 'type' = type`: the jsonb payload's discriminator matches the column (parsed with Zod on read).                                       |
+| `delivery_charge_area_name_ck`            | `delivery_charge`         | `(area_name is null) = is_fallback`: only the everywhere-else row has no name.                                                                  |
+| `delivery_charge_charge_ck`               | `delivery_charge`         | `charge >= 0` (minor units).                                                                                                                    |
+| `product_delivery_charge_charge_ck`       | `product_delivery_charge` | `charge >= 0` (minor units).                                                                                                                    |
+| `merchant_settings_country_ck`            | `merchant_settings`       | `country` is two upper-case letters (ISO 3166 shape). `@app/shared` decides which codes exist.                                                  |
+| `merchant_settings_currency_ck`           | `merchant_settings`       | `currency` is three upper-case letters (ISO 4217 shape).                                                                                        |
+| `merchant_settings_date_format_ck`        | `merchant_settings`       | `date_format` is one of the six `DATE_FORMATS` patterns.                                                                                        |
+| `merchant_settings_contact_phone_ck`      | `merchant_settings`       | `contact_phone` is E.164: `+`, then 7 to 15 digits, not starting with 0.                                                                        |
+| `merchant_settings_free_delivery_over_ck` | `merchant_settings`       | `free_delivery_over >= 0` (minor units); null always charges.                                                                                   |
+| `llm_call_purpose_ck`                     | `llm_call`                | `purpose` in `classify`, `extract`, `phrase`, `vision_match` (migration `0045`).                                                                |
+| `llm_call_outcome_ck`                     | `llm_call`                | `outcome` in `ok`, `timeout`, `provider_error`, `invalid_output`.                                                                               |
+| `product_post_status_ck`                  | `product_post`            | `status` in `linked`, `suggested`.                                                                                                              |
+| `assistant_settings_tone_ck`              | `assistant_settings`      | `tone` in `friendly`, `direct`, `formal`.                                                                                                       |
+| `assistant_settings_default_language_ck`  | `assistant_settings`      | `default_language` is `match` or two lower-case letters (ISO 639-1 shape, migration `0048`). `ASSISTANT_LANGUAGES` decides which are supported. |
+| `assistant_settings_notes_ck`             | `assistant_settings`      | `char_length(notes) <= 1000`.                                                                                                                   |
 
 ## Partial and special indexes
 

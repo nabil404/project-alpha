@@ -31,6 +31,25 @@ describe('validateEnv', () => {
     expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
   });
 
+  it("reads the assistant's languages as a list, defaulting when unset or blank", () => {
+    expect(validateEnv({ ...base, ASSISTANT_LANGUAGES: 'en, bn,ur' }).ASSISTANT_LANGUAGES).toEqual([
+      'en',
+      'bn',
+      'ur',
+    ]);
+    expect(validateEnv(base).ASSISTANT_LANGUAGES).toEqual(['en', 'bn']);
+    expect(validateEnv({ ...base, ASSISTANT_LANGUAGES: '' }).ASSISTANT_LANGUAGES).toEqual([
+      'en',
+      'bn',
+    ]);
+  });
+
+  it.each([['English'], ['en,en'], ['en,']])('rejects ASSISTANT_LANGUAGES=%s', (value) => {
+    expect(() => validateEnv({ ...base, ASSISTANT_LANGUAGES: value })).toThrow(
+      /ASSISTANT_LANGUAGES/,
+    );
+  });
+
   it('rejects an encryption key that is not 32 bytes', () => {
     expect(() => validateEnv({ ...base, TOKEN_ENCRYPTION_KEY: 'c2hvcnQ=' })).toThrow(
       /TOKEN_ENCRYPTION_KEY/,

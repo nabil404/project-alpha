@@ -28,6 +28,7 @@ import { Route as AppOrdersIndexRouteImport } from './routes/_app/orders/index'
 import { Route as AppOrdersOrderIdRouteImport } from './routes/_app/orders/$orderId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings/account'
+import { Route as AppSettingsAssistantRouteImport } from './routes/_app/settings/assistant'
 import { Route as AppSettingsDeliveryRouteImport } from './routes/_app/settings/delivery'
 import { Route as AppSettingsGeneralRouteImport } from './routes/_app/settings/general'
 import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
@@ -130,6 +131,11 @@ const AppSettingsAccountRoute = AppSettingsAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsAssistantRoute = AppSettingsAssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsDeliveryRoute = AppSettingsDeliveryRouteImport.update({
   id: '/delivery',
   path: '/delivery',
@@ -182,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
+  '/settings/assistant': typeof AppSettingsAssistantRoute
   '/settings/delivery': typeof AppSettingsDeliveryRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByTo {
   '/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/settings/account': typeof AppSettingsAccountRoute
+  '/settings/assistant': typeof AppSettingsAssistantRoute
   '/settings/delivery': typeof AppSettingsDeliveryRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/messenger': typeof AppSettingsMessengerRoute
@@ -235,6 +243,7 @@ export interface FileRoutesById {
   '/_app/customers/$customerId': typeof AppCustomersCustomerIdRoute
   '/_app/orders/$orderId': typeof AppOrdersOrderIdRoute
   '/_app/settings/account': typeof AppSettingsAccountRoute
+  '/_app/settings/assistant': typeof AppSettingsAssistantRoute
   '/_app/settings/delivery': typeof AppSettingsDeliveryRoute
   '/_app/settings/general': typeof AppSettingsGeneralRoute
   '/_app/settings/messenger': typeof AppSettingsMessengerRoute
@@ -263,6 +272,7 @@ export interface FileRouteTypes {
     | '/customers/$customerId'
     | '/orders/$orderId'
     | '/settings/account'
+    | '/settings/assistant'
     | '/settings/delivery'
     | '/settings/general'
     | '/settings/messenger'
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/customers/$customerId'
     | '/orders/$orderId'
     | '/settings/account'
+    | '/settings/assistant'
     | '/settings/delivery'
     | '/settings/general'
     | '/settings/messenger'
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/_app/customers/$customerId'
     | '/_app/orders/$orderId'
     | '/_app/settings/account'
+    | '/_app/settings/assistant'
     | '/_app/settings/delivery'
     | '/_app/settings/general'
     | '/_app/settings/messenger'
@@ -469,6 +481,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsAccountRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/assistant': {
+      id: '/_app/settings/assistant'
+      path: '/assistant'
+      fullPath: '/settings/assistant'
+      preLoaderRoute: typeof AppSettingsAssistantRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/delivery': {
       id: '/_app/settings/delivery'
       path: '/delivery'
@@ -539,6 +558,7 @@ const AppConversationsRouteWithChildren =
 
 interface AppSettingsRouteChildren {
   AppSettingsAccountRoute: typeof AppSettingsAccountRoute
+  AppSettingsAssistantRoute: typeof AppSettingsAssistantRoute
   AppSettingsDeliveryRoute: typeof AppSettingsDeliveryRoute
   AppSettingsGeneralRoute: typeof AppSettingsGeneralRoute
   AppSettingsMessengerRoute: typeof AppSettingsMessengerRoute
@@ -548,6 +568,7 @@ interface AppSettingsRouteChildren {
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsAccountRoute: AppSettingsAccountRoute,
+  AppSettingsAssistantRoute: AppSettingsAssistantRoute,
   AppSettingsDeliveryRoute: AppSettingsDeliveryRoute,
   AppSettingsGeneralRoute: AppSettingsGeneralRoute,
   AppSettingsMessengerRoute: AppSettingsMessengerRoute,

@@ -12,6 +12,7 @@ import {
   DeliveryChargesRepository,
   type DeliveryChargeRow,
 } from '../../settings/delivery-charges.repository';
+import { AssistantSettingsService } from '../../settings/assistant-settings.service';
 import { defaultMerchantSettings } from '../../settings/general-settings.service';
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
@@ -23,6 +24,7 @@ import {
   type LlmCallRecord,
   type LlmClient,
   type LlmResult,
+  type PhraseRequest,
 } from '../../llm/llm.types';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
 import {
@@ -64,7 +66,7 @@ import { checkReply } from './reply-check';
 import type { LastOrderFacts, ReplyIntent } from './reply-intent';
 import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmation.service';
 import { outgoingFor } from './outgoing';
-import { phraseRequestFor } from './reply-phrasing';
+import { phraseRequestFor, phraseVoice } from './reply-phrasing';
 import { askedAt, turnGate, type TurnGate } from './turn-gate';
 import { decideNonText } from './non-text-turn';
 import {
@@ -119,6 +121,7 @@ export class AssistantTurnService {
     private readonly sharedPosts: SharedPostResolver,
     private readonly productPosts: ProductPostRepository,
     private readonly photos: CustomerPhotoStore,
+    private readonly assistantSettings: AssistantSettingsService,
   ) {}
 
   async run({
@@ -146,6 +149,7 @@ export class AssistantTurnService {
         recent,
         page: await this.pages.findForMerchant(tx, scope),
         country: settings.country,
+        assistant: await this.assistantSettings.read(tx, scope),
         delivery: deliveryView(await this.deliveryCharges.list(tx, scope), settings),
       };
     });
@@ -259,7 +263,13 @@ export class AssistantTurnService {
       phrased = true;
     }
     const text = phrased
-      ? await this.words(decision.reply, history, language, calls)
+      ? await this.words(
+          decision.reply,
+          history,
+          language,
+          phraseVoice(read.assistant, language),
+          calls,
+        )
       : fallbackText(decision.reply, language);
     const outgoing = outgoingFor(decision.reply, text, { language, conversationId });
 
@@ -469,12 +479,13 @@ export class AssistantTurnService {
     reply: ReplyIntent,
     history: ChatLine[],
     language: ReplyLanguage,
+    voice: Pick<PhraseRequest, 'language' | 'tone'>,
     calls: LlmCallRecord[],
   ): Promise<string> {
     const fallback = fallbackText(reply, language);
     if (reply.kind !== 'ask_slot' || reply.offeredName !== undefined || !this.llm) return fallback;
     const phrased = record(
-      await this.llm.phraseReply(phraseRequestFor(reply, language), history.slice(-PHRASE_HISTORY)),
+      await this.llm.phraseReply(phraseRequestFor(reply, voice), history.slice(-PHRASE_HISTORY)),
       calls,
     );
     return phrased !== 'failed' && checkReply(phrased, reply.facts).ok ? phrased.trim() : fallback;

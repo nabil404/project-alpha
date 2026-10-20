@@ -102,7 +102,12 @@ describe('AiSdkLlmClient', () => {
 
   it('phrases with the routing model and trims the text', async () => {
     const result = await client('  Which colour would you like?  ').phraseReply(
-      { instruction: 'Ask which colour.', facts: { productName: 'Red saree' }, language: 'en' },
+      {
+        instruction: 'Ask which colour.',
+        facts: { productName: 'Red saree' },
+        language: 'en',
+        tone: 'friendly',
+      },
       history,
     );
     expect(result).toMatchObject({
@@ -166,7 +171,10 @@ describe('AiSdkLlmClient', () => {
     const traced = client(INTENT, ORDER, 2_000, telemetry);
     await traced.classifyIntent(history);
     await traced.extractOrder(history, { items: [] });
-    await traced.phraseReply({ instruction: 'greet', facts: {}, language: 'en' }, history);
+    await traced.phraseReply(
+      { instruction: 'greet', facts: {}, language: 'en', tone: 'friendly' },
+      history,
+    );
     expect(telemetry.seen).toEqual(['classify', 'extract', 'phrase']);
   });
 

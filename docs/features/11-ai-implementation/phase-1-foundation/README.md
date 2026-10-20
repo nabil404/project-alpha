@@ -92,8 +92,10 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
 - **Code decides, the LLM phrases.** `decideTurn` returns a typed intent, not
   text: `ask_slot`, `summary` or `handoff`. Phase 1 asked product, quantity,
   name, phone, address; phase 2 added `variant` after product.
-  `phraseReply` (routing model) writes the intent in the customer's language
-  and tone. `checkReply(text, facts)` then requires every number in the reply
+  `phraseReply` (routing model) writes the intent in the customer's language,
+  in the tone the seller picked, falling back to the seller's default
+  language when the customer's is unclear
+  ([Settings – Order assistant](../../12-settings-assistant/README.md)). `checkReply(text, facts)` then requires every number in the reply
   (prices, quantities, phone digits, Bangla digits normalised) to appear in
   `facts`, caps it at 500 graphemes, and rejects URLs. If phrasing fails,
   times out or fails the check, the intent's fixed sentence goes instead.

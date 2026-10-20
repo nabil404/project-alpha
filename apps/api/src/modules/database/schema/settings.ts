@@ -90,3 +90,36 @@ export const notificationPreference = pgTable(
 );
 
 export type NotificationPreferenceRow = typeof notificationPreference.$inferSelect;
+
+/** A literal copy of @app/shared's ASSISTANT_TONES; reply-phrasing.spec keeps them equal. */
+export const ASSISTANT_TONE_VALUES = ['friendly', 'direct', 'formal'] as const;
+
+/**
+ * Settings > Order assistant, one row per shop, written on first save: until
+ * then the shop reads as @app/shared's ASSISTANT_SETTINGS_DEFAULTS, which the
+ * repository also writes, so the columns carry no defaults of their own.
+ */
+export const assistantSettings = pgTable(
+  'assistant_settings',
+  {
+    merchantId: merchantId().primaryKey(),
+    tone: text('tone', { enum: ASSISTANT_TONE_VALUES }).notNull(),
+    /** `match`, or an ISO 639-1 code; ASSISTANT_LANGUAGES decides which are supported. */
+    defaultLanguage: text('default_language').notNull(),
+    /** The seller's own facts for customers; never prices or stock. */
+    notes: text('notes').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check('assistant_settings_tone_ck', oneOf(t.tone, ASSISTANT_TONE_VALUES)),
+    check(
+      'assistant_settings_default_language_ck',
+      sql`${t.defaultLanguage} ~ '^([a-z]{2}|match)$'`,
+    ),
+    check('assistant_settings_notes_ck', sql`char_length(${t.notes}) <= 1000`),
+    merchantIsolation('assistant_settings_merchant_isolation', t.merchantId),
+  ],
+);
+
+export type AssistantSettingsRow = typeof assistantSettings.$inferSelect;

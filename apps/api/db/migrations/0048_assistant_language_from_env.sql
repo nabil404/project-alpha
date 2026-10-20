@@ -1,0 +1,2 @@
+ALTER TABLE "assistant_settings" DROP CONSTRAINT "assistant_settings_default_language_ck";--> statement-breakpoint
+ALTER TABLE "assistant_settings" ADD CONSTRAINT "assistant_settings_default_language_ck" CHECK ("assistant_settings"."default_language" ~ '^([a-z]{2}|match)$');
