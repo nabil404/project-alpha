@@ -1,5 +1,5 @@
 {
-  "id": "478c80e1-8e85-4d75-bf58-53075756479b",
+  "id": "e5d6a3d9-0740-421c-8c61-815b03488040",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -576,6 +576,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

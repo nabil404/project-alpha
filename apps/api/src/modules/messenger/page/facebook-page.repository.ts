@@ -113,7 +113,7 @@ export class FacebookPageRepository {
   /**
    * Every shop with a connected Page, for worker jobs that run without a
    * merchant context. facebook_page is under forced RLS, so this goes through
-   * the app_connected_merchants() SECURITY DEFINER function (migration 0040),
+   * the app_connected_merchants() SECURITY DEFINER function (migration 0013),
    * which returns merchant ids only.
    */
   async listConnectedMerchantIds(executor: Executor): Promise<string[]> {

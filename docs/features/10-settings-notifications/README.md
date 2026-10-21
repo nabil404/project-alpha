@@ -103,12 +103,11 @@ thumb when on.
 `new_order`, `customer_waiting`, `daily_summary` and `import_finished`.
 `user_id` cascades from `user`. The columns have no defaults, because the
 repository writes `NOTIFICATION_DEFAULTS` itself; `import_finished` defaults
-to `true` only so migration `0049_product_import` could add it to existing
-rows. Migrations `0028_settings_notifications` and
-`0029_notification_preference_force_rls` create the table. The customer-waiting
+to `true` only because it was once added to existing rows. Migration
+`0020_notification_preference` creates the table, and
+`0024_settings_force_rls` forces RLS on it. The customer-waiting
 email also reads `conversation.handed_off_at`
-([Conversations](../04-conversations/README.md#data-model)), from
-`0030_conversation_handed_off_at`. See
+([Conversations](../04-conversations/README.md#data-model)). See
 [database.md](../../architecture/database.md).
 
 ## Code and tests

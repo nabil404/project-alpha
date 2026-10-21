@@ -38,7 +38,7 @@ export const customer = pgTable(
   (t) => [
     unique('customer_merchant_id_uq').on(t.merchantId, t.id),
     unique(CUSTOMER_PSID_UQ).on(t.merchantId, t.psid),
-    // Search by name; the pg_trgm operator class comes from migration 0009.
+    // Search by name; the pg_trgm operator class comes from migration 0011.
     index('customer_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
     merchantIsolation('customer_merchant_isolation', t.merchantId),
   ],

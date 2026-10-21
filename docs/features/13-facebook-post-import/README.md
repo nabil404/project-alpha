@@ -429,13 +429,9 @@ checked Oct 21, 2026):
 ## Data model
 
 [`schema/imports.ts`](../../../apps/api/src/modules/database/schema/imports.ts),
-migration `0049_product_import`. Both tables carry `merchant_id`, the
-isolation policy, and `FORCE ROW LEVEL SECURITY` (migration
-`0050_product_import_force_rls`), and pass `db:verify-rls`. Migrations
-`0051` to `0056` replaced a free-text `reason` column with the finer
-`result` values, `note` and `limits_applied`. `0052_import_post_reason_codes`
-and `0055_import_post_results_from_reasons` are hand-written data moves that
-convert older rows. `0057_import_post_anyway_status` adds `anyway_status`.
+migrations `0029_product_import` and `0030_product_import_post`. Both tables
+carry `merchant_id`, the isolation policy, and `FORCE ROW LEVEL SECURITY`
+(migration `0032_imports_force_rls`), and pass `db:verify-rls`.
 
 | Table                 | Key columns                                                                                                                                                                                                                                                                                                                                                | Constraints                                                                                                                                                                                                            |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

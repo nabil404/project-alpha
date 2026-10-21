@@ -152,15 +152,15 @@ strings.
 ## Data model
 
 [`orders.ts`](../../../apps/api/src/modules/database/schema/orders.ts).
-Migrations `0020` and `0021` create the tables, and `0022`–`0025` moved the
-number to a yearly sequence, renumbering existing orders within their year by
-`placed_at`. Each table has RLS enabled and forced with a
+Migrations `0025_order`, `0026_order_item` and `0027_order_event` create the
+tables, and `0028_orders_force_rls` forces RLS on them. Order numbers restart
+each calendar year. Each table has RLS enabled and forced with a
 `*_merchant_isolation` policy, and references its parent by
 `(merchant_id, id)`.
 
 - `order`: `year`, `number` (`UNIQUE (merchant_id, year, number)`),
   `reference` (unique per shop), `customer_id`, `conversation_id` (nullable),
-  `source`, `entry_source` (null for a seller's order; migration `0038`),
+  `source`, `entry_source` (null for a seller's order),
   `status`, `payment_status`, `payment_method`, `subtotal`,
   `delivery_fee`, `total`, `currency`, the delivery copy (`customer_name`,
   `phone`, `delivery_address`, `delivery_area`, `delivery_everywhere_else`,
@@ -169,10 +169,9 @@ number to a yearly sequence, renumbering existing orders within their year by
   `placed_at`.
   - `delivery_charge_id` references `delivery_charge` with
     `ON DELETE SET NULL (delivery_charge_id)`, written by hand in migration
-    `0027`.
+    `0028_orders_force_rls`.
   - Indexes on `(merchant_id, placed_at DESC, id)`, with `status`,
-    `customer_id` or `conversation_id` after `merchant_id` (the last from
-    migration `0035`, for a chat's latest order), and on
+    `customer_id` or `conversation_id` after `merchant_id` (the last for a chat's latest order), and on
     `(merchant_id, delivery_charge_id)`.
 - `order_item`: `order_id` (cascades), `product_id` and `variant_id` with no
   `ON DELETE` action (null only on lines written before the keys), copies of
