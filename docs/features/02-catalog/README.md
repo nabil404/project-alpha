@@ -53,7 +53,7 @@ another merchant's `product_id` or `category_id` fail in the database.
 - `product_variant.image_id` and `product.cover_image_id` reference
   `product_image (merchant_id, id)` `ON DELETE SET NULL (<column>)`. drizzle-kit
   cannot express the column list, and a plain composite `SET NULL` would null
-  `merchant_id` too, so these keys are in custom migrations `0006` and `0014`.
+  `merchant_id` too, so these keys are in custom migration `0010_catalog_force_rls`.
 - `FORCE ROW LEVEL SECURITY` is a custom migration as well.
 - The schema exports `VARIANT_SKU_LIVE_UIDX` and `CATEGORY_NAME_LIVE_UIDX`,
   whose unique violations the services map to coded errors.

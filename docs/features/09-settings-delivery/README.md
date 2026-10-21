@@ -78,9 +78,10 @@ and orders carry `deliveryChargeId` and
   (formerly `delivery_zone`), `delivery_charge_id`,
   `delivery_everywhere_else` and `delivery_time`.
 
-Migration `0026_settings_delivery` creates them. Migration
-`0027_delivery_charge_force_rls` forces RLS on both tables and adds
-`order_delivery_charge_fk` with `ON DELETE SET NULL (delivery_charge_id)`.
+Migrations `0022_delivery_charge` and `0023_product_delivery_charge` create
+them, and `0024_settings_force_rls` forces RLS on both. Migration
+`0028_orders_force_rls` adds `order_delivery_charge_fk` with
+`ON DELETE SET NULL (delivery_charge_id)`.
 See [database.md](../../architecture/database.md).
 
 ## Dashboard

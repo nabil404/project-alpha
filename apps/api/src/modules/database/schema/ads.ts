@@ -8,7 +8,7 @@ import { id, merchantId, merchantIsolation } from './columns';
  *
  * The composite foreign key (merchant_id, product_id) to product is not
  * declared here: it is `ON DELETE SET NULL (product_id)`, which drizzle-kit
- * cannot express, so migration 0039 adds it (as 0006, 0014 and 0027 did for
+ * cannot express, so migration 0035 adds it (as 0010 and 0028 do for
  * theirs), along with FORCE ROW LEVEL SECURITY and the last-seen index.
  */
 export const adProduct = pgTable(

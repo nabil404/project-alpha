@@ -1,2 +1,0 @@
-ALTER TABLE "llm_call" DROP CONSTRAINT "llm_call_purpose_ck";--> statement-breakpoint
-ALTER TABLE "llm_call" ADD CONSTRAINT "llm_call_purpose_ck" CHECK ("llm_call"."purpose" in ('classify', 'extract', 'phrase', 'vision_match'));

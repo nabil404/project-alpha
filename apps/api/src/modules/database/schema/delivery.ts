@@ -20,7 +20,7 @@ export const DELIVERY_CHARGE_FALLBACK_UIDX = 'delivery_charge_merchant_fallback_
 /**
  * Settings > Delivery charges: cost and time to each named area, plus one
  * nameless "everywhere else" row. Names are stored normalized
- * (normalizeAreaName). Removing a row unlinks its orders (migration 0027),
+ * (normalizeAreaName). Removing a row unlinks its orders (migration 0028),
  * which keep its name and estimate.
  */
 export const deliveryCharge = pgTable(

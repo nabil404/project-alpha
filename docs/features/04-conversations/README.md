@@ -291,18 +291,17 @@ policy. `conversation` references `customer`, and `message` references
   [05 · Customers](../05-customers/README.md).
 - `conversation`: `facebook_page_id` (text, deliberately not a foreign key),
   `customer_id`, `state` (default `browsing`), `collected_slots` (jsonb),
-  `bot_paused`, `handed_off_at` (set exactly while `state = handed_off`,
-  migration `0030`), `last_message_at`, `last_message_preview`,
-  `last_message_sender`, `last_message_kind` (migration `0042`; the list
+  `bot_paused`, `handed_off_at` (set exactly while `state = handed_off`), `last_message_at`, `last_message_preview`,
+  `last_message_sender`, `last_message_kind` (the list
   names a non-text message from it), `last_inbound_at`, `seller_last_read_at`.
   `entry_source` (`ad`, `link`, `get_started` or `organic`, default
-  `organic`, migration `0038`; how the current order attempt started),
+  `organic`; how the current order attempt started),
   `UNIQUE (merchant_id, facebook_page_id, customer_id)`, an index on the list
   order, and partial indexes for `handed_off` and `awaiting_confirmation`.
 - `message`: `sender`, `text`, `meta_message_id` (null while `sending`),
-  `payload` (a tap's payload, migration `0033`), `status`, `sent_at`, and
+  `payload` (a tap's payload), `status`, `sent_at`, and
   `updated_at` (a reply's last claim to be sent, which the Confirm redelivery
-  leases, migration `0034`). Migration `0041` adds `kind` (`text` by default),
+  leases), `kind` (`text` by default),
   `details` (jsonb, parsed with `messageDetailsSchema` on read),
   `edited_text`, `edited_at` and `deleted_at`
   ([AI phase 4](../11-ai-implementation/phase-4-non-text-events/README.md#data)). `UNIQUE (merchant_id, meta_message_id)`, deleted
@@ -316,7 +315,7 @@ unconnected Page. It is `SECURITY DEFINER` with a pinned `search_path`,
 `NOLOGIN` role `app_page_resolver`, which may only `SELECT` `page_id` and
 `merchant_id` from `facebook_page` (policy `facebook_page_resolver_read`). The
 migrating role must be a superuser or hold `SET` membership in
-`app_page_resolver`. Migrations `0009` and `0011` create both. Call it through
+`app_page_resolver`. Migrations `0011` and `0013` create both. Call it through
 `resolvePageMerchant()`.
 
 ## Web

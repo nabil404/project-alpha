@@ -831,8 +831,8 @@ minutes later.
 
 ## Observability
 
-- **`llm_call`** (migrations `0031`, `0032`, `0045` for `vision_match`, and
-  `0049` for `post_import`) holds one row per call with merchant, purpose,
+- **`llm_call`** (migrations `0031_llm_call` and
+  `0032_imports_force_rls`) holds one row per call with merchant, purpose,
   model, tokens, latency and outcome, and exactly one of the conversation or
   the import run (`llm_call_owner_ck`). Both keys cascade. A run's cost is the
   sum of its rows' tokens.

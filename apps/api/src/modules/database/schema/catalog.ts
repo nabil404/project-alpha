@@ -24,7 +24,7 @@ import { createdAt, id, merchantId, merchantIsolation, updatedAt } from './colum
 /** Index names the services map unique violations from. */
 export const VARIANT_SKU_LIVE_UIDX = 'product_variant_merchant_sku_live_uidx';
 export const CATEGORY_NAME_LIVE_UIDX = 'category_merchant_name_live_uidx';
-/** Named for readability in `\d`/pg_indexes; fixed by migration 0003, not mapped by any service. */
+/** Named for readability in `\d`/pg_indexes; fixed by migration 0005, not mapped by any service. */
 const VARIANT_DEFAULT_LIVE_UIDX = 'product_variant_default_live_uidx';
 
 export const product = pgTable(
@@ -51,7 +51,7 @@ export const product = pgTable(
      * The default photo: sent when a customer hasn't picked a variant, and for
      * variants without their own. Null exactly when the product has no images.
      * Its foreign key, (merchant_id, cover_image_id) -> product_image ON DELETE
-     * SET NULL (cover_image_id), lives in migration 0014 for the same reason as
+     * SET NULL (cover_image_id), lives in migration 0010 for the same reason as
      * product_variant.image_id's.
      */
     coverImageId: text('cover_image_id'),
@@ -104,7 +104,7 @@ export const productVariant = pgTable(
     /**
      * One of the product's own images, or null for the product's cover. Its
      * foreign key, (merchant_id, image_id) -> product_image ON DELETE SET NULL
-     * (image_id), lives in migration 0006: drizzle-kit cannot model the column
+     * (image_id), lives in migration 0010: drizzle-kit cannot model the column
      * list, and a plain composite SET NULL would null merchant_id too. The
      * service enforces the same product.
      */

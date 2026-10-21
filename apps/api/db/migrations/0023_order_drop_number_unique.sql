@@ -1,1 +1,0 @@
-ALTER TABLE "order" DROP CONSTRAINT "order_merchant_number_uq";

@@ -61,11 +61,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 --> statement-breakpoint
 
 -- The tenant context policies read, set per transaction by withMerchant()
--- in src/database/with-merchant.ts.
+-- in src/modules/database/with-merchant.ts.
 --
 -- Returns text, not uuid. merchantId references organization.id, and the Better
 -- Auth Organization plugin generates that id as TEXT - a random string, not a
--- UUID (see src/database/schema/auth.ts). A uuid-returning helper would not
+-- UUID (see src/modules/database/schema/auth.ts). A uuid-returning helper would not
 -- type-check against the column it guards.
 --
 -- The NULLIF is load-bearing, and not for an edge case. A transaction-local
@@ -75,7 +75,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- not "unset". Without the NULLIF that empty string is a real value a policy
 -- would compare against; with it, an absent context is NULL, the predicate is
 -- NULL, and the policy exposes nothing. Pinned by
--- src/database/__tests__/with-merchant.spec.ts.
+-- src/modules/database/__tests__/with-merchant.spec.ts.
 --
 -- STABLE lets the planner evaluate it once per statement instead of per row.
 CREATE FUNCTION app_current_merchant() RETURNS text

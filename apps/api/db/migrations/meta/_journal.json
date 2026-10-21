@@ -5,407 +5,253 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1790110396385,
+      "when": 1792568453518,
       "tag": "0000_auth_tables",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1790110404777,
+      "when": 1792568454331,
       "tag": "0001_rls_runtime_role",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1790493414887,
-      "tag": "0002_user_phone",
+      "when": 1792568455205,
+      "tag": "0002_category",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1790534862948,
-      "tag": "0003_catalog",
+      "when": 1792568456522,
+      "tag": "0003_product",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1790534880826,
-      "tag": "0004_catalog_force_rls",
+      "when": 1792568457551,
+      "tag": "0004_product_image",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "7",
-      "when": 1790537941794,
-      "tag": "0005_product_image",
+      "when": 1792568458473,
+      "tag": "0005_product_variant",
       "breakpoints": true
     },
     {
       "idx": 6,
       "version": "7",
-      "when": 1790537949590,
-      "tag": "0006_product_image_fk_force_rls",
+      "when": 1792568459345,
+      "tag": "0006_product_category",
       "breakpoints": true
     },
     {
       "idx": 7,
       "version": "7",
-      "when": 1790570975161,
-      "tag": "0007_facebook_page",
+      "when": 1792568460250,
+      "tag": "0007_product_option",
       "breakpoints": true
     },
     {
       "idx": 8,
       "version": "7",
-      "when": 1790570976394,
-      "tag": "0008_facebook_page_force_rls",
+      "when": 1792568461191,
+      "tag": "0008_product_option_value",
       "breakpoints": true
     },
     {
       "idx": 9,
       "version": "7",
-      "when": 1790641625790,
-      "tag": "0009_pg_trgm_page_resolver_role",
+      "when": 1792568462061,
+      "tag": "0009_product_variant_option_value",
       "breakpoints": true
     },
     {
       "idx": 10,
       "version": "7",
-      "when": 1790641630827,
-      "tag": "0010_conversations",
+      "when": 1792568462688,
+      "tag": "0010_catalog_force_rls",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "7",
-      "when": 1790641638576,
-      "tag": "0011_conversations_force_rls_page_resolver",
+      "when": 1792568463527,
+      "tag": "0011_pg_trgm_page_resolver_role",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
-      "when": 1790721149324,
-      "tag": "0012_customer_picture_url",
+      "when": 1792568464444,
+      "tag": "0012_facebook_page",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "7",
-      "when": 1790763108825,
-      "tag": "0013_catalog_options",
+      "when": 1792568465066,
+      "tag": "0013_facebook_page_force_rls_resolver",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "7",
-      "when": 1790763126146,
-      "tag": "0014_catalog_options_fk_force_rls_backfill",
+      "when": 1792568465885,
+      "tag": "0014_customer",
       "breakpoints": true
     },
     {
       "idx": 15,
       "version": "7",
-      "when": 1790804443869,
-      "tag": "0015_category_drop_parent",
+      "when": 1792568466802,
+      "tag": "0015_customer_note",
       "breakpoints": true
     },
     {
       "idx": 16,
       "version": "7",
-      "when": 1791056251944,
-      "tag": "0016_customers_orders",
+      "when": 1792568467753,
+      "tag": "0016_conversation",
       "breakpoints": true
     },
     {
       "idx": 17,
       "version": "7",
-      "when": 1791056258088,
-      "tag": "0017_customers_orders_force_rls",
+      "when": 1792568468627,
+      "tag": "0017_message",
       "breakpoints": true
     },
     {
       "idx": 18,
       "version": "7",
-      "when": 1791061093574,
-      "tag": "0018_settings_general",
+      "when": 1792568469315,
+      "tag": "0018_conversations_force_rls",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1791061096651,
-      "tag": "0019_settings_general_force_rls",
+      "when": 1792568470168,
+      "tag": "0019_merchant_settings",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1791218507851,
-      "tag": "0020_orders",
+      "when": 1792568471022,
+      "tag": "0020_notification_preference",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
-      "when": 1791218516784,
-      "tag": "0021_orders_force_rls",
+      "when": 1792568471864,
+      "tag": "0021_assistant_settings",
       "breakpoints": true
     },
     {
       "idx": 22,
       "version": "7",
-      "when": 1791228987677,
-      "tag": "0022_order_reference_columns",
+      "when": 1792568472736,
+      "tag": "0022_delivery_charge",
       "breakpoints": true
     },
     {
       "idx": 23,
       "version": "7",
-      "when": 1791229005508,
-      "tag": "0023_order_drop_number_unique",
+      "when": 1792568473605,
+      "tag": "0023_product_delivery_charge",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
-      "when": 1791229006381,
-      "tag": "0024_order_reference_backfill",
+      "when": 1792568474254,
+      "tag": "0024_settings_force_rls",
       "breakpoints": true
     },
     {
       "idx": 25,
       "version": "7",
-      "when": 1791229029035,
-      "tag": "0025_order_reference_required",
+      "when": 1792568475208,
+      "tag": "0025_order",
       "breakpoints": true
     },
     {
       "idx": 26,
       "version": "7",
-      "when": 1791238207217,
-      "tag": "0026_settings_delivery",
+      "when": 1792568476169,
+      "tag": "0026_order_item",
       "breakpoints": true
     },
     {
       "idx": 27,
       "version": "7",
-      "when": 1791238218591,
-      "tag": "0027_delivery_charge_force_rls",
+      "when": 1792568477034,
+      "tag": "0027_order_event",
       "breakpoints": true
     },
     {
       "idx": 28,
       "version": "7",
-      "when": 1791372464641,
-      "tag": "0028_settings_notifications",
+      "when": 1792568477684,
+      "tag": "0028_orders_force_rls",
       "breakpoints": true
     },
     {
       "idx": 29,
       "version": "7",
-      "when": 1791372468532,
-      "tag": "0029_notification_preference_force_rls",
+      "when": 1792568478572,
+      "tag": "0029_product_import",
       "breakpoints": true
     },
     {
       "idx": 30,
       "version": "7",
-      "when": 1791374548147,
-      "tag": "0030_conversation_handed_off_at",
+      "when": 1792568479454,
+      "tag": "0030_product_import_post",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1791573710195,
+      "when": 1792568480358,
       "tag": "0031_llm_call",
       "breakpoints": true
     },
     {
       "idx": 32,
       "version": "7",
-      "when": 1791573714848,
-      "tag": "0032_llm_call_force_rls",
+      "when": 1792568481037,
+      "tag": "0032_imports_force_rls",
       "breakpoints": true
     },
     {
       "idx": 33,
       "version": "7",
-      "when": 1791577780936,
-      "tag": "0033_message_payload",
+      "when": 1792568481925,
+      "tag": "0033_ad_product",
       "breakpoints": true
     },
     {
       "idx": 34,
       "version": "7",
-      "when": 1791732499173,
-      "tag": "0034_message_updated_at",
+      "when": 1792568482801,
+      "tag": "0034_product_post",
       "breakpoints": true
     },
     {
       "idx": 35,
       "version": "7",
-      "when": 1791827285797,
-      "tag": "0035_order_conversation_index",
-      "breakpoints": true
-    },
-    {
-      "idx": 36,
-      "version": "7",
-      "when": 1791913751959,
-      "tag": "0036_variant_reserved",
-      "breakpoints": true
-    },
-    {
-      "idx": 37,
-      "version": "7",
-      "when": 1791913755356,
-      "tag": "0037_backfill_variant_reserved",
-      "breakpoints": true
-    },
-    {
-      "idx": 38,
-      "version": "7",
-      "when": 1791947518087,
-      "tag": "0038_entry_points",
-      "breakpoints": true
-    },
-    {
-      "idx": 39,
-      "version": "7",
-      "when": 1791947525298,
-      "tag": "0039_ad_product_force_rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 40,
-      "version": "7",
-      "when": 1791949696293,
-      "tag": "0040_connected_merchants_fn",
-      "breakpoints": true
-    },
-    {
-      "idx": 41,
-      "version": "7",
-      "when": 1792000755649,
-      "tag": "0041_message_kind",
-      "breakpoints": true
-    },
-    {
-      "idx": 42,
-      "version": "7",
-      "when": 1792003276458,
-      "tag": "0042_conversation_last_message_kind",
-      "breakpoints": true
-    },
-    {
-      "idx": 43,
-      "version": "7",
-      "when": 1792004896751,
-      "tag": "0043_shared_posts",
-      "breakpoints": true
-    },
-    {
-      "idx": 44,
-      "version": "7",
-      "when": 1792004904817,
-      "tag": "0044_product_post_force_rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1792181607576,
-      "tag": "0045_llm_call_vision_match",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1792485368127,
-      "tag": "0046_settings_assistant",
-      "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1792485369306,
-      "tag": "0047_assistant_settings_force_rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1792485916204,
-      "tag": "0048_assistant_language_from_env",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1792523544353,
-      "tag": "0049_product_import",
-      "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1792523552245,
-      "tag": "0050_product_import_force_rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1792566569945,
-      "tag": "0051_import_post_note",
-      "breakpoints": true
-    },
-    {
-      "idx": 52,
-      "version": "7",
-      "when": 1792566586317,
-      "tag": "0052_import_post_reason_codes",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
-      "when": 1792566596808,
-      "tag": "0053_import_post_reason_check",
-      "breakpoints": true
-    },
-    {
-      "idx": 54,
-      "version": "7",
-      "when": 1792566839290,
-      "tag": "0054_import_post_limits_flag",
-      "breakpoints": true
-    },
-    {
-      "idx": 55,
-      "version": "7",
-      "when": 1792566848771,
-      "tag": "0055_import_post_results_from_reasons",
-      "breakpoints": true
-    },
-    {
-      "idx": 56,
-      "version": "7",
-      "when": 1792566850396,
-      "tag": "0056_import_post_drop_reason",
-      "breakpoints": true
-    },
-    {
-      "idx": 57,
-      "version": "7",
-      "when": 1792567422793,
-      "tag": "0057_import_post_anyway_status",
+      "when": 1792568483465,
+      "tag": "0035_entry_points_force_rls",
       "breakpoints": true
     }
   ]

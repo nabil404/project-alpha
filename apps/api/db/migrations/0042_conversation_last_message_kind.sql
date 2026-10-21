@@ -1,2 +1,0 @@
-ALTER TABLE "conversation" ADD COLUMN "last_message_kind" text DEFAULT 'text' NOT NULL;--> statement-breakpoint
-ALTER TABLE "conversation" ADD CONSTRAINT "conversation_last_kind_ck" CHECK ("conversation"."last_message_kind" in ('text', 'sticker', 'reaction', 'location', 'image', 'video', 'audio', 'file', 'other'));

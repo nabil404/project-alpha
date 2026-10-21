@@ -78,8 +78,8 @@ other failure shows an `ErrorBanner` in the card.
 letters). The columns have no defaults, because the repository writes
 `ASSISTANT_SETTINGS_DEFAULTS` itself. The schema keeps a literal copy of the
 tones, and `reply-phrasing.spec.ts` keeps it equal to `@app/shared`'s.
-Migrations `0046_settings_assistant`, `0047_assistant_settings_force_rls` and
-`0048_assistant_language_from_env` create it.
+Migration `0021_assistant_settings` creates it, and `0024_settings_force_rls`
+forces RLS on it.
 See [database.md](../../architecture/database.md).
 
 ## Code and tests

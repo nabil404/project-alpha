@@ -117,13 +117,12 @@ location]`, …), which no one else sees.
 
 ### Data
 
-Migration `0041_message_kind` adds to `message`: `kind` (default `text`, with
+`message` gains `kind` (default `text`, with
 `message_kind_ck`), `details` (jsonb, parsed with `messageDetailsSchema` in
 `message-content.ts`), `edited_text`, `edited_at` and `deleted_at`. The
 `Message` DTO gains `kind`, `attachments` (only `https` links reach the
 browser), `location`, `reaction` (`emoji` and our target id), `editedText` and
-`deleted`. Migration `0042_conversation_last_message_kind` adds
-`conversation.last_message_kind` (default `text`, with
+`deleted`. `conversation` gains `last_message_kind` (default `text`, with
 `conversation_last_kind_ck`); `LastMessage`, shared by the conversation list
 and the customer's latest conversation, gains `kind`.
 
@@ -225,7 +224,7 @@ its message's duplicate.
 
 - [x] `pnpm --filter @app/shared build && pnpm typecheck && pnpm lint && pnpm test`
       pass (last run Oct 15, 2026), the new suites ran against the database,
-      and `db:verify-rls` passes after migrations `0041` and `0042`.
+      and `db:verify-rls` passes.
 - [ ] Every event type above shows in the conversation viewer on the dev Page.
 - [x] An automated test proves none of them can create an order
       (`assistant-turn.service.spec.ts`, "messages without words").

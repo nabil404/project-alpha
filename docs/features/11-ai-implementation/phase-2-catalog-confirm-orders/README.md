@@ -255,7 +255,7 @@ cycle.
 - **A redelivery is leased, not just checked.** Retries of one Confirm run
   serially under the conversation lock but send after commit, so a status
   read let two of them send the same reference. The lease needed a time, so
-  `message` gained `updated_at` (migration `0034`). 20 s is past the Graph
+  `message` gained `updated_at`. 20 s is past the Graph
   call's 10 s timeout and short of the 30 s after which BullMQ reruns a job
   whose worker died. Turns back off from 3 s over five attempts
   (`ASSISTANT_TURN_RETRY`), so at least 24 s follow every attempt but the

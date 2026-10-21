@@ -80,7 +80,7 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   `conversation_id`, `purpose` (`classify`, `extract`, `phrase`), `model`,
   input and output tokens, `latency_ms`, `outcome` (`ok`, `timeout`,
   `provider_error`, `invalid_output`), `created_at`. RLS forced (migrations
-  `0031`, `0032`). Rows are written in step 5's transaction.
+  `0031_llm_call`, `0032_imports_force_rls`). Rows are written in step 5's transaction.
 - **Queue** (`src/modules/queue/queue.constants.ts`): `assistant-turns`, job
   `assistant-turn`, concurrency 4, shown in Bull Board.
 - **`src/modules/conversations/assistant/`**: `assistant-turn.processor.ts`
@@ -211,7 +211,7 @@ In `conversations/assistant/__tests__/` unless noted.
 - [x] `pnpm --filter @app/shared build && pnpm typecheck && pnpm lint && pnpm test`
       pass (last run Oct 13, 2026).
 - [x] Schema loop: `db:generate`, review, `db:custom` for `FORCE`,
-      `db:migrate`, `db:verify-rls` (migrations `0031` and `0032`).
+      `db:migrate`, `db:verify-rls`.
 - [ ] Manually, with a real `LLM_API_KEY`: a message to the dev Page gets an
       AI reply, the turn shows in Bull Board, and an `llm_call` row is
       written. With a bad key, the conversation goes to `handed_off` with the

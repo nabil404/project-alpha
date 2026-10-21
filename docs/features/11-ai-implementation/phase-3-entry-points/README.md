@@ -211,25 +211,25 @@ Errors, as the routes' `@ApiCodedError` decorators declare them
 
 ### Data
 
-Migrations `0038` to `0040`; `db:verify-rls` passes.
+`db:verify-rls` passes.
 
-- **`0038_entry_points`** (generated): `conversation.entry_source` (not null,
+- **Columns** (generated): `conversation.entry_source` (not null,
   default `organic`) and `order.entry_source` (null), each with a check
-  against the shared list; the new `ad_product` table; `merchant_settings`
+  against the shared list; `merchant_settings`
   `messenger_greeting` and `ice_breakers` (jsonb, parsed with Zod on read; null
   means the defaults); and `facebook_page` `profile_sync_requested_at`,
   `profile_synced_at` and `profile_sync_error`.
-- **`0039_ad_product_force_rls`** (`db:custom`): `FORCE ROW LEVEL SECURITY` on
+- **`0035_entry_points_force_rls`** (`db:custom`): `FORCE ROW LEVEL SECURITY` on
   `ad_product`, the composite foreign key `(merchant_id, product_id)` to
   `product` with `ON DELETE SET NULL (product_id)` (drizzle-kit cannot express
   the column list, so it lives only here), and an index on the product.
   Deleting a product unmaps its ads; another shop's product id is refused by
   the key.
-- **`0040_connected_merchants_fn`** (`db:custom`): `app_connected_merchants()`,
+- **`0013_facebook_page_force_rls_resolver`** (`db:custom`): `app_connected_merchants()`,
   a `SECURITY DEFINER` function owned by `app_page_resolver`, like
   `app_page_merchant()`. It returns only merchant ids, so the one-off
   re-subscribe job can list shops before any merchant context exists.
-- **`ad_product`**: `merchant_id`, `page_id`, `ad_id`, `product_id` (null =
+- **`ad_product`** (`0033_ad_product`): `merchant_id`, `page_id`, `ad_id`, `product_id` (null =
   seen but not mapped), `first_seen_at`, `last_seen_at`, `chat_count`. Unique
   on `(merchant_id, ad_id)`, with the isolation policy.
 
@@ -315,7 +315,7 @@ See the MVP [rules](../../../mvp/01-messenger-to-order/rules.md).
 - **`entry-points-schema.spec.ts`** (`database/__tests__/`, DB): the check
   constraints and defaults.
 - **`ad-product.repository.spec.ts`** (DB): two-shop isolation for list, map
-  and upsert, the `chat_count` bump, and 0039's key (deleting a product clears
+  and upsert, the `chat_count` bump, and `ad_product_product_fk` (deleting a product clears
   `product_id`; another shop's product id is refused).
 - **`inbound-message.ingest.spec.ts`** and `inbound-message.processor.spec.ts`
   (DB): an ad upserts and bumps; a mapped ad stores `ref:product:`;
@@ -385,7 +385,7 @@ See the MVP [rules](../../../mvp/01-messenger-to-order/rules.md).
 
 - [x] `pnpm --filter @app/shared build && pnpm typecheck && pnpm lint && pnpm test`
       pass (last run Oct 14, 2026), the new suites ran against the database,
-      and `db:verify-rls` passes for migrations `0038` to `0040`.
+      and `db:verify-rls` passes.
 - [ ] Scanning a product's QR code on a phone opens Messenger, and the
       assistant asks for that product's variant.
 - [ ] Get Started → category → product → confirmed order works on the dev

@@ -89,7 +89,7 @@ export const order = pgTable(
     deliveryArea: text('delivery_area'),
     /**
      * The Settings delivery charge it was priced by. Its foreign key is
-     * migration 0027's, not declared here: drizzle-kit cannot express ON
+     * migration 0028's, not declared here: drizzle-kit cannot express ON
      * DELETE SET NULL for one column of a composite key.
      */
     deliveryChargeId: text('delivery_charge_id'),

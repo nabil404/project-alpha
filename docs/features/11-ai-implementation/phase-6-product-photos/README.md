@@ -123,8 +123,7 @@ phrased, and prices come only from the catalog.
 
 ### Data
 
-- Migration `0045_llm_call_vision_match` re-creates `llm_call_purpose_ck`
-  with `vision_match`, the new member of `LLM_CALL_PURPOSES` and
+- `llm_call_purpose_ck` allows `vision_match`, the new member of `LLM_CALL_PURPOSES` and
   `LLM_PURPOSES`.
 - `messageDetailsSchema` gains `attachments[].key` and
   `attachments[].failed`. No new column.
@@ -216,6 +215,5 @@ come from the catalog. Never call the model inside a transaction.
 - [ ] Every photo shows in the conversation viewer.
 
 Also run (Oct 17, 2026): shared build, typecheck, lint, format and tests
-pass, the new database suites ran, and `db:verify-rls` passes after migration
-`0045`. Nothing was sent from the dev Page, and the viewer was not opened in a
+pass, the new database suites ran, and `db:verify-rls` passes. Nothing was sent from the dev Page, and the viewer was not opened in a
 browser.

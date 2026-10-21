@@ -141,9 +141,9 @@ entries in `error-keys.ts` and `errors.json`.
 
 ### Data
 
-- **`0043_shared_posts`** (generated): the `product_post` table, and `share`
-  added to `message_kind_ck` and `conversation_last_kind_ck`.
-- **`0044_product_post_force_rls`** (`db:custom`): `FORCE ROW LEVEL SECURITY`.
+- **`0034_product_post`** (generated): the `product_post` table. `share` is
+  in `message_kind_ck` and `conversation_last_kind_ck`.
+- **`0035_entry_points_force_rls`** (`db:custom`): `FORCE ROW LEVEL SECURITY`.
 - **`product_post`**: `merchant_id`, `product_id`, `post_id` (the id we were
   given first), `alias_id` (the other id, when known), `url`, `caption`,
   `status` (`linked` or `suggested`, with `product_post_status_ck`),
@@ -260,7 +260,7 @@ Facebook's hosts are parsed and only a short link is fetched, once.
 
 - [x] `pnpm --filter @app/shared build && pnpm typecheck && pnpm lint && pnpm test`
       pass (last run Oct 15, 2026), the new suites ran against the database,
-      and `db:verify-rls` passes after migrations `0043` and `0044`.
+      and `db:verify-rls` passes.
 - [ ] Sharing a linked post into the dev Page's chat starts the variant
       question for that product.
 - [ ] Sharing an unlinked post produces a "Do you mean …?" question and a

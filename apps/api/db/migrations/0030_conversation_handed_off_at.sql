@@ -1,1 +1,0 @@
-ALTER TABLE "conversation" ADD COLUMN "handed_off_at" timestamp (3) with time zone;

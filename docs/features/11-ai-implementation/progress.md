@@ -58,8 +58,7 @@ database, phases 3 to 5's among them.
 ### 1 · Foundation
 
 - [x] Shared build, typecheck, lint and tests pass.
-- [x] Schema loop for `llm_call`: migrations `0031_llm_call` and
-      `0032_llm_call_force_rls`, which `db:verify-rls` checks.
+- [x] Schema loop for `llm_call`, which `db:verify-rls` checks.
 - [ ] Manually, with a real `LLM_API_KEY`: a message to the dev Page gets an
       AI reply, the turn shows in Bull Board, and an `llm_call` row is
       written. With a bad key, the conversation goes to `handed_off` with the
@@ -82,7 +81,7 @@ database, phases 3 to 5's among them.
 ### 3 · Entry points
 
 - [x] Shared build, typecheck, lint and tests pass; the new database suites
-      ran; migrations `0038` to `0040`, which `db:verify-rls` checks.
+      ran, and `db:verify-rls` passes.
 - [ ] Scanning a product's QR code on a phone opens Messenger, and the
       assistant asks for that product's variant.
 - [ ] Get Started → category → product → confirmed order works on the dev
@@ -102,14 +101,14 @@ including 375 px overflow and a real QR scan) was not run either.
       (`assistant-turn.service.spec.ts`, "messages without words").
 
 Also run: shared build, typecheck, lint and tests pass, the new database
-suites ran, and `db:verify-rls` passes after migrations `0041` and `0042`.
+suites ran, and `db:verify-rls` passes.
 Only the reaction pills were checked in a browser, against stubbed API
 responses; no event was sent from the dev Page.
 
 ### 5 · Shared posts and ads
 
 Also run: shared build, typecheck, lint and tests pass, the new database
-suites ran, and `db:verify-rls` passes after migrations `0043` and `0044`.
+suites ran, and `db:verify-rls` passes.
 Nothing was sent from the dev Page: the share payloads are read from Meta's
 reference, not captured, and the product page's Facebook posts card was not
 opened in a browser.
@@ -123,7 +122,7 @@ opened in a browser.
 
 Also run (Oct 17, 2026): shared build, typecheck, lint and tests pass (141
 suites, 1,638 tests; 2 suites and 2 tests skipped), the new database suites
-ran, and `db:verify-rls` passes after migration `0045`. Nothing was sent from
+ran, and `db:verify-rls` passes. Nothing was sent from
 the dev Page, so there is no hit rate yet, and the viewer was not opened in a
 browser.
 

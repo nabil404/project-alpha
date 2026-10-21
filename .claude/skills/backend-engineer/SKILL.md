@@ -248,7 +248,7 @@ role does still need to be a superuser or hold `SET` membership in
 through `resolvePageMerchant()`
 (`src/modules/conversations/ingest/page-merchant.ts`). A worker job that must
 list every connected shop before any context exists uses
-`app_connected_merchants()` (migration `0040`), built the same way. Do **not**
+`app_connected_merchants()` (migration `0013`), built the same way. Do **not**
 write a policy that permits reads when no context is set.
 
 ### Authoring the policies
