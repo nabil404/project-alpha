@@ -30,6 +30,7 @@ import {
   importRunListResponseSchema,
   importRunSchema,
   listImportPostsQuerySchema,
+  productImportSourceSchema,
   listImportsQuerySchema,
   type ActivateImport,
   type ActivateImportResult,
@@ -41,6 +42,7 @@ import {
   type ImportRunListResponse,
   type ListImportPostsQuery,
   type ListImportsQuery,
+  type ProductImportSource,
 } from '@app/shared';
 import { z } from 'zod';
 import { TenantGuard, tenantScope, type TenantRequest } from '../../common/tenant.guard';
@@ -102,6 +104,21 @@ export class ImportsController {
   @ApiCodedError(503, ['MESSENGER_NOT_CONFIGURED', 'FACEBOOK_UNAVAILABLE'])
   access(@Req() request: TenantRequest): Promise<FacebookImportAccess> {
     return this.imports.access(tenantScope(request));
+  }
+
+  @Get('products/:productId')
+  @ApiOperation({
+    summary: 'Get the post a product was imported from',
+    description:
+      'The post that made the product, or the first merged into it. `source` is null for a product no import made, or one that does not exist.',
+  })
+  @ApiOkResponse({ schema: openApiSchema(productImportSourceSchema) })
+  @ApiCodedError(400, ['VALIDATION_FAILED'])
+  productSource(
+    @Req() request: TenantRequest,
+    @Param('productId', uuidParam) productId: string,
+  ): Promise<ProductImportSource> {
+    return this.imports.productSource(tenantScope(request), productId);
   }
 
   @Get()
@@ -179,7 +196,7 @@ export class ImportsController {
   @ApiOperation({
     summary: 'Import a skipped post anyway',
     description:
-      "A post already in the catalog becomes drafts with no catalog match; a post read as not a product is read again with the hint that it holds one. Runs in the background, even while another run goes; the post's row changes when it is done.",
+      "A post already in the catalog becomes drafts with no catalog match. A post read as not a product, or as products with no name, is read again with the hint that it holds one, and its products are matched against the catalog as a run's are. A post with no caption and no photo, or imported before, is refused. The post comes back with `importAnyway: queued`; the job runs in the background, even while another run goes, and leaves `no_product` or `failed` there when it makes no drafts.",
   })
   @ApiAcceptedResponse({
     description: 'The post as it is now.',

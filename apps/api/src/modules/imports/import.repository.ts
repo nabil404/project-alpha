@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
-import type { ImportPostFilter, ImportPostResult, ImportRunStatus } from '@app/shared';
+import { and, asc, count, desc, eq, inArray, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import {
+  FAILED_RESULTS,
+  NOT_PRODUCT_RESULTS,
+  type ImportAnywayStatus,
+  type ImportPostFilter,
+  type ImportPostResult,
+  type ImportRunStatus,
+} from '@app/shared';
 import type { Executor, TenantScope } from '../database/base.repository';
 import { one } from '../database/rows';
 import {
@@ -39,7 +46,9 @@ export type NewPostValues = Pick<
   | 'permalinkUrl'
   | 'photoCount'
   | 'result'
-  | 'reason'
+  | 'limitsApplied'
+  | 'anywayStatus'
+  | 'note'
   | 'matchedProductIds'
   | 'suggestedCategory'
   | 'productIds'
@@ -67,8 +76,12 @@ const COUNT_COLUMNS = {
   failed: productImport.failed,
 } as const;
 
-/** The results listed under Skipped posts, each with Import anyway. */
-export const SKIPPED_RESULTS: readonly ImportPostResult[] = ['not_product', 'in_catalog'];
+/** The Skipped posts tab: no product, already in the catalog, or imported before. */
+const SKIPPED_TAB: readonly ImportPostResult[] = [
+  ...NOT_PRODUCT_RESULTS,
+  'in_catalog',
+  'already_imported',
+];
 
 /** Import runs and the posts they handled. Every method is scoped to one shop. */
 @Injectable()
@@ -245,7 +258,9 @@ export class ImportRepository {
    * Whether the post was imported before: a product link holds it (any
    * status), or another run handled it with any result but `failed`.
    * `graphId` is Graph's `<page id>_<post id>`; `keys` are the post's own ids
-   * as product links store them.
+   * as product links store them. Answers the products it is linked to, or
+   * that the earlier run made or matched, so the seller can see where it went;
+   * null when it is new.
    */
   async importedBefore(
     executor: Executor,
@@ -253,33 +268,39 @@ export class ImportRepository {
     importId: string,
     graphId: string,
     keys: readonly string[],
-  ): Promise<boolean> {
+  ): Promise<{ productIds: string[] } | null> {
     if (keys.length > 0) {
-      const [linked] = await executor
-        .select({ id: productPost.id })
+      const linked = await executor
+        .select({ productId: productPost.productId })
         .from(productPost)
         .where(
           and(
             eq(productPost.merchantId, merchantId),
             or(inArray(productPost.postId, [...keys]), inArray(productPost.aliasId, [...keys])),
           ),
-        )
-        .limit(1);
-      if (linked) return true;
+        );
+      if (linked.length > 0) {
+        return { productIds: [...new Set(linked.map((row) => row.productId))] };
+      }
     }
     const [earlier] = await executor
-      .select({ id: productImportPost.id })
+      .select({
+        productIds: productImportPost.productIds,
+        matchedProductIds: productImportPost.matchedProductIds,
+      })
       .from(productImportPost)
       .where(
         and(
           eq(productImportPost.merchantId, merchantId),
           eq(productImportPost.postId, graphId),
           ne(productImportPost.importId, importId),
-          ne(productImportPost.result, 'failed'),
+          notInArray(productImportPost.result, [...FAILED_RESULTS]),
         ),
       )
       .limit(1);
-    return earlier !== undefined;
+    return earlier
+      ? { productIds: [...new Set([...earlier.productIds, ...earlier.matchedProductIds])] }
+      : null;
   }
 
   /**
@@ -308,6 +329,26 @@ export class ImportRepository {
         .returning(),
       `product_import_post upsert ${postId}`,
     );
+  }
+
+  /** Records where Import anyway stands on a post, without touching its result. */
+  async setAnywayStatus(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    importId: string,
+    id: string,
+    status: ImportAnywayStatus | null,
+  ): Promise<void> {
+    await executor
+      .update(productImportPost)
+      .set({ anywayStatus: status, updatedAt: new Date() })
+      .where(
+        and(
+          eq(productImportPost.merchantId, merchantId),
+          eq(productImportPost.importId, importId),
+          eq(productImportPost.id, id),
+        ),
+      );
   }
 
   /** The run's posts, latest handled first; `filter` picks a summary tab. */
@@ -391,6 +432,30 @@ export class ImportRepository {
     return row !== undefined;
   }
 
+  /** The post that made a product, or the first one merged into it when none did. */
+  async findProductSource(
+    executor: Executor,
+    { merchantId }: TenantScope,
+    productId: string,
+  ): Promise<ProductImportPostRow | undefined> {
+    const [row] = await executor
+      .select()
+      .from(productImportPost)
+      .where(
+        and(
+          eq(productImportPost.merchantId, merchantId),
+          sql`${productId} = any(${productImportPost.productIds})`,
+        ),
+      )
+      .orderBy(
+        sql`${productImportPost.result} = 'draft' desc`,
+        asc(productImportPost.createdAt),
+        asc(productImportPost.id),
+      )
+      .limit(1);
+    return row;
+  }
+
   /** Every product of the shop, any status, by name: what a post's products are matched against. */
   namedProducts(
     executor: Executor,
@@ -438,8 +503,7 @@ function postConditions(
     eq(productImportPost.importId, importId),
   );
   if (!filter) return own;
-  if (filter === 'skipped')
-    return and(own, inArray(productImportPost.result, [...SKIPPED_RESULTS]));
+  if (filter === 'skipped') return and(own, inArray(productImportPost.result, [...SKIPPED_TAB]));
 
   const unpriced = executor
     .select({ one: sql`1` })

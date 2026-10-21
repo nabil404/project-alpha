@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Plus, Search, TriangleAlert } from 'lucide-react';
+import { Plus, Search, TriangleAlert, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   LOW_STOCK_THRESHOLD,
@@ -18,6 +19,7 @@ import { PaginationBar } from '@/components/PaginationBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { ImportDialog, importRunQueryOptions, useRangeLabel } from '@/features/imports';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { statusToneDotClasses, stockLevelTones } from '@/i18n/status-tones';
@@ -70,7 +72,12 @@ export function ProductList({
     () => new Map((categories.data ?? []).map((category) => [category.id, category.name])),
     [categories.data],
   );
-  const filtered = query.filter !== 'all' || Boolean(query.q) || Boolean(query.categoryId);
+  const [importOpen, setImportOpen] = useState(false);
+  const filtered =
+    query.filter !== 'all' ||
+    Boolean(query.q) ||
+    Boolean(query.categoryId) ||
+    Boolean(query.importId);
   const noProducts = counts.data?.all === 0 && counts.data.archived === 0 && !filtered;
   const pagination = list.data?.pagination;
 
@@ -86,14 +93,18 @@ export function ProductList({
       <CatalogHeader
         section="products"
         action={
-          <Button asChild variant="primary">
-            <Link to="/catalog/products/new">
-              <Plus aria-hidden strokeWidth={1.5} />
-              {t('list.addProduct')}
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => setImportOpen(true)}>{t('list.import')}</Button>
+            <Button asChild variant="primary">
+              <Link to="/catalog/products/new">
+                <Plus aria-hidden strokeWidth={1.5} />
+                {t('list.addProduct')}
+              </Link>
+            </Button>
+          </div>
         }
       />
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} step="source" />
 
       {counts.data && <StockAlert counts={counts.data} onShow={(filter) => onChange({ filter })} />}
 
@@ -113,6 +124,12 @@ export function ProductList({
               options={categories.data ?? []}
               onChange={(categoryId) => onChange({ categoryId })}
             />
+            {query.importId && (
+              <ImportFilterChip
+                importId={query.importId}
+                onClear={() => onChange({ importId: undefined })}
+              />
+            )}
             <div
               role="group"
               aria-label={t('list.filters.label')}
@@ -240,7 +257,12 @@ export function ProductList({
                           variant="link"
                           className="mt-2"
                           onClick={() =>
-                            onChange({ filter: 'all', q: undefined, categoryId: undefined })
+                            onChange({
+                              filter: 'all',
+                              q: undefined,
+                              categoryId: undefined,
+                              importId: undefined,
+                            })
                           }
                         >
                           {t('list.clearFilters')}
@@ -276,6 +298,27 @@ export function ProductList({
         </section>
       )}
     </div>
+  );
+}
+
+/** The products one import made, reached from its summary. */
+function ImportFilterChip({ importId, onClear }: { importId: string; onClear: () => void }) {
+  const { t } = useTranslation('catalog');
+  const run = useQuery(importRunQueryOptions(importId));
+  const rangeLabel = useRangeLabel();
+
+  return (
+    <span className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-accent-soft bg-accent-soft pr-1 pl-3 text-label text-accent sm:h-8">
+      {t('list.fromImport', { range: run.data ? rangeLabel(run.data) : '' })}
+      <button
+        type="button"
+        aria-label={t('list.clearImport')}
+        onClick={onClear}
+        className="flex size-6 cursor-pointer items-center justify-center rounded-full hover:bg-surface-hover"
+      >
+        <X aria-hidden strokeWidth={1.5} className="size-3.5" />
+      </button>
+    </span>
   );
 }
 

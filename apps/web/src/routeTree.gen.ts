@@ -33,6 +33,8 @@ import { Route as AppSettingsDeliveryRouteImport } from './routes/_app/settings/
 import { Route as AppSettingsGeneralRouteImport } from './routes/_app/settings/general'
 import { Route as AppSettingsMessengerRouteImport } from './routes/_app/settings/messenger'
 import { Route as AppSettingsNotificationsRouteImport } from './routes/_app/settings/notifications'
+import { Route as AppCatalogImportsIndexRouteImport } from './routes/_app/catalog/imports/index'
+import { Route as AppCatalogImportsImportIdRouteImport } from './routes/_app/catalog/imports/$importId'
 import { Route as AppCatalogProductsProductIdRouteImport } from './routes/_app/catalog/products/$productId'
 import { Route as AppCatalogProductsNewRouteImport } from './routes/_app/catalog/products/new'
 import { Route as AppConversationsConversationIdDetailsRouteImport } from './routes/_app/conversations/$conversationId_.details'
@@ -157,6 +159,17 @@ const AppSettingsNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => AppSettingsRoute,
   } as any)
+const AppCatalogImportsIndexRoute = AppCatalogImportsIndexRouteImport.update({
+  id: '/catalog/imports/',
+  path: '/catalog/imports/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCatalogImportsImportIdRoute =
+  AppCatalogImportsImportIdRouteImport.update({
+    id: '/catalog/imports/$importId',
+    path: '/catalog/imports/$importId',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppCatalogProductsProductIdRoute =
   AppCatalogProductsProductIdRouteImport.update({
     id: '/catalog/products/$productId',
@@ -198,9 +211,11 @@ export interface FileRoutesByFullPath {
   '/customers/': typeof AppCustomersIndexRoute
   '/orders/': typeof AppOrdersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/catalog/imports/$importId': typeof AppCatalogImportsImportIdRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
   '/conversations/$conversationId/details': typeof AppConversationsConversationIdDetailsRoute
+  '/catalog/imports/': typeof AppCatalogImportsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -223,9 +238,11 @@ export interface FileRoutesByTo {
   '/customers': typeof AppCustomersIndexRoute
   '/orders': typeof AppOrdersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/catalog/imports/$importId': typeof AppCatalogImportsImportIdRoute
   '/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/catalog/products/new': typeof AppCatalogProductsNewRoute
   '/conversations/$conversationId/details': typeof AppConversationsConversationIdDetailsRoute
+  '/catalog/imports': typeof AppCatalogImportsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -253,9 +270,11 @@ export interface FileRoutesById {
   '/_app/customers/': typeof AppCustomersIndexRoute
   '/_app/orders/': typeof AppOrdersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/catalog/imports/$importId': typeof AppCatalogImportsImportIdRoute
   '/_app/catalog/products/$productId': typeof AppCatalogProductsProductIdRoute
   '/_app/catalog/products/new': typeof AppCatalogProductsNewRoute
   '/_app/conversations/$conversationId_/details': typeof AppConversationsConversationIdDetailsRoute
+  '/_app/catalog/imports/': typeof AppCatalogImportsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -282,9 +301,11 @@ export interface FileRouteTypes {
     | '/customers/'
     | '/orders/'
     | '/settings/'
+    | '/catalog/imports/$importId'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
     | '/conversations/$conversationId/details'
+    | '/catalog/imports/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -307,9 +328,11 @@ export interface FileRouteTypes {
     | '/customers'
     | '/orders'
     | '/settings'
+    | '/catalog/imports/$importId'
     | '/catalog/products/$productId'
     | '/catalog/products/new'
     | '/conversations/$conversationId/details'
+    | '/catalog/imports'
   id:
     | '__root__'
     | '/_app'
@@ -336,9 +359,11 @@ export interface FileRouteTypes {
     | '/_app/customers/'
     | '/_app/orders/'
     | '/_app/settings/'
+    | '/_app/catalog/imports/$importId'
     | '/_app/catalog/products/$productId'
     | '/_app/catalog/products/new'
     | '/_app/conversations/$conversationId_/details'
+    | '/_app/catalog/imports/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -516,6 +541,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsNotificationsRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/catalog/imports/': {
+      id: '/_app/catalog/imports/'
+      path: '/catalog/imports'
+      fullPath: '/catalog/imports/'
+      preLoaderRoute: typeof AppCatalogImportsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/catalog/imports/$importId': {
+      id: '/_app/catalog/imports/$importId'
+      path: '/catalog/imports/$importId'
+      fullPath: '/catalog/imports/$importId'
+      preLoaderRoute: typeof AppCatalogImportsImportIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/catalog/products/$productId': {
       id: '/_app/catalog/products/$productId'
       path: '/catalog/products/$productId'
@@ -590,8 +629,10 @@ interface AppRouteChildren {
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
   AppCustomersIndexRoute: typeof AppCustomersIndexRoute
   AppOrdersIndexRoute: typeof AppOrdersIndexRoute
+  AppCatalogImportsImportIdRoute: typeof AppCatalogImportsImportIdRoute
   AppCatalogProductsProductIdRoute: typeof AppCatalogProductsProductIdRoute
   AppCatalogProductsNewRoute: typeof AppCatalogProductsNewRoute
+  AppCatalogImportsIndexRoute: typeof AppCatalogImportsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -604,8 +645,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppCatalogIndexRoute: AppCatalogIndexRoute,
   AppCustomersIndexRoute: AppCustomersIndexRoute,
   AppOrdersIndexRoute: AppOrdersIndexRoute,
+  AppCatalogImportsImportIdRoute: AppCatalogImportsImportIdRoute,
   AppCatalogProductsProductIdRoute: AppCatalogProductsProductIdRoute,
   AppCatalogProductsNewRoute: AppCatalogProductsNewRoute,
+  AppCatalogImportsIndexRoute: AppCatalogImportsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

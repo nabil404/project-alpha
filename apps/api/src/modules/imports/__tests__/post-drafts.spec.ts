@@ -5,7 +5,7 @@ import {
   type PostProduct,
   type PostProducts,
 } from '@app/shared';
-import { aliasLanguagesFor, checkPostProducts, NO_NAMED_PRODUCT } from '../post-drafts';
+import { aliasLanguagesFor, checkPostProducts } from '../post-drafts';
 
 const SAREES = { id: '6f0c1d64-3c0e-4f43-9d8c-6a3f6f1f2a10', name: 'Sarees' };
 const context = { currency: 'BDT', categories: [SAREES] };
@@ -28,15 +28,21 @@ const products = (...items: PostProduct[]): PostProducts => ({
 
 function draftsOf(output: PostProducts) {
   const checked = checkPostProducts(output, context);
-  if (checked.kind !== 'products') throw new Error(`expected products, got ${checked.reason}`);
+  if (checked.kind !== 'products') throw new Error(`expected products, got ${checked.result}`);
   return checked;
 }
 
 describe('checkPostProducts', () => {
-  it('passes a not-product reason through', () => {
-    expect(
-      checkPostProducts({ kind: 'not_product', reason: 'Eid greeting', products: [] }, context),
-    ).toEqual({ kind: 'not_product', reason: 'Eid greeting' });
+  it("keeps the reader's words on a not-product post as its note", () => {
+    const notProduct = (reason: string | null) =>
+      checkPostProducts({ kind: 'not_product', reason, products: [] }, context);
+    expect(notProduct('Eid greeting')).toEqual({
+      kind: 'not_product',
+      result: 'not_a_product',
+      note: 'Eid greeting',
+    });
+    expect(notProduct('  ')).toEqual({ kind: 'not_product', result: 'not_a_product', note: null });
+    expect(notProduct(null)).toEqual({ kind: 'not_product', result: 'not_a_product', note: null });
   });
 
   it('keeps the name as written and writes a valid draft with no stock or SKU', () => {
@@ -154,7 +160,8 @@ describe('checkPostProducts', () => {
     expect(draftsOf(products(product({ name: ' ' }), product())).drafts).toHaveLength(1);
     expect(checkPostProducts(products(product({ name: '' })), context)).toEqual({
       kind: 'not_product',
-      reason: NO_NAMED_PRODUCT,
+      result: 'no_named_product',
+      note: null,
     });
   });
 });

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { FormControl, FormField, FormItem, FormMessage, useFormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 import {
   addCombinations,
@@ -35,6 +36,8 @@ import { OptionPanel } from './OptionPanel';
 import { VariantImagePicker } from './VariantImagePicker';
 
 const optionValueSchema = productOptionInputSchema.shape.values.element.shape.value;
+/** An empty price or stock: what keeps the product from going live. */
+const missingField = '[&_input]:border-warning';
 
 type Panel = { kind: 'new'; name: string } | { kind: 'edit'; index: number } | null;
 
@@ -221,7 +224,10 @@ export function VariantsCard({ product }: { product?: Product }) {
                         <FormItem className="w-32 pt-1">
                           <FormControl>
                             <MoneyInput
+                              nullable
+                              className={cn(priceField.value === null && missingField)}
                               aria-label={t('variants.priceFor', { variant: label })}
+                              placeholder={t('variants.needed')}
                               value={priceField.value}
                               onChange={priceField.onChange}
                               onBlur={priceField.onBlur}
@@ -243,19 +249,30 @@ export function VariantsCard({ product }: { product?: Product }) {
                           <FormControl>
                             <Input
                               aria-label={t('variants.stockFor', { variant: label })}
+                              placeholder={t('variants.needed')}
                               inputMode="numeric"
-                              className="w-20 tabular-nums"
+                              className={cn(
+                                'w-20 tabular-nums',
+                                stockField.value === null && 'border-warning',
+                              )}
                               name={stockField.name}
                               ref={stockField.ref}
                               onBlur={stockField.onBlur}
-                              value={Number.isNaN(stockField.value) ? '' : stockField.value}
-                              onChange={(event) =>
-                                stockField.onChange(
-                                  /^\d+$/.test(event.target.value.trim())
-                                    ? Number(event.target.value)
-                                    : Number.NaN,
-                                )
+                              value={
+                                stockField.value === null || Number.isNaN(stockField.value)
+                                  ? ''
+                                  : stockField.value
                               }
+                              onChange={(event) => {
+                                const text = event.target.value.trim();
+                                stockField.onChange(
+                                  text === ''
+                                    ? null
+                                    : /^\d+$/.test(text)
+                                      ? Number(text)
+                                      : Number.NaN,
+                                );
+                              }}
                             />
                           </FormControl>
                           <NumberMessage invalid={Number.isNaN(stockField.value)} kind="stock" />

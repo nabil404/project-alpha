@@ -7,6 +7,7 @@ import {
   importPostListResponseSchema,
   importRunListResponseSchema,
   importRunSchema,
+  productImportSourceSchema,
   shopToday,
 } from '@app/shared';
 import { eq, inArray, like } from 'drizzle-orm';
@@ -149,7 +150,7 @@ describeDb('Imports over HTTP', () => {
         merchantId,
         importId,
         postId: `1_${randomUUID()}`,
-        result: 'not_product',
+        result: 'not_a_product',
         ...values,
       })
       .returning();
@@ -419,10 +420,58 @@ describeDb('Imports over HTTP', () => {
       .expect(404);
     expect(missing.body.error.code).toBe('IMPORT_POST_NOT_FOUND');
 
-    await agent.post(`/api/v1/imports/${run.id}/posts/${skipped.id}/import`).expect(202);
+    const empty = await seedPost(merchantId, run.id, { result: 'no_caption_or_photo' });
+    const nothingToRead = await agent
+      .post(`/api/v1/imports/${run.id}/posts/${empty.id}/import`)
+      .expect(409);
+    expect(nothingToRead.body.error.code).toBe('IMPORT_POST_NOT_SKIPPED');
+
+    const queued = await agent
+      .post(`/api/v1/imports/${run.id}/posts/${skipped.id}/import`)
+      .expect(202);
+    expect(queued.body).toMatchObject({ id: skipped.id, importAnyway: 'queued' });
+    const [stored] = await db
+      .select({ anywayStatus: schema.productImportPost.anywayStatus })
+      .from(schema.productImportPost)
+      .where(eq(schema.productImportPost.id, skipped.id));
+    expect(stored).toEqual({ anywayStatus: 'queued' });
     expect(importsQueue.added).toEqual([
       { name: IMPORT_POST_JOB, data: { merchantId, importId: run.id, postId: skipped.id } },
     ]);
+  });
+
+  it('finds the post a product was imported from, for its shop only', async () => {
+    const { agent, merchantId } = await verifiedSellerWithShop();
+    const run = await seedRun(merchantId);
+    const draft = await seedProduct(db, merchantId, { name: 'Kurti', status: 'draft' });
+    await seedPost(merchantId, run.id, { result: 'merged', productIds: [draft.id] });
+    const made = await seedPost(merchantId, run.id, {
+      result: 'draft',
+      productIds: [draft.id],
+      caption: 'Kurti, 3 colours',
+      suggestedCategory: 'Kurtis',
+    });
+    const typed = await seedProduct(db, merchantId, { name: 'Typed in', status: 'active' });
+
+    const found = productImportSourceSchema.parse(
+      (await agent.get(`/api/v1/imports/products/${draft.id}`).expect(200)).body,
+    );
+    expect(found.source).toEqual({
+      importId: run.id,
+      post: expect.objectContaining({
+        id: made.id,
+        caption: 'Kurti, 3 colours',
+        suggestedCategory: 'Kurtis',
+        products: [expect.objectContaining({ id: draft.id, name: 'Kurti' })],
+      }),
+    });
+    const none = await agent.get(`/api/v1/imports/products/${typed.id}`).expect(200);
+    expect(none.body).toEqual({ source: null });
+    await agent.get('/api/v1/imports/products/not-a-uuid').expect(400);
+
+    const other = await verifiedSellerWithShop();
+    const elsewhere = await other.agent.get(`/api/v1/imports/products/${draft.id}`).expect(200);
+    expect(elsewhere.body).toEqual({ source: null });
   });
 
   it("activates the run's priced drafts with a starting stock, and reports the rest", async () => {

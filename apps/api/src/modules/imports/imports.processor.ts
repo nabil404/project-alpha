@@ -21,7 +21,8 @@ export class ImportsProcessor extends WorkerHost {
 
   /**
    * Throws while Graph or storage is down, for BullMQ to retry from the run's
-   * cursor; on the last attempt the run fails instead.
+   * cursor; on the last attempt the run fails, or Import anyway marks its post
+   * `failed`, instead.
    */
   async process(job: Job): Promise<void> {
     const lastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
@@ -37,7 +38,7 @@ export class ImportsProcessor extends WorkerHost {
         if (!parsed.success)
           throw new UnrecoverableError(`Malformed ${job.name} job ${job.id ?? ''}`);
         const { merchantId, importId, postId } = parsed.data;
-        return this.runner.importAnyway(merchantId, importId, postId);
+        return this.runner.importAnyway(merchantId, importId, postId, { lastAttempt });
       }
       default:
         throw new UnrecoverableError(`Unknown job on ${IMPORTS_QUEUE}: ${job.name}`);

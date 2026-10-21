@@ -3,10 +3,10 @@
 A seller whose Page already has many product posts turns them into draft
 products, so they don't type an existing catalog in by hand.
 
-**Status (Oct 2026):** in [MVP 01's scope](../../mvp/01-messenger-to-order/scope.md).
-The API and the worker are built: the routes below, the run, the LLM call,
-empty price and stock in the catalog, and the finished email. The dashboard
-screens are not ([Not yet built](#not-yet-built)). Screens: the "Catalog –
+**Status (Oct 2026):** built, in [MVP 01's scope](../../mvp/01-messenger-to-order/scope.md):
+the routes below, the run, the LLM call, empty price and stock in the
+catalog, the finished email and the dashboard screens. The App Review
+description is left ([Not yet built](#not-yet-built)). Screens: the "Catalog –
 Import from Facebook posts (proposal)" row of the design canvas.
 
 ## At a glance
@@ -48,7 +48,9 @@ Import from Facebook posts (proposal)" row of the design canvas.
      variant and activates the selected drafts at once.
    - **Skipped posts:** posts with no product, and posts whose product is
      already in the catalog, each with the reason, **View post** and
-     **Import anyway**.
+     **Import anyway** (not on a post with no caption and no photo); and
+     posts imported before, with the products they are linked to and no
+     Import anyway.
 5. **Fill in a draft.** The normal product edit page, breadcrumb Catalog ›
    Products, with a **From this Facebook post** panel: the caption, the
    photos, a link to the post, and what was read from it. A banner says
@@ -76,6 +78,7 @@ from the request. A non-UUID `:id` or `:postId` is `400 VALIDATION_FAILED`.
 | `POST /imports/:id/resume`               | none                                                         | 202 `ImportRun`                   | 400 `VALIDATION_FAILED`, 404 `IMPORT_NOT_FOUND`, 409 `IMPORT_NOT_STOPPED`, 409 `IMPORT_ALREADY_RUNNING`                                                                              |
 | `POST /imports/:id/posts/:postId/import` | none ("Import anyway")                                       | 202 `ImportPost`                  | 400 `VALIDATION_FAILED`, 404 `IMPORT_NOT_FOUND`, 404 `IMPORT_POST_NOT_FOUND`, 409 `IMPORT_POST_NOT_SKIPPED`, 503 `IMPORT_NOT_AVAILABLE`                                              |
 | `POST /imports/:id/activate`             | `{ productIds, startingStock }`                              | `{ activated, failed }`           | 400 `VALIDATION_FAILED`, 404 `IMPORT_NOT_FOUND`                                                                                                                                      |
+| `GET /imports/products/:productId`       | none                                                         | `{ source: { importId, post } }`  | 400 `VALIDATION_FAILED`                                                                                                                                                              |
 
 - **`since` and `until`** are dates in the shop's time zone. `until` is not
   after today, `since` is not after `until`, and the range is at most 366
@@ -102,12 +105,17 @@ from the request. A non-UUID `:id` or `:postId` is `400 VALIDATION_FAILED`.
   draft).
 - **`ImportPost`**: the post's row id (the `:postId` of Import anyway),
   Graph's `postId`, `createdTime`, `caption`, `url`, `photoCount`, `result`,
-  `reason`, `suggestedCategory`, `matchedProducts` (`{ id, name }`) and
+  `note`, `limitsApplied` ([Results](#results)), `importAnyway`
+  ([Import anyway](#import-anyway)), `suggestedCategory`, `matchedProducts` (`{ id, name }`: the
+  catalog products an `in_catalog` post matched, or the products an
+  `already_imported` post is linked to or an earlier run made from it) and
   `products`: the drafts it made or merged into that still exist, each with
   `status`, `coverThumbnailUrl`, `variantCount`, `needsPrice` and
   `needsStock`. `needs_info` lists posts that made a draft still missing a
   price, `ready` posts whose drafts are priced throughout, each with only
-  those drafts; `skipped` lists `not_product` and `in_catalog` posts. With no
+  those drafts; `skipped` lists the not-product results, `in_catalog` and `already_imported`;
+  Import anyway takes `not_a_product`, `no_named_product` and `in_catalog`
+  (`IMPORT_ANYWAY_RESULTS`). With no
   `result`, every post, latest handled first.
 - **`POST /imports/:id/activate`** sets `startingStock` (0 to 1,000,000) on
   every live variant with no stock, then makes each product `active`, one
@@ -115,6 +123,11 @@ from the request. A non-UUID `:id` or `:postId` is `400 VALIDATION_FAILED`.
   run's or no longer exists (`PRODUCT_NOT_FOUND`), is not a draft
   (`PRODUCT_NOT_DRAFT`), or still misses a price (`PRODUCT_PRICE_MISSING`)
   comes back in `failed` with that code, and the rest go ahead.
+- **`GET /imports/products/:productId`** returns the post that made the
+  product, or the first one merged into it, as an `ImportPost` with its run's
+  id (`productImportSourceSchema`). `source` is null for a product no import
+  made, another shop's, or none at all, so the edit page asks it for every
+  product.
 - **`GET /products?importId=`** filters the products list to one run's drafts,
   for "See them all in Products".
 - New `ErrorCode`s: `IMPORT_NOT_FOUND`, `IMPORT_ALREADY_RUNNING`,
@@ -131,15 +144,15 @@ From
 [`import-errors.ts`](../../../apps/api/src/modules/imports/import-errors.ts),
 plus the Page and catalog errors the table above names.
 
-| Code                      | Status | Params   | When                                                                        |
-| ------------------------- | ------ | -------- | --------------------------------------------------------------------------- |
-| `IMPORT_NOT_FOUND`        | 404    | `{ id }` | No such run for this shop                                                   |
-| `IMPORT_ALREADY_RUNNING`  | 409    | none     | The shop has a `queued`, `running` or `stopping` run                        |
-| `IMPORT_NOT_RUNNING`      | 409    | `{ id }` | Stop on a run that is not `queued` or `running`                             |
-| `IMPORT_NOT_STOPPED`      | 409    | `{ id }` | Resume on a run that is not `stopped`                                       |
-| `IMPORT_POST_NOT_FOUND`   | 404    | `{ id }` | No such post row in the run                                                 |
-| `IMPORT_POST_NOT_SKIPPED` | 409    | `{ id }` | Import anyway on a post that is not `not_product` or `in_catalog`           |
-| `IMPORT_NOT_AVAILABLE`    | 503    | none     | No `LLM_API_KEY` or no Graph client (`META_APP_ID`), so no post can be read |
+| Code                      | Status | Params   | When                                                                                    |
+| ------------------------- | ------ | -------- | --------------------------------------------------------------------------------------- |
+| `IMPORT_NOT_FOUND`        | 404    | `{ id }` | No such run for this shop                                                               |
+| `IMPORT_ALREADY_RUNNING`  | 409    | none     | The shop has a `queued`, `running` or `stopping` run                                    |
+| `IMPORT_NOT_RUNNING`      | 409    | `{ id }` | Stop on a run that is not `queued` or `running`                                         |
+| `IMPORT_NOT_STOPPED`      | 409    | `{ id }` | Resume on a run that is not `stopped`                                                   |
+| `IMPORT_POST_NOT_FOUND`   | 404    | `{ id }` | No such post row in the run                                                             |
+| `IMPORT_POST_NOT_SKIPPED` | 409    | `{ id }` | Import anyway on a post that is not `not_a_product`, `no_named_product` or `in_catalog` |
+| `IMPORT_NOT_AVAILABLE`    | 503    | none     | No `LLM_API_KEY` or no Graph client (`META_APP_ID`), so no post can be read             |
 
 ## Rules
 
@@ -171,16 +184,20 @@ For each post, in order:
 
 1. **Already imported.** The post is skipped as `already_imported`, with no
    LLM call, when a `product_post` row has its id or alias (any status), or
-   an earlier run's `product_import_post` row for it has any result but
-   `failed`. A post an earlier run marked `failed` is read again. This makes
+   an earlier run's `product_import_post` row for it has any result but a
+   failed one. A post an earlier run failed is read again. The row
+   keeps the linked products, or the earlier run's, in
+   `matched_product_ids`. This makes
    overlapping ranges safe and keeps a rerun from paying for the same posts
    twice.
-2. **No caption and no photo** is skipped as `not_product`, with no LLM call.
+2. **No caption and no photo** is skipped as `no_caption_or_photo`, with no
+   LLM call.
 3. **Photos.** Up to 8 of the post's photos are downloaded from Meta's URLs
    outside any transaction, with a size limit and a timeout, and re-encoded
    with `normalize-product-image`. Videos are not imported.
 4. **The LLM call** (`extractProductsFromPost`, [below](#llm-call)) returns
-   `not_product` with a reason, or up to 10 products.
+   `not_product` with a few words on what the post is, or up to 10
+   products.
 5. **Already in the catalog.** Each product is matched by name
    (`matchProduct`, score 1) against the shop's `active`, `draft` and
    `archived` products from before this run. A match is left out: the import
@@ -204,16 +221,31 @@ For each post, in order:
    `m/`. The orphan sweep leaves objects younger than 24 hours, so a failed
    write's objects are swept later.
 
-**Import anyway** reads the post from Graph again for fresh photo links. On an
-`in_catalog` post it makes drafts of every product in the stored `extracted`
-output, with no LLM call and no catalog match. On a `not_product` post it
-re-runs the LLM call with a hint that the post holds a product, and makes
-drafts of what it reads; if the LLM still finds none, or fails, the post stays
-as it was. Either way the run's counts move from the skip to `drafts`.
+#### Import anyway
+
+The route sets the post's `anyway_status` to `queued` and queues the job
+(`ImportRunner.importAnyway`), which reads the post from Graph again for fresh
+photo links.
+
+- **`in_catalog`:** drafts of every product in the stored `extracted` output,
+  with no LLM call and no catalog match, since the seller chose them.
+- **`not_a_product` and `no_named_product`:** the LLM call again, with a hint
+  that the post holds a product. Its products are matched against the catalog
+  and this run's drafts as a run's are: a known product is left out, a repeat
+  merges, and a post whose products are all known becomes `in_catalog`.
+- **`no_caption_or_photo` and `already_imported`** are refused with
+  `IMPORT_POST_NOT_SKIPPED`: the first has nothing to read, and the second
+  already has its products.
+
+When it writes drafts or a catalog match, the run's counts move from the skip
+and `anyway_status` clears. Otherwise the post keeps its result, and
+`anyway_status` says why: `no_product` when the LLM still finds none, `failed`
+when the Page is gone, Graph refuses the token, a photo can't be read, the LLM
+call fails, or Graph is still down on the job's last attempt.
 
 A post with several new products gives each draft its own copy of the
 photos, because an image row belongs to one product. A post whose products
-were cut to fit the catalog's limits keeps `reason: limits_applied`.
+were cut to fit the catalog's limits has `limits_applied` set.
 
 ### What a draft holds
 
@@ -225,7 +257,7 @@ were cut to fit the catalog's limits keeps `reason: limits_applied`.
   elsewhere gets English and, for a name in another script, Latin letters.
 - **Options** (at most 3) and their values, from the caption or the photos,
   within the catalog's limits (30 values, 100 variants). Beyond a limit the
-  draft keeps the first values and the post's `reason` is `limits_applied`.
+  draft keeps the first values and the post has `limits_applied` set.
 - **Price** per variant only when the post states it, in the caption or
   written on a photo. "Inbox for price" leaves it empty. Prices are stored in
   minor units like every other price.
@@ -265,6 +297,33 @@ imported ones:
 - **Lists.** The products list shows "—" for an empty price or stock, and the
   stock filters count an empty stock as out of stock.
 
+### Results
+
+A post's `result` is one value of `importPostResults` in
+[`imports.ts`](../../../packages/shared/src/schemas/imports.ts), which groups
+them as `NOT_PRODUCT_RESULTS` and `FAILED_RESULTS`. The dashboard words come
+from `imports.run.postResult` in `catalog.json`, keyed by the value, so a new
+one fails the web typecheck until it has words.
+
+| Result                | Counted as      | When                                                                                                                                      |
+| --------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `draft`               | drafts          | The post made at least one draft                                                                                                          |
+| `merged`              | merged          | All its products repeated drafts this run made                                                                                            |
+| `not_a_product`       | not products    | The LLM read it as no product. Its words for what the post is ("Eid greeting"), in English, are the post's `note`, null when it gave none |
+| `no_caption_or_photo` | not products    | Neither, so no LLM call was made                                                                                                          |
+| `no_named_product`    | not products    | The LLM gave products, but none had a name that passed the checks                                                                         |
+| `in_catalog`          | in catalog      | Every product matched one the shop has                                                                                                    |
+| `already_imported`    | imported before | A product link or an earlier run has it                                                                                                   |
+| `llm_failed`          | failed          | The LLM call failed                                                                                                                       |
+| `photo_unreadable`    | failed          | A photo could not be downloaded or re-encoded                                                                                             |
+| `write_failed`        | failed          | The post's transaction lost a race                                                                                                        |
+
+`limits_applied` is a separate flag on a `draft` or `merged` post whose
+products, options or values were cut to the catalog's limits. Needs info and
+Ready to activate show "Some options left out" on its drafts. Skipped posts
+shows the result's words. The API returns `note`, but the dashboard does not
+show it.
+
 ### Runs
 
 - **One at a time.** A shop with a `queued`, `running` or `stopping` run gets
@@ -278,7 +337,8 @@ imported ones:
   after the job's retries is `FACEBOOK_UNAVAILABLE`. Five LLM failures in a
   row is `IMPORT_NOT_AVAILABLE`. The run keeps the drafts it already made.
 - **Fails one post only:** one LLM failure, an unreadable photo, or a write
-  that loses a race. The post is `failed`, counted, and the run goes on.
+  that loses a race. The post is `llm_failed`, `photo_unreadable` or
+  `write_failed`, counted, and the run goes on.
 - **Import anyway** is a small job on the same queue. It is allowed while
   another run is going.
 
@@ -323,8 +383,8 @@ same change.
 - **Code checks the output:** an `existing` category not in the list is
   dropped, a price that is not a positive number is dropped, option limits
   are applied, and a product with no name is dropped.
-- **Failure** never throws, as every call. A failed post is `failed`, not a
-  guess.
+- **Failure** never throws, as every call. A failed post is `llm_failed`,
+  not a guess.
 - **Recording.** Every call writes an `llm_call` row with a new purpose,
   `post_import`, added to `llm.types` and to the literal copy in
   `schema/assistant.ts`, which `llm-call.repository.spec` keeps equal, and
@@ -371,13 +431,20 @@ checked Oct 21, 2026):
 [`schema/imports.ts`](../../../apps/api/src/modules/database/schema/imports.ts),
 migration `0049_product_import`. Both tables carry `merchant_id`, the
 isolation policy, and `FORCE ROW LEVEL SECURITY` (migration
-`0050_product_import_force_rls`), and pass `db:verify-rls`.
+`0050_product_import_force_rls`), and pass `db:verify-rls`. Migrations
+`0051` to `0056` replaced a free-text `reason` column with the finer
+`result` values, `note` and `limits_applied`. `0052_import_post_reason_codes`
+and `0055_import_post_results_from_reasons` are hand-written data moves that
+convert older rows. `0057_import_post_anyway_status` adds `anyway_status`.
 
-| Table                 | Key columns                                                                                                                                                                                                                                                                                                                             | Constraints                                                                                                                                                                                                            |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `product_import`      | `id`, `source` (`facebook_posts`), `since`, `until` (`date`), `status`, `error_code`, `started_by` (user, `SET NULL`), `cursor`, `posts_total`, `posts_read`, `drafts`, `merged`, `not_products`, `in_catalog`, `already_imported`, `failed`, `llm_failures_in_row`, `created_at`, `started_at`, `finished_at`, `updated_at`            | Status and source checks; `since <= until`; a partial unique index on `merchant_id` where `status IN ('queued', 'running', 'stopping')` (`PRODUCT_IMPORT_ACTIVE_UIDX`), so two runs can't start                        |
-| `product_import_post` | `import_id`, `post_id` (Graph's `<page>_<post>`), `created_time`, `caption`, `permalink_url`, `photo_count`, `result` (`draft`, `merged`, `not_product`, `in_catalog`, `already_imported`, `failed`), `reason`, `matched_product_ids text[]`, `suggested_category`, `product_ids text[]`, `extracted jsonb`, `created_at`, `updated_at` | Unique `(merchant_id, import_id, post_id)`; indexes on `(merchant_id, post_id)` for the skip check and `(merchant_id, import_id, created_at)` for the list; composite key to `product_import` with `ON DELETE CASCADE` |
+| Table                 | Key columns                                                                                                                                                                                                                                                                                                                                                | Constraints                                                                                                                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `product_import`      | `id`, `source` (`facebook_posts`), `since`, `until` (`date`), `status`, `error_code`, `started_by` (user, `SET NULL`), `cursor`, `posts_total`, `posts_read`, `drafts`, `merged`, `not_products`, `in_catalog`, `already_imported`, `failed`, `llm_failures_in_row`, `created_at`, `started_at`, `finished_at`, `updated_at`                               | Status and source checks; `since <= until`; a partial unique index on `merchant_id` where `status IN ('queued', 'running', 'stopping')` (`PRODUCT_IMPORT_ACTIVE_UIDX`), so two runs can't start                        |
+| `product_import_post` | `import_id`, `post_id` (Graph's `<page>_<post>`), `created_time`, `caption`, `permalink_url`, `photo_count`, `result` ([Results](#results)), `note`, `limits_applied boolean`, `anyway_status` (`queued`, `no_product`, `failed`), `matched_product_ids text[]`, `suggested_category`, `product_ids text[]`, `extracted jsonb`, `created_at`, `updated_at` | Unique `(merchant_id, import_id, post_id)`; indexes on `(merchant_id, post_id)` for the skip check and `(merchant_id, import_id, created_at)` for the list; composite key to `product_import` with `ON DELETE CASCADE` |
 
+- **`result`** is checked against `IMPORT_POST_RESULT_VALUES`
+  (`product_import_post_result_ck`), and `anyway_status` against
+  `IMPORT_ANYWAY_STATUS_VALUES`; `note` is free text.
 - **`llm_failures_in_row`** counts the run's LLM failures since its last
   successful call; five fail the run.
 - **`extracted`** is the checked LLM output, parsed with `postProductsSchema`
@@ -414,24 +481,53 @@ in development.
 
 ## Dashboard
 
-- **Catalog › Import** opens the source modal ([The flow](#the-flow)).
-- **`/catalog/imports`**, the **Imports** tab: a **Past imports** table with
-  Posts from (the range), Ran on, Result (Finished, Running, Stopped or
-  Failed, with a one-line reason), Posts read, Drafts, Left to review, and
-  **Open**, **Resume** or **Try again**. The tab's main button is **Import
-  from Facebook**.
-- **`/catalog/imports/:id`**: the running view, then the summary, in one
-  route. The breadcrumb is Catalog › Imports › the run's range. While the run
-  is `queued`, `running` or `stopping` the page refetches `GET /imports/:id`
-  every 3 seconds. It stops at any other status.
-- **Product edit page:** the **From this Facebook post** panel when the
-  product has a `product_import_post`, the missing-field banner, the
-  highlighted empty price and stock fields, and the category suggestion. An
-  empty price or stock is allowed while the status is Draft or Archived.
-- **Products list:** a "From import" filter (`importId`) reached from the
-  summary, and "—" for an empty price or stock.
+The screens follow the design canvas's "Catalog – Import from Facebook posts
+(proposal)" row. The code is in `apps/web/src/features/imports/`, with copy
+under `imports` in `catalog.json`.
+
+- **Catalog › Import** (beside Add product) opens "Import products": **Import
+  from Facebook**, and **Import from CSV**, disabled with "Coming soon".
+- **The date dialog** (`ImportDialog`) shows the connected Page, the presets
+  Last month, Last 3 months (picked), Last 6 months, Last year and Custom
+  dates as pills, and From and To fields that follow the preset; typing a
+  date makes it Custom. It checks the range before the API does: the end not
+  after the shop's today, the start not after the end, at most 366 days. It
+  calls `GET /imports/facebook/access` each time it opens; with no Page it
+  links to Settings › Messenger, and when `canReadPosts` is false it shows
+  **Reconnect your Page to allow reading posts** in place of **Start
+  import**.
+- **`/catalog/imports`**, the **Imports** tab: **Past imports** with Posts
+  from, Ran on, Result (a status badge and a note: skipped and merged counts,
+  where a stopped run stopped, or why it failed), Posts read, Drafts, Left to
+  review, and **Open**, **Resume** or **Try again**. The tab's main button is
+  **Import from Facebook**. The list refetches every 3 seconds while a run on
+  it is going.
+- **`/catalog/imports/:id`**, one route for both views. The breadcrumb is
+  Catalog › Imports › the run's range. While the run is `queued`, `running`
+  or `stopping`, "Importing your posts" shows "Reading post 34 of 84", a
+  progress bar, four counts, the latest posts with what became of each, and
+  **Stop import**; it refetches the run and its posts every 3 seconds and
+  stops at any other status. Then the title says Import finished, stopped or
+  failed, over a banner (drafts waiting, Resume, or the failure), four counts
+  and the tabs **Needs info**, **Ready to activate** and **Skipped posts**,
+  each with its count. Ready to activate has every draft ticked, one starting
+  stock, and **Activate N products**; Skipped posts has **View post** and
+  **Import anyway**, which says "Reading the post again…" until the job
+  settles, then "Read again: still no product found." or "Couldn't read the
+  post again." when it made no drafts. The tab polls every 3 seconds while a
+  post on it is being read again, and refreshes the run's counts once it
+  settles. The tab, page and page size are in the URL.
+- **Product edit page:** the **From this Facebook post** panel heads the side
+  column, with the Page, the post's date and photo count, the caption, a link
+  to the post and "What we read". A suggested category the shop doesn't have
+  shows under Categories with **Dismiss** and **Create and add**. A draft has
+  **Save draft** and **Activate**; the banner and empty fields are in
+  [Catalog](../02-catalog/README.md#dashboard).
+- **Products list:** `?importId=` shows the run's products with a "From
+  import" chip ("See them all in Products" on the summary).
 - **Settings › Notifications:** the fourth switch, **Import finished**.
-- Copy goes through `t()`, dates and money through `useFormatters()`.
+- Copy goes through `t()`, dates and money through `useFormatters()`. A run's
+  dates are shop days, read in the shop's zone (`useRangeLabel`).
 
 ## Meta / App Review
 
@@ -449,18 +545,19 @@ this use beside phase 5's post linking
 
 ## Tests
 
-| Spec                                                                                                                                                | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`imports/__tests__/post-drafts.spec.ts`](../../../apps/api/src/modules/imports/__tests__/post-drafts.spec.ts)                                      | Draft writing: names as written, aliases, option limits, prices per variant and from a photo, bad prices dropped, categories linked, dropped or suggested                                                                                                                                                                                                                                                                                                                                   |
-| [`imports/__tests__/import.repository.spec.ts`](../../../apps/api/src/modules/imports/__tests__/import.repository.spec.ts) (DB)                     | Schema literals equal the shared enums; one going run per shop under a race; one row per post per run; the skip check; the summary tabs; two-merchant isolation on both tables                                                                                                                                                                                                                                                                                                              |
-| [`imports/__tests__/import-runner.spec.ts`](../../../apps/api/src/modules/imports/__tests__/import-runner.spec.ts) (DB, Graph, CDN and LLM stubbed) | Paging and the cursor; photos, cover, category, link and `llm_call` of a draft; a linked post and an earlier run's posts skipped, its failed post read again; empty and not-product posts; in-catalog posts (active, draft, archived) left unchanged; one new and one known product; two products and no link; a repost merged; stop and resume; a stop before the job; token refused; a Graph outage and its last attempt; five LLM failures; an unreadable photo; Import anyway both ways |
-| [`imports/__tests__/imports.e2e.spec.ts`](../../../apps/api/src/modules/imports/__tests__/imports.e2e.spec.ts)                                      | The routes over HTTP and their errors, the access check, another shop's runs, stop and resume, the tabs, Import anyway, activate and the products list's `importId`                                                                                                                                                                                                                                                                                                                         |
-| [`products/__tests__/product-empty-price.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-empty-price.service.spec.ts)    | Empty price and stock on draft and archived products; each write refusing an active product with either empty; archived back to active; the list; `findSellableCatalog`                                                                                                                                                                                                                                                                                                                     |
-| [`notifications/__tests__/notification-composer.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notification-composer.spec.ts)      | The switch's default, a finished, a stopped and a failed run's email, and an end the run has moved on from                                                                                                                                                                                                                                                                                                                                                                                  |
-| [`messenger/page/__tests__/meta-graph.client.spec.ts`](../../../apps/api/src/modules/messenger/page/__tests__/meta-graph.client.spec.ts)            | `listPublishedPosts`: album photos, videos left out, the cursor and the last page                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Spec                                                                                                                                                | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`imports/__tests__/post-drafts.spec.ts`](../../../apps/api/src/modules/imports/__tests__/post-drafts.spec.ts)                                      | Draft writing: names as written, aliases, option limits, prices per variant and from a photo, bad prices dropped, categories linked, dropped or suggested                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| [`imports/__tests__/import.repository.spec.ts`](../../../apps/api/src/modules/imports/__tests__/import.repository.spec.ts) (DB)                     | Schema literals equal the shared enums; one going run per shop under a race; one row per post per run; the skip check; the summary tabs; two-merchant isolation on both tables                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| [`imports/__tests__/import-runner.spec.ts`](../../../apps/api/src/modules/imports/__tests__/import-runner.spec.ts) (DB, Graph, CDN and LLM stubbed) | Paging and the cursor; photos, cover, category, link and `llm_call` of a draft; a linked post and an earlier run's posts skipped, its failed post read again; empty and not-product posts; in-catalog posts (active, draft, archived) left unchanged; one new and one known product; two products and no link; a repost merged; stop and resume; a stop before the job; token refused; a Graph outage and its last attempt; five LLM failures; an unreadable photo; Import anyway both ways, its catalog match, still no product, a failed read, Graph down on the last attempt, and an empty post refused |
+| [`imports/__tests__/imports.e2e.spec.ts`](../../../apps/api/src/modules/imports/__tests__/imports.e2e.spec.ts)                                      | The routes over HTTP and their errors, the access check, another shop's runs, stop and resume, the tabs, Import anyway (queued, and refused on an empty post), activate, a product's source post and the products list's `importId`                                                                                                                                                                                                                                                                                                                                                                        |
+| [`products/__tests__/product-empty-price.service.spec.ts`](../../../apps/api/src/modules/products/__tests__/product-empty-price.service.spec.ts)    | Empty price and stock on draft and archived products; each write refusing an active product with either empty; archived back to active; the list; `findSellableCatalog`                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [`notifications/__tests__/notification-composer.spec.ts`](../../../apps/api/src/modules/notifications/__tests__/notification-composer.spec.ts)      | The switch's default, a finished, a stopped and a failed run's email, and an end the run has moved on from                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| [`messenger/page/__tests__/meta-graph.client.spec.ts`](../../../apps/api/src/modules/messenger/page/__tests__/meta-graph.client.spec.ts)            | `listPublishedPosts`: album photos, videos left out, the cursor and the last page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-`apps/web` has no test runner. The screens get `typecheck`, `lint` and a
-check at 375 px when they are built.
+`apps/web` has no test runner. The screens passed `typecheck` and `lint`,
+and no page scrolls sideways at 375 px, checked against stubbed API
+responses.
 
 ## Key files
 
@@ -473,19 +570,10 @@ Under `apps/api/src/modules/` unless noted:
 - [`llm/prompts/extract-products-from-post.ts`](../../../apps/api/src/modules/llm/prompts/extract-products-from-post.ts): the prompt
 - [`messenger/page/meta-graph.client.ts`](../../../apps/api/src/modules/messenger/page/meta-graph.client.ts): `listPublishedPosts` and `getImportPost`
 - [`packages/shared/src/schemas/imports.ts`](../../../packages/shared/src/schemas/imports.ts): the shared contract
+- [`apps/web/src/features/imports/`](../../../apps/web/src/features/imports/): the dialog, the history, the run page and the edit page's panel, with routes under `apps/web/src/routes/_app/catalog/imports/`
 
 ## Not yet built
 
-- **The dashboard**: the Import modal, the date dialog, `/catalog/imports`
-  and `/catalog/imports/:id`, the product edit page's **From this Facebook
-  post** panel, banner and category suggestion, the products list's "From
-  import" filter, and the **Import finished** switch
-  ([Settings – Notifications](../10-settings-notifications/README.md#follow-ups)).
-- **A read for the From this Facebook post panel.** No route returns a
-  product's import row yet; it joins through
-  `product_import_post.product_ids`.
-- **Empty fields on the product form**
-  ([Catalog](../02-catalog/README.md#not-yet-built)).
 - **The App Review description** of `pages_read_engagement` naming this use.
 
 ## Open questions

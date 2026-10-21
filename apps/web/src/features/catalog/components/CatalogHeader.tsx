@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
-/** The catalog's title over its section tabs, shared by Products and Categories. */
+/** The catalog's title over its section tabs, shared by Products, Categories and Imports. */
 export function CatalogHeader({
   section,
   action,
 }: {
-  section: 'products' | 'categories';
+  section: 'products' | 'categories' | 'imports';
   action?: ReactNode;
 }) {
   const { t } = useTranslation('catalog');
@@ -41,6 +41,13 @@ export function CatalogHeader({
           className={cn(tab, tabState(section === 'categories'))}
         >
           {t('list.tabs.categories')}
+        </Link>
+        <Link
+          to="/catalog/imports"
+          aria-current={section === 'imports' ? 'page' : undefined}
+          className={cn(tab, tabState(section === 'imports'))}
+        >
+          {t('list.tabs.imports')}
         </Link>
       </nav>
     </>

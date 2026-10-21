@@ -8,6 +8,7 @@ export interface SelectOption {
   /** An empty string is allowed: "All categories", "No area". */
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
 /** Radix rejects an item whose value is "", so the empty choice travels as this. */
@@ -91,6 +92,7 @@ function Select({
               <SelectPrimitive.Item
                 key={option.value}
                 value={toRadix(option.value)}
+                disabled={option.disabled}
                 data-slot="select-item"
                 className={cn(
                   'relative flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-body outline-hidden select-none',

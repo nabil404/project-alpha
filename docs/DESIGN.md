@@ -191,6 +191,8 @@ new enum member fails the build instead of rendering unstyled.
 | Customer `new`                                     | success                      |
 | Customer `needs_you`                               | warning                      |
 | Customer `inactive`                                | neutral                      |
+| Import run `queued`, `running`, `stopping`         | accent                       |
+| Import run `finished` / `stopped` / `failed`       | success / warning / danger   |
 
 Keep `accent` for the one status that needs the seller: the teal accent sits
 near `success` in hue, so an accent badge must never be the only thing that

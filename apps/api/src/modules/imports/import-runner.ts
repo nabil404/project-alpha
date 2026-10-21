@@ -8,6 +8,9 @@ import {
   regionDefaults,
   shopDayStart,
   type ErrorCode,
+  canImportAnyway,
+  isFailedResult,
+  type ImportAnywayStatus,
   type ImportPostResult,
 } from '@app/shared';
 import { CryptoService } from '../../common/crypto.service';
@@ -20,7 +23,7 @@ import {
 import { LlmCallRepository } from '../conversations/assistant/llm-call.repository';
 import type { TenantScope, Transaction } from '../database/base.repository';
 import { DATABASE, type Database } from '../database/database.module';
-import type { ProductImportRow } from '../database/schema/index';
+import type { ProductImportPostRow, ProductImportRow } from '../database/schema/index';
 import { withMerchant } from '../database/with-merchant';
 import { LLM, type LlmCallRecord, type LlmClient } from '../llm/llm.types';
 import { FacebookPageRepository } from '../messenger/page/facebook-page.repository';
@@ -44,7 +47,7 @@ import { ProductsRepository } from '../products/products.repository';
 import { MerchantSettingsRepository } from '../settings/merchant-settings.repository';
 import type { NormalizedImage } from '../products/images/normalize-product-image';
 import { ImportPhotos, type StoredImage } from './import-photos';
-import { ImportRepository, SKIPPED_RESULTS, type RunCounts } from './import.repository';
+import { ImportRepository, type RunCounts } from './import.repository';
 import {
   aliasLanguagesFor,
   checkPostProducts,
@@ -56,15 +59,6 @@ import {
 export const LLM_FAILURES_TO_FAIL = 5;
 /** Photos sent to the LLM per post. */
 export const LLM_PHOTOS_PER_POST = 4;
-
-/** Why a post failed, kept as its reason. */
-export const POST_FAILURE = {
-  llm: 'llm_failed',
-  photo: 'photo_unreadable',
-  write: 'write_failed',
-} as const;
-
-export const NO_CAPTION_OR_PHOTO = 'No caption or photo';
 
 type RunEnd = 'finished' | 'stopped' | 'failed';
 
@@ -93,7 +87,8 @@ interface ProductWrite {
 
 interface PostOutcome {
   result: ImportPostResult;
-  reason?: string | null;
+  note?: string | null;
+  limitsApplied?: boolean;
   matchedProductIds?: string[];
   suggestedCategory?: string | null;
   extracted?: unknown;
@@ -161,22 +156,59 @@ export class ImportRunner {
     }
   }
 
-  /** Import anyway on a skipped post. Does nothing when the post is no longer skipped. */
-  async importAnyway(merchantId: string, importId: string, rowId: string): Promise<void> {
+  /**
+   * Import anyway on a skipped post. Throws while Graph or storage is down,
+   * for BullMQ to retry; on the last attempt the post is marked `failed`.
+   * Does nothing when the post can no longer be imported anyway.
+   */
+  async importAnyway(
+    merchantId: string,
+    importId: string,
+    rowId: string,
+    { lastAttempt = true }: { lastAttempt?: boolean } = {},
+  ): Promise<void> {
     const scope: TenantScope = { merchantId };
     const row = await withMerchant(this.db, merchantId, (tx) =>
       this.imports.findPost(tx, scope, importId, rowId),
     );
-    if (!row || !SKIPPED_RESULTS.includes(row.result)) return;
+    if (!row || !canImportAnyway(row.result)) return;
+    let status: ImportAnywayStatus | null;
+    try {
+      status = await this.readAgain(scope, importId, row);
+    } catch (error) {
+      if (!lastAttempt) throw error;
+      this.logger.warn(`Import anyway on post ${row.postId} failed: ${describe(error)}`);
+      status = 'failed';
+    }
+    if (status) {
+      await withMerchant(this.db, merchantId, (tx) =>
+        this.imports.setAnywayStatus(tx, scope, importId, rowId, status),
+      );
+    }
+  }
+
+  /**
+   * Reads a skipped post again. A post already in the catalog becomes drafts
+   * of its stored output, unmatched, since the seller chose it. A not-product
+   * post goes to the LLM with the hint, and its products are matched against
+   * the catalog and this run's drafts as a run's are. Answers the post's
+   * Import anyway status when nothing was written, null when the post moved.
+   */
+  private async readAgain(
+    scope: TenantScope,
+    importId: string,
+    row: ProductImportPostRow,
+  ): Promise<ImportAnywayStatus | null> {
+    const { merchantId } = scope;
     const context = await this.context(scope, importId);
-    if (!context) return;
+    if (!context) return 'failed';
     const graph = this.requireGraph();
 
     let fresh: GraphImportPost | null;
     try {
       fresh = await graph.getImportPost(context.pageToken, row.postId);
     } catch (error) {
-      if (isPermissionError(error)) return;
+      if (isPermissionError(error)) return 'failed';
       throw new GraphUnavailable(describe(error));
     }
     const post: GraphImportPost = fresh ?? {
@@ -188,20 +220,23 @@ export class ImportRunner {
     };
 
     const read = await this.photos.read(post.photoUrls);
-    if (!read) return;
+    if (!read) return 'failed';
     const stored = await this.photos.store(merchantId, read);
-    const undo: RunCounts = row.result === 'in_catalog' ? { inCatalog: -1 } : { notProducts: -1 };
+    const inCatalog = row.result === 'in_catalog';
+    const undo: RunCounts = inCatalog ? { inCatalog: -1 } : { notProducts: -1 };
 
     let checked: CheckedPost;
     let llmCalls: LlmCallRecord[] = [];
     let extracted: unknown = row.extracted;
-    if (row.result === 'in_catalog') {
+    if (inCatalog) {
       const parsed = postProductsSchema.safeParse(row.extracted);
-      if (!parsed.success) return;
+      if (!parsed.success) {
+        await this.photos.discard(merchantId, stored);
+        return 'failed';
+      }
       checked = checkPostProducts(parsed.data, context);
     } else {
-      const llm = this.requireLlm();
-      const result = await llm.extractProductsFromPost({
+      const result = await this.requireLlm().extractProductsFromPost({
         caption: post.message,
         photos: stored.slice(0, LLM_PHOTOS_PER_POST).map((image) => image.url),
         currency: context.currency,
@@ -213,7 +248,7 @@ export class ImportRunner {
       if (!result.ok) {
         await this.recordCalls(scope, importId, llmCalls);
         await this.photos.discard(merchantId, stored);
-        return;
+        return 'failed';
       }
       extracted = result.value;
       checked = checkPostProducts(result.value, context);
@@ -222,18 +257,41 @@ export class ImportRunner {
     if (checked.kind === 'not_product') {
       await this.recordCalls(scope, importId, llmCalls);
       await this.photos.discard(merchantId, stored);
-      return;
+      return 'no_product';
     }
-    const products = await this.withImages(merchantId, checked, { read, stored }, () => undefined);
+
+    const known = inCatalog
+      ? checked.drafts.map((): string[] => [])
+      : checked.drafts.map((draft) => matchesOf(draft, context.catalog));
+    if (known.every((matches) => matches.length > 0)) {
+      await this.photos.discard(merchantId, stored);
+      await this.write(context, post, {
+        result: 'in_catalog',
+        matchedProductIds: [...new Set(known.flat())],
+        extracted,
+        llmCalls,
+        counts: { ...undo, inCatalog: 1 },
+      });
+      return null;
+    }
+    const left: CheckedPost = {
+      ...checked,
+      drafts: checked.drafts.filter((_, index) => known[index]!.length === 0),
+    };
+    const products = await this.withImages(merchantId, left, { read, stored }, (draft) =>
+      inCatalog ? undefined : matchesOf(draft, context.drafts)[0],
+    );
     await this.write(context, post, {
       result: 'draft',
-      reason: checked.flagged ? 'limits_applied' : null,
-      suggestedCategory: firstSuggestion(checked),
+      limitsApplied: checked.flagged,
+      matchedProductIds: [...new Set(known.flat())],
+      suggestedCategory: firstSuggestion(left),
       extracted,
       products,
       llmCalls,
       counts: undo,
     });
+    return null;
   }
 
   /** queued -> running. A stop that came before the job started ends the run here. */
@@ -318,25 +376,24 @@ export class ImportRunner {
     const seen = await withMerchant(this.db, scope.merchantId, async (tx) => {
       const own = await this.imports.findPostInRun(tx, scope, importId, post.id);
       // A post this run already handled is done; only a failed one is read again.
-      if (own && own.result !== 'failed') return 'done' as const;
-      if (await this.imports.importedBefore(tx, scope, importId, post.id, keys)) {
-        return 'imported' as const;
-      }
-      return own ? ('retry' as const) : ('new' as const);
+      if (own && !isFailedResult(own.result)) return 'done' as const;
+      const before = await this.imports.importedBefore(tx, scope, importId, post.id, keys);
+      if (before) return { kind: 'imported' as const, productIds: before.productIds };
+      return { kind: own ? ('retry' as const) : ('new' as const) };
     });
     if (seen === 'done') return 0;
-    const counted: RunCounts = seen === 'retry' ? { failed: -1 } : { postsRead: 1 };
+    const counted: RunCounts = seen.kind === 'retry' ? { failed: -1 } : { postsRead: 1 };
 
-    if (seen === 'imported') {
+    if (seen.kind === 'imported') {
       return this.write(context, post, {
         result: 'already_imported',
+        matchedProductIds: seen.productIds,
         counts: { ...counted, alreadyImported: 1 },
       });
     }
     if (!post.message && post.photoUrls.length === 0) {
       return this.write(context, post, {
-        result: 'not_product',
-        reason: NO_CAPTION_OR_PHOTO,
+        result: 'no_caption_or_photo',
         counts: { ...counted, notProducts: 1 },
       });
     }
@@ -344,8 +401,7 @@ export class ImportRunner {
     const read = await this.photos.read(post.photoUrls);
     if (!read) {
       return this.write(context, post, {
-        result: 'failed',
-        reason: POST_FAILURE.photo,
+        result: 'photo_unreadable',
         counts: { ...counted, failed: 1 },
       });
     }
@@ -364,8 +420,7 @@ export class ImportRunner {
     if (!result.ok) {
       await this.photos.discard(scope.merchantId, stored);
       return this.write(context, post, {
-        result: 'failed',
-        reason: POST_FAILURE.llm,
+        result: 'llm_failed',
         llmCalls,
         llmFailures: 'bump',
         counts: { ...counted, failed: 1 },
@@ -376,8 +431,8 @@ export class ImportRunner {
     if (checked.kind === 'not_product') {
       await this.photos.discard(scope.merchantId, stored);
       return this.write(context, post, {
-        result: 'not_product',
-        reason: checked.reason,
+        result: checked.result,
+        note: checked.note,
         llmCalls,
         llmFailures: 'reset',
         counts: { ...counted, notProducts: 1 },
@@ -409,7 +464,7 @@ export class ImportRunner {
     );
     return this.write(context, post, {
       result: 'draft',
-      reason: checked.flagged ? 'limits_applied' : null,
+      limitsApplied: checked.flagged,
       matchedProductIds: [...new Set(known.flat())],
       suggestedCategory: firstSuggestion(fresh),
       extracted: result.value,
@@ -480,7 +535,9 @@ export class ImportRunner {
           permalinkUrl: post.permalinkUrl,
           photoCount: Math.min(post.photoUrls.length, IMPORT_POST_PHOTO_MAX),
           result,
-          reason: outcome.reason ?? null,
+          limitsApplied: outcome.limitsApplied ?? false,
+          anywayStatus: null,
+          note: outcome.note ?? null,
           matchedProductIds: outcome.matchedProductIds ?? [],
           suggestedCategory: outcome.suggestedCategory ?? null,
           productIds,
@@ -511,8 +568,7 @@ export class ImportRunner {
       this.logger.warn(`Import ${importId} could not write post ${post.id}: ${describe(error)}`);
       const { postsRead, failed } = outcome.counts;
       return this.write(context, post, {
-        result: 'failed',
-        reason: POST_FAILURE.write,
+        result: 'write_failed',
         llmCalls: outcome.llmCalls,
         llmFailures: outcome.llmFailures,
         counts: { postsRead, failed: (failed ?? 0) + 1 },

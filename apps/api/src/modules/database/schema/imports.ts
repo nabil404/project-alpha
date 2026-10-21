@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   foreignKey,
@@ -28,11 +29,16 @@ export const IMPORT_STATUS_VALUES = [
 export const IMPORT_POST_RESULT_VALUES = [
   'draft',
   'merged',
-  'not_product',
+  'not_a_product',
+  'no_caption_or_photo',
+  'no_named_product',
   'in_catalog',
   'already_imported',
-  'failed',
+  'llm_failed',
+  'photo_unreadable',
+  'write_failed',
 ] as const;
+export const IMPORT_ANYWAY_STATUS_VALUES = ['queued', 'no_product', 'failed'] as const;
 
 /** The partial unique index that allows one queued, running or stopping run per shop. */
 export const PRODUCT_IMPORT_ACTIVE_UIDX = 'product_import_merchant_active_uidx';
@@ -109,7 +115,11 @@ export const productImportPost = pgTable(
     permalinkUrl: text('permalink_url'),
     photoCount: integer('photo_count').notNull().default(0),
     result: text('result', { enum: IMPORT_POST_RESULT_VALUES }).notNull(),
-    reason: text('reason'),
+    /** The reader's own words for a `not_a_product` post. */
+    note: text('note'),
+    limitsApplied: boolean('limits_applied').notNull().default(false),
+    /** The last Import anyway on the post, until it makes drafts. */
+    anywayStatus: text('anyway_status', { enum: IMPORT_ANYWAY_STATUS_VALUES }),
     matchedProductIds: text('matched_product_ids')
       .array()
       .notNull()
@@ -132,6 +142,10 @@ export const productImportPost = pgTable(
       foreignColumns: [productImport.merchantId, productImport.id],
     }).onDelete('cascade'),
     check('product_import_post_result_ck', oneOf(t.result, IMPORT_POST_RESULT_VALUES)),
+    check(
+      'product_import_post_anyway_status_ck',
+      oneOf(t.anywayStatus, IMPORT_ANYWAY_STATUS_VALUES),
+    ),
     check('product_import_post_photo_count_ck', sql`${t.photoCount} >= 0`),
     index('product_import_post_merchant_post_idx').on(t.merchantId, t.postId),
     index('product_import_post_merchant_import_created_idx').on(

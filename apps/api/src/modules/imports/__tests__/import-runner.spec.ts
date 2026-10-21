@@ -12,7 +12,6 @@ import {
   openRuntimeDb,
   seedCategory,
   seedProduct,
-  seedVariant,
   type CatalogTestDb,
 } from '../../database/__tests__/catalog-test-db';
 import { seedFacebookPage } from '../../database/__tests__/conversation-seeds';
@@ -34,12 +33,7 @@ import { ProductsRepository } from '../../products/products.repository';
 import { MerchantSettingsRepository } from '../../settings/merchant-settings.repository';
 import { InMemoryObjectStorage } from '../../storage/__tests__/in-memory-object-storage';
 import { ImportPhotos } from '../import-photos';
-import {
-  GraphUnavailable,
-  ImportRunner,
-  LLM_FAILURES_TO_FAIL,
-  NO_CAPTION_OR_PHOTO,
-} from '../import-runner';
+import { GraphUnavailable, ImportRunner, LLM_FAILURES_TO_FAIL } from '../import-runner';
 import { ImportRepository } from '../import.repository';
 
 const KEY = Buffer.alloc(32, 7).toString('base64');
@@ -118,6 +112,9 @@ const item = (name: string, overrides: Partial<PostProduct> = {}): PostProduct =
   category: null,
   ...overrides,
 });
+/** `count` distinct size values: one more than an option may hold is cut. */
+const sizes = (count: number) => Array.from({ length: count }, (_, index) => String(30 + index));
+
 const sells = (...items: PostProduct[]): PostProducts => ({
   kind: 'products',
   reason: null,
@@ -138,7 +135,6 @@ describeDb('ImportRunner (app_runtime)', () => {
   let postSeq = 0;
 
   const repo = new ImportRepository();
-  const scope = () => ({ merchantId: t.merchantA });
 
   const post = (caption: string | null, photos = 1): GraphImportPost => {
     postSeq += 1;
@@ -270,7 +266,30 @@ describeDb('ImportRunner (app_runtime)', () => {
     });
     expect(after.startedAt).not.toBeNull();
     expect(ended).toEqual([{ importId: run.id, endedAt: after.finishedAt }]);
-    expect((await postRow(run.id, first[1]!.id)).reason).toBe('Eid greeting');
+    expect(await postRow(run.id, first[1]!.id)).toMatchObject({
+      result: 'not_a_product',
+      note: 'Eid greeting',
+    });
+  });
+
+  it('flags a post whose products were cut to the catalog limits', async () => {
+    const tidy = post('Kurti');
+    const crowded = post('Shoes');
+    graph.setPages([tidy, crowded]);
+    llm.answers.set('Kurti', sells(item('Kurti')));
+    llm.answers.set(
+      'Shoes',
+      sells(item('Sandal', { options: [{ name: 'Size', values: sizes(31) }] })),
+    );
+    const run = await startRun();
+
+    await runner.run(t.merchantA, run.id);
+
+    expect(await postRow(run.id, tidy.id)).toMatchObject({ result: 'draft', limitsApplied: false });
+    expect(await postRow(run.id, crowded.id)).toMatchObject({
+      result: 'draft',
+      limitsApplied: true,
+    });
   });
 
   it('writes a draft with its photos, cover, category, aliases, link and LLM call', async () => {
@@ -355,7 +374,10 @@ describeDb('ImportRunner (app_runtime)', () => {
 
     expect(llm.requests).toEqual([]);
     expect(downloads).toEqual([]);
-    expect(await postRow(run.id, linked.id)).toMatchObject({ result: 'already_imported' });
+    expect(await postRow(run.id, linked.id)).toMatchObject({
+      result: 'already_imported',
+      matchedProductIds: [product.id],
+    });
     expect(await runOf(run.id)).toMatchObject({ alreadyImported: 1, postsRead: 1 });
   });
 
@@ -368,14 +390,14 @@ describeDb('ImportRunner (app_runtime)', () => {
       .where(eq(schema.productImport.id, earlier.id));
     await t.db.insert(schema.productImportPost).values(
       [
-        [notProduct, 'not_product'],
+        [notProduct, 'not_a_product'],
         [inCatalog, 'in_catalog'],
-        [failed, 'failed'],
+        [failed, 'llm_failed'],
       ].map(([graphPost, result]) => ({
         merchantId: t.merchantA,
         importId: earlier.id,
         postId: (graphPost as GraphImportPost).id,
-        result: result as 'failed',
+        result: result as 'llm_failed',
       })),
     );
     graph.setPages([notProduct, inCatalog, failed]);
@@ -397,8 +419,8 @@ describeDb('ImportRunner (app_runtime)', () => {
 
     expect(llm.requests).toEqual([]);
     expect(await postRow(run.id, empty.id)).toMatchObject({
-      result: 'not_product',
-      reason: NO_CAPTION_OR_PHOTO,
+      result: 'no_caption_or_photo',
+      note: null,
     });
   });
 
@@ -584,6 +606,9 @@ describeDb('ImportRunner (app_runtime)', () => {
       errorCode: 'IMPORT_NOT_AVAILABLE',
       failed: LLM_FAILURES_TO_FAIL,
     });
+    expect(await postRow(run.id, posts[0]!.id)).toMatchObject({
+      result: 'llm_failed',
+    });
   });
 
   it('fails a post whose photo cannot be read, and goes on', async () => {
@@ -595,7 +620,9 @@ describeDb('ImportRunner (app_runtime)', () => {
 
     await runner.run(t.merchantA, run.id);
 
-    expect(await postRow(run.id, broken.id)).toMatchObject({ result: 'failed' });
+    expect(await postRow(run.id, broken.id)).toMatchObject({
+      result: 'photo_unreadable',
+    });
     expect(await runOf(run.id)).toMatchObject({ status: 'finished', failed: 1, drafts: 1 });
   });
 
@@ -630,12 +657,109 @@ describeDb('ImportRunner (app_runtime)', () => {
       await runner.run(t.merchantA, run.id);
       const row = await postRow(run.id, greeting.id);
 
+      // As the route leaves it before queueing the job.
+      await t.db
+        .update(schema.productImportPost)
+        .set({ anywayStatus: 'queued' })
+        .where(eq(schema.productImportPost.id, row.id));
       llm.answers.set('Eid offer', sells(item('Eid special panjabi')));
       await runner.importAnyway(t.merchantA, run.id, row.id);
 
       expect(llm.requests.map((request) => request.hint)).toEqual([undefined, true]);
-      expect(await postRow(run.id, greeting.id)).toMatchObject({ result: 'draft' });
+      expect(await postRow(run.id, greeting.id)).toMatchObject({
+        result: 'draft',
+        anywayStatus: null,
+      });
       expect(await runOf(run.id)).toMatchObject({ notProducts: 0, drafts: 1 });
+    });
+
+    it('matches a re-read post against the catalog, as a run does', async () => {
+      const katan = await seedProduct(t.db, t.merchantA, { name: 'Katan saree', status: 'active' });
+      const onlyKnown = post('Puja wishes');
+      const mixed = post('Puja collection');
+      graph.setPages([onlyKnown, mixed]);
+      const notProduct = { kind: 'not_product' as const, reason: 'Puja greeting', products: [] };
+      llm.answers.set('Puja wishes', notProduct);
+      llm.answers.set('Puja collection', notProduct);
+      const run = await startRun();
+      await runner.run(t.merchantA, run.id);
+
+      llm.answers.set('Puja wishes', sells(item('Katan saree')));
+      llm.answers.set('Puja collection', sells(item('Katan saree'), item('Puja kurti')));
+      await runner.importAnyway(t.merchantA, run.id, (await postRow(run.id, onlyKnown.id)).id);
+      await runner.importAnyway(t.merchantA, run.id, (await postRow(run.id, mixed.id)).id);
+
+      expect(await postRow(run.id, onlyKnown.id)).toMatchObject({
+        result: 'in_catalog',
+        matchedProductIds: [katan.id],
+        productIds: [],
+      });
+      const made = await postRow(run.id, mixed.id);
+      expect(made).toMatchObject({ result: 'draft', matchedProductIds: [katan.id] });
+      expect(made.productIds).toHaveLength(1);
+      expect(await productOf(made.productIds[0]!)).toMatchObject({ name: 'Puja kurti' });
+      expect(await runOf(run.id)).toMatchObject({ notProducts: 0, inCatalog: 1, drafts: 1 });
+    });
+
+    it('says when a re-read post still holds no product, or could not be read', async () => {
+      const greeting = post('Eid wishes');
+      const blurry = post('Blurry');
+      graph.setPages([greeting, blurry]);
+      const notProduct = { kind: 'not_product' as const, reason: 'Eid greeting', products: [] };
+      llm.answers.set('Eid wishes', notProduct);
+      llm.answers.set('Blurry', notProduct);
+      const run = await startRun();
+      await runner.run(t.merchantA, run.id);
+
+      llm.answers.set('Blurry', 'timeout');
+      await runner.importAnyway(t.merchantA, run.id, (await postRow(run.id, greeting.id)).id);
+      await runner.importAnyway(t.merchantA, run.id, (await postRow(run.id, blurry.id)).id);
+
+      expect(await postRow(run.id, greeting.id)).toMatchObject({
+        result: 'not_a_product',
+        note: 'Eid greeting',
+        anywayStatus: 'no_product',
+      });
+      expect(await postRow(run.id, blurry.id)).toMatchObject({
+        result: 'not_a_product',
+        anywayStatus: 'failed',
+      });
+      expect(await runOf(run.id)).toMatchObject({ notProducts: 2, drafts: 0 });
+    });
+
+    it('marks the post failed when Graph is still down on the last attempt', async () => {
+      const greeting = post('Eid card');
+      graph.setPages([greeting]);
+      llm.answers.set('Eid card', { kind: 'not_product', reason: 'Eid greeting', products: [] });
+      const run = await startRun();
+      await runner.run(t.merchantA, run.id);
+      const row = await postRow(run.id, greeting.id);
+
+      graph.refuse = new GraphError(500, 2, 'unknown error');
+      await expect(
+        runner.importAnyway(t.merchantA, run.id, row.id, { lastAttempt: false }),
+      ).rejects.toThrow(GraphUnavailable);
+      await runner.importAnyway(t.merchantA, run.id, row.id, { lastAttempt: true });
+      graph.refuse = null;
+
+      expect(await postRow(run.id, greeting.id)).toMatchObject({ anywayStatus: 'failed' });
+    });
+
+    it('never reads a post with no caption and no photo again', async () => {
+      const empty: GraphImportPost = { ...post('x'), message: null, photoUrls: [] };
+      graph.setPages([empty]);
+      const run = await startRun();
+      await runner.run(t.merchantA, run.id);
+      const row = await postRow(run.id, empty.id);
+      expect(row.result).toBe('no_caption_or_photo');
+
+      await runner.importAnyway(t.merchantA, run.id, row.id);
+
+      expect(llm.requests).toEqual([]);
+      expect(await postRow(run.id, empty.id)).toMatchObject({
+        result: 'no_caption_or_photo',
+        anywayStatus: null,
+      });
     });
 
     it('leaves a post that is no longer skipped alone', async () => {

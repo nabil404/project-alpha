@@ -511,18 +511,19 @@ and builds with SWC into `dist/seed`, leaving the dev server's `dist` alone.
   post's link, and **Choose from your Page** for the Page's 25 newest posts
   ([phase 11.5](../11-ai-implementation/phase-5-shared-posts/README.md#dashboard)).
 - **`/catalog/categories`**: the [Categories page](#categories-page).
-- **Empty price and stock** show as "—" in the products list. The edit page
-  reads an empty field as blank, but still asks for a number before it saves,
-  so it cannot yet keep a draft's field empty ([Not yet built](#not-yet-built)).
-  The order item picker leaves out variants with no price.
+- **Empty price and stock** show as "—" in the products list. On the edit
+  page an empty price or stock field saves as `null`, shows the placeholder
+  "Needed" with a warning border, and a banner says what is missing while any
+  variant has one. Published can't be picked in Status then, and a draft's
+  **Activate** button stays disabled. The API's `PRODUCT_PRICE_MISSING` and
+  `PRODUCT_STOCK_MISSING` land on the variant's field. The order item picker
+  leaves out variants with no price.
+- **Import** beside Add product opens the
+  [import from Facebook posts](../13-facebook-post-import/README.md#dashboard),
+  and `?importId=` filters the list to one run's products, shown as a "From
+  import" chip that clears it.
 
 ## Not yet built
-
-- **Empty fields on the edit page.** The form should send `null` for an
-  empty price or stock on a draft or archived product, highlight what an
-  active one is missing, and show the API's `PRODUCT_PRICE_MISSING` or
-  `PRODUCT_STOCK_MISSING` on the field
-  ([Import from Facebook posts](../13-facebook-post-import/README.md#dashboard)).
 
 - **Dashboard extras:** reordering photos; the Categories page's insights
   panel (what customers ask for, missing categories, needs attention); and

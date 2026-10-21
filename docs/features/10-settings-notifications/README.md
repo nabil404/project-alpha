@@ -5,9 +5,8 @@ assistant drafted, a customer waiting for them, a daily summary, and an
 import from Facebook posts that ended.
 
 **Status (Oct 2026):** built. The API stores the switches, the worker sends
-all four emails, and the page is at `/settings/notifications`. The page does
-not show the fourth switch, **Import finished**, yet
-([Follow-ups](#follow-ups)). The assistant
+all four emails, and the page at `/settings/notifications` shows a switch for
+each. The assistant
 reports hand-offs since
 [phase 11.1](../11-ai-implementation/phase-1-foundation/README.md) and
 drafted orders since
@@ -142,8 +141,8 @@ email also reads `conversation.handed_off_at`
 
 ## Follow-ups
 
-- The fourth switch, **Import finished**, on `/settings/notifications` and
-  the canvas's Notifications screens.
+- The canvas's Notifications screens don't show the fourth switch, **Import
+  finished**, yet.
 - Send emails in the reader's language once the dashboard has more than
   English.
 - The daily summary is outside MVP 01's scope. It exists because the design

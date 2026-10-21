@@ -1,0 +1,1 @@
+ALTER TABLE "product_import_post" ADD COLUMN "note" text;

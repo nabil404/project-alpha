@@ -32,6 +32,11 @@ const ROWS: readonly SwitchRow[] = [
     label: 'notifications.dailySummary.label',
     hint: 'notifications.dailySummary.hint',
   },
+  {
+    name: 'importFinished',
+    label: 'notifications.importFinished.label',
+    hint: 'notifications.importFinished.hint',
+  },
 ];
 
 /** The signed-in person's notification emails for this shop. Each switch saves the moment it flips. */

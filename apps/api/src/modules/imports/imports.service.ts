@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import {
+  canImportAnyway,
   DEFAULT_COUNTRY,
   regionDefaults,
   shopToday,
@@ -9,12 +10,14 @@ import {
   type ActivateImportResult,
   type CreateImport,
   type FacebookImportAccess,
+  type ImportAnywayStatus,
   type ImportPost,
   type ImportPostListResponse,
   type ImportRun,
   type ImportRunListResponse,
   type ListImportPostsQuery,
   type ListImportsQuery,
+  type ProductImportSource,
 } from '@app/shared';
 import { CryptoService } from '../../common/crypto.service';
 import { AppConfig } from '../config/app.config';
@@ -63,7 +66,7 @@ import {
   importPostNotSkipped,
   importUntilInFuture,
 } from './import-errors';
-import { ImportRepository, SKIPPED_RESULTS, type ImportProductSummary } from './import.repository';
+import { ImportRepository, type ImportProductSummary } from './import.repository';
 
 /**
  * The import routes. Graph runs before any transaction (invariant #1); the
@@ -187,6 +190,24 @@ export class ImportsService {
     });
   }
 
+  /** The edit page's "From this Facebook post" panel; null for a product no import made. */
+  productSource(scope: TenantScope, productId: string): Promise<ProductImportSource> {
+    return withMerchant(this.db, scope.merchantId, async (tx) => {
+      const row = await this.imports.findProductSource(tx, scope, productId);
+      if (!row) return { source: null };
+      const summaries = await this.imports.productSummaries(tx, scope, [
+        ...row.productIds,
+        ...row.matchedProductIds,
+      ]);
+      return {
+        source: {
+          importId: row.importId,
+          post: this.toImportPost(scope, row, summaries, () => true),
+        },
+      };
+    });
+  }
+
   /** Stop after the current post: the worker sees `stopping` before the next one. */
   async stop(scope: TenantScope, id: string): Promise<ImportRun> {
     const run = await withMerchant(this.db, scope.merchantId, async (tx) => {
@@ -220,19 +241,30 @@ export class ImportsService {
       if (!(await this.imports.findRun(tx, scope, id))) throw importNotFound(id);
       const found = await this.imports.findPost(tx, scope, id, postId);
       if (!found) throw importPostNotFound(postId);
-      if (!SKIPPED_RESULTS.includes(found.result)) throw importPostNotSkipped(postId);
+      if (!canImportAnyway(found.result)) throw importPostNotSkipped(postId);
       return found;
     });
     if (!this.graph || !this.config.get('LLM_API_KEY')) throw importNotAvailable();
+    // Queued before the job, so the job's own outcome always lands after it.
+    const setStatus = (status: ImportAnywayStatus | null) =>
+      withMerchant(this.db, scope.merchantId, (tx) =>
+        this.imports.setAnywayStatus(tx, scope, id, postId, status),
+      );
+    await setStatus('queued');
     const data: ImportPostJob = { merchantId: scope.merchantId, importId: id, postId };
-    await this.queue.add(IMPORT_POST_JOB, data, {
-      ...IMPORT_JOB_RETENTION,
-      jobId: `import-post-${id}-${postId}`,
-    });
+    try {
+      await this.queue.add(IMPORT_POST_JOB, data, {
+        ...IMPORT_JOB_RETENTION,
+        jobId: `import-post-${id}-${postId}`,
+      });
+    } catch (error) {
+      await setStatus(row.anywayStatus);
+      throw error;
+    }
     const summaries = await withMerchant(this.db, scope.merchantId, (tx) =>
       this.imports.productSummaries(tx, scope, row.matchedProductIds),
     );
-    return this.toImportPost(scope, row, summaries, () => true);
+    return this.toImportPost(scope, { ...row, anywayStatus: 'queued' }, summaries, () => true);
   }
 
   /**
@@ -335,7 +367,9 @@ export class ImportsService {
       url: url ? url.toString() : null,
       photoCount: row.photoCount,
       result: row.result,
-      reason: row.reason,
+      limitsApplied: row.limitsApplied,
+      importAnyway: row.anywayStatus,
+      note: row.note,
       suggestedCategory: row.suggestedCategory,
       matchedProducts: found(row.matchedProductIds).map(({ id, name }) => ({ id, name })),
       products: found(row.productIds)
