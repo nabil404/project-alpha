@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { AppConfigModule } from '../config/config.module';
 import { AppConfig } from '../config/app.config';
 import {
   ASSISTANT_QUEUE,
@@ -15,8 +14,10 @@ import {
 
 @Module({
   imports: [
+    // AppConfig comes from the global AppConfigModule that AppModule imports.
+    // Importing it here would validate the environment as soon as a spec
+    // loaded this file, even one that swaps in FakeQueueModule.
     BullModule.forRootAsync({
-      imports: [AppConfigModule],
       inject: [AppConfig],
       useFactory: (config: AppConfig) => ({
         connection: { url: config.get('REDIS_URL') },
