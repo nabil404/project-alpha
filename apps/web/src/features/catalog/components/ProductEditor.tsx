@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useBlocker, useNavigate } from '@tanstack/react-router';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, TriangleAlert } from 'lucide-react';
 import { useForm, useWatch, type Path, type Resolver } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import {
@@ -34,6 +34,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, fieldProps } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { ImportCategorySuggestion, ProductImportSourceCard } from '@/features/imports';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
 import { ApiError } from '@/lib/api-error';
@@ -41,7 +42,13 @@ import { applyServerFieldErrors, useZodResolver } from '@/lib/form';
 import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
-import { emptyProduct, toDocument, toFormValues, type ProductFormValues } from '../product-form';
+import {
+  emptyProduct,
+  isIncomplete,
+  toDocument,
+  toFormValues,
+  type ProductFormValues,
+} from '../product-form';
 import { catalogKeys, productQueryOptions, useCreateProduct, useSaveProduct } from '../queries';
 import { CategoryPicker } from './CategoryPicker';
 import { CommaListInput } from './CommaListInput';
@@ -56,6 +63,12 @@ import { VariantsCard } from './VariantsCard';
 const card = 'flex flex-col gap-4 rounded-lg border border-border bg-surface p-6 shadow-card';
 /** Main column and side column; 22rem is just wide enough for Delete, Discard and Save in one row. */
 const columns = 'lg:grid-cols-[minmax(0,1fr)_22rem]';
+/** Errors the API reports against one variant's field, by `params.variantId`. */
+const variantErrorFields: Partial<Record<string, 'price' | 'stock'>> = {
+  VARIANT_STOCK_RESERVED: 'stock',
+  PRODUCT_PRICE_MISSING: 'price',
+  PRODUCT_STOCK_MISSING: 'stock',
+};
 const topLevelFields = [
   'name',
   'description',
@@ -124,13 +137,14 @@ export function ProductEditor({ product }: { product?: Product }) {
   };
 
   const onError = (error: unknown) => {
-    if (error instanceof ApiError && error.code === 'VARIANT_STOCK_RESERVED') {
+    const variantField = error instanceof ApiError ? variantErrorFields[error.code] : undefined;
+    if (error instanceof ApiError && variantField) {
       const index = form
         .getValues('variants')
         .findIndex((variant) => variant.id === error.params.variantId);
       if (index >= 0) {
         form.setError(
-          `variants.${index}.stock`,
+          `variants.${index}.${variantField}`,
           { type: 'server', message: forError(error) },
           { shouldFocus: true },
         );
@@ -206,6 +220,11 @@ export function ProductEditor({ product }: { product?: Product }) {
   };
 
   const name = useWatch({ control: form.control, name: 'name' });
+  const variants = useWatch({ control: form.control, name: 'variants' });
+  const incomplete = variants.some(isIncomplete);
+  // A saved draft is activated with its own button, as the import's summary sends sellers here.
+  const drafted = product?.status === 'draft';
+  const missingId = useId();
   const title = product ? name.trim() || product.name : t('editor.newTitle');
   const stale = mutation.error instanceof ApiError && mutation.error.code === 'PRODUCT_STALE';
 
@@ -230,7 +249,13 @@ export function ProductEditor({ product }: { product?: Product }) {
               </ol>
             </nav>
             {/* The columns below, so the actions start where the side column does. */}
-            <div className={cn('mt-1 flex flex-wrap items-center gap-4 lg:grid lg:gap-6', columns)}>
+            <div
+              className={cn(
+                'mt-1 flex flex-wrap items-center gap-4',
+                // A draft's four actions outgrow the side column, so they don't align to it.
+                !drafted && cn('lg:grid lg:gap-6', columns),
+              )}
+            >
               <div className="flex min-w-0 grow items-center gap-3">
                 <h1 className="truncate text-display">{title}</h1>
                 {product && <ProductStatusBadge status={product.status} />}
@@ -250,9 +275,31 @@ export function ProductEditor({ product }: { product?: Product }) {
                 <Button type="button" disabled={busy || (!!product && !isDirty)} onClick={discard}>
                   {t('editor.actions.discard')}
                 </Button>
-                <Button type="submit" variant="primary" disabled={busy || (!!product && !isDirty)}>
-                  {busy ? t('editor.actions.saving') : t('editor.actions.save')}
+                <Button
+                  type="submit"
+                  variant={drafted ? 'secondary' : 'primary'}
+                  disabled={busy || (!!product && !isDirty)}
+                >
+                  {busy
+                    ? t('editor.actions.saving')
+                    : drafted
+                      ? t('editor.actions.saveDraft')
+                      : t('editor.actions.save')}
                 </Button>
+                {drafted && (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={busy || incomplete}
+                    aria-describedby={incomplete ? missingId : undefined}
+                    onClick={() => {
+                      form.setValue('status', 'active', { shouldDirty: true });
+                      void form.handleSubmit(onSubmit)();
+                    }}
+                  >
+                    {t('editor.actions.activate')}
+                  </Button>
+                )}
               </div>
             </div>
           </header>
@@ -270,6 +317,8 @@ export function ProductEditor({ product }: { product?: Product }) {
             </div>
           )}
 
+          {incomplete && <MissingFieldsBanner id={missingId} />}
+
           <div className={cn('grid grid-cols-1 items-start gap-6', columns)}>
             <div className="flex min-w-0 flex-col gap-6">
               <BasicDetailsCard />
@@ -277,10 +326,11 @@ export function ProductEditor({ product }: { product?: Product }) {
               <VariantsCard product={product} />
             </div>
             <div className="flex min-w-0 flex-col gap-6">
+              {product && <ProductImportSourceCard product={product} />}
               <StatusCard />
               {product && <MessengerLinkCard product={product} />}
               {product && <ProductPostsCard product={product} />}
-              <OrganisationCard />
+              <OrganisationCard productId={product?.id} />
               <StockSummaryCard product={product} />
               <DeliveryChargeCard className={card} />
             </div>
@@ -348,9 +398,34 @@ function BasicDetailsCard() {
   );
 }
 
+/** An imported draft, say: the fields it still needs are highlighted in Variants. */
+function MissingFieldsBanner({ id }: { id: string }) {
+  const { t } = useTranslation('catalog');
+
+  return (
+    <div
+      id={id}
+      role="status"
+      className="flex items-start gap-3 rounded-lg bg-warning-soft px-4 py-3"
+    >
+      <TriangleAlert
+        aria-hidden
+        strokeWidth={1.5}
+        className="mt-0.5 size-5 shrink-0 text-warning"
+      />
+      <p className="text-body text-ink">
+        <strong className="font-semibold">{t('editor.missingFieldsTitle')}</strong>{' '}
+        {t('editor.missingFields')}
+      </p>
+    </div>
+  );
+}
+
 function StatusCard() {
   const { t } = useTranslation('catalog');
   const { productStatus } = useStatusLabels();
+  const variants = useWatch<ProductFormValues, 'variants'>({ name: 'variants' });
+  const incomplete = variants.some(isIncomplete);
 
   return (
     <section className={card}>
@@ -376,6 +451,7 @@ function StatusCard() {
                 options={productStatusSchema.options.map((status) => ({
                   value: status,
                   label: productStatus(status),
+                  disabled: status === 'active' && incomplete && field.value !== 'active',
                 }))}
               />
             </FormControl>
@@ -388,7 +464,7 @@ function StatusCard() {
   );
 }
 
-function OrganisationCard() {
+function OrganisationCard({ productId }: { productId?: string }) {
   const { t } = useTranslation('catalog');
   const labelId = useId();
 
@@ -403,6 +479,7 @@ function OrganisationCard() {
               {t('organisation.categories')}
             </span>
             <CategoryPicker value={field.value} onChange={field.onChange} labelId={labelId} />
+            {productId && <ImportCategorySuggestion productId={productId} />}
           </div>
         )}
       />
@@ -433,10 +510,12 @@ function OrganisationCard() {
 function StockSummaryCard({ product }: { product?: Product }) {
   const { t } = useTranslation('catalog');
   const variants = useWatch<ProductFormValues, 'variants'>({ name: 'variants' });
-  const total = variants.reduce((sum, v) => sum + (Number.isNaN(v.stock) ? 0 : v.stock), 0);
+  const stockOf = (v: (typeof variants)[number]) =>
+    v.stock === null || Number.isNaN(v.stock) ? 0 : v.stock;
+  const total = variants.reduce((sum, v) => sum + stockOf(v), 0);
   const reservedById = new Map(product?.variants.map((v) => [v.id, v.reserved]));
   const outOfStock = variants.filter(
-    (v) => (Number.isNaN(v.stock) ? 0 : v.stock) - (reservedById.get(v.id ?? '') ?? 0) <= 0,
+    (v) => stockOf(v) - (reservedById.get(v.id ?? '') ?? 0) <= 0,
   ).length;
 
   return (

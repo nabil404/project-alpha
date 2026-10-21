@@ -7,6 +7,7 @@ import {
   PRODUCT_VARIANT_MAX_COUNT,
   toMinorUnits,
   type CreateProduct,
+  type NotProductResult,
   type PostProduct,
   type PostProducts,
 } from '@app/shared';
@@ -26,7 +27,12 @@ export interface PostDraft {
 }
 
 export type CheckedPost =
-  | { kind: 'not_product'; reason: string }
+  | {
+      kind: 'not_product';
+      result: Extract<NotProductResult, 'not_a_product' | 'no_named_product'>;
+      /** The reader's own words for what the post is, when it gave any. */
+      note: string | null;
+    }
   | {
       kind: 'products';
       drafts: PostDraft[];
@@ -47,12 +53,9 @@ const ALIASES_MAX = 10;
 
 const same = (text: string) => text.trim().toLowerCase();
 
-/** The reason recorded when the LLM said products but none survived the checks. */
-export const NO_NAMED_PRODUCT = 'No product with a name';
-
 export function checkPostProducts(output: PostProducts, context: DraftContext): CheckedPost {
   if (output.kind === 'not_product') {
-    return { kind: 'not_product', reason: output.reason?.trim() || 'Not a product' };
+    return { kind: 'not_product', result: 'not_a_product', note: output.reason?.trim() || null };
   }
   let flagged = output.products.length > MAX_POST_PRODUCTS;
   const drafts: PostDraft[] = [];
@@ -62,7 +65,8 @@ export function checkPostProducts(output: PostProducts, context: DraftContext): 
     flagged ||= checked.flagged;
     drafts.push(checked.draft);
   }
-  if (drafts.length === 0) return { kind: 'not_product', reason: NO_NAMED_PRODUCT };
+  // The reader said products, but none had a name that passed the checks.
+  if (drafts.length === 0) return { kind: 'not_product', result: 'no_named_product', note: null };
   return { kind: 'products', drafts, flagged };
 }
 

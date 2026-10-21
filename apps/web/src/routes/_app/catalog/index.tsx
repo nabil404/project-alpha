@@ -17,6 +17,8 @@ interface CatalogSearch {
   show?: Exclude<ProductListFilter, 'all'>;
   q?: string;
   categoryId?: string;
+  /** "See them all in Products" from an import's summary: that run's products. */
+  importId?: string;
   page?: number;
   limit?: number;
 }
@@ -36,6 +38,7 @@ function toSearch(input: Record<string, unknown>): CatalogSearch {
     // A hand-typed `?q=481` arrives as a number: the router parses search values as JSON.
     q: parsed(shape.q.safeParse(typeof input.q === 'number' ? String(input.q) : input.q)),
     categoryId: parsed(shape.categoryId.safeParse(input.categoryId)),
+    importId: parsed(shape.importId.safeParse(input.importId)),
     page: page === DEFAULTS.page ? undefined : page,
     limit: limit === DEFAULTS.limit ? undefined : limit,
   };
@@ -55,6 +58,7 @@ function CatalogPage() {
     filter: search.show ?? DEFAULTS.filter,
     q: search.q,
     categoryId: search.categoryId,
+    importId: search.importId,
     page: search.page ?? DEFAULTS.page,
     limit: search.limit ?? DEFAULTS.limit,
   };

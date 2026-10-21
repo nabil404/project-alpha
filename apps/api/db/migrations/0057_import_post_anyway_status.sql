@@ -1,0 +1,2 @@
+ALTER TABLE "product_import_post" ADD COLUMN "anyway_status" text;--> statement-breakpoint
+ALTER TABLE "product_import_post" ADD CONSTRAINT "product_import_post_anyway_status_ck" CHECK ("product_import_post"."anyway_status" in ('queued', 'no_product', 'failed'));

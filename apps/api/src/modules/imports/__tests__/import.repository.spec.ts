@@ -1,5 +1,10 @@
 import { eq } from 'drizzle-orm';
-import { importPostResults, importRunStatuses, importSources } from '@app/shared';
+import {
+  importAnywayStatuses,
+  importPostResults,
+  importRunStatuses,
+  importSources,
+} from '@app/shared';
 import {
   describeDb,
   openCatalogTestDb,
@@ -11,6 +16,7 @@ import {
 } from '../../database/__tests__/catalog-test-db';
 import * as schema from '../../database/schema/index';
 import {
+  IMPORT_ANYWAY_STATUS_VALUES,
   IMPORT_POST_RESULT_VALUES,
   IMPORT_SOURCE_VALUES,
   IMPORT_STATUS_VALUES,
@@ -25,8 +31,8 @@ const post = (postId: string, overrides: Partial<NewPostValues> = {}): NewPostVa
   caption: 'Jamdani saree',
   permalinkUrl: null,
   photoCount: 0,
-  result: 'not_product',
-  reason: null,
+  result: 'not_a_product',
+  limitsApplied: false,
   matchedProductIds: [],
   suggestedCategory: null,
   productIds: [],
@@ -40,6 +46,7 @@ it('keeps the schema literals equal to the shared enums', () => {
   expect([...IMPORT_SOURCE_VALUES]).toEqual([...importSources]);
   expect([...IMPORT_STATUS_VALUES]).toEqual([...importRunStatuses]);
   expect([...IMPORT_POST_RESULT_VALUES]).toEqual([...importPostResults]);
+  expect([...IMPORT_ANYWAY_STATUS_VALUES]).toEqual([...importAnywayStatuses]);
 });
 
 describeDb('ImportRepository (app_runtime)', () => {
@@ -91,12 +98,12 @@ describeDb('ImportRepository (app_runtime)', () => {
   it('keeps one row per post in a run, and replaces it on a second write', async () => {
     const run = await startRun(t.merchantA);
     await withMerchant(runtime.db, t.merchantA, (tx) =>
-      repo.upsertPost(tx, scopeA(), run.id, post('1_10', { result: 'failed' })),
+      repo.upsertPost(tx, scopeA(), run.id, post('1_10', { result: 'llm_failed' })),
     );
     const again = await withMerchant(runtime.db, t.merchantA, (tx) =>
-      repo.upsertPost(tx, scopeA(), run.id, post('1_10', { result: 'not_product' })),
+      repo.upsertPost(tx, scopeA(), run.id, post('1_10', { result: 'not_a_product' })),
     );
-    expect(again.result).toBe('not_product');
+    expect(again.result).toBe('not_a_product');
     const rows = await t.db
       .select()
       .from(schema.productImportPost)
@@ -116,10 +123,16 @@ describeDb('ImportRepository (app_runtime)', () => {
   });
 
   it('finds a post an earlier run handled, unless it failed there', async () => {
+    const known = (await seedProduct(t.db, t.merchantA)).id;
     const earlier = await startRun(t.merchantA);
     await withMerchant(runtime.db, t.merchantA, async (tx) => {
-      await repo.upsertPost(tx, scopeA(), earlier.id, post('1_20', { result: 'in_catalog' }));
-      await repo.upsertPost(tx, scopeA(), earlier.id, post('1_21', { result: 'failed' }));
+      await repo.upsertPost(
+        tx,
+        scopeA(),
+        earlier.id,
+        post('1_20', { result: 'in_catalog', matchedProductIds: [known] }),
+      );
+      await repo.upsertPost(tx, scopeA(), earlier.id, post('1_21', { result: 'photo_unreadable' }));
       await repo.updateRun(tx, scopeA(), earlier.id, { status: 'finished' });
     });
     const run = await startRun(t.merchantA);
@@ -127,9 +140,9 @@ describeDb('ImportRepository (app_runtime)', () => {
       withMerchant(runtime.db, t.merchantA, (tx) =>
         repo.importedBefore(tx, scopeA(), run.id, graphId, []),
       );
-    expect(await before('1_20')).toBe(true);
-    expect(await before('1_21')).toBe(false);
-    expect(await before('1_22')).toBe(false);
+    expect(await before('1_20')).toEqual({ productIds: [known] });
+    expect(await before('1_21')).toBeNull();
+    expect(await before('1_22')).toBeNull();
   });
 
   it('counts a post linked to a product as imported, by its id or alias', async () => {
@@ -146,9 +159,9 @@ describeDb('ImportRepository (app_runtime)', () => {
       withMerchant(runtime.db, t.merchantA, (tx) =>
         repo.importedBefore(tx, scopeA(), run.id, '1_x', keys),
       );
-    expect(await before(['555'])).toBe(true);
-    expect(await before(['pfbid0abcdefghijk'])).toBe(true);
-    expect(await before(['556'])).toBe(false);
+    expect(await before(['555'])).toEqual({ productIds: [product.id] });
+    expect(await before(['pfbid0abcdefghijk'])).toEqual({ productIds: [product.id] });
+    expect(await before(['556'])).toBeNull();
   });
 
   it('lists the summary tabs by what the drafts still need', async () => {
@@ -186,7 +199,7 @@ describeDb('ImportRepository (app_runtime)', () => {
       );
     expect(await tab('ready')).toEqual(['1_1']);
     expect(await tab('needs_info')).toEqual(['1_2']);
-    expect(await tab('skipped')).toEqual(['1_3']);
+    expect((await tab('skipped')).sort()).toEqual(['1_3', '1_4']);
     const left = await withMerchant(runtime.db, t.merchantA, (tx) =>
       repo.leftToReview(tx, scopeA(), [run.id]),
     );
@@ -204,7 +217,7 @@ describeDb('ImportRepository (app_runtime)', () => {
       expect(await repo.findRun(tx, scopeB(), runA.id)).toBeUndefined();
       expect(await repo.listRuns(tx, scopeB(), { offset: 0, limit: 10 })).toEqual([]);
       expect(await repo.findPostInRun(tx, scopeB(), runA.id, '1_30')).toBeUndefined();
-      expect(await repo.importedBefore(tx, scopeB(), runA.id, '1_30', [])).toBe(false);
+      expect(await repo.importedBefore(tx, scopeB(), runA.id, '1_30', [])).toBeNull();
       expect(await tx.select().from(schema.productImportPost)).toEqual([]);
     });
     // A's scope under B's context: the policy hides A's rows.

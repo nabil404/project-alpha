@@ -1,0 +1,3 @@
+ALTER TABLE "product_import_post" DROP CONSTRAINT "product_import_post_reason_ck";--> statement-breakpoint
+ALTER TABLE "product_import_post" DROP COLUMN "reason";--> statement-breakpoint
+ALTER TABLE "product_import_post" ADD CONSTRAINT "product_import_post_result_ck" CHECK ("product_import_post"."result" in ('draft', 'merged', 'not_a_product', 'no_caption_or_photo', 'no_named_product', 'in_catalog', 'already_imported', 'llm_failed', 'photo_unreadable', 'write_failed'));

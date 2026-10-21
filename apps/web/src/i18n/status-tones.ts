@@ -1,6 +1,7 @@
 import type {
   ConversationState,
   CustomerStatus,
+  ImportRunStatus,
   OrderStatus,
   PaymentStatus,
   ProductStatus,
@@ -63,6 +64,15 @@ export const stockLevelTones = {
   low_stock: 'warning',
   out_of_stock: 'danger',
 } as const satisfies Record<StockLevel, StatusTone>;
+
+export const importRunStatusTones = {
+  queued: 'accent',
+  running: 'accent',
+  stopping: 'accent',
+  stopped: 'warning',
+  finished: 'success',
+  failed: 'danger',
+} as const satisfies Record<ImportRunStatus, StatusTone>;
 
 export const statusToneClasses = {
   accent: 'bg-accent-soft text-accent',

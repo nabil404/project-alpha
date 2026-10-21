@@ -264,6 +264,10 @@
       "label": "Daily summary"
     },
     "description": "Where we tell you about things that need you.",
+    "importFinished": {
+      "hint": "An email when an import from your Facebook posts finishes, stops or fails.",
+      "label": "Import finished"
+    },
     "newOrder": {
       "hint": "An email for every order the assistant drafts.",
       "label": "New order drafted"

@@ -19,9 +19,13 @@ export interface VariantDraft {
   optionValues: string[];
   /** Blank: the API generates one. */
   sku: string;
-  /** Minor units; NaN while the field holds something that isn't an amount. */
-  price: number;
-  stock: number;
+  /**
+   * Minor units. Null when the field is empty, which a draft or archived
+   * product may be; NaN while it holds something that isn't an amount.
+   */
+  price: number | null;
+  /** Null when empty; NaN while it holds something that isn't a whole number. */
+  stock: number | null;
   imageId: string | null;
 }
 
@@ -53,7 +57,7 @@ export const emptyProduct: ProductFormValues = {
   categoryIds: [],
   coverImageId: null,
   options: [],
-  variants: [{ name: '', optionValues: [], sku: '', price: 0, stock: 0, imageId: null }],
+  variants: [{ name: '', optionValues: [], sku: '', price: null, stock: 0, imageId: null }],
 };
 
 export function toFormValues(product: Product): ProductFormValues {
@@ -85,14 +89,17 @@ export function toFormValues(product: Product): ProductFormValues {
         name,
         optionValues,
         sku: variant.sku,
-        // An imported draft may have none yet: the field reads empty until it is filled.
-        price: variant.price ?? Number.NaN,
-        stock: variant.stock ?? Number.NaN,
+        price: variant.price,
+        stock: variant.stock,
         imageId: variant.imageId,
       };
     }),
   };
 }
+
+/** A variant missing what an active product needs: an imported draft, say. */
+export const isIncomplete = (variant: Pick<VariantDraft, 'price' | 'stock'>) =>
+  variant.price === null || variant.stock === null;
 
 /**
  * A blank description is no description; a blank SKU asks the API for one; a

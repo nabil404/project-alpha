@@ -84,7 +84,9 @@
       "discard": "Discard",
       "reload": "Load the latest version",
       "save": "Save product",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "activate": "Activate",
+      "saveDraft": "Save draft"
     },
     "backToCatalog": "Back to catalog",
     "breadcrumb": "Breadcrumb",
@@ -95,8 +97,10 @@
       "stay": "Keep editing",
       "title": "Leave this page?"
     },
+    "missingFields": "Fill in the highlighted fields to activate this product.",
     "newTitle": "New product",
-    "saved": "Product saved."
+    "saved": "Product saved.",
+    "missingFieldsTitle": "Some details are missing."
   },
   "gallery": {
     "caption": "Photo {{number}} · {{w}} × {{h}}",
@@ -197,7 +201,8 @@
     "tabs": {
       "categories": "Categories",
       "label": "Catalog sections",
-      "products": "Products"
+      "products": "Products",
+      "imports": "Imports"
     },
     "title": "Catalog",
     "toggle": {
@@ -205,7 +210,10 @@
       "show": "Show variants of {{name}}"
     },
     "variantsFailed": "Couldn't load the variants of {{name}}.",
-    "variantsLoading": "Loading the variants of {{name}}"
+    "variantsLoading": "Loading the variants of {{name}}",
+    "import": "Import",
+    "fromImport": "From import {{range}}",
+    "clearImport": "Show all products"
   },
   "options": {
     "add": "Add option",
@@ -369,7 +377,8 @@
     "stockFor": "Stock for {{variant}}",
     "stockInvalid": "Enter a whole number, like 0 or 12.",
     "title": "Variants",
-    "variant": "Variant"
+    "variant": "Variant",
+    "needed": "Needed"
   },
   "viewer": {
     "close": "Exit full screen",
@@ -418,5 +427,212 @@
     "untitled": "Post {{id}}",
     "urlLabel": "Post link",
     "urlPlaceholder": "Paste a post's link from Facebook"
+  },
+  "imports": {
+    "dialog": {
+      "back": "Back",
+      "checking": "Checking your Page…",
+      "close": "Close",
+      "comingSoon": "Coming soon",
+      "connectFirst": "Connect your Facebook Page first. The import reads the posts of your connected Page.",
+      "connectPage": "Connect your Page",
+      "csv": "Import from CSV",
+      "csvHint": "Upload a spreadsheet of your products.",
+      "datesDescription": "Turn the product posts on your Page into draft products. Nothing goes live until you activate it.",
+      "datesTitle": "Import from Facebook posts",
+      "facebook": "Import from Facebook",
+      "facebookHint": "Turn the product posts on your Page into draft products.",
+      "footerNote": "Takes a few minutes. You can leave this page while it runs.",
+      "pageHint": "Your connected Page",
+      "pageLabel": "Posts from",
+      "presets": {
+        "custom": "Custom dates",
+        "groupLabel": "Date range",
+        "label": "Which posts?",
+        "lastMonth": "Last month",
+        "lastMonths3": "Last 3 months",
+        "lastMonths6": "Last 6 months",
+        "lastYear": "Last year"
+      },
+      "range": {
+        "future": "The end date can't be after today.",
+        "order": "The start date must be on or before the end date.",
+        "since": "From",
+        "tooLong": "Pick at most a year. Import older posts in another run.",
+        "until": "To"
+      },
+      "rangeNote": "Up to 1 year at a time. For older posts, run another import with earlier dates. Posts you already imported are skipped.",
+      "reconnect": "Reconnect your Page to allow reading posts",
+      "reconnectHint": "Your Page was connected without permission to read its posts.",
+      "sourceDescription": "Where are your products now?",
+      "sourceTitle": "Import products",
+      "start": "Start import",
+      "starting": "Starting…",
+      "whatHappens": {
+        "drafts": "Each product becomes a draft with the name, sizes, colours and price we find. You add anything missing.",
+        "photos": "Photos are copied into your catalog, so they keep working if you delete the post.",
+        "read": "We read each post's text and photos, and skip posts that aren't products, like offers and notices.",
+        "title": "What happens"
+      }
+    },
+    "list": {
+      "actions": "Actions",
+      "allReviewed": "All reviewed",
+      "columns": {
+        "drafts": "Drafts",
+        "leftToReview": "Left to review",
+        "postsRead": "Posts read",
+        "ranOn": "Ran on",
+        "range": "Posts from",
+        "result": "Result"
+      },
+      "empty": "Imports you run appear here, so you can come back to their drafts.",
+      "finishedNote": "{{skipped}} skipped, {{merged}} repeats merged",
+      "importFromFacebook": "Import from Facebook",
+      "label": "Past imports",
+      "leftDrafts_one": "{{count}} draft",
+      "leftDrafts_other": "{{count}} drafts",
+      "open": "Open",
+      "pagination": {
+        "perPageLabel": "Imports per page",
+        "showing_one": "Showing {{from}}–{{to}} of {{count}} import",
+        "showing_other": "Showing {{from}}–{{to}} of {{count}} imports"
+      },
+      "resume": "Resume",
+      "stoppedAfter_one": "Stopped after {{count}} post",
+      "stoppedAfter_other": "Stopped after {{count}} posts",
+      "stoppedAt": "You stopped it at post {{read}} of {{total}}",
+      "title": "Past imports",
+      "tryAgain": "Try again"
+    },
+    "range": "{{since}} – {{until}}",
+    "run": {
+      "activate": {
+        "action_one": "Activate {{count}} product",
+        "action_other": "Activate {{count}} products",
+        "busy": "Activating…",
+        "done_one": "{{count}} product activated.",
+        "done_other": "{{count}} products activated.",
+        "failed": "These couldn't be activated:",
+        "selectAll": "Select all",
+        "selectProduct": "Activate {{name}}",
+        "stock": "Starting stock for each option"
+      },
+      "anyway": {
+        "failed": "Couldn't read the post again. Try again later.",
+        "no_product": "Read again: still no product found.",
+        "queued": "Reading the post again…"
+      },
+      "counts": {
+        "alreadyImported": "Imported before, skipped",
+        "drafts": "Draft products made",
+        "draftsSoFar": "Draft products so far",
+        "label": "What the import found",
+        "merged": "Repeat posts merged",
+        "mergedInto": "Repeat posts merged into those drafts",
+        "notProducts": "Not products, skipped",
+        "postsRead": "Posts read",
+        "skipped": "Skipped: not products, or already in your catalog"
+      },
+      "empty": {
+        "needs_info": "No drafts are missing a price.",
+        "ready": "No drafts are ready yet. Fill in the ones under Needs info first.",
+        "skipped": "No posts were skipped."
+      },
+      "failedHint": "The drafts it made before it stopped are kept.",
+      "fillIn": "Fill in",
+      "fromPost": "{{variants}} · from a post on {{date}}",
+      "importAnyway": "Import anyway",
+      "intro": {
+        "needs_info": "These drafts are missing something the assistant needs before it can sell them, usually a price the post didn't show.",
+        "ready": "These have a name and a price for every option. Posts don't say how many you have, so set a starting stock before they go live.",
+        "skipped": "We didn't add these posts: some hold no product, some show a product you already have, and some were imported before. Check them and import any you want."
+      },
+      "latest": "Latest posts",
+      "leaveNote": "You can leave this page. We'll let you know when it's done, and every draft stays out of the assistant's reach until you activate it.",
+      "limitsApplied": "Some options left out",
+      "linkedTo": "Imported before, and linked to:",
+      "meta": {
+        "finishedAt": "finished {{time}}",
+        "startedAt": "started {{time}}"
+      },
+      "needsPrice": "Needs price",
+      "needsStock": "Needs stock",
+      "noCaption": "No caption",
+      "noPostsYet": "No posts read yet.",
+      "pagination": {
+        "perPageLabel": "Posts per page",
+        "showing_one": "Showing {{from}}–{{to}} of {{count}} post",
+        "showing_other": "Showing {{from}}–{{to}} of {{count}} posts"
+      },
+      "postResult": {
+        "already_imported": "Imported before",
+        "draftNone": "Draft made",
+        "draft_one": "{{count}} draft: {{names}}",
+        "draft_other": "{{count}} drafts: {{names}}",
+        "in_catalog": "Already in your catalog",
+        "llm_failed": "Couldn't read",
+        "merged": "Same as {{names}}, merged",
+        "no_caption_or_photo": "No caption or photo",
+        "no_named_product": "No product with a name",
+        "not_a_product": "Not a product",
+        "photo_unreadable": "A photo couldn't be downloaded",
+        "write_failed": "Couldn't save its drafts"
+      },
+      "posted": "Posted {{date}}",
+      "progressLabel": "Import progress",
+      "queued": "Waiting to start…",
+      "reading": "Reading post {{read}} of {{total}}",
+      "readingSoFar": "Reading post {{read}}",
+      "resume": "Resume import",
+      "review": "Review",
+      "seeAll": "See them all in Products, filtered to this import",
+      "showing": "Showing {{shown}} of {{count}}",
+      "stop": "Stop import",
+      "stopped": "This import was stopped. Resume it to read the rest of the posts.",
+      "stopping": "Stopping after this post…",
+      "tabs": {
+        "label": "Import results",
+        "needs_info": "Needs info",
+        "ready": "Ready to activate",
+        "skipped": "Skipped posts"
+      },
+      "titles": {
+        "failed": "Import failed",
+        "finished": "Import finished",
+        "queued": "Importing your posts",
+        "running": "Importing your posts",
+        "stopped": "Import stopped",
+        "stopping": "Importing your posts"
+      },
+      "tryAgain": "Try again",
+      "variants_one": "{{count}} variant",
+      "variants_other": "{{count}} variants",
+      "viewPost": "View post",
+      "waitingHint": "None are live yet, so the assistant won't offer them until you activate them.",
+      "waiting_one": "{{count}} draft product is waiting for you.",
+      "waiting_other": "{{count}} draft products are waiting for you."
+    },
+    "source": {
+      "addCategory": "Create and add",
+      "categoryCreated": "Category created and added.",
+      "dismiss": "Dismiss",
+      "meta_one": "{{date}} · {{count}} photo",
+      "meta_other": "{{date}} · {{count}} photos",
+      "openImport": "Open the import",
+      "suggestedNew": "Suggested new category:",
+      "title": "From this Facebook post",
+      "viewPost": "View on Facebook",
+      "whatWeRead": {
+        "fromCaption": "From the caption",
+        "fromPost": "From the post",
+        "name": "Name",
+        "notInPost": "Not in the post",
+        "price": "Price",
+        "stock": "Stock",
+        "title": "What we read",
+        "valuesFromCaption": "{{values}} from the caption"
+      }
+    }
   }
 }

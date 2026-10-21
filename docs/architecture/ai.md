@@ -568,11 +568,14 @@ Output schema (`postProductsSchema`):
 `checkPostProducts` (`imports/post-drafts.ts`) checks it before anything is
 written: it keeps the first 10 products (`MAX_POST_PRODUCTS`) and drops one
 with no name; trims options to 3 of 30 values and 100 variants, flagging the
-post (`reason: limits_applied`); converts each positive price from major to
+post (`limits_applied`); converts each positive price from major to
 minor units and drops any other; prices each variant from the most specific
 row whose values it has; links an `existing` category only when the shop has
 it, keeps a new name as a suggestion only, and drops the rest. A post left
-with no product reads as `not_product`. The draft gets no stock and a
+with no product is `no_named_product`. A `not_product` answer makes the post
+`not_a_product`, with the answer's `reason` kept as its `note`
+([Results](../features/13-facebook-post-import/README.md#results)). The draft
+gets no stock and a
 generated SKU.
 
 ## Entry points
@@ -589,9 +592,9 @@ stickers, reactions and seller messages. The one call outside the assistant,
 worker consumes (`ImportRunner.run`). For each post Graph returns, in order:
 
 1. **Skip** with no LLM call when this run already handled it, when a product
-   link or an earlier run (any result but `failed`) has it
+   link or an earlier run (any result but a failed one) has it
    (`already_imported`), or when it has no caption and no photo
-   (`not_product`).
+   (`no_caption_or_photo`).
 2. **Photos.** Up to 8 are downloaded from Meta, re-encoded and stored under
    `m/`, with no transaction open.
 3. **`extractProductsFromPost`**, then `checkPostProducts`.

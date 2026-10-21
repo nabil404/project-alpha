@@ -32,17 +32,60 @@ export const ACTIVE_IMPORT_STATUSES = [
   'stopping',
 ] as const satisfies readonly ImportRunStatus[];
 
+/**
+ * A post that holds no product. `not_a_product` is the reader's verdict, its
+ * own words in the post's `note`; `no_caption_or_photo` was never read;
+ * `no_named_product` gave products with no usable name.
+ */
+export const NOT_PRODUCT_RESULTS = [
+  'not_a_product',
+  'no_caption_or_photo',
+  'no_named_product',
+] as const;
+
+/** A post that failed, and is read again by a resume or a later run. */
+export const FAILED_RESULTS = ['llm_failed', 'photo_unreadable', 'write_failed'] as const;
+
 /** What became of one post. */
 export const importPostResults = [
   'draft',
   'merged',
-  'not_product',
+  ...NOT_PRODUCT_RESULTS,
   'in_catalog',
   'already_imported',
-  'failed',
+  ...FAILED_RESULTS,
 ] as const;
 export const importPostResultSchema = z.enum(importPostResults);
 export type ImportPostResult = z.infer<typeof importPostResultSchema>;
+export type NotProductResult = (typeof NOT_PRODUCT_RESULTS)[number];
+export type FailedResult = (typeof FAILED_RESULTS)[number];
+
+/**
+ * The skipped posts Import anyway reads again. A post with no caption and no
+ * photo has nothing to read, and one imported before already has its products.
+ */
+export const IMPORT_ANYWAY_RESULTS = [
+  'not_a_product',
+  'no_named_product',
+  'in_catalog',
+] as const satisfies readonly ImportPostResult[];
+
+export const canImportAnyway = (result: ImportPostResult): boolean =>
+  (IMPORT_ANYWAY_RESULTS as readonly ImportPostResult[]).includes(result);
+
+/**
+ * Where Import anyway stands on a post: `queued` while it reads it again,
+ * `no_product` when it still found none, `failed` when it could not read it.
+ * Cleared once the post makes drafts or is found in the catalog.
+ */
+export const importAnywayStatuses = ['queued', 'no_product', 'failed'] as const;
+export const importAnywayStatusSchema = z.enum(importAnywayStatuses);
+export type ImportAnywayStatus = z.infer<typeof importAnywayStatusSchema>;
+
+export const isNotProductResult = (result: ImportPostResult): result is NotProductResult =>
+  (NOT_PRODUCT_RESULTS as readonly ImportPostResult[]).includes(result);
+export const isFailedResult = (result: ImportPostResult): result is FailedResult =>
+  (FAILED_RESULTS as readonly ImportPostResult[]).includes(result);
 
 /** The summary's tabs. */
 export const importPostFilters = ['needs_info', 'ready', 'skipped'] as const;
@@ -187,11 +230,18 @@ export const importPostSchema = z
     url: z.string().url().nullable(),
     photoCount: z.number().int().nonnegative(),
     result: importPostResultSchema,
-    /** Why it was skipped or failed, in the reader's words or as a code. */
-    reason: z.string().nullable(),
+    /** Its drafts were cut to the catalog's limits: products, options or values left out. */
+    limitsApplied: z.boolean(),
+    /** The last Import anyway on it, while it has not made drafts. */
+    importAnyway: importAnywayStatusSchema.nullable(),
+    /** What the reader said the post is ("Eid greeting"), in English, for `not_a_product`. */
+    note: z.string().nullable(),
     /** A category name the LLM suggested that the shop does not have. */
     suggestedCategory: z.string().nullable(),
-    /** For `in_catalog`: the shop's products it matched. */
+    /**
+     * For `in_catalog`, the shop's products it matched; for `already_imported`,
+     * the products the post is linked to or an earlier run made from it.
+     */
     matchedProducts: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
     /** The drafts it made or merged into that still exist. */
     products: z.array(importProductSchema),
@@ -203,6 +253,23 @@ export const importPostListResponseSchema = z
   .object({ data: z.array(importPostSchema), total: count })
   .meta({ id: 'ImportPostListResponse' });
 export type ImportPostListResponse = z.infer<typeof importPostListResponseSchema>;
+
+/**
+ * GET /imports/products/:productId: the post a product was imported from,
+ * for the edit page's "From this Facebook post" panel. Null for a product no
+ * import made.
+ */
+export const productImportSourceSchema = z
+  .object({
+    source: z
+      .object({
+        importId: z.string().uuid(),
+        post: importPostSchema,
+      })
+      .nullable(),
+  })
+  .meta({ id: 'ProductImportSource' });
+export type ProductImportSource = z.infer<typeof productImportSourceSchema>;
 
 /** POST /imports/:id/activate. */
 export const activateImportSchema = z

@@ -47,10 +47,11 @@ const refreshLists = (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: catalogKeys.categories() }),
   ]);
 
-function listSearch({ filter, q, categoryId, page, limit }: ListProductsQuery): string {
+function listSearch({ filter, q, categoryId, importId, page, limit }: ListProductsQuery): string {
   const params = new URLSearchParams({ filter, page: String(page), limit: String(limit) });
   if (q) params.set('q', q);
   if (categoryId) params.set('categoryId', categoryId);
+  if (importId) params.set('importId', importId);
   return params.toString();
 }
 
