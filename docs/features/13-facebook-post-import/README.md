@@ -28,6 +28,9 @@ Import from Facebook posts (proposal)" row of the design canvas.
 
 ## The flow
 
+The diagrams of a run, from the start checks to each post's result, are in
+[Import flow](flow.md).
+
 1. **Choose a source.** Catalog's **Import** button opens "Import products"
    with two choices: **Import from Facebook**, and **Import from CSV**,
    disabled and marked "Coming soon" until
