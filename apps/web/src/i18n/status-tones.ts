@@ -14,13 +14,13 @@ import type {
  * `satisfies Record<Enum, …>` fails the typecheck when a member is added
  * upstream without a tone. `null` means the status shows no badge.
  */
-export type StatusTone = 'accent' | 'neutral' | 'success' | 'warning' | 'danger';
+export type StatusTone = 'accent' | 'accentStrong' | 'neutral' | 'success' | 'warning' | 'danger';
 
 export const orderStatusTones = {
-  new: 'accent',
-  confirmed: 'neutral',
+  new: 'warning',
+  confirmed: 'accent',
   packed: 'neutral',
-  shipped: 'neutral',
+  shipped: 'accentStrong',
   delivered: 'success',
   returned: 'warning',
   cancelled: 'danger',
@@ -76,6 +76,7 @@ export const importRunStatusTones = {
 
 export const statusToneClasses = {
   accent: 'bg-accent-soft text-accent',
+  accentStrong: 'bg-accent text-on-accent',
   neutral: 'bg-surface-sunken text-ink-muted',
   success: 'bg-success-soft text-success',
   warning: 'bg-warning-soft text-warning',
@@ -85,8 +86,19 @@ export const statusToneClasses = {
 /** A status dot's fill: the tone's full colour, always beside a word or a screen-reader label. */
 export const statusToneDotClasses = {
   accent: 'bg-accent',
+  accentStrong: 'bg-accent',
   neutral: 'bg-ink-muted',
   success: 'bg-success',
   warning: 'bg-warning',
   danger: 'bg-danger',
+} as const satisfies Record<StatusTone, string>;
+
+/** A status shown as tinted words, with no badge behind them. */
+export const statusToneTextClasses = {
+  accent: 'text-accent',
+  accentStrong: 'text-accent',
+  neutral: 'text-ink-muted',
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
 } as const satisfies Record<StatusTone, string>;

@@ -16,7 +16,7 @@ import { SearchInput } from '@/components/SearchInput';
 import { Button } from '@/components/ui/button';
 import { useErrorMessages } from '@/i18n/error-keys';
 import { useStatusLabels } from '@/i18n/status-keys';
-import { paymentStatusTones, statusToneClasses } from '@/i18n/status-tones';
+import { paymentStatusTones, statusToneTextClasses } from '@/i18n/status-tones';
 import { useFormatters } from '@/lib/format';
 import { useShopRegion } from '@/lib/shop-region';
 import { cn } from '@/lib/utils';
@@ -212,16 +212,16 @@ export function OrderList({
               <div className="relative hidden overflow-x-auto md:block">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-surface-sunken text-left text-label whitespace-nowrap text-ink-muted">
-                      <th scope="col" className="border-t border-border py-3 pr-4 pl-6">
+                    <tr className="text-left text-label whitespace-nowrap text-ink-muted">
+                      <th scope="col" className="border-b border-border py-3 pr-4 pl-6">
                         {t('list.columns.order')}
                       </th>
-                      <th scope="col" className="border-t border-border px-4 py-3">
+                      <th scope="col" className="border-b border-border px-4 py-3">
                         {t('list.columns.customer')}
                       </th>
                       <th
                         scope="col"
-                        className="hidden border-t border-border px-4 py-3 lg:table-cell"
+                        className="hidden border-b border-border px-4 py-3 lg:table-cell"
                       >
                         {t('list.columns.items')}
                       </th>
@@ -230,19 +230,22 @@ export function OrderList({
                       </SortableHeader>
                       <th
                         scope="col"
-                        className="hidden border-t border-border px-4 py-3 xl:table-cell"
+                        className="hidden border-b border-border px-4 py-3 xl:table-cell"
                       >
                         {t('list.columns.payment')}
                       </th>
-                      <th scope="col" className="border-t border-border px-4 py-3">
+                      <th scope="col" className="border-b border-border px-4 py-3">
                         {t('list.columns.status')}
                       </th>
-                      <SortableHeader sort="placed_at" view={view} onSort={onSort} align="left">
+                      <SortableHeader
+                        sort="placed_at"
+                        view={view}
+                        onSort={onSort}
+                        align="left"
+                        last
+                      >
                         {t('list.columns.date')}
                       </SortableHeader>
-                      <th scope="col" className="border-t border-border py-3 pr-6 pl-4">
-                        <span className="sr-only">{t('list.columns.action')}</span>
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -292,12 +295,14 @@ function SortableHeader({
   view,
   onSort,
   align = 'right',
+  last = false,
   children,
 }: {
   sort: OrderSort;
   view: OrderListView;
   onSort: (sort: OrderSort) => void;
   align?: 'left' | 'right';
+  last?: boolean;
   children: string;
 }) {
   const { t } = useTranslation('orders');
@@ -308,7 +313,11 @@ function SortableHeader({
     <th
       scope="col"
       aria-sort={active ? (view.direction === 'desc' ? 'descending' : 'ascending') : 'none'}
-      className={cn('border-t border-border px-4 py-3', align === 'right' && 'text-right')}
+      className={cn(
+        'border-b border-border py-3',
+        last ? 'pr-6 pl-4' : 'px-4',
+        align === 'right' && 'text-right',
+      )}
     >
       <button
         type="button"
@@ -320,7 +329,11 @@ function SortableHeader({
         )}
       >
         {children}
-        <Icon aria-hidden strokeWidth={1.5} className="size-3.5" />
+        <Icon
+          aria-hidden
+          strokeWidth={1.5}
+          className={cn('size-3.5', active ? 'text-accent' : 'text-ink-disabled')}
+        />
       </button>
     </th>
   );
@@ -342,72 +355,59 @@ function ItemsSummary({ order }: { order: OrderListItem }) {
   );
 }
 
-function PaymentCell({ order }: { order: OrderListItem }) {
-  const { paymentStatus, paymentMethod } = useStatusLabels();
-  return (
-    <span className="flex flex-col items-start gap-0.5">
-      <span
-        className={cn(
-          'inline-flex h-5 items-center rounded-full px-2 text-label',
-          statusToneClasses[paymentStatusTones[order.paymentStatus]],
-        )}
-      >
-        {paymentStatus(order.paymentStatus)}
-      </span>
-      <span className="text-small whitespace-nowrap text-ink-muted">
-        {paymentMethod(order.paymentMethod)}
-      </span>
-    </span>
-  );
-}
-
+/** Drafted orders, still waiting for the seller, carry a warm tint. */
 function OrderRow({ order }: { order: OrderListItem }) {
   const { t } = useTranslation('orders');
-  const { orderSource } = useStatusLabels();
+  const { paymentStatus } = useStatusLabels();
   const { formatAmount } = useFormatters();
   const placedLabel = usePlacedLabel();
 
   return (
-    <tr className="border-t border-border hover:bg-surface-hover">
+    <tr
+      className={cn(
+        'border-t border-border first:border-t-0 hover:bg-surface-hover',
+        order.status === 'new' && 'bg-warning-soft/30',
+      )}
+    >
       <td className="py-3 pr-4 pl-6 whitespace-nowrap">
         <Link
           to="/orders/$orderId"
           params={{ orderId: order.id }}
-          className="flex flex-col font-mono text-code text-ink hover:text-link"
+          className="flex items-center gap-1.5 text-ink hover:text-link"
         >
-          {order.reference}
-          <span className="font-sans text-small text-ink-muted">{orderSource(order.source)}</span>
+          <span className="font-mono text-code">{order.reference}</span>
+          {order.source === 'assistant' && (
+            <Bot
+              role="img"
+              aria-label={t('list.drafted')}
+              strokeWidth={1.5}
+              className="size-4 shrink-0 text-ink-muted"
+            >
+              <title>{t('list.drafted')}</title>
+            </Bot>
+          )}
         </Link>
       </td>
-      <td className="max-w-48 px-4 py-3">
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-body font-medium">{order.customer.name}</span>
-          <span className="truncate text-small text-ink-muted">{order.customer.phone}</span>
-        </span>
-      </td>
+      <td className="max-w-48 truncate px-4 py-3 text-body font-medium">{order.customer.name}</td>
       <td className="hidden max-w-64 px-4 py-3 text-body lg:table-cell">
         <ItemsSummary order={order} />
       </td>
-      <td className="px-4 py-3 text-right text-body whitespace-nowrap tabular-nums">
+      <td className="px-4 py-3 text-right text-body font-medium whitespace-nowrap tabular-nums">
         {formatAmount(order.total, order.currency)}
       </td>
-      <td className="hidden px-4 py-3 xl:table-cell">
-        <PaymentCell order={order} />
+      <td
+        className={cn(
+          'hidden px-4 py-3 text-label whitespace-nowrap xl:table-cell',
+          statusToneTextClasses[paymentStatusTones[order.paymentStatus]],
+        )}
+      >
+        {paymentStatus(order.paymentStatus)}
       </td>
       <td className="px-4 py-3">
         <OrderStatusBadge status={order.status} />
       </td>
-      <td className="px-4 py-3 text-small whitespace-nowrap text-ink-muted">
+      <td className="py-3 pr-6 pl-4 text-small whitespace-nowrap text-ink-muted">
         {placedLabel(order.placedAt)}
-      </td>
-      <td className="py-3 pr-6 pl-4 text-right">
-        {order.status === 'new' && (
-          <Button asChild size="sm" variant="primary">
-            <Link to="/orders/$orderId" params={{ orderId: order.id }}>
-              {t('list.review')}
-            </Link>
-          </Button>
-        )}
       </td>
     </tr>
   );

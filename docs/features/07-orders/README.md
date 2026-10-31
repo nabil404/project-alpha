@@ -212,7 +212,8 @@ missing a name, phone or address the customer's record cannot fill),
     a custom range of the shop's calendar days, sent as instants in the
     shop's time zone.
   - From `md` up the list is a table sortable by total and date; below `md`
-    it is a list of cards.
+    it is a list of cards. In the table, orders the assistant drafted carry a
+    bot mark, and ones still in `new` a warm tint.
   - The URL holds `status`, `q`, `range`, `from`, `to`, `sort`, `direction`,
     `page` and `pageSize`.
 - **The item picker**, in Create order and in Edit items, shows "N available"
