@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import {
   ConversationDetailsHeader,
+  HandoffReason,
   conversationQueryOptions,
   useConversation,
 } from '@/features/conversations';
@@ -39,6 +40,11 @@ function ConversationDetailsPage() {
                 key={conversation.data.latestOrderId}
                 orderId={conversation.data.latestOrderId}
               />
+            </div>
+          )}
+          {conversation.data.handoff && (
+            <div className={card}>
+              <HandoffReason conversationId={conversationId} />
             </div>
           )}
         </main>

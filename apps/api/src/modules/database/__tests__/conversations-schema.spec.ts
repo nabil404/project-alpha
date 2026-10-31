@@ -1,5 +1,11 @@
 import { sql } from 'drizzle-orm';
-import { conversationStates, messageKinds, messageSenders, messageStatuses } from '@app/shared';
+import {
+  conversationStates,
+  handoffReasons,
+  messageKinds,
+  messageSenders,
+  messageStatuses,
+} from '@app/shared';
 import type { Transaction } from '../base.repository';
 import * as schema from '../schema/index';
 import {
@@ -20,6 +26,7 @@ import {
 describe('conversation enum columns', () => {
   it('match the shared enums', () => {
     expect(schema.conversation.state.enumValues).toEqual([...conversationStates]);
+    expect(schema.conversation.handoffReason.enumValues).toEqual([...handoffReasons]);
     expect(schema.conversation.lastMessageSender.enumValues).toEqual([...messageSenders]);
     expect(schema.message.sender.enumValues).toEqual([...messageSenders]);
     expect(schema.message.status.enumValues).toEqual([...messageStatuses]);

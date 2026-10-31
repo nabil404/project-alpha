@@ -1,5 +1,6 @@
 export { ConversationList } from './components/ConversationList';
 export { ConversationDetailsHeader, ConversationThread } from './components/ConversationThread';
+export { HandoffReason } from './components/HandoffReason';
 export { UnreadBadge } from './components/UnreadBadge';
 export { NoConversationSelected } from './components/NoConversationSelected';
 export {

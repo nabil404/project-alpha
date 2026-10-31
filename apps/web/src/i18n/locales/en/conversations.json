@@ -27,6 +27,52 @@
     "needs_you": "Needs you",
     "unread": "Unread"
   },
+  "handoff": {
+    "at": "Handed to you at {{time}}",
+    "reason": {
+      "awaiting_seller": {
+        "body": "{{name}} gave everything the order needs. The assistant told them the shop will confirm shortly.",
+        "title": "Order ready for you to confirm"
+      },
+      "complain": {
+        "body": "{{name}} sounded unhappy, so the assistant stopped replying instead of guessing.",
+        "title": "Customer has a complaint"
+      },
+      "llm_failed": {
+        "body": "It couldn’t reply because of a problem on our side.",
+        "title": "The assistant ran into an error"
+      },
+      "low_confidence": {
+        "body": "It couldn’t tell what {{name}} meant and didn’t want to send a wrong reply.",
+        "title": "The assistant wasn’t sure"
+      },
+      "no_delivery_charge": {
+        "body": "{{name}}’s area isn’t in any of your delivery zones, so the assistant can’t quote a total.",
+        "title": "No delivery charge for this area"
+      },
+      "question": {
+        "body": "{{name}} asked something your catalog and shop settings don’t cover.",
+        "title": "A question the assistant can’t answer"
+      },
+      "repeated_confusion": {
+        "body": "The assistant asked for the same detail several times without a clear answer.",
+        "title": "The chat went in circles"
+      },
+      "request_human": {
+        "body": "{{name}} asked to talk to someone from the shop.",
+        "title": "Customer asked for a person"
+      },
+      "send_failed": {
+        "body": "Messenger didn’t deliver the assistant’s reply, so {{name}} may be waiting on you.",
+        "title": "The assistant’s reply didn’t send"
+      },
+      "unreadable": {
+        "body": "{{name}} sent something the assistant can’t read, such as a voice note.",
+        "title": "Message the assistant couldn’t read"
+      }
+    },
+    "title": "Why this needs you"
+  },
   "list": {
     "empty": "No conversations yet. When customers message your Page, they show up here.",
     "emptyFiltered": "No conversations match.",

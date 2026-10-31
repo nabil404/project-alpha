@@ -299,11 +299,15 @@ export class AssistantTurnService {
       if (!isReplyWindowOpen(locked.conversation.lastInboundAt, now))
         return { outcome: 'window_closed' as const };
 
-      const handedOffAt = decision.reply.kind === 'handoff' ? now : null;
+      const handoff =
+        decision.reply.kind === 'handoff'
+          ? { handedOffAt: now, handoffReason: decision.reply.reason }
+          : null;
+      const handedOffAt = handoff?.handedOffAt ?? null;
       const updated = await this.conversations.update(tx, scope, conversationId, {
         state: decision.state,
         collectedSlots: decision.slots,
-        ...(handedOffAt ? { handedOffAt } : {}),
+        ...handoff,
       });
       if (!updated) return { outcome: 'stale' as const };
       const rows = [];
@@ -412,6 +416,7 @@ export class AssistantTurnService {
       await this.conversations.update(tx, scope, conversationId, {
         state: 'handed_off',
         handedOffAt: at,
+        handoffReason: 'send_failed',
       });
       return at;
     });

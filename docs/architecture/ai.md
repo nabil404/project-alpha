@@ -890,6 +890,12 @@ when:
 | `awaiting_seller`    | nothing changed on the card, no room for an 11th item, or nothing to sell                                            |
 | `unreadable`         | a second video, audio or file in a row, or a conversation's seventh vision call in 24 hours (`VISION_CALLS_PER_DAY`) |
 
+The reason is stored in `conversation.handoff_reason` with `handed_off_at`,
+and the dashboard explains it beside the chat
+([04 · Conversations](../features/04-conversations/README.md#web)). A reply
+Messenger refuses hands off too, stored as `send_failed`, which no turn
+decides.
+
 `NotificationsService` emails the seller if the chat is still unanswered 10
 minutes later.
 

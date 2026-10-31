@@ -114,7 +114,7 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   in a row (`MAX_ASKS`, counted in `collected_slots`). Before any item is in
   the cart, a `browse` or `other` turn (a greeting, a look around) asks again
   without counting, so chatting never reads as confusion. The write sets
-  `handed_off_at`; after commit,
+  `handed_off_at` and `handoff_reason`; after commit,
   `NotificationsService.handedOff(merchantId, conversationId, handedOffAt)`
   emails the seller if nobody replies in 10 minutes
   ([Notifications](../../10-settings-notifications/README.md#sending)).

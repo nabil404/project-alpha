@@ -1,4 +1,10 @@
-import type { CustomerIntent, OrderStatus, Quote, SlotName } from '@app/shared';
+import type {
+  CustomerIntent,
+  HandoffReason as StoredHandoffReason,
+  OrderStatus,
+  Quote,
+  SlotName,
+} from '@app/shared';
 
 /** One item as the reply may speak of it: catalog names, formatted money. */
 export interface LineFacts {
@@ -31,16 +37,8 @@ export interface ReplyFacts {
   total?: string;
 }
 
-export type HandoffReason =
-  | 'llm_failed'
-  | 'low_confidence'
-  | 'complain'
-  | 'request_human'
-  | 'question'
-  | 'repeated_confusion'
-  | 'awaiting_seller'
-  | 'no_delivery_charge'
-  | 'unreadable';
+/** A turn's hand-off; `send_failed` is stored only after a refused send, never decided. */
+export type HandoffReason = Exclude<StoredHandoffReason, 'send_failed'>;
 
 /** Why a slot is asked for again, when it is not just missing. */
 export type AskReason =

@@ -260,6 +260,13 @@
       "when": 1793458968101,
       "tag": "0036_llm_call_prompt_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793470274800,
+      "tag": "0037_conversation_handoff_reason",
+      "breakpoints": true
     }
   ]
 }

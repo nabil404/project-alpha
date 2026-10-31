@@ -37,6 +37,10 @@ export function toConversationDetail(
     lastInboundAt: row.lastInboundAt?.toISOString() ?? null,
     replyWindowClosesAt: replyWindowClosesAt(row.lastInboundAt)?.toISOString() ?? null,
     latestOrderId,
+    handoff:
+      row.state === 'handed_off' && row.handedOffAt && row.handoffReason
+        ? { reason: row.handoffReason, at: row.handedOffAt.toISOString() }
+        : null,
   };
 }
 

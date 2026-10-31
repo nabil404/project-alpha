@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import {
   ConversationThread,
+  HandoffReason,
   conversationQueryOptions,
   messagesQueryOptions,
   useConversation,
@@ -45,8 +46,8 @@ function ConversationPage() {
 }
 
 /**
- * Who the chat is with and the order it produced last, beside it on wide
- * screens. Composed here because it draws on three features.
+ * Who the chat is with, the order it produced last and why it needs the
+ * seller, beside it on wide screens. Composed here because it draws on three features.
  */
 function ConversationDetails({ conversationId }: { conversationId: string }) {
   const { t } = useTranslation('conversations');
@@ -64,6 +65,12 @@ function ConversationDetails({ conversationId }: { conversationId: string }) {
         <>
           <div className="h-px shrink-0 bg-border" />
           <ChatOrderSummary key={latestOrderId} orderId={latestOrderId} />
+        </>
+      )}
+      {conversation.data.handoff && (
+        <>
+          <div className="h-px shrink-0 bg-border" />
+          <HandoffReason conversationId={conversationId} />
         </>
       )}
     </aside>
