@@ -45,15 +45,11 @@ import { ProductOptionsRepository } from '../products/options/product-options.re
 import { ProductWriter } from '../products/options/product-writer';
 import { ProductsRepository } from '../products/products.repository';
 import { MerchantSettingsRepository } from '../settings/merchant-settings.repository';
+import { promptPackFor } from '../llm/prompts/prompt-pack';
 import type { NormalizedImage } from '../products/images/normalize-product-image';
 import { ImportPhotos, type StoredImage } from './import-photos';
 import { ImportRepository, type RunCounts } from './import.repository';
-import {
-  aliasLanguagesFor,
-  checkPostProducts,
-  type CheckedPost,
-  type PostDraft,
-} from './post-drafts';
+import { checkPostProducts, type CheckedPost, type PostDraft } from './post-drafts';
 
 /** LLM failures in a row that fail the run. */
 export const LLM_FAILURES_TO_FAIL = 5;
@@ -240,7 +236,7 @@ export class ImportRunner {
         caption: post.message,
         photos: stored.slice(0, LLM_PHOTOS_PER_POST).map((image) => image.url),
         currency: context.currency,
-        aliasLanguages: aliasLanguagesFor(context.country),
+        pack: promptPackFor(context.country),
         categories: context.categories.map((category) => category.name),
         hint: true,
       });
@@ -411,7 +407,7 @@ export class ImportRunner {
       caption: post.message,
       photos: stored.slice(0, LLM_PHOTOS_PER_POST).map((image) => image.url),
       currency: context.currency,
-      aliasLanguages: aliasLanguagesFor(context.country),
+      pack: promptPackFor(context.country),
       categories: context.categories.map((category) => category.name),
     });
     const llmCalls: LlmCallRecord[] = [

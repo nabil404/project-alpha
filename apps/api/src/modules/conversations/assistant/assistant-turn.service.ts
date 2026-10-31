@@ -67,6 +67,7 @@ import type { LastOrderFacts, ReplyIntent } from './reply-intent';
 import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmation.service';
 import { outgoingFor } from './outgoing';
 import { phraseRequestFor, phraseVoice } from './reply-phrasing';
+import { promptPackFor } from '../../llm/prompts/prompt-pack';
 import { askedAt, turnGate, type TurnGate } from './turn-gate';
 import { decideNonText } from './non-text-turn';
 import {
@@ -267,7 +268,7 @@ export class AssistantTurnService {
           decision.reply,
           history,
           language,
-          phraseVoice(read.assistant, language),
+          phraseVoice(read.assistant, promptPackFor(read.country)),
           calls,
         )
       : fallbackText(decision.reply, language);
@@ -460,11 +461,12 @@ export class AssistantTurnService {
         trigger: { kind: 'message', classified: 'failed', extracted: 'skipped' },
       });
     }
-    const classified = record(await llm.classifyIntent(history), calls);
+    const pack = promptPackFor(turn.country);
+    const classified = record(await llm.classifyIntent(history, pack), calls);
     const extracted =
       classified !== 'failed' && shouldExtract(turn.state, classified.intent)
         ? record(
-            await llm.extractOrder(history, extractionContext(turn.slots, turn.catalog)),
+            await llm.extractOrder(history, extractionContext(turn.slots, turn.catalog), pack),
             calls,
           )
         : 'skipped';
@@ -479,7 +481,7 @@ export class AssistantTurnService {
     reply: ReplyIntent,
     history: ChatLine[],
     language: ReplyLanguage,
-    voice: Pick<PhraseRequest, 'language' | 'tone'>,
+    voice: Pick<PhraseRequest, 'language' | 'tone' | 'pack'>,
     calls: LlmCallRecord[],
   ): Promise<string> {
     const fallback = fallbackText(reply, language);

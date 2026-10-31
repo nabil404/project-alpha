@@ -1,6 +1,7 @@
 import type { OrderStatus, SlotName } from '@app/shared';
 import type { AskReason, Choice, LastOrderFacts, ReplyFacts, ReplyIntent } from './reply-intent';
 import { summaryMessages } from './summary-card';
+import { promptPackFor } from '../../llm/prompts/prompt-pack';
 
 export type ReplyLanguage = 'bn' | 'en';
 
@@ -32,9 +33,9 @@ type FallbackKey =
 /** The BCP-47 locale each reply language formats money in. */
 export const LOCALES: Record<ReplyLanguage, string> = { bn: 'bn-BD', en: 'en-US' };
 
-/** The shop's country picks the fallback language: Bangladesh answers in Bangla. */
+/** The region's reply language when fixed lines exist in it (Bangla, English); English otherwise. */
 export function languageFor(country: string): ReplyLanguage {
-  return country === 'BD' ? 'bn' : 'en';
+  return promptPackFor(country).replyLanguage === 'bn' ? 'bn' : 'en';
 }
 
 /** The customer's side of a standalone referral, stored as their message. Draft Bangla, to be reviewed. */

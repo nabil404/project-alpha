@@ -5,6 +5,7 @@ import type {
   PhotoMatch,
   PostProducts,
 } from '@app/shared';
+import type { PromptPack } from './prompts/prompt-pack';
 
 /** What each call was for; one row per call in llm_call. */
 export const LLM_PURPOSES = [
@@ -27,6 +28,8 @@ export interface LlmUsage {
   inputTokens: number | null;
   outputTokens: number | null;
   latencyMs: number;
+  /** The region's prompt (`PromptPack.id`); null for a call whose prompt has no region. */
+  promptPack: string | null;
 }
 
 export type LlmCallRecord = LlmUsage & { outcome: LlmOutcome };
@@ -51,6 +54,8 @@ export interface PhraseRequest {
   language: string;
   /** The seller's choice in Settings > Order assistant. */
   tone: AssistantTone;
+  /** The shop's region: the languages the customer may write in. */
+  pack: PromptPack;
 }
 
 /**
@@ -97,8 +102,8 @@ export interface PostExtractionRequest {
   photos: string[];
   /** ISO 4217, for reading prices. */
   currency: string;
-  /** Which scripts and languages the aliases should cover, from the shop's country. */
-  aliasLanguages: string;
+  /** The shop's region: the languages the caption and aliases are in. */
+  pack: PromptPack;
   /** The shop's live category names; only these may come back as `existing`. */
   categories: string[];
   /** The seller said the post does hold a product (Import anyway). */
@@ -106,8 +111,12 @@ export interface PostExtractionRequest {
 }
 
 export interface LlmClient {
-  classifyIntent(history: ChatLine[]): Promise<LlmResult<IntentResult>>;
-  extractOrder(history: ChatLine[], context: ExtractionContext): Promise<LlmResult<ExtractedOrder>>;
+  classifyIntent(history: ChatLine[], pack: PromptPack): Promise<LlmResult<IntentResult>>;
+  extractOrder(
+    history: ChatLine[],
+    context: ExtractionContext,
+    pack: PromptPack,
+  ): Promise<LlmResult<ExtractedOrder>>;
   phraseReply(request: PhraseRequest, history: ChatLine[]): Promise<LlmResult<string>>;
   matchProductPhoto(request: PhotoMatchRequest): Promise<LlmResult<PhotoMatch>>;
   extractProductsFromPost(request: PostExtractionRequest): Promise<LlmResult<PostProducts>>;

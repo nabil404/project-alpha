@@ -4,8 +4,10 @@ import { registerTelemetry, type Telemetry } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import { AiSdkLlmClient } from '../ai-sdk-llm.client';
 import type { ChatLine } from '../llm.types';
+import { promptPackFor } from '../prompts/prompt-pack';
 
 const history: ChatLine[] = [{ from: 'customer', text: 'I want the red saree, 2 pcs' }];
+const pack = promptPackFor('BD');
 
 /**
  * A mock model that answers `text`, throws, or hangs until aborted. The usage
@@ -78,7 +80,10 @@ beforeAll(() => Logger.overrideLogger(false));
 
 describe('AiSdkLlmClient', () => {
   it('classifies with the routing model and reports usage', async () => {
-    const result = await client('{"intent":"order","confidence":0.9}').classifyIntent(history);
+    const result = await client('{"intent":"order","confidence":0.9}').classifyIntent(
+      history,
+      pack,
+    );
     expect(result).toEqual({
       ok: true,
       value: { intent: 'order', confidence: 0.9 },
@@ -92,11 +97,11 @@ describe('AiSdkLlmClient', () => {
   });
 
   it('extracts with the extraction model', async () => {
-    const result = await client('unused', ORDER).extractOrder(history, { items: [] });
+    const result = await client('unused', ORDER).extractOrder(history, { items: [] }, pack);
     expect(result).toMatchObject({
       ok: true,
       value: { items: [RED_SAREE] },
-      usage: { purpose: 'extract', model: 'mock-extraction' },
+      usage: { purpose: 'extract', model: 'mock-extraction', promptPack: 'bn-BD' },
     });
   });
 
@@ -107,6 +112,7 @@ describe('AiSdkLlmClient', () => {
         facts: { productName: 'Red saree' },
         language: 'en',
         tone: 'friendly',
+        pack,
       },
       history,
     );
@@ -118,7 +124,7 @@ describe('AiSdkLlmClient', () => {
   });
 
   it('reports invalid JSON as invalid_output', async () => {
-    const result = await client('not json at all').classifyIntent(history);
+    const result = await client('not json at all').classifyIntent(history, pack);
     expect(result).toMatchObject({
       ok: false,
       reason: 'invalid_output',
@@ -127,7 +133,10 @@ describe('AiSdkLlmClient', () => {
   });
 
   it('reports output that fails the Zod schema as invalid_output', async () => {
-    const result = await client('{"intent":"order","confidence":1.7}').classifyIntent(history);
+    const result = await client('{"intent":"order","confidence":1.7}').classifyIntent(
+      history,
+      pack,
+    );
     expect(result).toMatchObject({
       ok: false,
       reason: 'invalid_output',
@@ -142,7 +151,7 @@ describe('AiSdkLlmClient', () => {
         name: 'AI_APICallError',
         statusCode: 401,
       });
-      await client(error).classifyIntent(history);
+      await client(error).classifyIntent(history, pack);
       const line = String(warn.mock.calls[0]?.[0]);
       expect(line).toContain('AI_APICallError');
       expect(line).toContain('401');
@@ -153,7 +162,7 @@ describe('AiSdkLlmClient', () => {
   });
 
   it('reports a provider error as provider_error, with no tokens', async () => {
-    const result = await client(new Error('upstream exploded')).classifyIntent(history);
+    const result = await client(new Error('upstream exploded')).classifyIntent(history, pack);
     expect(result).toMatchObject({
       ok: false,
       reason: 'provider_error',
@@ -162,17 +171,17 @@ describe('AiSdkLlmClient', () => {
   });
 
   it('gives up after the timeout', async () => {
-    const result = await client('hang', '{}', 20).classifyIntent(history);
+    const result = await client('hang', '{}', 20).classifyIntent(history, pack);
     expect(result).toMatchObject({ ok: false, reason: 'timeout' });
   });
 
   it('traces each call under its purpose when given telemetry', async () => {
     const telemetry = recorder();
     const traced = client(INTENT, ORDER, 2_000, telemetry);
-    await traced.classifyIntent(history);
-    await traced.extractOrder(history, { items: [] });
+    await traced.classifyIntent(history, pack);
+    await traced.extractOrder(history, { items: [] }, pack);
     await traced.phraseReply(
-      { instruction: 'greet', facts: {}, language: 'en', tone: 'friendly' },
+      { instruction: 'greet', facts: {}, language: 'en', tone: 'friendly', pack },
       history,
     );
     expect(telemetry.seen).toEqual(['classify', 'extract', 'phrase']);
@@ -182,7 +191,7 @@ describe('AiSdkLlmClient', () => {
   it('traces nothing without telemetry, even when an integration is registered globally', async () => {
     const global = recorder();
     registerTelemetry(global);
-    await client(INTENT).classifyIntent(history);
+    await client(INTENT).classifyIntent(history, pack);
     expect(global.seen).toHaveLength(0);
   });
 

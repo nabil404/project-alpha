@@ -1,18 +1,27 @@
 import { ASSISTANT_TONES } from '@app/shared';
 import { ASSISTANT_TONE_VALUES } from '../../../database/schema/settings';
 import { phraseReplyPrompt } from '../../../llm/prompts/phrase-reply';
+import { promptPackFor } from '../../../llm/prompts/prompt-pack';
 import { phraseVoice } from '../reply-phrasing';
 
 describe('phraseVoice', () => {
-  it("falls back to the country's language when the shop matches the customer", () => {
-    expect(phraseVoice({ tone: 'friendly', defaultLanguage: 'match' }, 'bn')).toEqual({
+  const bd = promptPackFor('BD');
+
+  it("falls back to the region's language when the shop matches the customer", () => {
+    expect(phraseVoice({ tone: 'friendly', defaultLanguage: 'match' }, bd)).toEqual({
       tone: 'friendly',
       language: 'bn',
+      pack: bd,
+    });
+    expect(
+      phraseVoice({ tone: 'friendly', defaultLanguage: 'match' }, promptPackFor('IN')),
+    ).toMatchObject({
+      language: 'hi',
     });
   });
 
-  it("puts the shop's default language over the country's", () => {
-    expect(phraseVoice({ tone: 'formal', defaultLanguage: 'ur' }, 'bn')).toEqual({
+  it("puts the shop's default language over the region's", () => {
+    expect(phraseVoice({ tone: 'formal', defaultLanguage: 'ur' }, bd)).toMatchObject({
       tone: 'formal',
       language: 'ur',
     });
@@ -22,7 +31,13 @@ describe('phraseVoice', () => {
 describe('phraseReplyPrompt', () => {
   it('names the tone and the fallback language', () => {
     const prompt = phraseReplyPrompt(
-      { instruction: 'Ask how many.', facts: {}, language: 'sw', tone: 'direct' },
+      {
+        instruction: 'Ask how many.',
+        facts: {},
+        language: 'sw',
+        tone: 'direct',
+        pack: promptPackFor('KE'),
+      },
       [],
     );
 
@@ -32,7 +47,13 @@ describe('phraseReplyPrompt', () => {
 
   it('names Bangla as Bangla', () => {
     const prompt = phraseReplyPrompt(
-      { instruction: 'Ask how many.', facts: {}, language: 'bn', tone: 'friendly' },
+      {
+        instruction: 'Ask how many.',
+        facts: {},
+        language: 'bn',
+        tone: 'friendly',
+        pack: promptPackFor('BD'),
+      },
       [],
     );
 

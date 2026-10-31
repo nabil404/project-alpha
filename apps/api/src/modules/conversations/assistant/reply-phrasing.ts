@@ -5,7 +5,7 @@ import {
   type SlotName,
 } from '@app/shared';
 import type { PhraseRequest } from '../../llm/llm.types';
-import type { ReplyLanguage } from './assistant-fallbacks';
+import type { PromptPack } from '../../llm/prompts/prompt-pack';
 import type { AskReason, ReplyFacts, ReplyIntent } from './reply-intent';
 
 const ASK: Record<SlotName, string> = {
@@ -51,20 +51,20 @@ function factValues(facts: ReplyFacts): Record<string, unknown> {
     : { ...facts, phone: formatPhoneInternational(facts.phone) };
 }
 
-/** How a phrased reply sounds: the seller's tone, and their default language over the country's. */
+/** How a phrased reply sounds: the seller's tone, and their default language over the region's. */
 export function phraseVoice(
   settings: Pick<AssistantSettings, 'tone' | 'defaultLanguage'>,
-  countryLanguage: ReplyLanguage,
-): Pick<PhraseRequest, 'language' | 'tone'> {
+  pack: PromptPack,
+): Pick<PhraseRequest, 'language' | 'tone' | 'pack'> {
   const language =
-    settings.defaultLanguage === MATCH_CUSTOMER ? countryLanguage : settings.defaultLanguage;
-  return { language, tone: settings.tone };
+    settings.defaultLanguage === MATCH_CUSTOMER ? pack.replyLanguage : settings.defaultLanguage;
+  return { language, tone: settings.tone, pack };
 }
 
 /** What code decided, as an instruction. Hand-offs and the summary card are never phrased. */
 export function phraseRequestFor(
   reply: Extract<ReplyIntent, { kind: 'ask_slot' }>,
-  voice: Pick<PhraseRequest, 'language' | 'tone'>,
+  voice: Pick<PhraseRequest, 'language' | 'tone' | 'pack'>,
 ): PhraseRequest {
   // The item by name, never by number: a number the facts lack would fail checkReply.
   const item =

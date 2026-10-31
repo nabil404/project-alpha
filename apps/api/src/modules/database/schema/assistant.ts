@@ -33,6 +33,8 @@ export const llmCall = pgTable(
     outputTokens: integer('output_tokens'),
     latencyMs: integer('latency_ms').notNull(),
     outcome: text('outcome', { enum: LLM_CALL_OUTCOMES }).notNull(),
+    /** The region's prompt (`PromptPack.id`, e.g. `bn-BD`); null for a call with no region (photo match). */
+    promptPack: text('prompt_pack'),
     createdAt: createdAt(),
   },
   (t) => [
