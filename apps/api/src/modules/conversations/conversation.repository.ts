@@ -5,6 +5,7 @@ import type {
   ConversationFilter,
   ConversationState,
   EntrySource,
+  HandoffReason,
   MessageKind,
   MessageSender,
 } from '@app/shared';
@@ -281,6 +282,7 @@ export class ConversationRepository {
       botPaused?: boolean;
       state?: ConversationState;
       handedOffAt?: Date | null;
+      handoffReason?: HandoffReason | null;
       collectedSlots?: CollectedSlots;
       entrySource?: EntrySource;
     },

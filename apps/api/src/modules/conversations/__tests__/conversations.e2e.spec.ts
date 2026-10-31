@@ -80,6 +80,7 @@ describeDb('conversation routes over HTTP', () => {
         facebookPageId: page.pageId,
         state: 'handed_off',
         handedOffAt: new Date(now - 60_000),
+        handoffReason: 'question',
         lastMessageAt: new Date(now - 60_000),
         lastInboundAt: new Date(now - 60_000),
       })
@@ -261,7 +262,11 @@ describeDb('conversation routes over HTTP', () => {
           .expect(200)
       ).body,
     );
-    expect(paused).toMatchObject({ botPaused: true, state: 'handed_off' });
+    expect(paused).toMatchObject({
+      botPaused: true,
+      state: 'handed_off',
+      handoff: { reason: 'question', at: expect.any(String) },
+    });
 
     const handedBack = conversationDetailSchema.parse(
       (
@@ -271,13 +276,16 @@ describeDb('conversation routes over HTTP', () => {
           .expect(200)
       ).body,
     );
-    expect(handedBack).toMatchObject({ botPaused: false, state: 'browsing' });
+    expect(handedBack).toMatchObject({ botPaused: false, state: 'browsing', handoff: null });
     // Off the handoff, so its pending customer-waiting email stays quiet.
     const [row] = await t.db
-      .select({ handedOffAt: schema.conversation.handedOffAt })
+      .select({
+        handedOffAt: schema.conversation.handedOffAt,
+        handoffReason: schema.conversation.handoffReason,
+      })
       .from(schema.conversation)
       .where(eq(schema.conversation.id, handedOff));
-    expect(row?.handedOffAt).toBeNull();
+    expect(row).toEqual({ handedOffAt: null, handoffReason: null });
 
     const refused = await request(server())
       .patch(`/api/v1/conversations/${handedOff}`)

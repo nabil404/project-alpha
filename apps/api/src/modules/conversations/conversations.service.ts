@@ -190,6 +190,7 @@ export class ConversationsService {
           ? {
               state: stateAfterHandBack(slots ?? emptySlots()),
               handedOffAt: null,
+              handoffReason: null,
             }
           : {}),
         ...(retireCard ? { state: 'collecting_details' as const } : {}),

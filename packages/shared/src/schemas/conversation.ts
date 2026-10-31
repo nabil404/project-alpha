@@ -13,6 +13,22 @@ export const conversationStates = [
 export const conversationStateSchema = z.enum(conversationStates);
 export type ConversationState = z.infer<typeof conversationStateSchema>;
 
+/** Why the assistant handed the chat to the seller; the dashboard explains each one. */
+export const handoffReasons = [
+  'awaiting_seller',
+  'request_human',
+  'complain',
+  'question',
+  'low_confidence',
+  'repeated_confusion',
+  'no_delivery_charge',
+  'unreadable',
+  'llm_failed',
+  'send_failed',
+] as const;
+export const handoffReasonSchema = z.enum(handoffReasons);
+export type HandoffReason = z.infer<typeof handoffReasonSchema>;
+
 /** How the current order attempt started; stored on the conversation and copied to its order. */
 export const entrySources = ['ad', 'link', 'get_started', 'organic'] as const;
 export const entrySourceSchema = z.enum(entrySources);
@@ -302,6 +318,8 @@ export const conversationDetailSchema = z
     replyWindowClosesAt: z.string().datetime().nullable(),
     /** The order placed from this chat most recently, whatever its status; null if none. */
     latestOrderId: z.string().uuid().nullable(),
+    /** Why and when the assistant handed the chat over; null unless it is handed off. */
+    handoff: z.object({ reason: handoffReasonSchema, at: z.string().datetime() }).nullable(),
   })
   .meta({ id: 'ConversationDetail' });
 export type ConversationDetail = z.infer<typeof conversationDetailSchema>;

@@ -339,7 +339,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
       fallbackText({ kind: 'handoff', reason: 'llm_failed' }, 'bn'),
     ]);
     const row = await conversationRow(convo.id);
-    expect(row).toMatchObject({ state: 'handed_off' });
+    expect(row).toMatchObject({ state: 'handed_off', handoffReason: 'llm_failed' });
     expect(row?.handedOffAt).toBeInstanceOf(Date);
     expect(handoffs).toEqual([
       { merchantId: t.merchantA, conversationId: convo.id, at: row?.handedOffAt },
@@ -446,7 +446,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
       status: 'failed',
     });
     const row = await conversationRow(convo.id);
-    expect(row?.state).toBe('handed_off');
+    expect(row).toMatchObject({ state: 'handed_off', handoffReason: 'send_failed' });
     expect(handoffs).toEqual([
       { merchantId: t.merchantA, conversationId: convo.id, at: row?.handedOffAt },
     ]);
@@ -626,7 +626,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
 
     expect(sent).toHaveLength(1);
     const row = await conversationRow(convo.id);
-    expect(row).toMatchObject({ state: 'handed_off' });
+    expect(row).toMatchObject({ state: 'handed_off', handoffReason: 'complain' });
     expect(row?.handedOffAt).toBeInstanceOf(Date);
     expect(handoffs).toEqual([
       { merchantId: t.merchantA, conversationId: convo.id, at: row?.handedOffAt },

@@ -1,0 +1,2 @@
+ALTER TABLE "conversation" ADD COLUMN "handoff_reason" text;--> statement-breakpoint
+ALTER TABLE "conversation" ADD CONSTRAINT "conversation_handoff_reason_ck" CHECK ("conversation"."handoff_reason" in ('awaiting_seller', 'request_human', 'complain', 'question', 'low_confidence', 'repeated_confusion', 'no_delivery_charge', 'unreadable', 'llm_failed', 'send_failed'));

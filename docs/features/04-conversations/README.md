@@ -185,7 +185,9 @@ Shapes, in
 - `ConversationDetail`: the same without `lastMessage`, plus
   `replyWindowClosesAt` (`lastInboundAt` + 24 h, or null if the customer never
   wrote; it stays set after closing, so compare it with the clock) and
-  `latestOrderId` (the chat's most recent order of any status, or null).
+  `latestOrderId` (the chat's most recent order of any status, or null) and
+  `handoff` (`{ reason, at }` while `state = handed_off` and a reason was
+  stored, else null).
 - `Message`: `{ id, sender (customer | assistant | seller), text, status (sending | sent | failed), sentAt }`.
   Replies from the dashboard and from Facebook's inbox are both `seller`.
 
@@ -252,7 +254,8 @@ it.
   `state = handed_off` is the assistant giving up, shown as "Needs you".
 - **Hand back.** `PATCH /:id` with `botPaused: false` clears `bot_paused` and
   the ask counter. A `handed_off` chat resumes at `collecting_details` if any
-  detail was collected, else `browsing`, and `handed_off_at` is cleared. A
+  detail was collected, else `browsing`, and `handed_off_at` and
+  `handoff_reason` are cleared. A
   paused chat in `awaiting_confirmation` goes back to `collecting_details` and
   its summary card is retired (`revision` + 1, quote cleared). The assistant
   resumes only on Hand back.
@@ -291,7 +294,11 @@ policy. `conversation` references `customer`, and `message` references
   [05 · Customers](../05-customers/README.md).
 - `conversation`: `facebook_page_id` (text, deliberately not a foreign key),
   `customer_id`, `state` (default `browsing`), `collected_slots` (jsonb),
-  `bot_paused`, `handed_off_at` (set exactly while `state = handed_off`), `last_message_at`, `last_message_preview`,
+  `bot_paused`, `handed_off_at` (set exactly while `state = handed_off`),
+  `handoff_reason` (why, set and cleared with `handed_off_at`; one of
+  `handoffReasons` from `@app/shared`, migration
+  `0037_conversation_handoff_reason`; null on chats handed off before it),
+  `last_message_at`, `last_message_preview`,
   `last_message_sender`, `last_message_kind` (the list
   names a non-text message from it), `last_inbound_at`, `seller_last_read_at`.
   `entry_source` (`ad`, `link`, `get_started` or `organic`, default
@@ -336,6 +343,11 @@ migrating role must be a superuser or hold `SET` membership in
   confirmation, and Edit order; a later one offers View order. The route
   composes `ChatCustomerDetails` and `ChatOrderSummary`, so the conversations
   feature imports neither.
+- **Why this needs you.** While a chat is handed off, `HandoffReason` closes
+  the panel (and the Details screen) with when the assistant handed it over
+  and a title and line per reason, in `conversations.json` under
+  `handoff.reason.<reason>`; a reason with no copy fails the web typecheck.
+  It shows nothing for a chat handed off before reasons were stored.
 - **Below `xl`,** the same sections are their own screen,
   **`/conversations/:id/details`**, opened from the person icon in the chat
   header, with a back link and breadcrumb. While the order is drafted,
@@ -360,28 +372,28 @@ migrating role must be a superuser or hold `SET` membership in
 In `apps/api/src/modules/conversations/`. Specs marked (DB) need the test
 database, and `redis-connections.spec.ts` needs `TEST_REDIS_URL`.
 
-| Spec                                                       | Covers                                                                                             |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `__tests__/conversations.e2e.spec.ts` (DB)                 | The routes over HTTP: list, cursor paging, filters and counts, one thread                          |
-| `__tests__/conversation-guards.e2e.spec.ts` (DB)           | The routes behind the real guards; a session with no active merchant is refused                    |
-| `__tests__/conversation-events.e2e.spec.ts` (DB)           | `GET /events`: only the merchant's own ids; the oldest of six streams is evicted                   |
-| `__tests__/read-repositories.spec.ts` (DB)                 | List order, cursor paging without gaps, filter chips, literal search including Bangla, two shops   |
-| `__tests__/ingest-repositories.spec.ts` (DB)               | Customer and conversation upserts, profile reads, one person messaging two shops                   |
-| `__tests__/send-reply.service.spec.ts` (DB)                | A seller reply: sent and pausing, the 24-hour window, a Messenger refusal as `502`, a changed Page |
-| `__tests__/outbound-message.sender.spec.ts` (DB)           | Staging and sending assistant replies, quick replies, cards and images                             |
-| `__tests__/message-claim.spec.ts` (DB)                     | `claimForResend`: another merchant's reply is never claimed; the lease clock                       |
-| `__tests__/delete-message.spec.ts` (DB)                    | Deleting an undelivered reply, the preview moving back, another conversation or shop as missing    |
-| `__tests__/conversation-rules.spec.ts`                     | Message previews (emoji and Bangla safe) and state rules                                           |
-| `__tests__/conversation-schemas.spec.ts`                   | Query strings, blank search, limits, reply trimming to Messenger's length                          |
-| `__tests__/cursor.spec.ts`                                 | The opaque, URL-safe cursor and refusing one the API did not issue                                 |
-| `events/__tests__/conversation-events.hub.spec.ts`         | Per-merchant delivery, one Redis connection, malformed events dropped                              |
-| `events/__tests__/conversation-events.publisher.spec.ts`   | Publishing JSON on the channel; a failure never reaches the caller                                 |
-| `events/__tests__/event-stream.spec.ts`                    | Retry hint, ids only, pings, ending at session expiry, on shutdown and on eviction                 |
-| `events/__tests__/redis-connections.spec.ts` (Redis)       | Publisher to subscriber over a real Redis; a failed connect leaves no client reconnecting          |
-| `ingest/__tests__/inbound-message.ingest.spec.ts` (DB)     | Storing messages and echoes, redelivery as a no-op, skipping our own echoes                        |
-| `ingest/__tests__/inbound-message.processor.spec.ts`       | Handing each job kind to the ingest                                                                |
-| `profiles/__tests__/customer-profile-refresh.spec.ts` (DB) | The daily refresh: due customers only, keeping known names on failure, stopping after failures     |
-| `profiles/__tests__/profile-refresh.processor.spec.ts`     | The refresh job and its scheduler                                                                  |
+| Spec                                                       | Covers                                                                                                    |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `__tests__/conversations.e2e.spec.ts` (DB)                 | The routes over HTTP: list, cursor paging, filters and counts, one thread, `handoff` cleared on hand back |
+| `__tests__/conversation-guards.e2e.spec.ts` (DB)           | The routes behind the real guards; a session with no active merchant is refused                           |
+| `__tests__/conversation-events.e2e.spec.ts` (DB)           | `GET /events`: only the merchant's own ids; the oldest of six streams is evicted                          |
+| `__tests__/read-repositories.spec.ts` (DB)                 | List order, cursor paging without gaps, filter chips, literal search including Bangla, two shops          |
+| `__tests__/ingest-repositories.spec.ts` (DB)               | Customer and conversation upserts, profile reads, one person messaging two shops                          |
+| `__tests__/send-reply.service.spec.ts` (DB)                | A seller reply: sent and pausing, the 24-hour window, a Messenger refusal as `502`, a changed Page        |
+| `__tests__/outbound-message.sender.spec.ts` (DB)           | Staging and sending assistant replies, quick replies, cards and images                                    |
+| `__tests__/message-claim.spec.ts` (DB)                     | `claimForResend`: another merchant's reply is never claimed; the lease clock                              |
+| `__tests__/delete-message.spec.ts` (DB)                    | Deleting an undelivered reply, the preview moving back, another conversation or shop as missing           |
+| `__tests__/conversation-rules.spec.ts`                     | Message previews (emoji and Bangla safe) and state rules                                                  |
+| `__tests__/conversation-schemas.spec.ts`                   | Query strings, blank search, limits, reply trimming to Messenger's length                                 |
+| `__tests__/cursor.spec.ts`                                 | The opaque, URL-safe cursor and refusing one the API did not issue                                        |
+| `events/__tests__/conversation-events.hub.spec.ts`         | Per-merchant delivery, one Redis connection, malformed events dropped                                     |
+| `events/__tests__/conversation-events.publisher.spec.ts`   | Publishing JSON on the channel; a failure never reaches the caller                                        |
+| `events/__tests__/event-stream.spec.ts`                    | Retry hint, ids only, pings, ending at session expiry, on shutdown and on eviction                        |
+| `events/__tests__/redis-connections.spec.ts` (Redis)       | Publisher to subscriber over a real Redis; a failed connect leaves no client reconnecting                 |
+| `ingest/__tests__/inbound-message.ingest.spec.ts` (DB)     | Storing messages and echoes, redelivery as a no-op, skipping our own echoes                               |
+| `ingest/__tests__/inbound-message.processor.spec.ts`       | Handing each job kind to the ingest                                                                       |
+| `profiles/__tests__/customer-profile-refresh.spec.ts` (DB) | The daily refresh: due customers only, keeping known names on failure, stopping after failures            |
+| `profiles/__tests__/profile-refresh.processor.spec.ts`     | The refresh job and its scheduler                                                                         |
 
 The assistant's specs are on the
 [phase 11.1](../11-ai-implementation/phase-1-foundation/README.md#tests) and

@@ -24,6 +24,19 @@ const CONVERSATION_STATES = [
 ] as const;
 /** Literal copy of @app/shared's entrySources. */
 const ENTRY_SOURCES = ['ad', 'link', 'get_started', 'organic'] as const;
+/** Literal copy of @app/shared's handoffReasons. */
+const HANDOFF_REASONS = [
+  'awaiting_seller',
+  'request_human',
+  'complain',
+  'question',
+  'low_confidence',
+  'repeated_confusion',
+  'no_delivery_charge',
+  'unreadable',
+  'llm_failed',
+  'send_failed',
+] as const;
 const MESSAGE_SENDERS = ['customer', 'assistant', 'seller'] as const;
 const MESSAGE_STATUSES = ['sending', 'sent', 'failed'] as const;
 
@@ -74,6 +87,8 @@ export const conversation = pgTable(
      * by this, so one from an earlier handoff stays quiet.
      */
     handedOffAt: instant('handed_off_at'),
+    /** Why the assistant handed it over, shown to the seller; null with `handed_off_at`. */
+    handoffReason: text('handoff_reason', { enum: HANDOFF_REASONS }),
     lastMessageAt: instant('last_message_at').notNull(),
     lastMessagePreview: text('last_message_preview').notNull(),
     lastMessageSender: text('last_message_sender', { enum: MESSAGE_SENDERS }).notNull(),
@@ -96,6 +111,7 @@ export const conversation = pgTable(
     }),
     check('conversation_state_ck', oneOf(t.state, CONVERSATION_STATES)),
     check('conversation_entry_source_ck', oneOf(t.entrySource, ENTRY_SOURCES)),
+    check('conversation_handoff_reason_ck', oneOf(t.handoffReason, HANDOFF_REASONS)),
     check('conversation_last_sender_ck', oneOf(t.lastMessageSender, MESSAGE_SENDERS)),
     check('conversation_last_kind_ck', oneOf(t.lastMessageKind, MESSAGE_KINDS)),
     index('conversation_merchant_last_message_idx').on(
