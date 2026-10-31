@@ -173,7 +173,6 @@
     "awaiting_other": "{{formatted}} orders are waiting for you to check and confirm them.",
     "clearFilters": "Clear search and filters",
     "columns": {
-      "action": "Action",
       "customer": "Customer",
       "date": "Date",
       "items": "Items",
@@ -183,6 +182,7 @@
       "total": "Total ({{symbol}})"
     },
     "description": "Orders the assistant drafted from chats and ones you added yourself.",
+    "drafted": "Drafted by the assistant from a Messenger chat",
     "empty": "No orders yet. Orders the assistant drafts from chats show up here.",
     "emptyFiltered": "No orders match.",
     "filters": {
@@ -208,7 +208,6 @@
       "to": "To",
       "today": "Today"
     },
-    "review": "Review",
     "searchLabel": "Search orders",
     "searchPlaceholder": "Order ID, customer or phone",
     "showDrafted": "Show drafted",

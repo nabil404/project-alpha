@@ -167,7 +167,7 @@ changes ~120ms, fades ~200ms, no bounces or slides.
 | Page header | `text-display` title, one `text-body text-ink-muted` line, actions on the right.                                                                                                                                                                                                                  |
 | Field       | `text-label` label 8px above a 40px input with `border-border-strong`; hint `text-small text-ink-muted`; error replaces the hint in `text-danger` and sets `aria-invalid`.                                                                                                                        |
 | Switch      | Immediate on/off settings (bot on/off). On: accent track, `on-accent` thumb. Not inside forms with a Save button.                                                                                                                                                                                 |
-| Table       | Rounded `surface` wrapper; header row `bg-surface-sunken text-label text-ink-muted`; rows divided by `border`, hover `surface-hover`; IDs in mono, money right-aligned. No zebra stripes.                                                                                                         |
+| Table       | Rounded `surface` wrapper; header row `bg-surface text-label text-ink-muted` over a `border` divider; rows divided by `border`, hover `surface-hover`; IDs in mono, money right-aligned. No zebra stripes.                                                                                        |
 | Stat card   | `text-small` label, `text-stat tabular-nums` figure, `text-small` note. Three or four per row; the figure is never coloured.                                                                                                                                                                      |
 
 ### Status badge tones
@@ -175,28 +175,31 @@ changes ~120ms, fades ~200ms, no bounces or slides.
 Map status → tone in one place, next to `apps/web/src/i18n/status-keys.ts`, so a
 new enum member fails the build instead of rendering unstyled.
 
-| Status                                             | Tone                         |
-| -------------------------------------------------- | ---------------------------- |
-| Order `new`                                        | accent — it needs the seller |
-| Order `confirmed`, `packed`, `shipped`             | neutral                      |
-| Order `delivered`, stock `in_stock`                | success                      |
-| Order `cancelled`, stock `out_of_stock`            | danger                       |
-| Order `returned`, payment `refunded`               | warning                      |
-| Payment `unpaid` / `paid`                          | neutral / success            |
-| Conversation `awaiting_confirmation`, `handed_off` | warning                      |
-| Conversation `abandoned`                           | neutral                      |
-| Product `active` (Published)                       | success                      |
-| Product `draft`, `archived`                        | neutral                      |
-| Customer `repeat`                                  | accent                       |
-| Customer `new`                                     | success                      |
-| Customer `needs_you`                               | warning                      |
-| Customer `inactive`                                | neutral                      |
-| Import run `queued`, `running`, `stopping`         | accent                       |
-| Import run `finished` / `stopped` / `failed`       | success / warning / danger   |
+| Status                                             | Tone                           |
+| -------------------------------------------------- | ------------------------------ |
+| Order `new` (Drafted)                              | warning — it needs the seller  |
+| Order `confirmed`                                  | accent                         |
+| Order `packed`                                     | neutral                        |
+| Order `shipped`                                    | accent, solid (`accentStrong`) |
+| Order `delivered`, stock `in_stock`                | success                        |
+| Order `cancelled`, stock `out_of_stock`            | danger                         |
+| Order `returned`, payment `refunded`               | warning                        |
+| Payment `unpaid` / `paid`                          | neutral / success              |
+| Conversation `awaiting_confirmation`, `handed_off` | warning                        |
+| Conversation `abandoned`                           | neutral                        |
+| Product `active` (Published)                       | success                        |
+| Product `draft`, `archived`                        | neutral                        |
+| Customer `repeat`                                  | accent                         |
+| Customer `new`                                     | success                        |
+| Customer `needs_you`                               | warning                        |
+| Customer `inactive`                                | neutral                        |
+| Import run `queued`, `running`, `stopping`         | accent                         |
+| Import run `finished` / `stopped` / `failed`       | success / warning / danger     |
 
-Keep `accent` for the one status that needs the seller: the teal accent sits
-near `success` in hue, so an accent badge must never be the only thing that
-tells it apart from Delivered.
+Orders read warm to cool along the lifecycle: amber while the seller must
+check a draft, teal once confirmed and solid teal on its way, then green. The
+teal accent sits near `success` in hue, so an accent badge must never be the
+only thing that tells it apart from Delivered.
 
 ## Voice
 
