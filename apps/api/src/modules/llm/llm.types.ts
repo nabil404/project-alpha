@@ -50,8 +50,10 @@ export interface ChatLine {
 export interface PhraseRequest {
   instruction: string;
   facts: Record<string, unknown>;
-  /** ISO 639-1; used when the customer's own language is unclear. */
+  /** ISO 639-1: the reply language, or only the fallback when `matchCustomer`. */
   language: string;
+  /** The seller chose "Match the customer": mirror the customer's language and script. */
+  matchCustomer: boolean;
   /** The seller's choice in Settings > Order assistant. */
   tone: AssistantTone;
   /** The shop's region: the languages the customer may write in. */

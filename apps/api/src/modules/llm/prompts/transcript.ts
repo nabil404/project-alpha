@@ -6,9 +6,17 @@ const LABEL: Record<ChatLine['from'], string> = {
   assistant: 'Assistant',
 };
 
-/** The chat as data. `<` is swapped so a message cannot close the tag and speak outside it. */
+/** A line break inside a message would start a line the model reads as another speaker's. */
+const LINE_BREAK = /\s*(?:\r\n|[\n\r\u0085\u2028\u2029])\s*/g;
+
+/**
+ * The chat as data, one line per message. `<` is swapped so a message cannot
+ * close the tag, and its line breaks become " / " so it cannot forge a line.
+ */
 export function transcript(history: ChatLine[]): string {
-  const lines = history.map((line) => `${LABEL[line.from]}: ${line.text.replaceAll('<', '‹')}`);
+  const lines = history.map(
+    (line) => `${LABEL[line.from]}: ${line.text.replaceAll('<', '‹').replace(LINE_BREAK, ' / ')}`,
+  );
   return `<conversation>\n${lines.join('\n')}\n</conversation>`;
 }
 

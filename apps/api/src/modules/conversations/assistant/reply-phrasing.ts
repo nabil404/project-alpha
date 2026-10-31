@@ -51,28 +51,34 @@ function factValues(facts: ReplyFacts): Record<string, unknown> {
     : { ...facts, phone: formatPhoneInternational(facts.phone) };
 }
 
-/** How a phrased reply sounds: the seller's tone, and their default language over the region's. */
+export type PhraseVoice = Pick<PhraseRequest, 'language' | 'matchCustomer' | 'tone' | 'pack'>;
+
+/**
+ * How a phrased reply sounds: the seller's tone, and the language they chose.
+ * "Match the customer" mirrors the customer, with the region's language as the fallback.
+ */
 export function phraseVoice(
   settings: Pick<AssistantSettings, 'tone' | 'defaultLanguage'>,
   pack: PromptPack,
-): Pick<PhraseRequest, 'language' | 'tone' | 'pack'> {
-  const language =
-    settings.defaultLanguage === MATCH_CUSTOMER ? pack.replyLanguage : settings.defaultLanguage;
-  return { language, tone: settings.tone, pack };
+): PhraseVoice {
+  const matchCustomer = settings.defaultLanguage === MATCH_CUSTOMER;
+  const language = matchCustomer ? pack.replyLanguage : settings.defaultLanguage;
+  return { language, matchCustomer, tone: settings.tone, pack };
 }
 
 /** What code decided, as an instruction. Hand-offs and the summary card are never phrased. */
 export function phraseRequestFor(
   reply: Extract<ReplyIntent, { kind: 'ask_slot' }>,
-  voice: Pick<PhraseRequest, 'language' | 'tone' | 'pack'>,
+  voice: PhraseVoice,
 ): PhraseRequest {
   // The item by name, never by number: a number the facts lack would fail checkReply.
   const item =
     reply.item === undefined ? '' : `"${reply.facts.items[reply.item]?.productName ?? ''}"`;
+  // A direct tone has no small talk, so it skips the acknowledgement rather than leave the model to choose.
+  const acknowledge =
+    voice.tone !== 'direct' && (reply.intent === 'browse' || reply.intent === 'other');
   const parts = [
-    reply.intent === 'browse' || reply.intent === 'other'
-      ? 'Briefly acknowledge their last message first.'
-      : '',
+    acknowledge ? 'Briefly acknowledge their last message first.' : '',
     reply.reason === undefined ? ASK[reply.slot] : BECAUSE[reply.reason],
   ];
   const instruction = parts
