@@ -1,4 +1,4 @@
-import { turnGate } from '../turn-gate';
+import { STALE_CHAT_DAYS, staleReply, turnGate } from '../turn-gate';
 
 const at = (s: number) => new Date(Date.UTC(2026, 9, 10, 10, 0, s));
 const msg = (
@@ -50,5 +50,34 @@ describe('turnGate', () => {
     expect(
       turnGate(open, [msg('a2', 'assistant', 6), msg('a1', 'assistant', 2), edited], 'm1'),
     ).toBe('answered');
+  });
+});
+
+describe('staleReply', () => {
+  const daysLater = (days: number) => (id: string) => ({
+    ...msg(id, 'customer', 0),
+    sentAt: new Date(at(0).getTime() + days * 24 * 60 * 60 * 1000),
+  });
+  const reply = msg('a1', 'assistant', 0);
+
+  it('is the shop’s last message when the customer comes back after STALE_CHAT_DAYS', () => {
+    expect(staleReply([daysLater(STALE_CHAT_DAYS)('m2'), reply], 'm2')).toBe(reply);
+  });
+  it('is null when the shop spoke within STALE_CHAT_DAYS', () => {
+    expect(staleReply([daysLater(STALE_CHAT_DAYS - 1)('m2'), reply], 'm2')).toBeNull();
+  });
+  it('looks past the customer’s own burst to the shop’s reply', () => {
+    const burst = [daysLater(STALE_CHAT_DAYS)('m3'), daysLater(STALE_CHAT_DAYS)('m2'), reply];
+    expect(staleReply(burst, 'm3')).toBe(reply);
+  });
+  it('counts a seller’s message as the shop speaking', () => {
+    const seller = msg('s1', 'seller', 0);
+    expect(staleReply([daysLater(STALE_CHAT_DAYS)('m2'), seller], 'm2')).toBe(seller);
+  });
+  it('is null when the shop never spoke, or the trigger is not in view', () => {
+    expect(
+      staleReply([daysLater(STALE_CHAT_DAYS)('m2'), msg('m1', 'customer', 0)], 'm2'),
+    ).toBeNull();
+    expect(staleReply([reply], 'm9')).toBeNull();
   });
 });

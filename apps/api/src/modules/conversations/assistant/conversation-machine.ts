@@ -142,6 +142,11 @@ export function readSlots(value: unknown): CollectedSlots {
   return parsed.success ? parsed.data : emptySlots();
 }
 
+/** Nothing collected and no ask counted, for a customer back after a long silence; any card still out is retired. */
+export function startOver(slots: CollectedSlots): CollectedSlots {
+  return { ...emptySlots(), revision: slots.revision + 1 };
+}
+
 /**
  * One turn, decided by code: hand-off rules, then the tap or the extraction
  * merged in, each item matched to the catalog, the delivery row matched to
@@ -268,7 +273,10 @@ function decide(input: TurnInput): TurnDecision {
 
   const item = 'item' in missing ? missing.item : undefined;
   const last = slots.lastAsked;
-  const times = last?.slot === missing.slot && last.item === item ? last.times + 1 : 1;
+  // Before any item, a greeting or a look around answers nothing, so it is no miss.
+  const missed = slots.items.length > 0 || (intent !== 'browse' && intent !== 'other');
+  const times =
+    last?.slot === missing.slot && last.item === item ? last.times + (missed ? 1 : 0) : 1;
   if (times >= MAX_ASKS) return handOff(slots, 'repeated_confusion');
 
   const problem = resolved.problems.find(

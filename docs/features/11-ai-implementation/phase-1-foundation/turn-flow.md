@@ -52,6 +52,7 @@ sequenceDiagram
 ```
 
 An LLM error or timeout, output that fails Zod, confidence under 0.6, a
-`complain` or `request_human` intent, or a third ask for one slot all end in
+`complain` or `request_human` intent, or a third ask for one slot (greetings
+and browsing before any item don't count) all end in
 `decideTurn` returning `handoff` (no LLM configured counts as a failed call),
 which sends the fixed hand-off sentence with no phrasing call.

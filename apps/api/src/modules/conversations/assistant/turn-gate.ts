@@ -47,3 +47,24 @@ export function turnGate(
   );
   return replied ? 'answered' : 'go';
 }
+
+/** Days of silence from the shop after which a customer's new message starts the order over. */
+export const STALE_CHAT_DAYS = 10;
+const STALE_CHAT_MS = STALE_CHAT_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * The shop's newest message before the trigger, when the trigger came
+ * STALE_CHAT_DAYS or more after it; otherwise null. The customer's own burst
+ * is looked past, so a run of "hi"s is measured from the shop's last reply.
+ */
+export function staleReply<T extends GateMessage>(
+  newestFirst: T[],
+  triggerMessageId: string,
+): T | null {
+  const index = newestFirst.findIndex((message) => message.id === triggerMessageId);
+  const trigger = newestFirst[index];
+  if (!trigger) return null;
+  const reply = newestFirst.slice(index + 1).find((message) => message.sender !== 'customer');
+  if (!reply) return null;
+  return askedAt(trigger).getTime() - reply.sentAt.getTime() >= STALE_CHAT_MS ? reply : null;
+}

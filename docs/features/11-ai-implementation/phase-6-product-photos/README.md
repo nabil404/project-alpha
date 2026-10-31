@@ -106,15 +106,15 @@ across any download or call:
    `offerProducts()` with the shared post's `decideSharedPost()`: the
    candidates are offered for a new item and nothing fills a slot.
 
-| Outcome                                  | Reply                                                                                           | Slots                                                           |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| One match                                | Its cover, then "Is it this one: …?" with **Yes** (`pick:product:<id>`) and **No** (`photo:no`) | `offered` holds it                                              |
-| Two or three                             | "Is it one of these?", then a carousel of covers and lowest prices, each with **This one**      | `offered` holds them                                            |
-| None, or none sure enough                | "Sorry, I couldn't tell which product is in the photo. Could you type its name?"                | `lastAsked` one short of `MAX_ASKS`, so the next miss hands off |
-| Not downloaded, too large, not an image  | "Sorry, I couldn't open that photo. Could you type the product's name?", and no model call      | as above                                                        |
-| **No** tapped                            | "Okay. Which product are you looking for? Please type its name." (`decideNotIt()`)              | as above                                                        |
-| Vision call failed, or no LLM configured | hand-off `llm_failed`                                                                           |                                                                 |
-| Already 10 items                         | hand-off `awaiting_seller`                                                                      |                                                                 |
+| Outcome                                  | Reply                                                                                           | Slots                                                                                                    |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| One match                                | Its cover, then "Is it this one: …?" with **Yes** (`pick:product:<id>`) and **No** (`photo:no`) | `offered` holds it                                                                                       |
+| Two or three                             | "Is it one of these?", then a carousel of covers and lowest prices, each with **This one**      | `offered` holds them                                                                                     |
+| None, or none sure enough                | "Sorry, I couldn't tell which product is in the photo. Could you type its name?"                | `lastAsked` one short of `MAX_ASKS`, so the next miss hands off (a greeting or browsing turn is no miss) |
+| Not downloaded, too large, not an image  | "Sorry, I couldn't open that photo. Could you type the product's name?", and no model call      | as above                                                                                                 |
+| **No** tapped                            | "Okay. Which product are you looking for? Please type its name." (`decideNotIt()`)              | as above                                                                                                 |
+| Vision call failed, or no LLM configured | hand-off `llm_failed`                                                                           |                                                                                                          |
+| Already 10 items                         | hand-off `awaiting_seller`                                                                      |                                                                                                          |
 
 **Yes** and a carousel tap are ordinary picks: `validPick()` checks the id was
 offered, and the item is added as from a shared post. The replies are fixed

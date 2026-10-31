@@ -53,6 +53,7 @@ import {
   LOCALES,
   readSlots,
   shouldExtract,
+  startOver,
   validNameTap,
   validPick,
   type DeliveryView,
@@ -68,7 +69,7 @@ import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmat
 import { outgoingFor } from './outgoing';
 import { phraseRequestFor, phraseVoice } from './reply-phrasing';
 import { promptPackFor } from '../../llm/prompts/prompt-pack';
-import { askedAt, turnGate, type TurnGate } from './turn-gate';
+import { askedAt, staleReply, turnGate, type TurnGate } from './turn-gate';
 import { decideNonText } from './non-text-turn';
 import {
   matchedProductIds,
@@ -172,11 +173,16 @@ export class AssistantTurnService {
     // 2. Think, with no transaction open. A tapped candidate or name needs no LLM.
     const catalog = await this.products.findSellableCatalog(merchantId);
     const calls: LlmCallRecord[] = [];
-    const history = toChatLines(read.recent);
+    // A customer back after a long silence starts over, and the old chat no longer speaks for them.
+    const stale = staleReply(read.recent, triggerMessageId);
+    const history = toChatLines(
+      stale ? read.recent.slice(0, read.recent.indexOf(stale)) : read.recent,
+    );
     const language = languageFor(read.country);
+    const slots = readSlots(read.conversation.collectedSlots);
     const turn = {
-      state,
-      slots: readSlots(read.conversation.collectedSlots),
+      state: stale ? ('browsing' as const) : state,
+      slots: stale ? startOver(slots) : slots,
       country: read.country,
       language,
       catalog,
