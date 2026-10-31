@@ -18,6 +18,7 @@ import {
   type PostProducts,
 } from '@app/shared';
 import type { z } from 'zod';
+import type { IntentClassifier } from './jev-intent.classifier';
 import { classifyIntentSystem } from './prompts/classify-intent';
 import { extractOrderPrompt, extractOrderSystem } from './prompts/extract-order';
 import {
@@ -49,6 +50,8 @@ export interface AiSdkLlmOptions {
   routing: Model;
   extraction: Model;
   timeoutMs: number;
+  /** Classifies intent in place of the routing model (LLM_INTENT_PROVIDER=jev). */
+  intent?: IntentClassifier;
   /** Traces every call, named by its purpose; absent, telemetry is off for every call. */
   telemetry?: Telemetry;
 }
@@ -85,6 +88,7 @@ export class AiSdkLlmClient implements LlmClient {
   constructor(private readonly options: AiSdkLlmOptions) {}
 
   classifyIntent(history: ChatLine[], pack: PromptPack): Promise<LlmResult<IntentResult>> {
+    if (this.options.intent) return this.options.intent.classifyIntent(history, pack);
     return this.object(
       'classify',
       this.options.routing,

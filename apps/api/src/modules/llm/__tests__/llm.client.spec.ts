@@ -96,6 +96,30 @@ describe('AiSdkLlmClient', () => {
     });
   });
 
+  it('hands intent to the classifier it was given, leaving the routing model unused', async () => {
+    const answer = { ok: true as const, value: { intent: 'browse' as const, confidence: 0.7 } };
+    const classifyIntent = jest.fn(async () => ({
+      ...answer,
+      usage: {
+        purpose: 'classify' as const,
+        model: 'jev-1.14.0',
+        inputTokens: 1,
+        outputTokens: 1,
+        latencyMs: 1,
+        promptPack: 'bn-BD',
+      },
+    }));
+    const llm = new AiSdkLlmClient({
+      routing: model('mock-routing', new Error('routing model called')),
+      extraction: model('mock-extraction', '{}'),
+      timeoutMs: 2_000,
+      intent: { classifyIntent },
+    });
+
+    await expect(llm.classifyIntent(history, pack)).resolves.toMatchObject(answer);
+    expect(classifyIntent).toHaveBeenCalledWith(history, pack);
+  });
+
   it('extracts with the extraction model', async () => {
     const result = await client('unused', ORDER).extractOrder(history, { items: [] }, pack);
     expect(result).toMatchObject({

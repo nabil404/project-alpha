@@ -59,6 +59,8 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   | `LLM_MODEL_EXTRACTION` | `gpt-6.1-sol`       | The mid tier: extraction                                  |
   | `LLM_TIMEOUT_MS`       | `15000`             | An `AbortSignal.timeout` on each call                     |
   | `LLM_API_KEY`          | none                | Without it no turn is queued. `*.apiKey` is pino-redacted |
+  | `LLM_INTENT_PROVIDER`  | `openai`            | `jev` classifies intent with TypeSafe's Jev instead       |
+  | `TYPESAFE_API_KEY`     | none                | Required when `LLM_INTENT_PROVIDER=jev`                   |
   | `LANGSMITH_API_KEY`    | none                | Traces every call to LangSmith. Dev and stage only        |
   | `LANGSMITH_PROJECT`    | `social-glider-dev` | The LangSmith project                                     |
   | `LANGSMITH_ENDPOINT`   | US API              | The EU region's URL for an EU workspace                   |
@@ -197,6 +199,9 @@ In `conversations/assistant/__tests__/` unless noted.
 - `llm/__tests__/llm.client.spec.ts`: the AI SDK's mock model; timeout,
   invalid JSON and provider errors give `ok: false`; each call reaches the
   telemetry integration under its purpose, and none does without one.
+- `llm/__tests__/jev-intent.classifier.spec.ts`: Jev's state and question;
+  the chosen intent's probability is the confidence; timeout and provider
+  errors give `ok: false`.
 - `assistant-turn.service.spec.ts`: an LLM failure hands off with a reply; a
   paused chat or stale trigger makes no LLM call; a takeover mid-turn is
   caught by the step 5 re-check; a Graph failure gives `failed` and
