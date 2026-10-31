@@ -12,6 +12,7 @@ import type { CatalogView, DeliveryArea } from '../catalog-match';
 import {
   decideTurn,
   shouldExtract,
+  startOver,
   validNameTap,
   validPick,
   type ActiveState,
@@ -195,8 +196,31 @@ describe('decideTurn: hand-offs', () => {
     const decision = decideTurn(
       turn({
         state: 'collecting_details',
-        slots: slots({ lastAsked: { slot: 'product', item: 0, times: 2 } }),
+        slots: slots({
+          items: [{ productQuery: 'iphone', quantity: 1 }],
+          lastAsked: { slot: 'product', item: 0, times: 2 },
+        }),
         trigger: message(nothing, asked('other')),
+      }),
+    );
+    expect(decision.reply).toEqual({ kind: 'handoff', reason: 'repeated_confusion' });
+  });
+
+  it('keeps asking, without handing off, while a customer only greets or looks around', () => {
+    let current = turn();
+    for (const intent of ['other', 'browse', 'other', 'browse'] as const) {
+      const decision = decideTurn({ ...current, trigger: message('skipped', asked(intent, 1)) });
+      expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'product' });
+      expect(decision.slots.lastAsked?.times).toBe(1);
+      current = { ...current, slots: decision.slots };
+    }
+  });
+
+  it('still counts an order that names nothing, before any item', () => {
+    const decision = decideTurn(
+      turn({
+        slots: slots({ lastAsked: { slot: 'product', item: 0, times: 2 } }),
+        trigger: message(nothing, asked('order')),
       }),
     );
     expect(decision.reply).toEqual({ kind: 'handoff', reason: 'repeated_confusion' });
@@ -1296,5 +1320,18 @@ describe('the profile name', () => {
     const handed = decideTurn(named({ slots: offered.slots, trigger: message('failed') }));
     expect(handed.reply).toEqual({ kind: 'handoff', reason: 'llm_failed' });
     expect(handed.slots.offeredName).toBeUndefined();
+  });
+});
+
+describe('startOver', () => {
+  it('drops the cart, the details and the ask count, and retires any card still out', () => {
+    const stale = slots({
+      items: [{ productQuery: 'lungi', quantity: 2 }],
+      ...DETAILS,
+      revision: 3,
+      lastAsked: { slot: 'phone', times: 2 },
+      offeredName: 'Rahim',
+    });
+    expect(startOver(stale)).toEqual({ items: [], revision: 4 });
   });
 });

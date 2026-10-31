@@ -111,7 +111,9 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
 - **Hand-off** (`handed_off`, fixed reply) when the LLM errors or times out,
   the output fails Zod, confidence is below 0.6 (`CONFIDENCE_FLOOR`), the
   intent is `complain` or `request_human`, or one slot was asked three times
-  in a row (`MAX_ASKS`, counted in `collected_slots`). The write sets
+  in a row (`MAX_ASKS`, counted in `collected_slots`). Before any item is in
+  the cart, a `browse` or `other` turn (a greeting, a look around) asks again
+  without counting, so chatting never reads as confusion. The write sets
   `handed_off_at`; after commit,
   `NotificationsService.handedOff(merchantId, conversationId, handedOffAt)`
   emails the seller if nobody replies in 10 minutes
@@ -126,6 +128,11 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   filled field below 0.6 still hands off.
 - **Hand back clears the counter** (`lastAsked`) in
   `ConversationsService.update`.
+- **A customer back after 10 days starts over.** When the shop's last
+  message came `STALE_CHAT_DAYS` (10) or more before the trigger, `startOver`
+  empties the slots (cart, details and ask count), bumps `revision` so an old
+  summary card is refused, and the turn runs as `browsing` on only the
+  messages after that reply, so the old cart is not extracted again.
 - **One send path.** `OutboundMessageSender` does store-`sending`, then
   `graph.sendText`, then `markSent` or `markFailed`, then publish, for both
   `ConversationsService.send` and the assistant, with `sender` as a
@@ -192,8 +199,13 @@ old Claude model ids would make every call fail and every turn hand off.
 In `conversations/assistant/__tests__/` unless noted.
 
 - `conversation-machine.spec.ts`: every state × intent; null never overwrites
-  a slot; the repeated-confusion hand-off; all slots filled →
+  a slot; the repeated-confusion hand-off, and greetings or browsing before
+  any item never counting toward it; `startOver`; all slots filled →
   `awaiting_confirmation`.
+- `turn-gate.spec.ts`: `staleReply` measures from the shop's last message,
+  past the customer's own burst.
+- `assistant-turn.service.spec.ts`: a customer back after `STALE_CHAT_DAYS`
+  gets a fresh order, and the LLM sees only the new messages.
 - `reply-check.spec.ts`: an invented price or quantity is rejected in Latin
   and Bangla digits; allowed facts pass; URLs and long replies are rejected.
 - `llm/__tests__/llm.client.spec.ts`: the AI SDK's mock model; timeout,

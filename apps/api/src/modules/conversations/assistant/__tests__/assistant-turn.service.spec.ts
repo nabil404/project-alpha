@@ -66,6 +66,7 @@ import { CustomerPhotoStore } from '../../photos/customer-photo.store';
 import type { DownloadResult } from '../../photos/photo-download';
 import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-object-storage';
 import { MAX_ASKS } from '../conversation-machine';
+import { STALE_CHAT_DAYS } from '../turn-gate';
 import { VISION_CALLS_PER_DAY } from '../photo-turn';
 import { fallbackText, REFERRAL_TEXT } from '../assistant-fallbacks';
 import { AssistantTurnService, extractionContext } from '../assistant-turn.service';
@@ -375,6 +376,37 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     expect(llm.calls).toEqual([]);
     await expect(service().run({ ...first, triggerMessageId: later.id })).resolves.toBe('replied');
     expect(sent).toHaveLength(1);
+  });
+
+  it('starts over when the customer comes back after STALE_CHAT_DAYS', async () => {
+    llm.intent = ok({ intent: 'other', confidence: 1 }, 'classify');
+    const { convo, job } = await thread(t.merchantA, {
+      state: 'collecting_details',
+      collectedSlots: {
+        items: [{ productQuery: 'lungi', quantity: 2 }],
+        revision: 1,
+        lastAsked: { slot: 'product', item: 0, times: 2 },
+      },
+    });
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    await seedMessage(t.db, t.merchantA, convo.id, {
+      sentAt: daysAgo(STALE_CHAT_DAYS + 2),
+      text: 'lungi 2 ta',
+    });
+    await seedMessage(t.db, t.merchantA, convo.id, {
+      sender: 'assistant',
+      sentAt: daysAgo(STALE_CHAT_DAYS + 1),
+      text: 'Which lungi?',
+    });
+
+    await expect(service().run(job)).resolves.toBe('replied');
+
+    expect(llm.histories).toEqual([[{ from: 'customer', text: 'hi' }]]);
+    expect(await conversationRow(convo.id)).toMatchObject({
+      state: 'browsing',
+      collectedSlots: { items: [], revision: 2, lastAsked: { slot: 'product', item: 0, times: 1 } },
+    });
+    expect(handoffs).toEqual([]);
   });
 
   it('a retried turn sends nothing twice', async () => {

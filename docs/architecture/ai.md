@@ -185,6 +185,11 @@ assembled from data (`prompts/transcript.ts`):
   `toChatLines` leaves out replies Messenger refused and reactions. An edited
   message reads as its latest edit, and a message with no words reads as a
   tag such as `[sent a sticker]`. `phraseReply` sees only the last 6.
+- **A chat the shop left silent for 10 days starts over.** When the shop's
+  last message came `STALE_CHAT_DAYS` (10) or more before the trigger
+  (`staleReply` in `turn-gate.ts`), the calls see only the messages after it.
+  `startOver` empties `collected_slots`, which drops the cart and the ask
+  count and retires any summary card, and the turn runs as `browsing`.
 - **The chat goes inside `<conversation>` tags**, one line per message,
   labelled `Customer:`, `Shop:` (the seller) or `Assistant:`.
 - **`transcript` and `asData` swap `<` for `‹`** in every message and every
@@ -738,7 +743,8 @@ has the full sequence diagram.
    one, or the trigger is already answered (which makes a retry safe).
 2. **Think**, with no transaction open: pick the path for the trigger (the
    table below), call the LLM if that path needs it, run `decideTurn`, then
-   phrase or use the fixed text.
+   phrase or use the fixed text. A chat the shop left silent for
+   `STALE_CHAT_DAYS` first starts over with empty slots.
 3. **Write** in one short transaction under the conversation lock: insert the
    `llm_call` rows, re-run `turnGate`, check the 24-hour reply window, save
    state and slots, stage the outgoing messages as `sending`.
@@ -879,7 +885,7 @@ when:
 | `complain`           | intent `complain`                                                                                                    |
 | `request_human`      | intent `request_human`, or the menu's Talk to a person                                                               |
 | `question`           | intent `ask_question` (shop questions are not answered from settings yet)                                            |
-| `repeated_confusion` | the third ask in a row for the same slot (`MAX_ASKS`)                                                                |
+| `repeated_confusion` | the third ask in a row for the same slot (`MAX_ASKS`); before any item, a `browse` or `other` turn does not count    |
 | `no_delivery_charge` | everything collected but no delivery row matches                                                                     |
 | `awaiting_seller`    | nothing changed on the card, no room for an 11th item, or nothing to sell                                            |
 | `unreadable`         | a second video, audio or file in a row, or a conversation's seventh vision call in 24 hours (`VISION_CALLS_PER_DAY`) |
