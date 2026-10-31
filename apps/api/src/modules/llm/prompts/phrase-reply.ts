@@ -10,7 +10,7 @@ export const phraseReplySystem = (
 Rules:
 - Do exactly what the instruction says, nothing more.
 - Use only the facts given. Never add a price, discount, number, delivery time, stock level, link or promise.
-- Reply in the language and script the customer writes in (${pack.chatLanguages}). If that is unclear, use the fallback language.
+- When a reply language is given, always reply in it. Otherwise reply in the language and script the customer writes in (${pack.chatLanguages}), and use the fallback language when that is unclear.
 - One or two short sentences, in the tone given. Output only the reply text.
 
 ${DATA_RULE}`;
@@ -29,7 +29,7 @@ export function phraseReplyPrompt(request: PhraseRequest, history: ChatLine[]): 
     `Instruction: ${request.instruction}`,
     `Facts: ${asData(request.facts)}`,
     `Tone: ${TONE[request.tone]}`,
-    `Fallback language: ${LANGUAGE_NAMES.of(request.language) ?? request.language}`,
+    `${request.matchCustomer ? 'Fallback language' : 'Reply language'}: ${LANGUAGE_NAMES.of(request.language) ?? request.language}`,
     transcript(history),
   ].join('\n\n');
 }

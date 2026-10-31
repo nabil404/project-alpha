@@ -135,6 +135,7 @@ describe('AiSdkLlmClient', () => {
         instruction: 'Ask which colour.',
         facts: { productName: 'Red saree' },
         language: 'en',
+        matchCustomer: true,
         tone: 'friendly',
         pack,
       },
@@ -205,7 +206,14 @@ describe('AiSdkLlmClient', () => {
     await traced.classifyIntent(history, pack);
     await traced.extractOrder(history, { items: [] }, pack);
     await traced.phraseReply(
-      { instruction: 'greet', facts: {}, language: 'en', tone: 'friendly', pack },
+      {
+        instruction: 'greet',
+        facts: {},
+        language: 'en',
+        matchCustomer: true,
+        tone: 'friendly',
+        pack,
+      },
       history,
     );
     expect(telemetry.seen).toEqual(['classify', 'extract', 'phrase']);

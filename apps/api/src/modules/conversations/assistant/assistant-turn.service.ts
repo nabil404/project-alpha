@@ -24,7 +24,6 @@ import {
   type LlmCallRecord,
   type LlmClient,
   type LlmResult,
-  type PhraseRequest,
 } from '../../llm/llm.types';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
 import {
@@ -67,7 +66,7 @@ import { checkReply } from './reply-check';
 import type { LastOrderFacts, ReplyIntent } from './reply-intent';
 import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmation.service';
 import { outgoingFor } from './outgoing';
-import { phraseRequestFor, phraseVoice } from './reply-phrasing';
+import { phraseRequestFor, phraseVoice, type PhraseVoice } from './reply-phrasing';
 import { promptPackFor } from '../../llm/prompts/prompt-pack';
 import { askedAt, staleReply, turnGate, type TurnGate } from './turn-gate';
 import { decideNonText } from './non-text-turn';
@@ -492,7 +491,7 @@ export class AssistantTurnService {
     reply: ReplyIntent,
     history: ChatLine[],
     language: ReplyLanguage,
-    voice: Pick<PhraseRequest, 'language' | 'tone' | 'pack'>,
+    voice: PhraseVoice,
     calls: LlmCallRecord[],
   ): Promise<string> {
     const fallback = fallbackText(reply, language);

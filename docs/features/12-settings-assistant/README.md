@@ -46,12 +46,13 @@ set `ASSISTANT_LANGUAGES=en,ar,bn,hi,id,es,sw,ur` for that list.
 - **Tone** goes into every `phraseReply` call as a `Tone:` line
   ([ai.md](../../architecture/ai.md#phrasereply)). The fixed sentences
   (hand-off, summary, entry replies) do not change with it.
-- **Default language** replaces the fallback language of `phraseReply`, the
-  one used when the customer's own language is unclear. `match` uses the
-  region's language, `replyLanguage` of the shop country's prompt pack
-  ([ai.md](../../architecture/ai.md#how-a-prompt-is-built)): Bangla in
-  Bangladesh, the country's first listed language elsewhere (Hindi in India),
-  English when it lists none. A saved
+- **Default language** is the language of every `phraseReply` reply, sent as
+  `Reply language:`, whatever the customer writes in. `match` mirrors the
+  customer's language and script instead, and falls back to the region's
+  language, `replyLanguage` of the shop country's prompt pack
+  ([ai.md](../../architecture/ai.md#how-a-prompt-is-built)), when the
+  customer's is unclear: Bangla in Bangladesh, the country's first listed
+  language elsewhere (Hindi in India), English when it lists none. A saved
   code that `ASSISTANT_LANGUAGES` no longer lists reads, and replies, as
   `match`; the row keeps it, so adding the code back restores it. The
   assistant still replies in the customer's language when it can tell. The
@@ -101,7 +102,7 @@ See [database.md](../../architecture/database.md).
 | Spec                                                                                                                                                   | Covers                                                                                                                                            |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`settings/__tests__/assistant-settings.e2e.spec.ts`](../../../apps/api/src/modules/settings/__tests__/assistant-settings.e2e.spec.ts)                 | Defaults, `supportedLanguages`, partial updates, trimmed notes, a language the env does not list, another seller's settings, the errors over HTTP |
-| [`assistant/__tests__/reply-phrasing.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/reply-phrasing.spec.ts)                 | `phraseVoice`, the prompt's tone and language lines, the schema's literal tones                                                                   |
+| [`assistant/__tests__/reply-phrasing.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/reply-phrasing.spec.ts)                 | `phraseVoice`, the reply or fallback language line, the acknowledgement skipped in the `direct` tone, the schema's literal tones                  |
 | [`assistant/__tests__/assistant-turn.service.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/assistant-turn.service.spec.ts) | A saved tone and language reach `phraseReply`, for that shop only; a code since removed falls back to the country's                               |
 
 ## Follow-ups
