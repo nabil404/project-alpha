@@ -18,17 +18,18 @@ import {
   type PostProducts,
 } from '@app/shared';
 import type { z } from 'zod';
-import { CLASSIFY_INTENT_SYSTEM } from './prompts/classify-intent';
-import { EXTRACT_ORDER_SYSTEM, extractOrderPrompt } from './prompts/extract-order';
+import { classifyIntentSystem } from './prompts/classify-intent';
+import { extractOrderPrompt, extractOrderSystem } from './prompts/extract-order';
 import {
-  EXTRACT_PRODUCTS_FROM_POST_SYSTEM,
   extractProductsFromPostContent,
+  extractProductsFromPostSystem,
 } from './prompts/extract-products-from-post';
 import {
   MATCH_PRODUCT_PHOTO_SYSTEM,
   matchProductPhotoContent,
 } from './prompts/match-product-photo';
-import { PHRASE_REPLY_SYSTEM, phraseReplyPrompt } from './prompts/phrase-reply';
+import { phraseReplyPrompt, phraseReplySystem } from './prompts/phrase-reply';
+import type { PromptPack } from './prompts/prompt-pack';
 import { transcript } from './prompts/transcript';
 import type {
   ChatLine,
@@ -83,12 +84,13 @@ export class AiSdkLlmClient implements LlmClient {
 
   constructor(private readonly options: AiSdkLlmOptions) {}
 
-  classifyIntent(history: ChatLine[]): Promise<LlmResult<IntentResult>> {
+  classifyIntent(history: ChatLine[], pack: PromptPack): Promise<LlmResult<IntentResult>> {
     return this.object(
       'classify',
       this.options.routing,
+      pack,
       intentResultSchema,
-      CLASSIFY_INTENT_SYSTEM,
+      classifyIntentSystem(pack),
       transcript(history),
     );
   }
@@ -96,22 +98,24 @@ export class AiSdkLlmClient implements LlmClient {
   extractOrder(
     history: ChatLine[],
     context: ExtractionContext,
+    pack: PromptPack,
   ): Promise<LlmResult<ExtractedOrder>> {
     return this.object(
       'extract',
       this.options.extraction,
+      pack,
       extractedOrderSchema,
-      EXTRACT_ORDER_SYSTEM,
+      extractOrderSystem(pack),
       extractOrderPrompt(history, context),
     );
   }
 
   phraseReply(request: PhraseRequest, history: ChatLine[]): Promise<LlmResult<string>> {
     const model = this.options.routing;
-    return this.call('phrase', model, async (abortSignal) => {
+    return this.call('phrase', model, request.pack, async (abortSignal) => {
       const result = await generateText({
         model,
-        system: PHRASE_REPLY_SYSTEM,
+        system: phraseReplySystem(request.pack),
         prompt: phraseReplyPrompt(request, history),
         abortSignal,
         maxRetries: 1,
@@ -124,7 +128,7 @@ export class AiSdkLlmClient implements LlmClient {
   /** The larger model: it reads images, and a wrong match costs more than the call. */
   matchProductPhoto(request: PhotoMatchRequest): Promise<LlmResult<PhotoMatch>> {
     const model = this.options.extraction;
-    return this.call('vision_match', model, async (abortSignal) => {
+    return this.call('vision_match', model, null, async (abortSignal) => {
       const result = await generateText({
         model,
         system: MATCH_PRODUCT_PHOTO_SYSTEM,
@@ -143,10 +147,10 @@ export class AiSdkLlmClient implements LlmClient {
   /** The larger model: it reads the post's photos, prices written on them included. */
   extractProductsFromPost(request: PostExtractionRequest): Promise<LlmResult<PostProducts>> {
     const model = this.options.extraction;
-    return this.call('post_import', model, async (abortSignal) => {
+    return this.call('post_import', model, request.pack, async (abortSignal) => {
       const result = await generateText({
         model,
-        system: EXTRACT_PRODUCTS_FROM_POST_SYSTEM,
+        system: extractProductsFromPostSystem(request.pack),
         messages: [{ role: 'user', content: extractProductsFromPostContent(request) }],
         output: Output.object({ schema: postProductsSchema }),
         abortSignal,
@@ -162,11 +166,12 @@ export class AiSdkLlmClient implements LlmClient {
   private object<S extends z.ZodType>(
     purpose: LlmPurpose,
     model: Model,
+    pack: PromptPack,
     schema: S,
     system: string,
     prompt: string,
   ): Promise<LlmResult<z.infer<S>>> {
-    return this.call(purpose, model, async (abortSignal) => {
+    return this.call(purpose, model, pack, async (abortSignal) => {
       const result = await generateText({
         model,
         system,
@@ -191,6 +196,7 @@ export class AiSdkLlmClient implements LlmClient {
   private async call<T>(
     purpose: LlmPurpose,
     model: Model,
+    pack: PromptPack | null,
     run: (abortSignal: AbortSignal) => Promise<{ value: T; tokens: Tokens }>,
   ): Promise<LlmResult<T>> {
     const started = performance.now();
@@ -201,6 +207,7 @@ export class AiSdkLlmClient implements LlmClient {
       inputTokens: tokens?.inputTokens ?? null,
       outputTokens: tokens?.outputTokens ?? null,
       latencyMs: Math.round(performance.now() - started),
+      promptPack: pack?.id ?? null,
     });
     try {
       const { value, tokens } = await run(signal);

@@ -1,5 +1,4 @@
 import {
-  languagesOf,
   MAX_POST_PRODUCTS,
   minorUnitsPerMajor,
   PRODUCT_OPTION_MAX_COUNT,
@@ -204,19 +203,4 @@ function categoryOf(
   const found = categories.find((category) => same(category.name) === same(name));
   if (found) return { categoryId: found.id, suggested: null };
   return { categoryId: null, suggested: raw.kind === 'suggested' ? name.slice(0, 80) : null };
-}
-
-/**
- * Which languages the aliases cover, from the shop's country as the
- * assistant's fallback language is: a shop in Bangladesh gets Bangla and
- * English or Latin letters; elsewhere English, and Latin letters for a name
- * in another script.
- */
-export function aliasLanguagesFor(country: string): string {
-  const main = languagesOf(country)[0] ?? 'en';
-  if (country === 'BD' || main === 'bn') {
-    return 'Bangla in Bangla script, and English or Banglish (Bangla in Latin letters)';
-  }
-  if (main === 'en') return 'English, and Latin letters for a name written in another script';
-  return `English, the shop's language (ISO 639-1 "${main}") in its own script, and Latin letters for a name written in another script`;
 }

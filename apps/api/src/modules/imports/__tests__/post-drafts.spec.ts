@@ -5,7 +5,7 @@ import {
   type PostProduct,
   type PostProducts,
 } from '@app/shared';
-import { aliasLanguagesFor, checkPostProducts } from '../post-drafts';
+import { checkPostProducts } from '../post-drafts';
 
 const SAREES = { id: '6f0c1d64-3c0e-4f43-9d8c-6a3f6f1f2a10', name: 'Sarees' };
 const context = { currency: 'BDT', categories: [SAREES] };
@@ -163,12 +163,5 @@ describe('checkPostProducts', () => {
       result: 'no_named_product',
       note: null,
     });
-  });
-});
-
-describe('aliasLanguagesFor', () => {
-  it('asks a shop in Bangladesh for Bangla and Latin letters, and elsewhere for English', () => {
-    expect(aliasLanguagesFor('BD')).toMatch(/Bangla script.*Latin letters/);
-    expect(aliasLanguagesFor('US')).toMatch(/^English/);
   });
 });

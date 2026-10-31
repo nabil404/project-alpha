@@ -47,8 +47,11 @@ set `ASSISTANT_LANGUAGES=en,ar,bn,hi,id,es,sw,ur` for that list.
   ([ai.md](../../architecture/ai.md#phrasereply)). The fixed sentences
   (hand-off, summary, entry replies) do not change with it.
 - **Default language** replaces the fallback language of `phraseReply`, the
-  one used when the customer's own language is unclear. `match` keeps
-  today's rule: Bangla for a shop in Bangladesh, English elsewhere. A saved
+  one used when the customer's own language is unclear. `match` uses the
+  region's language, `replyLanguage` of the shop country's prompt pack
+  ([ai.md](../../architecture/ai.md#how-a-prompt-is-built)): Bangla in
+  Bangladesh, the country's first listed language elsewhere (Hindi in India),
+  English when it lists none. A saved
   code that `ASSISTANT_LANGUAGES` no longer lists reads, and replies, as
   `match`; the row keeps it, so adding the code back restores it. The
   assistant still replies in the customer's language when it can tell. The
@@ -89,8 +92,8 @@ See [database.md](../../architecture/database.md).
 - `apps/api/src/modules/conversations/assistant/`: `AssistantTurnService`
   reads the settings through `AssistantSettingsService.read` in the turn's
   first transaction, and `phraseVoice`
-  (`reply-phrasing.ts`) turns them into the `PhraseRequest`'s tone and
-  language.
+  (`reply-phrasing.ts`) turns them and the shop's prompt pack into the
+  `PhraseRequest`'s tone, language and pack.
 - Web: `features/settings/components/AssistantVoiceCard.tsx`,
   `features/settings/assistant-queries.ts` and
   `routes/_app/settings/assistant.tsx`, under `apps/web/src/`.

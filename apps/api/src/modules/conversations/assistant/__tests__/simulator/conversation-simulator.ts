@@ -134,6 +134,7 @@ class ScriptedLlm implements LlmClient {
     inputTokens: 0,
     outputTokens: 0,
     latencyMs: 0,
+    promptPack: null,
   });
   private turn(): ScriptedTurn {
     if (!this.next) throw new Error('This step called the model but scripts no LLM turn');

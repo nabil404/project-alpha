@@ -253,6 +253,13 @@
       "when": 1792568483465,
       "tag": "0035_entry_points_force_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793458968101,
+      "tag": "0036_llm_call_prompt_pack",
+      "breakpoints": true
     }
   ]
 }

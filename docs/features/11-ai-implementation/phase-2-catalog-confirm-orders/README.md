@@ -385,8 +385,9 @@ In `apps/api/src/modules/conversations/assistant/__tests__/` unless noted.
 
 - Run the live extraction model on typed agreements to the profile-name
   offer ("yes", "ji", "হ্যাঁ", "ঠিক আছে"), and on replies that only look like
-  one, and record the result here. The specs fake extraction, so only the
-  prompt covers it today.
+  one, and record the result here. The specs fake extraction, and since the
+  prompts became region packs the extraction prompt lists no Bangla
+  agreement words, so only the model's own knowledge covers it today.
 - A native-speaker review of the Bangla card labels and sentences
   (`summary-card.ts`, `assistant-fallbacks.ts`).
 - Run `catalog-match.live-eval.spec.ts` with the live model and record the

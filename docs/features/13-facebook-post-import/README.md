@@ -254,10 +254,11 @@ were cut to fit the catalog's limits has `limits_applied` set.
 
 - **Name and description** from the caption, as written.
 - **Aliases:** other ways customers write the name, so the assistant's
-  matching finds it. The languages come from the shop's country, as the
-  assistant's fallback language does: a shop in Bangladesh gets the name in
-  Bangla and in English or Latin letters ("থ্রি পিস", "3 piece"), and a shop
-  elsewhere gets English and, for a name in another script, Latin letters.
+  matching finds it. The languages are the shop country's prompt pack
+  ([ai.md](../../architecture/ai.md#how-a-prompt-is-built)): a shop in
+  Bangladesh gets the name in Bangla and in English or Banglish ("থ্রি পিস",
+  "3 piece"), a shop in India in Hindi and English, and a shop in the US in
+  English.
 - **Options** (at most 3) and their values, from the caption or the photos,
   within the catalog's limits (30 values, 100 variants). Beyond a limit the
   draft keeps the first values and the post has `limits_applied` set.

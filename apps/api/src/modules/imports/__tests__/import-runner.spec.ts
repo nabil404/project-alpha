@@ -91,6 +91,7 @@ class FakeLlm implements Pick<LlmClient, 'extractProductsFromPost'> {
       inputTokens: 4000,
       outputTokens: 300,
       latencyMs: 900,
+      promptPack: 'bn-BD',
     };
     const answer = this.answers.get(request.caption ?? '') ?? {
       kind: 'not_product' as const,

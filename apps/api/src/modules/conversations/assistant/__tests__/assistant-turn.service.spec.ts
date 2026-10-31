@@ -84,6 +84,7 @@ const usage = (purpose: LlmPurpose) => ({
   inputTokens: 10,
   outputTokens: 3,
   latencyMs: 5,
+  promptPack: null,
 });
 const ok = <T>(value: T, purpose: LlmPurpose): LlmResult<T> => ({
   ok: true,

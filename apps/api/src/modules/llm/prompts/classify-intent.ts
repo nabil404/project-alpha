@@ -1,6 +1,9 @@
+import type { PromptPack } from './prompt-pack';
 import { DATA_RULE } from './transcript';
 
-export const CLASSIFY_INTENT_SYSTEM = `You classify the latest customer message(s) in a Facebook Messenger chat with an online shop. The chat may be in Bangla, Banglish (Bangla in Latin letters) or English.
+export const classifyIntentSystem = (
+  pack: PromptPack,
+): string => `You classify the latest customer message(s) in a Facebook Messenger chat with an online shop. The chat may be in ${pack.chatLanguages}.
 
 Intents:
 - browse: looking around or asking what the shop sells, without choosing anything.

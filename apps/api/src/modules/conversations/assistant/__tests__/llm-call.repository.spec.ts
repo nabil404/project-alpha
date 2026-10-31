@@ -18,6 +18,7 @@ const call = (overrides: Partial<LlmCallRecord> = {}): LlmCallRecord => ({
   inputTokens: 120,
   outputTokens: 9,
   latencyMs: 340,
+  promptPack: 'bn-BD',
   outcome: 'ok',
   ...overrides,
 });

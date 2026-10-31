@@ -1,6 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { envSchema } from '../../../config/env.schema';
 import { AiSdkLlmClient } from '../../../llm/ai-sdk-llm.client';
+import { promptPackFor } from '../../../llm/prompts/prompt-pack';
 import { matchProduct } from '../catalog-match';
 import { EVAL_CATALOG, PRODUCT_CASES } from './fixtures/match-eval';
 import { keyOf } from './fixtures/match-score';
@@ -25,9 +26,11 @@ const live = process.env.LLM_EVAL === '1' && Boolean(process.env.LLM_API_KEY);
 
     const misses: string[] = [];
     for (const entry of PRODUCT_CASES) {
-      const extracted = await llm.extractOrder([{ from: 'customer', text: entry.message }], {
-        items: [],
-      });
+      const extracted = await llm.extractOrder(
+        [{ from: 'customer', text: entry.message }],
+        { items: [] },
+        promptPackFor('BD'),
+      );
       const item = extracted.ok ? extracted.value.items?.[0] : undefined;
       const match = matchProduct(
         [item?.productQuery ?? undefined, item?.productQueryAlt ?? undefined],

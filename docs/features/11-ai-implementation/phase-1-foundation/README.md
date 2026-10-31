@@ -79,7 +79,8 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
 - **Cost tracking.** `llm_call` (`schema/assistant.ts`): `merchant_id`,
   `conversation_id`, `purpose` (`classify`, `extract`, `phrase`), `model`,
   input and output tokens, `latency_ms`, `outcome` (`ok`, `timeout`,
-  `provider_error`, `invalid_output`), `created_at`. RLS forced (migrations
+  `provider_error`, `invalid_output`), `prompt_pack` (the region's
+  `PromptPack.id`, migration `0036_llm_call_prompt_pack`), `created_at`. RLS forced (migrations
   `0031_llm_call`, `0032_imports_force_rls`). Rows are written in step 5's transaction.
 - **Queue** (`src/modules/queue/queue.constants.ts`): `assistant-turns`, job
   `assistant-turn`, concurrency 4, shown in Bull Board.

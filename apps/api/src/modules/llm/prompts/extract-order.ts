@@ -1,22 +1,25 @@
 import type { ChatLine, ExtractionContext } from '../llm.types';
+import type { PromptPack } from './prompt-pack';
 import { asData, DATA_RULE, transcript } from './transcript';
 
-export const EXTRACT_ORDER_SYSTEM = `You extract order details a customer gave in a Facebook Messenger chat with an online shop. The chat may be in Bangla, Banglish (Bangla in Latin letters) or English. A customer may order several items.
+export const extractOrderSystem = (
+  pack: PromptPack,
+): string => `You extract order details a customer gave in a Facebook Messenger chat with an online shop. The chat may be in ${pack.chatLanguages}. A customer may order several items.
 
 Items:
 - items is the customer's whole list of items after their latest message, in order. Return null when the latest message says nothing about items (only a name, phone or address, a greeting, a question).
 - Each item has ref: the index of the already-collected item it continues (as listed in "Already collected"), or null for an item the customer newly asks for.
 - To change an item, return the list with that item changed ("make it 2" changes the quantity of the item being discussed). To remove an item, return the list without it. Keep every other item as it is, with its ref.
 - productQuery and variantQuery: the customer's own words for the product and for its variant (colour, size), copied as written. Do not translate, correct or guess a catalog name. Use null when the customer gave none for that item.
-- On an item with a ref, productQuery is null unless the customer changed which product that item is; mentioning the same product again ("make the saree 3", "the red one") is not a change. When they did change it, productQuery holds only their words for the product they want now, never words for one they turned down: "not katan, jamdani" gives "jamdani"; "jamdani instead of katan" gives "jamdani"; "কাতান না, জামদানি" gives "জামদানি". variantQuery follows the same rule for the variant: null unless the customer changed it, and then only the variant they want ("not red, blue" gives "blue").
+- On an item with a ref, productQuery is null unless the customer changed which product that item is; mentioning the same product again ("make the saree 3", "the red one") is not a change. When they did change it, productQuery holds only their words for the product they want now, never words for one they turned down: "not the cotton one, the silk" gives "silk"; "silk instead of cotton" gives "silk". variantQuery follows the same rule for the variant: null unless the customer changed it, and then only the variant they want ("not red, blue" gives "blue").
 - "Already collected" shows each item's catalog name (product, variant) and the customer's earlier words for it (customerWords, customerVariantWords), so you can tell which item the customer means. Never copy them back as productQuery or variantQuery.
-- productQueryAlt and variantQueryAlt: the same words transliterated into the other script: Bangla script into Latin letters, or Latin letters (English or Banglish) into Bangla script. Spell the sounds, never translate the meaning. Null when the query is null.
+- productQueryAlt and variantQueryAlt: the same words written in the other script customers here use, such as a language's own script into Latin letters or Latin letters into that script. Spell the sounds, never translate the meaning. Null when the query is null, or when the chat's languages share one script.
 - quantity: a whole number, only when the customer said how many of that item.
 
 Details:
 - customerName, phone, deliveryAddress: as the customer wrote them.
-- offeredName in "Already collected" is a name the shop just asked the customer to confirm for the order. When their latest message agrees to it ("yes", "ok", "ji", "hya", "হ্যাঁ", "জি", "ঠিক আছে"), return offeredName exactly as customerName. When they give another name, return theirs. Otherwise customerName is null.
-- deliveryArea: the area, thana or district the customer named for delivery (for example "Mirpur" or "Chattogram"), as written; null if they named none.
+- offeredName in "Already collected" is a name the shop just asked the customer to confirm for the order. When their latest message agrees to it ("yes", "ok", or the same in the customer's language), return offeredName exactly as customerName. When they give another name, return theirs. Otherwise customerName is null.
+- deliveryArea: the area, thana or district the customer named for delivery (a neighbourhood, town or district), as written; null if they named none.
 - Use null for anything the customer has not given. Never invent a value. When the customer changes a detail, return the new value.
 
 confidence is a number from 0 to 1: how sure you are of what you returned. If you returned nothing (items null and every detail null), return confidence 1.
