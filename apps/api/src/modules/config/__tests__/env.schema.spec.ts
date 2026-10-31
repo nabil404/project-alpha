@@ -31,6 +31,14 @@ describe('validateEnv', () => {
     expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
   });
 
+  it('requires a TypeSafe key only when Jev classifies intent', () => {
+    expect(validateEnv(base).LLM_INTENT_PROVIDER).toBe('openai');
+    expect(() => validateEnv({ ...base, LLM_INTENT_PROVIDER: 'jev' })).toThrow(/TYPESAFE_API_KEY/);
+    expect(
+      validateEnv({ ...base, LLM_INTENT_PROVIDER: 'jev', TYPESAFE_API_KEY: 'key' }).TYPESAFE_MODEL,
+    ).toBe('jev-1.14.0');
+  });
+
   it("reads the assistant's languages as a list, defaulting when unset or blank", () => {
     expect(validateEnv({ ...base, ASSISTANT_LANGUAGES: 'en, bn,ur' }).ASSISTANT_LANGUAGES).toEqual([
       'en',

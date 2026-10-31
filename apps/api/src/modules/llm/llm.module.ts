@@ -1,9 +1,11 @@
 import { Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { createOpenAI } from '@ai-sdk/openai';
+import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { Client } from 'langsmith';
 import { LangSmithTelemetry } from 'langsmith/experimental/vercel';
 import { AppConfig } from '../config/app.config';
 import { AiSdkLlmClient } from './ai-sdk-llm.client';
+import { JevIntentClassifier } from './jev-intent.classifier';
 import { LLM, type LlmClient } from './llm.types';
 
 /** The LangSmith client, or null without LANGSMITH_API_KEY: then no call is traced. */
@@ -35,6 +37,18 @@ const LANGSMITH = Symbol('LANGSMITH');
           routing: openai(config.get('LLM_MODEL_ROUTING')),
           extraction: openai(config.get('LLM_MODEL_EXTRACTION')),
           timeoutMs: config.get('LLM_TIMEOUT_MS'),
+          intent:
+            config.get('LLM_INTENT_PROVIDER') === 'jev'
+              ? new JevIntentClassifier({
+                  // The SDK logs request bodies, customer chats included, below `warn`.
+                  client: new TypeSafeClient({
+                    apiKey: config.get('TYPESAFE_API_KEY'),
+                    logLevel: 'warn',
+                  }),
+                  model: config.get('TYPESAFE_MODEL'),
+                  timeoutMs: config.get('LLM_TIMEOUT_MS'),
+                })
+              : undefined,
           telemetry: langsmith
             ? LangSmithTelemetry({
                 client: langsmith,

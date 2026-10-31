@@ -57,6 +57,11 @@ const envObject = z.object({
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   /** Optional: without it the worker stores messages but queues no assistant turns. */
   LLM_API_KEY: optional(z.string()),
+  /** Who classifies intent: the routing model, or TypeSafe's Jev. `jev` needs TYPESAFE_API_KEY. */
+  LLM_INTENT_PROVIDER: z.enum(['openai', 'jev']).default('openai'),
+  TYPESAFE_API_KEY: optional(z.string()),
+  /** A versioned id rather than `jev-latest`, so an alias move never shifts the confidence floor. */
+  TYPESAFE_MODEL: z.string().min(1).default('jev-1.14.0'),
   /**
    * Optional: traces every LLM call, prompt and output included, to LangSmith.
    * Development and stage only: those traces hold customer chats, which in
@@ -130,7 +135,12 @@ function databasePassword(url: string): string {
   }
 }
 
-export const envSchema = envObject.superRefine(refusePlaceholderSecrets);
+export const envSchema = envObject
+  .superRefine(refusePlaceholderSecrets)
+  .refine((env) => env.LLM_INTENT_PROVIDER !== 'jev' || Boolean(env.TYPESAFE_API_KEY), {
+    path: ['TYPESAFE_API_KEY'],
+    message: 'is required when LLM_INTENT_PROVIDER=jev',
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

@@ -43,7 +43,7 @@ flowchart TD
     chat(["🌐 Customer's typed words<br/>last 20 messages as a transcript"]) --> classify
 
     subgraph understand ["LLM: understand"]
-        classify["🤖 classifyIntent<br/>LLM_MODEL_ROUTING"]
+        classify["🤖 classifyIntent<br/>LLM_MODEL_ROUTING or Jev"]
         extract["🤖 extractOrder<br/>LLM_MODEL_EXTRACTION<br/>raw words, never catalog ids"]
     end
 
@@ -98,6 +98,7 @@ call.
 | `apps/api/src/modules/llm/llm.types.ts`             | `LlmClient` interface, `LlmResult`, `ChatLine`, `PhraseRequest`, `ExtractionContext`, `PhotoMatchRequest`    |
 | `apps/api/src/modules/llm/ai-sdk-llm.client.ts`     | The only `LlmClient`: the Vercel AI SDK (`ai`, `@ai-sdk/openai`), timeouts, failure mapping                  |
 | `apps/api/src/modules/llm/llm.module.ts`            | Provides `LLM` (or `null` without `LLM_API_KEY`) and the optional LangSmith tracer                           |
+| `apps/api/src/modules/llm/jev-intent.classifier.ts` | `classifyIntent` through TypeSafe's Jev (`@typesafe-ai/sdk`), when `LLM_INTENT_PROVIDER=jev`                 |
 | `apps/api/src/modules/llm/prompts/`                 | The five system prompts and the prompt builders                                                              |
 | `apps/api/src/modules/llm/prompts/prompt-pack.ts`   | `PromptPack` and `promptPackFor`: what the shop's country changes in the prompts                             |
 | `packages/shared/src/schemas/llm.ts`                | `intentResultSchema`, `extractedOrderSchema`, `photoMatchSchema`, `postProductsSchema`: the output contracts |
@@ -118,6 +119,9 @@ From `apps/api/src/modules/config/env.schema.ts`:
 | `LLM_MODEL_EXTRACTION` | `gpt-6.1-sol`                     | Larger model: `extractOrder` when the turn needs it, `matchProductPhoto` and `extractProductsFromPost`                                           |
 | `LLM_TIMEOUT_MS`       | `15000`                           | Per call; the AI SDK's one retry (`maxRetries: 1`) happens inside it                                                                             |
 | `LLM_API_KEY`          | unset                             | Without it `LLM` is `null`: the ingest queues no assistant turns (messages are still stored), and `POST /imports` answers `IMPORT_NOT_AVAILABLE` |
+| `LLM_INTENT_PROVIDER`  | `openai`                          | Who classifies intent: `openai` (the routing model) or `jev`. `jev` fails validation without `TYPESAFE_API_KEY`                                  |
+| `TYPESAFE_MODEL`       | `jev-1.14.0`                      | A versioned id, not `jev-latest`, so an alias move never shifts answers near `CONFIDENCE_FLOOR`                                                  |
+| `TYPESAFE_API_KEY`     | unset                             | TypeSafe's key; read only when `LLM_INTENT_PROVIDER=jev`                                                                                         |
 | `ASSISTANT_LANGUAGES`  | `en,bn`                           | The default languages a seller may pick, which `phraseReply` names as its fallback language                                                      |
 | `LANGSMITH_API_KEY`    | unset                             | Traces every call, prompt and output included. Development and stage only, because traces hold customer chats                                    |
 | `LANGSMITH_PROJECT`    | `social-glider-dev`               | LangSmith project name                                                                                                                           |
@@ -251,6 +255,45 @@ Example, for the transcript above:
 off on `ask_question` as `question`, after it merges any details from the same
 message. A confidence under `CONFIDENCE_FLOOR` (0.6) hands off as
 `low_confidence`.
+
+#### Through Jev
+
+With `LLM_INTENT_PROVIDER=jev`, `AiSdkLlmClient` hands `classifyIntent` to
+`JevIntentClassifier`, and the other four calls stay on OpenAI. Jev is
+TypeSafe's System One model: it answers a typed question about a state with a
+probability per option, and writes no text. The request is one Choice
+(`prompts/classify-intent-jev.ts`).
+
+State, built by `classifyIntentState(history, pack)`. The customer's messages
+after the last shop or assistant line are `latest_customer_messages`;
+`earlier_chat` is left out when there is none, and the assistant's lines are
+`shop`:
+
+```json
+{
+  "chat_languages": "{chatLanguages}",
+  "earlier_chat": [
+    { "from": "customer", "text": "red saree ache?" },
+    { "from": "shop", "text": "Yes, the red Jamdani is 2,500 taka." }
+  ],
+  "latest_customer_messages": ["ok 2 ta dao", "Mirpur e"]
+}
+```
+
+Question (`CLASSIFY_INTENT_QUESTION`), a Choice whose criteria are the seven
+intents' descriptions above:
+
+```text
+What does the customer want from the online shop in `latest_customer_messages`? The messages are in `chat_languages`.
+```
+
+`confidence` is the chosen option's probability, not Jev's own `confidence`,
+which measures how peaked the answer is rather than how likely it is right.
+So the same `CONFIDENCE_FLOOR` reads as "under 60% likely". A choice outside
+`intentResultSchema` is `invalid_output`; any thrown error is `timeout` once
+`LLM_TIMEOUT_MS` passes, else `provider_error`. The SDK retries once inside
+the timeout. Jev reads English best; its other languages are "handled but not
+equally well", which is why `intent.live-eval` carries Bangla and Banglish.
 
 ### `extractOrder`
 
@@ -855,6 +898,8 @@ minutes later.
   Row-level security applies. It never holds message text or model output.
 - **LangSmith** traces each call under its purpose (`classify`, `extract`,
   `phrase`, `vision_match`, `post_import`), with prompt and output, only when `LANGSMITH_API_KEY` is set.
+  A Jev `classify` call is not traced; its `llm_call` row's `model` is the
+  versioned id that answered.
   `LlmModule` flushes pending batches on shutdown. Never set the key in
   production.
 - **Logs** get one warning per failed call with purpose, model, reason, error
@@ -864,26 +909,38 @@ minutes later.
 
 ## Tests
 
-| Spec                                                      | Covers                                                                                               |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `llm/__tests__/llm.client.spec.ts`                        | Failure mapping, the second Zod parse, usage on failure; photos sent as links                        |
-| `llm/__tests__/prompt-pack.spec.ts`                       | `promptPackFor` per country; Bangla only in Bangladesh's prompts; the data rule last                 |
-| `assistant/__tests__/photo-turn.spec.ts`                  | The burst's photos, the shortlist, numbers not shown discarded                                       |
-| `photos/__tests__/photo-download.spec.ts`                 | Meta hosts only, redirects, size cap, timeout                                                        |
-| `assistant/__tests__/reply-check.spec.ts`                 | Numbers, links, length                                                                               |
-| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, `shouldExtract`, hand-off rules                                                        |
-| `assistant/__tests__/assistant-turn.service.spec.ts` (DB) | The turn end to end with a fake `LlmClient`; non-text messages never create an order; photo matching |
-| `assistant/__tests__/conversation-simulator.spec.ts`      | Multi-turn conversations through the machine                                                         |
-| `assistant/__tests__/catalog-match.eval.spec.ts`          | ≥ 90% product identification on the eval set                                                         |
-| `assistant/__tests__/catalog-match.live-eval.spec.ts`     | The same against the real model; opt-in: `LLM_EVAL=1` with `LLM_API_KEY`                             |
-| `imports/__tests__/post-drafts.spec.ts`                   | `checkPostProducts`: names, aliases, option limits, prices, categories                               |
-| `imports/__tests__/import-runner.spec.ts` (DB)            | A run end to end with a fake Graph and `LlmClient`: skips, matches, merges, failures, Import anyway  |
+| Spec                                                      | Covers                                                                                                |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `llm/__tests__/llm.client.spec.ts`                        | Failure mapping, the second Zod parse, usage on failure; photos sent as links                         |
+| `llm/__tests__/prompt-pack.spec.ts`                       | `promptPackFor` per country; Bangla only in Bangladesh's prompts; the data rule last                  |
+| `llm/__tests__/jev-intent.classifier.spec.ts`             | Jev's state, the chosen option's probability as confidence, timeout and errors as failures            |
+| `llm/__tests__/intent.live-eval.spec.ts`                  | 42 labelled Bangla, Banglish and English chats against each provider with a key; opt-in: `LLM_EVAL=1` |
+| `assistant/__tests__/photo-turn.spec.ts`                  | The burst's photos, the shortlist, numbers not shown discarded                                        |
+| `photos/__tests__/photo-download.spec.ts`                 | Meta hosts only, redirects, size cap, timeout                                                         |
+| `assistant/__tests__/reply-check.spec.ts`                 | Numbers, links, length                                                                                |
+| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, `shouldExtract`, hand-off rules                                                         |
+| `assistant/__tests__/assistant-turn.service.spec.ts` (DB) | The turn end to end with a fake `LlmClient`; non-text messages never create an order; photo matching  |
+| `assistant/__tests__/conversation-simulator.spec.ts`      | Multi-turn conversations through the machine                                                          |
+| `assistant/__tests__/catalog-match.eval.spec.ts`          | ≥ 90% product identification on the eval set                                                          |
+| `assistant/__tests__/catalog-match.live-eval.spec.ts`     | The same against the real model; opt-in: `LLM_EVAL=1` with `LLM_API_KEY`                              |
+| `imports/__tests__/post-drafts.spec.ts`                   | `checkPostProducts`: names, aliases, option limits, prices, categories                                |
+| `imports/__tests__/import-runner.spec.ts` (DB)            | A run end to end with a fake Graph and `LlmClient`: skips, matches, merges, failures, Import anyway   |
 
 The live eval runs only on request:
 
 ```bash
 LLM_EVAL=1 pnpm --filter api test catalog-match.live-eval
 ```
+
+```bash
+LLM_EVAL=1 pnpm --filter api test intent.live-eval
+```
+
+The intent eval runs the routing model with `LLM_API_KEY` and Jev with
+`TYPESAFE_API_KEY`, and reports accuracy, wrong intents the machine would act
+on (at or above the floor), hand-offs, latency and input tokens. On Oct 31,
+2026 both `gpt-6-luna` and `jev-1.14.0` scored 42/42 with no wrong intent
+acted on; Jev's median latency was about 0.4 s against 2 s.
 
 ## Not yet built
 

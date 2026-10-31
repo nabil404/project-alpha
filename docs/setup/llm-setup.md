@@ -32,6 +32,9 @@ in every local `.env` and in Parameter Store before deploying. Update or unset `
 | `LLM_MODEL_EXTRACTION` | The mid-tier model: extracting order details on every mid-flow turn (collecting details or awaiting confirmation), and while browsing when the customer is ordering or editing; product photos in [phase 11.6](../features/11-ai-implementation/phase-6-product-photos/README.md) |
 | `LLM_TIMEOUT_MS`       | A timeout for each call, 15000 by default. A call that exceeds it counts as a failure and the conversation is handed off                                                                                                                                                          |
 | `LLM_API_KEY`          | The provider's API key. A secret                                                                                                                                                                                                                                                  |
+| `LLM_INTENT_PROVIDER`  | Who classifies intent: `openai` (`LLM_MODEL_ROUTING`) by default, or `jev` ([Intent through Jev](#intent-through-jev))                                                                                                                                                            |
+| `TYPESAFE_MODEL`       | The Jev model, `jev-1.14.0` by default                                                                                                                                                                                                                                            |
+| `TYPESAFE_API_KEY`     | TypeSafe's API key, required when `LLM_INTENT_PROVIDER=jev`. A secret                                                                                                                                                                                                             |
 | `ASSISTANT_LANGUAGES`  | The default languages a seller may pick in [Settings – Order assistant](../features/12-settings-assistant/README.md), as ISO 639-1 codes, comma-separated. `en,bn` when unset or blank                                                                                            |
 
 Model IDs change as new models ship; check
@@ -86,6 +89,25 @@ Store with the other secrets ([deployment](../architecture/deployment.md)).
 3. Set a wrong key and send another message: the conversation goes to
    `handed_off` and the customer gets the fixed hand-off reply.
 
+## Intent through Jev
+
+TypeSafe's Jev can classify intent in place of the routing model; extraction,
+phrasing and the vision calls stay on OpenAI, so `LLM_API_KEY` is still
+required. Jev returns a probability per intent in about half a second
+([AI](../architecture/ai.md#through-jev)).
+
+1. Sign in to the [TypeSafe console](https://console.typesafe.ai), create an
+   API key per environment, and copy it into `TYPESAFE_API_KEY`.
+2. Compare the two on the eval set before switching:
+   `LLM_EVAL=1 pnpm --filter api test intent.live-eval`.
+3. Set `LLM_INTENT_PROVIDER=jev` and restart the worker. `llm_call` rows for
+   `classify` now show the Jev model id.
+
+Jev receives the customer's recent messages, so review TypeSafe's
+[Data Processing Agreement](https://docs.typesafe.ai/legal.md) before using it
+in production. Keep `TYPESAFE_MODEL` on a versioned id: `jev-latest` moves with
+each release, which can shift answers near the confidence floor.
+
 ## Tracing with LangSmith
 
 Development and stage can send every LLM call to
@@ -115,16 +137,17 @@ of cost per conversation, and LangSmith adds the content.
 
 ## Troubleshooting
 
-| Symptom                                               | Cause and fix                                                                                                                                |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| The API will not boot, with a `LLM_PROVIDER` error    | The env still says `anthropic`. Set `LLM_PROVIDER=openai`.                                                                                   |
-| Messages are stored but no turn appears in Bull Board | `LLM_API_KEY` is unset, the worker is not running, `META_APP_ID` is unset, the bot is paused on that conversation, or the Page's bot is off. |
-| Every conversation goes straight to `handed_off`      | The key is wrong or revoked, the project is out of credit or over its budget, or a model ID no longer exists.                                |
-| Replies are slow, or many turns time out              | The provider is degraded or the extraction model is overloaded; the turns hand off as designed. Check its status page.                       |
+| Symptom                                                | Cause and fix                                                                                                                                |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| The API will not boot, with a `LLM_PROVIDER` error     | The env still says `anthropic`. Set `LLM_PROVIDER=openai`.                                                                                   |
+| Messages are stored but no turn appears in Bull Board  | `LLM_API_KEY` is unset, the worker is not running, `META_APP_ID` is unset, the bot is paused on that conversation, or the Page's bot is off. |
+| Every conversation goes straight to `handed_off`       | The key is wrong or revoked, the project is out of credit or over its budget, or a model ID no longer exists.                                |
+| The API will not boot, with a `TYPESAFE_API_KEY` error | `LLM_INTENT_PROVIDER=jev` without a key. Set the key or go back to `openai`.                                                                 |
+| Replies are slow, or many turns time out               | The provider is degraded or the extraction model is overloaded; the turns hand off as designed. Check its status page.                       |
 
 ## Secrets
 
 Never commit the key, paste it into an issue, or log it: the pino redact list
 covers `*.apiKey`. If it leaks, revoke it in the dashboard, create a new one,
 update `LLM_API_KEY` everywhere it is set, and restart the API and worker.
-`LANGSMITH_API_KEY` is handled the same way.
+`LANGSMITH_API_KEY` and `TYPESAFE_API_KEY` are handled the same way.
