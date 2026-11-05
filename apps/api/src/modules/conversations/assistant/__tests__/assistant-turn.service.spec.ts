@@ -34,7 +34,11 @@ import {
 import type { ExtractionContext } from '../../../llm/agents/order-extraction/order-extraction.agent';
 import type { PhotoMatchRequest } from '../../../llm/agents/photo-match/photo-match.agent';
 import type { PhraseRequest } from '../../../llm/agents/reply-phrasing/reply-phrasing.agent';
-import type { ShopAnswerInput } from '../../../llm/agents/shop-answer/shop-answer.agent';
+import type {
+  ShopAnswered,
+  ShopAnswerInput,
+  ShopFact,
+} from '../../../llm/agents/shop-answer/shop-answer.agent';
 import type { ChatLine, LlmPurpose, LlmResult } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { ProductPostRepository } from '../../../messenger/posts/product-post.repository';
@@ -140,12 +144,20 @@ class FakeLlm {
     return this.photo(request);
   }
 
-  answer: LlmResult<ShopAnswer> = ok({ kind: 'unknown', text: null, facts: [] }, 'answer');
+  answer: LlmResult<ShopAnswer> | ((facts: ShopFact[]) => LlmResult<ShopAnswer>) = ok(
+    { kind: 'unknown', text: null, facts: [] },
+    'answer',
+  );
   answerInputs: ShopAnswerInput[] = [];
-  async answerQuestion(input: ShopAnswerInput) {
+  /** Words the fake looks up with `findProduct` before it answers, as the model may. */
+  lookUp: string[] = [];
+  async answerQuestion(input: ShopAnswerInput): Promise<LlmResult<ShopAnswered>> {
     this.answerInputs.push(input);
     this.calls.push('answer');
-    return this.answer;
+    const facts = [...input.facts];
+    for (const words of this.lookUp) facts.push(...(input.lookup?.findProduct(words) ?? []));
+    const result = typeof this.answer === 'function' ? this.answer(facts) : this.answer;
+    return result.ok ? { ...result, value: { answer: result.value, facts } } : result;
   }
 
   /** The fake as the turn service's agents. */
@@ -744,6 +756,34 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         'answer',
         'classify',
       ]);
+    });
+
+    it("answers from a product the model looked up in its own shop's catalog", async () => {
+      for (const [merchantId, price] of [
+        [t.merchantA, 320_000],
+        [t.merchantB, 990_000],
+      ] as const) {
+        const muslin = await seedProduct(t.db, merchantId, {
+          name: 'Turnservice Muslin',
+          status: 'active',
+        });
+        await seedVariant(t.db, merchantId, muslin.id, { name: 'Free size', price, stock: 3 });
+      }
+      llm.lookUp = ['muslin'];
+      llm.answer = (facts) => {
+        const index = facts.findIndex((fact) => fact.text.startsWith('Turnservice Muslin'));
+        return answered(`Yes! ${facts[index]?.text}`, [index + 1]);
+      };
+      const { job } = await thread();
+
+      await expect(service().run(job)).resolves.toBe('replied');
+
+      const given = llm.answerInputs[0]!.facts.map((fact) => fact.text);
+      expect(given.some((text) => text.includes('Muslin'))).toBe(false);
+      // The shop's language writes Bangla digits: ৩,২০০ is A's price, ৯,৯০০ would be B's.
+      const reply = sent.at(-1)!.text;
+      expect(reply).toMatch(/^Yes! Turnservice Muslin\. Free size: ৩,২০০/);
+      expect(reply).not.toContain('৯,৯০০');
     });
 
     it('follows the answer with the next ask in an order', async () => {
