@@ -104,3 +104,19 @@ export const postProductsSchema = z.object({
 });
 export type PostProducts = z.infer<typeof postProductsSchema>;
 export type PostProduct = PostProducts['products'][number];
+
+/** Facts one answer may draw on; code keeps the rest out of the prompt. */
+export const MAX_ANSWER_FACTS = 40;
+
+/**
+ * Output shape for the shop answer agent. `answered` replies in `text` from
+ * the numbered facts it was given and lists the ones it used in `facts`;
+ * `unknown`, with `text` null, says the facts do not answer the question.
+ * Code checks every number in `text` against the facts before it is sent.
+ */
+export const shopAnswerSchema = z.object({
+  kind: z.enum(['answered', 'unknown']),
+  text: z.string().nullable(),
+  facts: z.array(z.number().int().positive()).max(MAX_ANSWER_FACTS),
+});
+export type ShopAnswer = z.infer<typeof shopAnswerSchema>;

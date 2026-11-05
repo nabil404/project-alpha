@@ -5,6 +5,7 @@ export const LLM_PURPOSES = [
   'phrase',
   'vision_match',
   'post_import',
+  'answer',
 ] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 

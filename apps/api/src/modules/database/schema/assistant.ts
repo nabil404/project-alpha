@@ -11,6 +11,7 @@ export const LLM_CALL_PURPOSES = [
   'phrase',
   'vision_match',
   'post_import',
+  'answer',
 ] as const;
 export const LLM_CALL_OUTCOMES = ['ok', 'timeout', 'provider_error', 'invalid_output'] as const;
 
