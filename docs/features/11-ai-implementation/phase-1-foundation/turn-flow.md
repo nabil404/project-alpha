@@ -24,7 +24,7 @@ sequenceDiagram
         Turn-->>Queue: stop, no LLM call
     else
         Turn->>LLM: IntentAgent, routing model, no transaction open
-        opt shouldExtract(state, intent)
+        opt routeFor(state, intent).extract
             Turn->>LLM: OrderExtractionAgent, extraction model
         end
         Turn->>Turn: decideTurn, pure: ask_slot, summary or handoff

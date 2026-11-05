@@ -53,7 +53,7 @@ flowchart TD
         extract["🤖 OrderExtractionAgent<br/>LLM_MODEL_EXTRACTION<br/>raw words, never catalog ids"]
     end
 
-    classify --> want{"shouldExtract<br/>state, intent?"}
+    classify --> want{"routeFor<br/>state, intent:<br/>extract?"}
     want -- yes --> extract
     want -- no --> match
     extract --> merge
@@ -337,11 +337,11 @@ equally well", which is why `intent.live-eval` carries Bangla and Banglish.
 
 ### `OrderExtractionAgent`
 
-It uses `LLM_MODEL_EXTRACTION` and runs only when `shouldExtract(state,
-intent)` returns true. That is every turn in `collecting_details` and
-`awaiting_confirmation`, because the classifier often calls a bare "01812…"
-`other`. In `browsing` it runs only for `order` or `edit_order`, and it never
-runs for `complain` or `request_human`. The user prompt is
+It uses `LLM_MODEL_EXTRACTION` and runs only when the
+[route table](#the-route-table) says so. That is every turn in
+`collecting_details` and `awaiting_confirmation`, because the classifier often
+calls a bare "01812…" `other`. In `browsing` and `abandoned` it runs only for
+`order` or `edit_order`, and it never runs for `complain` or `request_human`. The user prompt is
 `Already collected: <ExtractionContext as JSON>`, a blank line, then the
 transcript block. The output must match `extractedOrderSchema`.
 
@@ -799,6 +799,33 @@ has the full sequence diagram.
 Database and Redis errors throw so BullMQ retries (5 attempts, exponential
 from 3 s); LLM and Graph errors never throw.
 
+### The route table
+
+A classified message goes where `turn-routes.ts` says. `routeFor(state,
+intent)` returns whether `OrderExtractionAgent` reads the turn and what code
+does next. `decideTurn` and the turn service both read it, so the rules live
+in one place. Its `satisfies` fails typecheck when an intent or an active
+state has no row. "Outside an order" is `browsing` and `abandoned`; "in an
+order" is `collecting_details` and `awaiting_confirmation`.
+
+| Intent          | Outside an order           | In an order                                 |
+| --------------- | -------------------------- | ------------------------------------------- |
+| `order`         | extract → continue         | extract → continue                          |
+| `edit_order`    | extract → continue         | extract → continue                          |
+| `browse`        | → continue                 | extract → continue                          |
+| `other`         | → continue                 | extract → continue                          |
+| `ask_question`  | → hand off `question`      | extract → hand off `question`, details kept |
+| `complain`      | → hand off `complain`      | → hand off `complain`                       |
+| `request_human` | → hand off `request_human` | → hand off `request_human`                  |
+
+"Continue" merges the extraction, matches the catalog and asks for the next
+missing slot or sends the summary. A hand-off `before_merge` (`complain`,
+`request_human`) keeps nothing from the message and wins over a failed or
+low-confidence extraction; one `after_merge` (`question`) keeps the extracted
+details, so it still hands off as `llm_failed` or `low_confidence` first.
+Phrasing is not in the table: it follows the reply kind (`ask_slot`), not the
+intent. A new spoke is a new `RouteThen` kind and a changed row.
+
 ### Paths per entry point
 
 `AssistantTurnService.run` checks the trigger in this order to pick the turn's path:
@@ -845,20 +872,20 @@ flowchart TD
 
 The table says what each entry point stores and gets back:
 
-| Entry point (trigger)                                                                 | Stored as                                                        | LLM calls                                                            | Reply                                                                     |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Typed text message                                                                    | `customer-message`, kind `text`                                  | classify, then extract if `shouldExtract`, then phrase if `ask_slot` | Phrased ask, fixed summary card, or fixed hand-off                        |
-| Typed message carrying a product referral (`m.me` link or mapped ad, with words)      | payload `ref-typed:product:<id>`                                 | As a typed message, after the product is added                       | Product photo, then the reply; hand-off without LLM at 10 items           |
-| Shared post or ad, with words beside it, that resolves to a product                   | message with `links`                                             | As a typed message, after the product is added                       | As above                                                                  |
-| Shared post that does not resolve to one product                                      | message with `links`                                             | None                                                                 | Fixed "Do you mean …?" with quick replies, or "type the product's name"   |
-| Photo or screenshot, before the summary card                                          | kind `image`, our copy's key in `details`                        | `PhotoMatchAgent`, once per turn                                     | Cover and "Is it this one?" with Yes / No, a carousel, or "type its name" |
-| **No** to a photo's one match                                                         | payload `photo:no`                                               | None                                                                 | Fixed "type its name"; the next miss hands off                            |
-| Get Started, Browse, a category, a carousel **Choose**, a bare referral               | payload `start`, `browse…`, `choose:…`, `ref:…`                  | None                                                                 | Fixed categories, carousel, or variant/quantity ask                       |
-| Menu: My last order / Talk to a person                                                | payload `menu:last-order` / `menu:human`                         | None                                                                 | Fixed last-order line / hand-off                                          |
-| Quick-reply pick of an offered product or variant, or the offered profile name        | payload `pick:product:<id>`, `pick:variant:<id>`, `name:profile` | None                                                                 | Fixed next ask, or the summary card                                       |
-| Summary card **Confirm** / **Change**                                                 | payload `confirm:<conversation>:<revision>` / `change:…`         | None                                                                 | `OrderConfirmationService`: order reference / reopened collection         |
-| Sticker, emoji-only text, reaction, location, video, audio, file; a photo on the card | kind `sticker`, `reaction`, `location`, …                        | None (`decideNonText`)                                               | Fixed notice, or silent for a reaction that asks nothing                  |
-| Seller's own message from Business Suite (`page-echo`)                                | sender `seller`                                                  | None, and no turn                                                    | The bot pauses for that chat                                              |
+| Entry point (trigger)                                                                 | Stored as                                                        | LLM calls                                                              | Reply                                                                     |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Typed text message                                                                    | `customer-message`, kind `text`                                  | classify, then extract if the route says so, then phrase if `ask_slot` | Phrased ask, fixed summary card, or fixed hand-off                        |
+| Typed message carrying a product referral (`m.me` link or mapped ad, with words)      | payload `ref-typed:product:<id>`                                 | As a typed message, after the product is added                         | Product photo, then the reply; hand-off without LLM at 10 items           |
+| Shared post or ad, with words beside it, that resolves to a product                   | message with `links`                                             | As a typed message, after the product is added                         | As above                                                                  |
+| Shared post that does not resolve to one product                                      | message with `links`                                             | None                                                                   | Fixed "Do you mean …?" with quick replies, or "type the product's name"   |
+| Photo or screenshot, before the summary card                                          | kind `image`, our copy's key in `details`                        | `PhotoMatchAgent`, once per turn                                       | Cover and "Is it this one?" with Yes / No, a carousel, or "type its name" |
+| **No** to a photo's one match                                                         | payload `photo:no`                                               | None                                                                   | Fixed "type its name"; the next miss hands off                            |
+| Get Started, Browse, a category, a carousel **Choose**, a bare referral               | payload `start`, `browse…`, `choose:…`, `ref:…`                  | None                                                                   | Fixed categories, carousel, or variant/quantity ask                       |
+| Menu: My last order / Talk to a person                                                | payload `menu:last-order` / `menu:human`                         | None                                                                   | Fixed last-order line / hand-off                                          |
+| Quick-reply pick of an offered product or variant, or the offered profile name        | payload `pick:product:<id>`, `pick:variant:<id>`, `name:profile` | None                                                                   | Fixed next ask, or the summary card                                       |
+| Summary card **Confirm** / **Change**                                                 | payload `confirm:<conversation>:<revision>` / `change:…`         | None                                                                   | `OrderConfirmationService`: order reference / reopened collection         |
+| Sticker, emoji-only text, reaction, location, video, audio, file; a photo on the card | kind `sticker`, `reaction`, `location`, …                        | None (`decideNonText`)                                                 | Fixed notice, or silent for a reaction that asks nothing                  |
+| Seller's own message from Business Suite (`page-echo`)                                | sender `seller`                                                  | None, and no turn                                                      | The bot pauses for that chat                                              |
 
 ### Request / response cycle: a typed message
 
@@ -977,7 +1004,8 @@ minutes later.
 | `assistant/__tests__/photo-turn.spec.ts`                  | The burst's photos, the shortlist, numbers not shown discarded                                            |
 | `photos/__tests__/photo-download.spec.ts`                 | Meta hosts only, redirects, size cap, timeout                                                             |
 | `assistant/__tests__/reply-check.spec.ts`                 | Numbers, links, length                                                                                    |
-| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, `shouldExtract`, hand-off rules                                                             |
+| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, hand-off rules                                                                              |
+| `assistant/__tests__/turn-routes.spec.ts`                 | every state × intent route, and that it matches the old extraction gate                                   |
 | `assistant/__tests__/assistant-turn.service.spec.ts` (DB) | The turn end to end with fake agents; non-text messages never create an order; photo matching             |
 | `assistant/__tests__/conversation-simulator.spec.ts`      | Multi-turn conversations through the machine                                                              |
 | `assistant/__tests__/catalog-match.eval.spec.ts`          | ≥ 90% product identification on the eval set                                                              |

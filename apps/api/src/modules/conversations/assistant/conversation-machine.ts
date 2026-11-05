@@ -30,6 +30,7 @@ import {
 } from './catalog-match';
 import { browseReply, cardOf } from './entry-replies';
 import { mergeItems, mergeSameVariant } from './item-merge';
+import { routeFor } from './turn-routes';
 import type {
   AskReason,
   Choice,
@@ -107,16 +108,6 @@ export interface TurnDecision {
   reply: ReplyIntent;
   /** A product photo to send before the reply: the item matched most recently this turn. */
   image?: string;
-}
-
-/**
- * Mid-flow, a bare answer ("01812…", "Rahim") is often classified `other`, so
- * extraction runs on every turn there; while browsing only an order needs it.
- */
-export function shouldExtract(state: ActiveState, intent: CustomerIntent): boolean {
-  if (intent === 'complain' || intent === 'request_human') return false;
-  if (state === 'collecting_details' || state === 'awaiting_confirmation') return true;
-  return intent === 'order' || intent === 'edit_order';
 }
 
 /** The tap as a pick when it names a candidate the last reply offered; otherwise null. */
@@ -198,11 +189,16 @@ function decide(input: TurnInput): TurnDecision {
   }
 
   if (trigger.kind === 'message') {
-    const { classified, extracted } = trigger;
-    if (classified === 'failed' || extracted === 'failed') return handOff(slots, 'llm_failed');
-    if (classified.intent === 'complain' || classified.intent === 'request_human') {
-      return handOff(slots, classified.intent);
+    const { classified } = trigger;
+    if (classified === 'failed') return handOff(slots, 'llm_failed');
+    const route = routeFor(input.state, classified.intent);
+    const { then } = route;
+    if (then.kind === 'handoff' && then.when === 'before_merge') {
+      return handOff(slots, then.reason);
     }
+    // An extraction the route does not use is ignored, failed or not.
+    const extracted = route.extract ? trigger.extracted : 'skipped';
+    if (extracted === 'failed') return handOff(slots, 'llm_failed');
     if (
       classified.confidence < CONFIDENCE_FLOOR ||
       (extracted !== 'skipped' &&
@@ -216,7 +212,7 @@ function decide(input: TurnInput): TurnDecision {
       slots = merged.slots;
       invalidPhone = merged.invalidPhone;
     }
-    if (classified.intent === 'ask_question') return handOff(slots, 'question');
+    if (then.kind === 'handoff') return handOff(slots, then.reason);
     intent = classified.intent;
   } else if (trigger.kind === 'pick') {
     slots = applyPick(slots, trigger.pick);
