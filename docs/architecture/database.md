@@ -260,7 +260,7 @@ merchant's row even if RLS were off. Every tenant table also has a plain
 | `merchant_settings_date_format_ck`        | `merchant_settings`       | `date_format` is one of the six `DATE_FORMATS` patterns.                                                                      |
 | `merchant_settings_contact_phone_ck`      | `merchant_settings`       | `contact_phone` is E.164: `+`, then 7 to 15 digits, not starting with 0.                                                      |
 | `merchant_settings_free_delivery_over_ck` | `merchant_settings`       | `free_delivery_over >= 0` (minor units); null always charges.                                                                 |
-| `llm_call_purpose_ck`                     | `llm_call`                | `purpose` in `classify`, `extract`, `phrase`, `vision_match`, `post_import`.                                                  |
+| `llm_call_purpose_ck`                     | `llm_call`                | `purpose` in `classify`, `extract`, `phrase`, `vision_match`, `post_import`, `answer`.                                        |
 | `llm_call_owner_ck`                       | `llm_call`                | `num_nonnulls(conversation_id, import_id) = 1`: a call is a conversation's or an import run's, never both.                    |
 | `product_import_source_ck`                | `product_import`          | `source` in `facebook_posts`.                                                                                                 |
 | `product_import_status_ck`                | `product_import`          | `status` in `queued`, `running`, `stopping`, `stopped`, `finished`, `failed`.                                                 |

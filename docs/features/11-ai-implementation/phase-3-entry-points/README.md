@@ -367,11 +367,10 @@ See the MVP [rules](../../../mvp/01-messenger-to-order/rules.md).
   `DELETE` instead (noted in `buildMessengerProfile`).
 - A shop with more than 100 products cannot map an ad to a product beyond the
   newest 100 from the dashboard. Add a server-search variant of the Combobox.
-- **Known limit: Ask ice breakers mostly hand off.** The default questions
-  ("What is the delivery charge?", "How do I pay?") are kept because the spec
-  lists them, but they classify as `ask_question`, which hands off to the
-  seller. The dashboard copy says so. Answering shop questions from settings
-  is later work.
+- **Ask ice breakers are answered when the shop has the facts.** "What is
+  the delivery charge?" reads the delivery rows; "How do I pay?" needs the
+  seller's notes to say, and hands off without them
+  ([ai.md](../../../architecture/ai.md#shopansweragent)).
 - `MessengerLinkCard` imports `sonner` directly for two plain-text failure
   toasts, since `lib/toast` has no plain-message error path.
 - A native-speaker review of the Bangla menu labels, browse text and default

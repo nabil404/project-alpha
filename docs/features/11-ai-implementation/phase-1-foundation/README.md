@@ -155,8 +155,10 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   uses the extraction or hands off before the merge, so waiting for the
   classifier only adds latency. The cost is one discarded extraction per
   complaint or human request mid-order.
-- **`browse` and `other` ask the next slot; `ask_question` hands off**, since
-  nothing answers delivery, payment or catalog questions from facts yet.
+- **`browse` and `other` ask the next slot.** `ask_question` handed off in
+  phase 1; it is now answered from the shop's facts by `ShopAnswerAgent`, and
+  hands off only when they do not answer it
+  ([ai.md](../../../architecture/ai.md#shopansweragent)).
 - **The phone is strict.** `parseCustomerPhone` accepts only a number it can
   read and stores it as E.164.
 - **Job id escaping.** `turn-<metaMessageId>` has `%` and `:` escaped

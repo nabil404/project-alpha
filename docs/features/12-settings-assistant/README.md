@@ -3,10 +3,10 @@
 How the assistant talks to the shop's customers: its tone, the language it
 falls back to, and short facts from the seller.
 
-**Status (Oct 2026):** the design's "How it talks" card is built, API and
+**Status (Nov 2026):** the design's "How it talks" card is built, API and
 page. The assistant uses the tone and the default language when it phrases
-a reply. The notes are stored but not yet read by the assistant. The
-design's "Order assistant" switches are not built yet.
+a reply or answers a question, and answers customers' questions from the
+notes. The design's "Order assistant" switches are not built yet.
 
 ## Routes (session + TenantGuard)
 
@@ -59,7 +59,11 @@ set `ASSISTANT_LANGUAGES=en,ar,bn,hi,id,es,sw,ur` for that list.
   fixed sentences still follow the shop's country, because they exist only
   in Bangla and English.
 - **Notes** are the seller's facts, never prices or stock, which come from
-  the catalog. The assistant does not read them yet.
+  the catalog. `ShopAnswerAgent` gets them as one fact, word for word, beside
+  the delivery rows and the catalog, when a customer asks a question
+  ([ai.md](../../architecture/ai.md#shopansweragent)). They are the only
+  source for payment, exchange or opening-hours answers; a question they do
+  not cover hands off. A number in the notes is one an answer may quote.
 
 ## Dashboard
 
@@ -94,22 +98,20 @@ See [database.md](../../architecture/database.md).
   reads the settings through `AssistantSettingsService.read` in the turn's
   first transaction, and `phraseVoice`
   (`reply-phrasing.ts`) turns them and the shop's prompt pack into the
-  `PhraseRequest`'s tone, language and pack.
+  `PhraseRequest`'s tone, language and pack. `shop-facts.ts` puts the notes
+  into a question's facts.
 - Web: `features/settings/components/AssistantVoiceCard.tsx`,
   `features/settings/assistant-queries.ts` and
   `routes/_app/settings/assistant.tsx`, under `apps/web/src/`.
 
-| Spec                                                                                                                                                   | Covers                                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`settings/__tests__/assistant-settings.e2e.spec.ts`](../../../apps/api/src/modules/settings/__tests__/assistant-settings.e2e.spec.ts)                 | Defaults, `supportedLanguages`, partial updates, trimmed notes, a language the env does not list, another seller's settings, the errors over HTTP |
-| [`assistant/__tests__/reply-phrasing.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/reply-phrasing.spec.ts)                 | `phraseVoice`, the reply or fallback language line, the acknowledgement skipped in the `direct` tone, the schema's literal tones                  |
-| [`assistant/__tests__/assistant-turn.service.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/assistant-turn.service.spec.ts) | A saved tone and language reach `ReplyPhrasingAgent`, for that shop only; a code since removed falls back to the country's                        |
+| Spec                                                                                                                                                   | Covers                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`settings/__tests__/assistant-settings.e2e.spec.ts`](../../../apps/api/src/modules/settings/__tests__/assistant-settings.e2e.spec.ts)                 | Defaults, `supportedLanguages`, partial updates, trimmed notes, a language the env does not list, another seller's settings, the errors over HTTP                             |
+| [`assistant/__tests__/reply-phrasing.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/reply-phrasing.spec.ts)                 | `phraseVoice`, the reply or fallback language line, the acknowledgement skipped in the `direct` tone, the schema's literal tones                                              |
+| [`assistant/__tests__/assistant-turn.service.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/assistant-turn.service.spec.ts) | A saved tone and language reach `ReplyPhrasingAgent`, for that shop only; a code since removed falls back to the country's; the notes reach a shop answer, for that shop only |
 
 ## Follow-ups
 
-- **Answer customers from the notes.** A question (`ask_question`) hands off
-  to the seller today. Answering from the notes needs a new reply kind, and
-  `checkReply` must accept the numbers the notes hold.
 - **Fixed sentences in the default language**, which needs every
   `FallbackKey` written in each language.
 - **The "Order assistant" switches** in the same design (draft orders, ask
