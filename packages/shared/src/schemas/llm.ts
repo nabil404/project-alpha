@@ -40,7 +40,7 @@ export const extractedItemSchema = z.object({
 export type ExtractedItem = z.infer<typeof extractedItemSchema>;
 
 /**
- * Output shape for extractOrder(). `items` is the customer's whole list after
+ * Output shape for the order extraction agent. `items` is the customer's whole list after
  * this message, or null when the message said nothing about items; an item
  * left out of a returned list is removed. Raw words only, never catalog ids.
  */
@@ -59,7 +59,7 @@ export type ExtractedOrder = z.infer<typeof extractedOrderSchema>;
 export const MAX_PHOTO_MATCHES = 3;
 
 /**
- * Output shape for matchProductPhoto(). Each match names a candidate by the
+ * Output shape for the photo match agent. Each match names a candidate by the
  * number it was shown with, never by a catalog id; code maps the numbers back
  * and drops any it did not show. Empty when no candidate is the product.
  */
@@ -79,7 +79,7 @@ export type PhotoMatch = z.infer<typeof photoMatchSchema>;
 export const MAX_POST_PRODUCTS = 10;
 
 /**
- * Output shape for extractProductsFromPost(). Names, descriptions and option
+ * Output shape for the post import agent. Names, descriptions and option
  * values are the seller's own words; `aliases` are other ways customers
  * write the name. `prices` holds one row per option-value combination the
  * post prices (`values` empty for a product with no options), in major units

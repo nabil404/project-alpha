@@ -18,8 +18,21 @@ import type { CatalogTestDb } from '../../../../database/__tests__/catalog-test-
 import { seedFacebookPage } from '../../../../database/__tests__/conversation-seeds';
 import type { Database } from '../../../../database/database.module';
 import * as schema from '../../../../database/schema/index';
-import { AiSdkLlmClient } from '../../../../llm/ai-sdk-llm.client';
-import type { LlmClient, LlmPurpose, LlmResult } from '../../../../llm/llm.types';
+import type { Agent } from '../../../../llm/agents/agent';
+import { AiSdkIntentAgent, type IntentAgent } from '../../../../llm/agents/intent/intent.agent';
+import {
+  AiSdkOrderExtractionAgent,
+  type OrderExtractionAgent,
+} from '../../../../llm/agents/order-extraction/order-extraction.agent';
+import {
+  AiSdkPhotoMatchAgent,
+  type PhotoMatchAgent,
+} from '../../../../llm/agents/photo-match/photo-match.agent';
+import {
+  AiSdkReplyPhrasingAgent,
+  type ReplyPhrasingAgent,
+} from '../../../../llm/agents/reply-phrasing/reply-phrasing.agent';
+import type { LlmPurpose, LlmResult } from '../../../../llm/llm.types';
 import { MessengerController } from '../../../../messenger/messenger.controller';
 import { FacebookPageRepository } from '../../../../messenger/page/facebook-page.repository';
 import type { GraphOption, MetaGraphClient } from '../../../../messenger/page/meta-graph.client';
@@ -124,8 +137,16 @@ class MemoryQueue<T> {
   }
 }
 
+/** The four agents a turn calls, as the turn service is built with them. */
+export interface TurnAgents {
+  intent: IntentAgent;
+  extraction: OrderExtractionAgent;
+  phrasing: ReplyPhrasingAgent;
+  photoMatch: PhotoMatchAgent;
+}
+
 /** The scripted model: each message step sets `next`, its answers. */
-class ScriptedLlm implements LlmClient {
+class ScriptedLlm {
   next: ScriptedTurn | null = null;
   calls: LlmPurpose[] = [];
   private usage = (purpose: LlmPurpose) => ({
@@ -140,82 +161,85 @@ class ScriptedLlm implements LlmClient {
     if (!this.next) throw new Error('This step called the model but scripts no LLM turn');
     return this.next;
   }
-  async classifyIntent(): Promise<LlmResult<IntentResult>> {
-    this.calls.push('classify');
-    return {
-      ok: true,
-      value: { intent: this.turn().intent, confidence: 0.95 },
-      usage: this.usage('classify'),
-    };
-  }
-  async extractOrder(): Promise<LlmResult<ExtractedOrder>> {
-    this.calls.push('extract');
-    const turn = this.turn();
-    return {
-      ok: true,
-      value: {
-        items:
-          turn.items === undefined || turn.items === null
-            ? null
-            : turn.items.map((item) => ({
-                ref: null,
-                productQuery: null,
-                productQueryAlt: null,
-                variantQuery: null,
-                variantQueryAlt: null,
-                quantity: null,
-                ...item,
-              })),
-        customerName: turn.customerName ?? null,
-        phone: turn.phone ?? null,
-        deliveryAddress: turn.deliveryAddress ?? null,
-        deliveryArea: turn.deliveryArea ?? null,
-        confidence: 0.95,
+  readonly agents: TurnAgents = {
+    intent: {
+      purpose: 'classify',
+      run: async (): Promise<LlmResult<IntentResult>> => {
+        this.calls.push('classify');
+        return {
+          ok: true,
+          value: { intent: this.turn().intent, confidence: 0.95 },
+          usage: this.usage('classify'),
+        };
       },
-      usage: this.usage('extract'),
-    };
-  }
-  /** Fails, so every ask goes out as its fixed sentence and the transcript is stable. */
-  async phraseReply(): Promise<LlmResult<string>> {
-    this.calls.push('phrase');
-    return { ok: false, reason: 'timeout', usage: this.usage('phrase') };
-  }
-  /** The simulator sends no photos; a step that does sees no match. */
-  async matchProductPhoto(): Promise<LlmResult<PhotoMatch>> {
-    this.calls.push('vision_match');
-    return { ok: true, value: { matches: [] }, usage: this.usage('vision_match') };
-  }
-
-  /** The assistant never reads posts into products. */
-  extractProductsFromPost(): never {
-    throw new Error('The assistant never imports posts');
-  }
+    },
+    extraction: {
+      purpose: 'extract',
+      run: async (): Promise<LlmResult<ExtractedOrder>> => {
+        this.calls.push('extract');
+        const turn = this.turn();
+        return {
+          ok: true,
+          value: {
+            items:
+              turn.items === undefined || turn.items === null
+                ? null
+                : turn.items.map((item) => ({
+                    ref: null,
+                    productQuery: null,
+                    productQueryAlt: null,
+                    variantQuery: null,
+                    variantQueryAlt: null,
+                    quantity: null,
+                    ...item,
+                  })),
+            customerName: turn.customerName ?? null,
+            phone: turn.phone ?? null,
+            deliveryAddress: turn.deliveryAddress ?? null,
+            deliveryArea: turn.deliveryArea ?? null,
+            confidence: 0.95,
+          },
+          usage: this.usage('extract'),
+        };
+      },
+    },
+    /** Fails, so every ask goes out as its fixed sentence and the transcript is stable. */
+    phrasing: {
+      purpose: 'phrase',
+      run: async (): Promise<LlmResult<string>> => {
+        this.calls.push('phrase');
+        return { ok: false, reason: 'timeout', usage: this.usage('phrase') };
+      },
+    },
+    /** The simulator sends no photos; a step that does sees no match. */
+    photoMatch: {
+      purpose: 'vision_match',
+      run: async (): Promise<LlmResult<PhotoMatch>> => {
+        this.calls.push('vision_match');
+        return { ok: true, value: { matches: [] }, usage: this.usage('vision_match') };
+      },
+    },
+  };
 }
 
-/** Counts calls on the real client so the transcript can show them. */
-class CountingLlm implements LlmClient {
+/** The real agents, each call counted so the transcript can show them. */
+class CountingLlm {
   calls: LlmPurpose[] = [];
-  constructor(private readonly inner: LlmClient) {}
-  classifyIntent(...args: Parameters<LlmClient['classifyIntent']>) {
-    this.calls.push('classify');
-    return this.inner.classifyIntent(...args);
-  }
-  extractOrder(...args: Parameters<LlmClient['extractOrder']>) {
-    this.calls.push('extract');
-    return this.inner.extractOrder(...args);
-  }
-  phraseReply(...args: Parameters<LlmClient['phraseReply']>) {
-    this.calls.push('phrase');
-    return this.inner.phraseReply(...args);
-  }
-  matchProductPhoto(...args: Parameters<LlmClient['matchProductPhoto']>) {
-    this.calls.push('vision_match');
-    return this.inner.matchProductPhoto(...args);
-  }
-
-  extractProductsFromPost(...args: Parameters<LlmClient['extractProductsFromPost']>) {
-    this.calls.push('post_import');
-    return this.inner.extractProductsFromPost(...args);
+  readonly agents: TurnAgents;
+  constructor(inner: TurnAgents) {
+    const counted = <I, O>(agent: Agent<I, O>): Agent<I, O> => ({
+      purpose: agent.purpose,
+      run: (input) => {
+        this.calls.push(agent.purpose);
+        return agent.run(input);
+      },
+    });
+    this.agents = {
+      intent: counted(inner.intent),
+      extraction: counted(inner.extraction),
+      phrasing: counted(inner.phrasing),
+      photoMatch: counted(inner.photoMatch),
+    };
   }
 }
 
@@ -225,13 +249,14 @@ function makeLlm(): ScriptedLlm | CountingLlm {
   if (!liveLlm) return new ScriptedLlm();
   const env = envSchema.parse(process.env);
   const openai = createOpenAI({ apiKey: env.LLM_API_KEY });
-  return new CountingLlm(
-    new AiSdkLlmClient({
-      routing: openai(env.LLM_MODEL_ROUTING),
-      extraction: openai(env.LLM_MODEL_EXTRACTION),
-      timeoutMs: env.LLM_TIMEOUT_MS,
-    }),
-  );
+  const routing = { model: openai(env.LLM_MODEL_ROUTING), timeoutMs: env.LLM_TIMEOUT_MS };
+  const extraction = { model: openai(env.LLM_MODEL_EXTRACTION), timeoutMs: env.LLM_TIMEOUT_MS };
+  return new CountingLlm({
+    intent: new AiSdkIntentAgent(routing),
+    extraction: new AiSdkOrderExtractionAgent(extraction),
+    phrasing: new AiSdkReplyPhrasingAgent(routing),
+    photoMatch: new AiSdkPhotoMatchAgent(extraction),
+  });
 }
 
 export interface SimProduct {
@@ -369,7 +394,10 @@ export class ConversationSimulator {
         charges,
         productsService(runtime),
         new LlmCallRepository(),
-        this.llm,
+        this.llm.agents.intent,
+        this.llm.agents.extraction,
+        this.llm.agents.phrasing,
+        this.llm.agents.photoMatch,
         outbound,
         notifications,
         confirmation,

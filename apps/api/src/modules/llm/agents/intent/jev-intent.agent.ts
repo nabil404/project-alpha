@@ -1,11 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { intentResultSchema, type IntentResult } from '@app/shared';
 import { APIError, type TypeSafeClient } from '@typesafe-ai/sdk';
-import { CLASSIFY_INTENT_QUESTION, classifyIntentState } from './prompts/classify-intent-jev';
-import type { PromptPack } from './prompts/prompt-pack';
-import type { ChatLine, LlmClient, LlmFailure, LlmResult } from './llm.types';
-
-export type IntentClassifier = Pick<LlmClient, 'classifyIntent'>;
+import type { LlmFailure, LlmResult } from '../../llm.types';
+import type { IntentAgent, IntentInput } from './intent.agent';
+import { CLASSIFY_INTENT_QUESTION, classifyIntentState } from './jev-intent.prompt';
 
 export interface JevIntentOptions {
   client: Pick<TypeSafeClient, 'systemOne'>;
@@ -20,12 +18,13 @@ export interface JevIntentOptions {
  * floor; Jev's own `confidence` measures how peaked the answer is, not how
  * likely it is right. Never throws, and logs no chat or answer.
  */
-export class JevIntentClassifier implements IntentClassifier {
-  private readonly logger = new Logger('JevIntentClassifier');
+export class JevIntentAgent implements IntentAgent {
+  readonly purpose = 'classify' as const;
+  private readonly logger = new Logger('JevIntentAgent');
 
   constructor(private readonly options: JevIntentOptions) {}
 
-  async classifyIntent(history: ChatLine[], pack: PromptPack): Promise<LlmResult<IntentResult>> {
+  async run({ history, pack }: IntentInput): Promise<LlmResult<IntentResult>> {
     const { client, model, timeoutMs } = this.options;
     const started = performance.now();
     const signal = AbortSignal.timeout(timeoutMs);
@@ -33,7 +32,7 @@ export class JevIntentClassifier implements IntentClassifier {
       answeredBy: string,
       tokens?: { input_tokens: number | null; output_tokens: number | null },
     ) => ({
-      purpose: 'classify' as const,
+      purpose: this.purpose,
       model: answeredBy,
       inputTokens: tokens?.input_tokens ?? null,
       outputTokens: tokens?.output_tokens ?? null,

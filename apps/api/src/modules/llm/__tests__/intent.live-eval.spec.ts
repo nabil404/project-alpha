@@ -3,9 +3,8 @@ import type { IntentResult } from '@app/shared';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { envSchema } from '../../config/env.schema';
 import { CONFIDENCE_FLOOR } from '../../conversations/assistant/conversation-machine';
-import { AiSdkLlmClient } from '../ai-sdk-llm.client';
-import { JevIntentClassifier } from '../jev-intent.classifier';
-import type { LlmClient } from '../llm.types';
+import { AiSdkIntentAgent, type IntentAgent } from '../agents/intent/intent.agent';
+import { JevIntentAgent } from '../agents/intent/jev-intent.agent';
 import { promptPackFor } from '../prompts/prompt-pack';
 import { INTENT_CASES } from './fixtures/intent-eval';
 
@@ -22,18 +21,17 @@ import { INTENT_CASES } from './fixtures/intent-eval';
 const live = process.env.LLM_EVAL === '1';
 const env = live ? envSchema.parse(process.env) : undefined;
 
-const providers: [string, Pick<LlmClient, 'classifyIntent'>][] = [];
+const providers: [string, IntentAgent][] = [];
 if (env?.LLM_API_KEY) {
   const openai = createOpenAI({ apiKey: env.LLM_API_KEY });
-  const llm = new AiSdkLlmClient({
-    routing: openai(env.LLM_MODEL_ROUTING),
-    extraction: openai(env.LLM_MODEL_EXTRACTION),
+  const agent = new AiSdkIntentAgent({
+    model: openai(env.LLM_MODEL_ROUTING),
     timeoutMs: env.LLM_TIMEOUT_MS,
   });
-  providers.push([env.LLM_MODEL_ROUTING, llm]);
+  providers.push([env.LLM_MODEL_ROUTING, agent]);
 }
 if (env?.TYPESAFE_API_KEY) {
-  const jev = new JevIntentClassifier({
+  const jev = new JevIntentAgent({
     client: new TypeSafeClient({ apiKey: env.TYPESAFE_API_KEY, logLevel: 'warn' }),
     model: env.TYPESAFE_MODEL,
     timeoutMs: env.LLM_TIMEOUT_MS,
@@ -42,7 +40,7 @@ if (env?.TYPESAFE_API_KEY) {
 }
 
 /** The lowest, median and highest confidence the provider gave, failures left out. */
-function confidences(results: Awaited<ReturnType<LlmClient['classifyIntent']>>[]): string {
+function confidences(results: Awaited<ReturnType<IntentAgent['run']>>[]): string {
   const sorted = results
     .flatMap((result) => (result.ok ? [result.value.confidence] : []))
     .sort((a, b) => a - b);
@@ -62,7 +60,7 @@ function median(values: number[]): number {
     it('classifies the eval chats', async () => {
       const pack = promptPackFor('BD');
       const results = await Promise.all(
-        INTENT_CASES.map((entry) => classifier!.classifyIntent(entry.history, pack)),
+        INTENT_CASES.map((entry) => classifier!.run({ history: entry.history, pack })),
       );
 
       let correct = 0;

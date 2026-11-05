@@ -1,7 +1,7 @@
 import type { FilePart, TextPart } from 'ai';
-import type { PostExtractionRequest } from '../llm.types';
-import type { PromptPack } from './prompt-pack';
-import { asData } from './transcript';
+import type { PostExtractionRequest } from './post-import.agent';
+import type { PromptPack } from '../../prompts/prompt-pack';
+import { asData } from '../../prompts/transcript';
 
 export const extractProductsFromPostSystem = (
   pack: PromptPack,

@@ -4,7 +4,7 @@ import {
   type AssistantSettings,
   type SlotName,
 } from '@app/shared';
-import type { PhraseRequest } from '../../llm/llm.types';
+import type { PhraseRequest } from '../../llm/agents/reply-phrasing/reply-phrasing.agent';
 import type { PromptPack } from '../../llm/prompts/prompt-pack';
 import type { AskReason, ReplyFacts, ReplyIntent } from './reply-intent';
 

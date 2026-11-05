@@ -1,7 +1,8 @@
 import type { AssistantTone } from '@app/shared';
-import type { ChatLine, PhraseRequest } from '../llm.types';
-import type { PromptPack } from './prompt-pack';
-import { asData, DATA_RULE, transcript } from './transcript';
+import type { ChatLine } from '../../llm.types';
+import type { PhraseRequest } from './reply-phrasing.agent';
+import type { PromptPack } from '../../prompts/prompt-pack';
+import { asData, DATA_RULE, transcript } from '../../prompts/transcript';
 
 export const phraseReplySystem = (
   pack: PromptPack,

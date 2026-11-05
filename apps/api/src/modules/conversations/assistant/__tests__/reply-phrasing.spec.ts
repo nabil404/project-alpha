@@ -1,6 +1,6 @@
 import { ASSISTANT_TONES } from '@app/shared';
 import { ASSISTANT_TONE_VALUES } from '../../../database/schema/settings';
-import { phraseReplyPrompt } from '../../../llm/prompts/phrase-reply';
+import { phraseReplyPrompt } from '../../../llm/agents/reply-phrasing/reply-phrasing.prompt';
 import { promptPackFor } from '../../../llm/prompts/prompt-pack';
 import { phraseRequestFor, phraseVoice } from '../reply-phrasing';
 import type { ReplyIntent } from '../reply-intent';

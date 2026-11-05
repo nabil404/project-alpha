@@ -1,10 +1,10 @@
 import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { InternalServerError, type SystemOneRequest } from '@typesafe-ai/sdk';
-import { JevIntentClassifier, type JevIntentOptions } from '../jev-intent.classifier';
-import type { ChatLine } from '../llm.types';
-import { classifyIntentState } from '../prompts/classify-intent-jev';
-import { promptPackFor } from '../prompts/prompt-pack';
+import type { ChatLine } from '../../../llm.types';
+import { promptPackFor } from '../../../prompts/prompt-pack';
+import { JevIntentAgent, type JevIntentOptions } from '../jev-intent.agent';
+import { classifyIntentState } from '../jev-intent.prompt';
 
 const pack = promptPackFor('BD');
 const history: ChatLine[] = [
@@ -26,7 +26,7 @@ function classifier(answer: object | Error | 'hang', timeoutMs = 2_000) {
     }
     return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
   });
-  const jev = new JevIntentClassifier({
+  const jev = new JevIntentAgent({
     client: { systemOne: systemOne as unknown as SystemOne },
     model: 'jev-1.14.0',
     timeoutMs,
@@ -77,10 +77,10 @@ describe('classifyIntentState', () => {
   });
 });
 
-describe('JevIntentClassifier', () => {
+describe('JevIntentAgent', () => {
   it("returns the chosen intent with that intent's probability, not Jev's confidence", async () => {
     const { jev, systemOne } = classifier(ORDER_ANSWER);
-    const result = await jev.classifyIntent(history, pack);
+    const result = await jev.run({ history, pack });
 
     expect(result).toEqual({
       ok: true,
@@ -102,7 +102,7 @@ describe('JevIntentClassifier', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     try {
       const { jev } = classifier(new InternalServerError(500, 'boom', new Headers()));
-      const result = await jev.classifyIntent(history, pack);
+      const result = await jev.run({ history, pack });
 
       expect(result).toMatchObject({ ok: false, reason: 'provider_error' });
       const line = String(warn.mock.calls[0]?.[0]);
@@ -115,7 +115,7 @@ describe('JevIntentClassifier', () => {
 
   it('gives up at the timeout', async () => {
     const { jev } = classifier('hang', 50);
-    await expect(jev.classifyIntent(history, pack)).resolves.toMatchObject({
+    await expect(jev.run({ history, pack })).resolves.toMatchObject({
       ok: false,
       reason: 'timeout',
       usage: { model: 'jev-1.14.0', inputTokens: null },
@@ -129,7 +129,7 @@ describe('JevIntentClassifier', () => {
         intent: { ...ORDER_ANSWER.answers.intent, choice: 'refund', probabilities: { refund: 1 } },
       },
     });
-    await expect(jev.classifyIntent(history, pack)).resolves.toMatchObject({
+    await expect(jev.run({ history, pack })).resolves.toMatchObject({
       ok: false,
       reason: 'invalid_output',
     });
