@@ -118,7 +118,13 @@ describe('decideTurn: every state × intent', () => {
       if (intent === 'complain' || intent === 'request_human') {
         expect(reply).toEqual({ kind: 'handoff', reason: intent });
       } else if (intent === 'ask_question') {
-        expect(reply).toEqual({ kind: 'handoff', reason: 'question' });
+        // Answered from the shop's facts; in an order the next ask follows.
+        const inOrder = state === 'collecting_details' || state === 'awaiting_confirmation';
+        expect(reply).toEqual(
+          inOrder
+            ? { kind: 'answer', next: expect.objectContaining({ kind: 'ask_slot' }) }
+            : { kind: 'answer' },
+        );
       } else {
         expect(reply).toMatchObject({ kind: 'ask_slot', slot: 'product', intent });
       }
@@ -164,16 +170,41 @@ describe('decideTurn: hand-offs', () => {
     expect(decision.reply).toMatchObject({ kind: 'ask_slot', slot: 'product' });
   });
 
-  it('keeps what a question carried, then hands off', () => {
+  it('keeps what a question carried and answers it, then asks the next slot', () => {
     const decision = decideTurn(
       turn({
         state: 'collecting_details',
+        slots: slots({ items: [{ productQuery: 'jamdani', quantity: 1 }] }),
         trigger: message({ ...nothing, deliveryAddress: 'Sylhet sadar' }, asked('ask_question')),
       }),
     );
-    expect(decision.state).toBe('handed_off');
+    expect(decision.state).toBe('collecting_details');
     expect(decision.slots.deliveryAddress).toBe('Sylhet sadar');
-    expect(decision.reply).toEqual({ kind: 'handoff', reason: 'question' });
+    expect(decision.reply).toMatchObject({ kind: 'answer', next: { kind: 'ask_slot' } });
+  });
+
+  it('answers a question outside an order alone, changing nothing', () => {
+    const input = turn({ trigger: message('skipped', asked('ask_question')) });
+    expect(decideTurn(input)).toEqual({
+      state: 'browsing',
+      slots: input.slots,
+      reply: { kind: 'answer' },
+    });
+  });
+
+  it('counts no miss for the ask that follows an answer', () => {
+    const decision = decideTurn(
+      turn({
+        state: 'collecting_details',
+        slots: slots({
+          items: [{ productQuery: 'iphone', quantity: 1 }],
+          lastAsked: { slot: 'product', item: 0, times: 2 },
+        }),
+        trigger: message(nothing, asked('ask_question')),
+      }),
+    );
+    expect(decision.reply).toMatchObject({ kind: 'answer', next: { kind: 'ask_slot' } });
+    expect(decision.slots.lastAsked).toEqual({ slot: 'product', item: 0, times: 2 });
   });
 
   it('hands off instead of asking for the same slot of the same item a third time', () => {
@@ -935,6 +966,22 @@ describe('decideTurn: the summary', () => {
     expect(decision.reply).toEqual({ kind: 'handoff', reason: 'awaiting_seller' });
     expect(decision.slots.quote).toBeUndefined();
     expect(decision.slots.revision).toBe(2);
+  });
+
+  it('answers a question about the card and keeps the card out', () => {
+    const shown = complete();
+    const decision = decideTurn(
+      turn({
+        state: 'awaiting_confirmation',
+        slots: shown.slots,
+        trigger: message(nothing, asked('ask_question')),
+      }),
+    );
+    expect(decision).toEqual({
+      state: 'awaiting_confirmation',
+      slots: shown.slots,
+      reply: { kind: 'answer' },
+    });
   });
 
   it('retires the card when a message after the summary leads to a question', () => {

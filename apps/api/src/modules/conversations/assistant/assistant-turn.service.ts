@@ -31,6 +31,10 @@ import {
   REPLY_PHRASING_AGENT,
   type ReplyPhrasingAgent,
 } from '../../llm/agents/reply-phrasing/reply-phrasing.agent';
+import {
+  SHOP_ANSWER_AGENT,
+  type ShopAnswerAgent,
+} from '../../llm/agents/shop-answer/shop-answer.agent';
 import type { ChatLine, LlmCallRecord, LlmResult } from '../../llm/llm.types';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
 import {
@@ -71,11 +75,12 @@ import { LlmCallRepository } from './llm-call.repository';
 import { checkReply } from './reply-check';
 import type { LastOrderFacts, ReplyIntent } from './reply-intent';
 import { OrderConfirmationService, type ConfirmOutcome } from './order-confirmation.service';
-import { outgoingFor } from './outgoing';
 import { phraseRequestFor, phraseVoice, type PhraseVoice } from './reply-phrasing';
 import { promptPackFor } from '../../llm/prompts/prompt-pack';
 import { askedAt, staleReply, turnGate, type TurnGate } from './turn-gate';
 import { extractsWhateverIntent, routeFor } from './turn-routes';
+import { ANSWERS_PER_DAY, latestCustomerWords, shopFacts, type ShopFactsInput } from './shop-facts';
+import { outgoingFor, type Outgoing } from './outgoing';
 import { decideNonText } from './non-text-turn';
 import {
   matchedProductIds,
@@ -133,6 +138,7 @@ export class AssistantTurnService {
     private readonly productPosts: ProductPostRepository,
     private readonly photos: CustomerPhotoStore,
     private readonly assistantSettings: AssistantSettingsService,
+    @Inject(SHOP_ANSWER_AGENT) private readonly shopAnswer: ShopAnswerAgent | null,
   ) {}
 
   async run({
@@ -161,7 +167,10 @@ export class AssistantTurnService {
         page: await this.pages.findForMerchant(tx, scope),
         country: settings.country,
         assistant: await this.assistantSettings.read(tx, scope),
-        delivery: deliveryView(await this.deliveryCharges.list(tx, scope), settings),
+        ...(await this.deliveryCharges.list(tx, scope).then((rows) => ({
+          delivery: deliveryView(rows, settings),
+          shop: shopView(rows, settings),
+        }))),
       };
     });
     if (!read) return 'stale';
@@ -278,16 +287,37 @@ export class AssistantTurnService {
       decision = await this.decide(turn, history, calls);
       phrased = true;
     }
-    const text = phrased
-      ? await this.words(
-          decision.reply,
-          history,
-          language,
-          phraseVoice(read.assistant, promptPackFor(read.country)),
-          calls,
-        )
-      : fallbackText(decision.reply, language);
-    const outgoing = outgoingFor(decision.reply, text, { language, conversationId });
+    const voice = phraseVoice(read.assistant, promptPackFor(read.country));
+    let answer: string | null = null;
+    if (decision.reply.kind === 'answer') {
+      answer = await this.answerQuestion(
+        scope,
+        conversationId,
+        { ...read.shop, notes: read.assistant.notes, catalog, slots: decision.slots, language },
+        history,
+        voice,
+        calls,
+      );
+      // One the shop's facts cannot answer goes to the seller, as every question once did.
+      if (answer === null) decision = handOff(decision.slots, 'question');
+    }
+    const say = async (reply: ReplyIntent) =>
+      phrased
+        ? await this.words(reply, history, language, voice, calls)
+        : fallbackText(reply, language);
+    let outgoing: Outgoing[];
+    if (decision.reply.kind === 'answer' && answer !== null) {
+      const { next } = decision.reply;
+      outgoing = [
+        { text: answer, content: { kind: 'text' } },
+        ...(next ? outgoingFor(next, await say(next), { language, conversationId }) : []),
+      ];
+    } else {
+      outgoing = outgoingFor(decision.reply, await say(decision.reply), {
+        language,
+        conversationId,
+      });
+    }
 
     // 3. Re-check under the lock and write.
     const staged = await withMerchant(this.db, merchantId, async (tx) => {
@@ -504,6 +534,50 @@ export class AssistantTurnService {
   }
 
   /**
+   * ShopAnswerAgent's answer from the facts code chose, if it answered, named
+   * the facts it used and passes checkReply; otherwise null, and the question
+   * goes to the seller. At most ANSWERS_PER_DAY calls per conversation.
+   */
+  private async answerQuestion(
+    scope: TenantScope,
+    conversationId: string,
+    shop: Omit<ShopFactsInput, 'orderProductIds' | 'words'> & { slots: CollectedSlots },
+    history: ChatLine[],
+    voice: PhraseVoice,
+    calls: LlmCallRecord[],
+  ): Promise<string | null> {
+    if (!this.shopAnswer) return null;
+    const { slots, ...rest } = shop;
+    const { facts, allowed } = shopFacts({
+      ...rest,
+      orderProductIds: slots.items.flatMap((item) => (item.productId ? [item.productId] : [])),
+      words: latestCustomerWords(history),
+    });
+    if (facts.length === 0) return null;
+    const since = new Date(Date.now() - 24 * 3_600 * 1_000);
+    const made = await withMerchant(this.db, scope.merchantId, (tx) =>
+      this.llmCalls.countSince(tx, scope, conversationId, 'answer', since),
+    );
+    if (made >= ANSWERS_PER_DAY) return null;
+    const answered = record(
+      await this.shopAnswer.run({
+        facts,
+        history: history.slice(-PHRASE_HISTORY),
+        language: voice.language,
+        matchCustomer: voice.matchCustomer,
+        tone: voice.tone,
+        pack: voice.pack,
+      }),
+      calls,
+    );
+    if (answered === 'failed' || answered.kind !== 'answered' || answered.text === null) {
+      return null;
+    }
+    const cites = answered.facts.length > 0 && answered.facts.every((n) => n <= facts.length);
+    return cites && checkReply(answered.text, allowed).ok ? answered.text.trim() : null;
+  }
+
+  /**
    * The phrased reply if it passes checkReply; otherwise the fixed sentence.
    * A hand-off, the summary and the offered name are never phrased.
    */
@@ -683,6 +757,33 @@ export function extractionContext(slots: CollectedSlots, catalog: CatalogView): 
 }
 
 /** The shop's delivery rows and threshold, as the quote reads them. */
+/** What a shop answer may quote from the shop's settings and delivery rows. */
+function shopView(
+  rows: DeliveryChargeRow[],
+  settings: {
+    currency: string;
+    freeDeliveryOver?: number | null;
+    pickupAddress?: string | null;
+    contactPhone?: string | null;
+  },
+): Pick<
+  ShopFactsInput,
+  'delivery' | 'freeDeliveryOver' | 'currency' | 'pickupAddress' | 'contactPhone'
+> {
+  return {
+    delivery: rows.map((row) => ({
+      id: row.id,
+      areaName: row.areaName,
+      charge: row.charge,
+      deliveryTime: row.deliveryTime,
+    })),
+    freeDeliveryOver: settings.freeDeliveryOver ?? null,
+    currency: settings.currency,
+    pickupAddress: settings.pickupAddress ?? null,
+    contactPhone: settings.contactPhone ?? null,
+  };
+}
+
 function deliveryView(
   rows: DeliveryChargeRow[],
   settings: { currency: string; freeDeliveryOver?: number | null },

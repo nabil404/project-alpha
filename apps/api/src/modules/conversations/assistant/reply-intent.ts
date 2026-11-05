@@ -89,7 +89,12 @@ export type ReplyIntent =
   | { kind: 'browse_products'; cards: ProductCard[]; more: boolean }
   | { kind: 'last_order'; order: LastOrderFacts | null }
   | { kind: 'notice'; notice: Notice }
-  | { kind: 'handoff'; reason: HandoffReason };
+  | { kind: 'handoff'; reason: HandoffReason }
+  /**
+   * A question to answer from the shop's facts; the turn service writes the
+   * text, or hands off as `question`. `next` follows it in an order.
+   */
+  | { kind: 'answer'; next?: Exclude<ReplyIntent, { kind: 'answer' }> };
 
 /** A fixed line for a message without words; it changes no state. */
 export type Notice =

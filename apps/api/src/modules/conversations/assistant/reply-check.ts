@@ -1,5 +1,4 @@
 import { phoneDigitForms, toLatinDigits } from '@app/shared';
-import type { ReplyFacts } from './reply-intent';
 
 export const REPLY_MAX_GRAPHEMES = 500;
 
@@ -36,11 +35,11 @@ function allowedRuns(value: unknown, key = ''): string[] {
 }
 
 /**
- * Code's last word on a phrased reply: every number in it must come from the
+ * Code's last word on a phrased reply or a shop answer: every number in it must come from the
  * facts, it carries no link, and it fits. Anything else is replaced by the
  * fixed fallback sentence.
  */
-export function checkReply(text: string, facts: ReplyFacts): ReplyCheck {
+export function checkReply(text: string, facts: object): ReplyCheck {
   const reply = text.trim();
   if (reply === '') return { ok: false, reason: 'empty' };
   if (Array.from(graphemes.segment(reply)).length > REPLY_MAX_GRAPHEMES) {

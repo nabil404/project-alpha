@@ -13,6 +13,7 @@ import {
   AiSdkReplyPhrasingAgent,
   REPLY_PHRASING_AGENT,
 } from '../agents/reply-phrasing/reply-phrasing.agent';
+import { AiSdkShopAnswerAgent, SHOP_ANSWER_AGENT } from '../agents/shop-answer/shop-answer.agent';
 import { LlmModule } from '../llm.module';
 
 const TOKENS = [
@@ -21,6 +22,7 @@ const TOKENS = [
   REPLY_PHRASING_AGENT,
   PHOTO_MATCH_AGENT,
   POST_IMPORT_AGENT,
+  SHOP_ANSWER_AGENT,
 ];
 
 const DEFAULTS: Record<string, unknown> = {
@@ -53,22 +55,25 @@ describe('LlmModule', () => {
       null,
       null,
       null,
+      null,
     ]);
   });
 
   it('builds each agent on its model tier', async () => {
-    const [intent, extraction, phrasing, photo, post] = await agents({ LLM_API_KEY: 'k' });
+    const [intent, extraction, phrasing, photo, post, answer] = await agents({ LLM_API_KEY: 'k' });
     expect(intent).toBeInstanceOf(AiSdkIntentAgent);
     expect(extraction).toBeInstanceOf(AiSdkOrderExtractionAgent);
     expect(phrasing).toBeInstanceOf(AiSdkReplyPhrasingAgent);
     expect(photo).toBeInstanceOf(AiSdkPhotoMatchAgent);
     expect(post).toBeInstanceOf(AiSdkPostImportAgent);
-    expect([intent, extraction, phrasing, photo, post].map(modelOf)).toEqual([
+    expect(answer).toBeInstanceOf(AiSdkShopAnswerAgent);
+    expect([intent, extraction, phrasing, photo, post, answer].map(modelOf)).toEqual([
       'routing-model',
       'extraction-model',
       'routing-model',
       'extraction-model',
       'extraction-model',
+      'routing-model',
     ]);
   });
 
