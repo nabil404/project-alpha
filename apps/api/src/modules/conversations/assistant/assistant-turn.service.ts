@@ -79,7 +79,14 @@ import { phraseRequestFor, phraseVoice, type PhraseVoice } from './reply-phrasin
 import { promptPackFor } from '../../llm/prompts/prompt-pack';
 import { askedAt, staleReply, turnGate, type TurnGate } from './turn-gate';
 import { extractsWhateverIntent, routeFor } from './turn-routes';
-import { ANSWERS_PER_DAY, latestCustomerWords, shopFacts, type ShopFactsInput } from './shop-facts';
+import {
+  allowedFrom,
+  ANSWERS_PER_DAY,
+  latestCustomerWords,
+  shopFactLookup,
+  shopFacts,
+  type ShopFactsInput,
+} from './shop-facts';
 import { outgoingFor, type Outgoing } from './outgoing';
 import { decideNonText } from './non-text-turn';
 import {
@@ -534,8 +541,8 @@ export class AssistantTurnService {
   }
 
   /**
-   * ShopAnswerAgent's answer from the facts code chose, if it answered, named
-   * the facts it used and passes checkReply; otherwise null, and the question
+   * ShopAnswerAgent's answer from the facts code chose and those its lookups
+   * added, if it answered, named the facts it used and passes checkReply; otherwise null, and the question
    * goes to the seller. At most ANSWERS_PER_DAY calls per conversation.
    */
   private async answerQuestion(
@@ -548,7 +555,7 @@ export class AssistantTurnService {
   ): Promise<string | null> {
     if (!this.shopAnswer) return null;
     const { slots, ...rest } = shop;
-    const { facts, allowed } = shopFacts({
+    const { facts } = shopFacts({
       ...rest,
       orderProductIds: slots.items.flatMap((item) => (item.productId ? [item.productId] : [])),
       words: latestCustomerWords(history),
@@ -562,6 +569,7 @@ export class AssistantTurnService {
     const answered = record(
       await this.shopAnswer.run({
         facts,
+        lookup: shopFactLookup(rest),
         history: history.slice(-PHRASE_HISTORY),
         language: voice.language,
         matchCustomer: voice.matchCustomer,
@@ -570,11 +578,14 @@ export class AssistantTurnService {
       }),
       calls,
     );
-    if (answered === 'failed' || answered.kind !== 'answered' || answered.text === null) {
-      return null;
-    }
-    const cites = answered.facts.length > 0 && answered.facts.every((n) => n <= facts.length);
-    return cites && checkReply(answered.text, allowed).ok ? answered.text.trim() : null;
+    if (answered === 'failed') return null;
+    const { answer, facts: seen } = answered;
+    if (answer.kind !== 'answered' || answer.text === null) return null;
+    // Numbers and citations are checked against every fact the model saw, looked-up ones included.
+    const cites = answer.facts.length > 0 && answer.facts.every((n) => n <= seen.length);
+    return cites && checkReply(answer.text, allowedFrom(seen, rest.contactPhone)).ok
+      ? answer.text.trim()
+      : null;
   }
 
   /**

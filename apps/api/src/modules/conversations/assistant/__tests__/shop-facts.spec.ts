@@ -1,6 +1,12 @@
 import type { Category } from '@app/shared';
 import { checkReply } from '../reply-check';
-import { latestCustomerWords, shopFacts, type ShopFactsInput } from '../shop-facts';
+import {
+  allowedFrom,
+  latestCustomerWords,
+  shopFactLookup,
+  shopFacts,
+  type ShopFactsInput,
+} from '../shop-facts';
 import { EVAL_PRODUCTS, productByKey } from './fixtures/match-eval';
 
 const SAREES: Category = { id: '00000000-0000-4000-8000-0000000ca001', name: 'Sarees' } as Category;
@@ -114,6 +120,37 @@ describe('shopFacts', () => {
       ok: true,
     });
     expect(checkReply('Delivery is BDT 50.', allowed)).toEqual({ ok: false, reason: 'number' });
+  });
+});
+
+describe('shopFactLookup', () => {
+  const lookup = shopFactLookup(input());
+
+  it('finds the product the words name, written as the turn writes it', () => {
+    const found = plain(lookup.findProduct('jamdani shari'));
+    expect(found.map((fact) => fact.text.split('.')[0])).toEqual(['Jamdani Saree']);
+    const given = plain(shopFacts(input({ words: 'jamdani shari' })).facts);
+    expect(given).toContainEqual(found[0]);
+  });
+
+  it('finds nothing for words no product is named', () => {
+    expect(lookup.findProduct('bicycle helmet')).toEqual([]);
+  });
+
+  it('lists a category the name is close to, not only one spelt exactly', () => {
+    for (const name of ['saree', 'SAREES', 'sarees collection']) {
+      expect(lookup.listCategory(name).map((fact) => fact.about)).toEqual(['In stock in Sarees']);
+    }
+    expect(lookup.listCategory('shoes')).toEqual([]);
+    expect(lookup.listCategory('  ')).toEqual([]);
+  });
+
+  it('lets a reply quote a looked-up fact once it is allowed', () => {
+    const [fact] = plain(lookup.findProduct('katan'));
+    const price = fact!.text.match(/BDT [\d,]+/)![0];
+    const reply = `The katan is ${price}.`;
+    expect(checkReply(reply, shopFacts(input()).allowed)).toEqual({ ok: false, reason: 'number' });
+    expect(checkReply(reply, allowedFrom([fact!], null))).toEqual({ ok: true });
   });
 });
 

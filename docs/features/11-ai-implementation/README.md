@@ -43,7 +43,10 @@ shipped.
 
 - **The LLM reads and writes words; code owns every decision and every fact.** The LLM classifies, extracts raw words and
   writes sentences. Code matches products, fills slots, moves the conversation
-  state, and checks every number in a reply against catalog facts.
+  state, and checks every number in a reply against catalog facts. A shop
+  answer may ask code to look up a product or category it was not given;
+  code does the matching and writes the facts, and nothing else calls a tool
+  ([ai.md](../../architecture/ai.md#lookups)).
 - **Only the Confirm button confirms.** A reaction, sticker, emoji, comment,
   edit, photo or shared post is never an order confirmation.
 - **Never in a transaction.** LLM, vision and Graph calls happen outside any

@@ -3,11 +3,12 @@ import { envSchema } from '../../../config/env.schema';
 import { AiSdkShopAnswerAgent } from '../../../llm/agents/shop-answer/shop-answer.agent';
 import { promptPackFor } from '../../../llm/prompts/prompt-pack';
 import { checkReply } from '../reply-check';
-import { shopFacts } from '../shop-facts';
+import { allowedFrom, shopFactLookup, shopFacts } from '../shop-facts';
 import { EVAL_CATALOG } from './fixtures/match-eval';
 
 /**
- * The live routing model answering shop questions from the facts code chose.
+ * The live routing model answering shop questions from the facts code chose,
+ * and from what its lookups add when they miss.
  * An answer counts only if it passes the turn's own checks; an `unknown` case
  * must come back unknown, never with an invented answer. Costs real tokens, so
  * it runs only on request: `LLM_EVAL=1` with `LLM_API_KEY` set
@@ -30,7 +31,8 @@ const SHOP = {
   language: 'en' as const,
 };
 
-const CASES: { question: string; expect: 'answered' | 'unknown' }[] = [
+/** `before` is the customer's earlier line: a product named there is only in the facts once looked up. */
+const CASES: { before?: string; question: string; expect: 'answered' | 'unknown' }[] = [
   { question: 'Dhaka te delivery charge koto?', expect: 'answered' },
   { question: 'ঢাকার বাইরে ডেলিভারি কত দিনে?', expect: 'answered' },
   { question: 'How do I pay?', expect: 'answered' },
@@ -42,6 +44,8 @@ const CASES: { question: string; expect: 'answered' | 'unknown' }[] = [
   { question: 'Can you deliver to Dhaka by tomorrow morning?', expect: 'unknown' },
   { question: 'Do you accept bKash?', expect: 'unknown' },
   { question: 'Is the jamdani pure silk?', expect: 'unknown' },
+  { before: 'jamdani saree ta dekhchilam', question: 'dam koto?', expect: 'answered' },
+  { before: 'I saw your panjabi', question: 'how much is it?', expect: 'answered' },
 ];
 
 (live ? describe : describe.skip)('shop answers with the live routing model', () => {
@@ -55,22 +59,32 @@ const CASES: { question: string; expect: 'answered' | 'unknown' }[] = [
     const misses: string[] = [];
     let invented = 0;
     for (const entry of CASES) {
-      const { facts, allowed } = shopFacts({ ...SHOP, words: entry.question });
+      const { facts } = shopFacts({ ...SHOP, words: entry.question });
       const result = await agent.run({
         facts,
-        history: [{ from: 'customer', text: entry.question }],
+        lookup: shopFactLookup(SHOP),
+        history: [
+          ...(entry.before
+            ? [
+                { from: 'customer' as const, text: entry.before },
+                { from: 'assistant' as const, text: 'Ji, bolun!' },
+              ]
+            : []),
+          { from: 'customer', text: entry.question },
+        ],
         language: 'bn',
         matchCustomer: true,
         tone: 'friendly',
         pack: promptPackFor('BD'),
       });
-      const value = result.ok ? result.value : null;
+      const value = result.ok ? result.value.answer : null;
+      const seen = result.ok ? result.value.facts : facts;
       const passes =
         value?.kind === 'answered' &&
         value.text !== null &&
         value.facts.length > 0 &&
-        value.facts.every((n) => n <= facts.length) &&
-        checkReply(value.text, allowed).ok;
+        value.facts.every((n) => n <= seen.length) &&
+        checkReply(value.text, allowedFrom(seen, SHOP.contactPhone)).ok;
       const got = passes ? 'answered' : 'unknown';
       if (entry.expect === 'unknown' && got === 'answered') invented += 1;
       if (got !== entry.expect) misses.push(`${entry.question}: ${JSON.stringify(value)}`);
