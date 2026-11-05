@@ -30,7 +30,7 @@ import {
 } from './catalog-match';
 import { browseReply, cardOf } from './entry-replies';
 import { mergeItems, mergeSameVariant } from './item-merge';
-import { routeFor } from './turn-routes';
+import { isInOrder, routeFor } from './turn-routes';
 import type {
   AskReason,
   Choice,
@@ -193,9 +193,7 @@ function decide(input: TurnInput): TurnDecision {
     if (classified === 'failed') return handOff(slots, 'llm_failed');
     const route = routeFor(input.state, classified.intent);
     const { then } = route;
-    if (then.kind === 'handoff' && then.when === 'before_merge') {
-      return handOff(slots, then.reason);
-    }
+    if (then.kind === 'handoff') return handOff(slots, then.reason);
     // An extraction the route does not use is ignored, failed or not.
     const extracted = route.extract ? trigger.extracted : 'skipped';
     if (extracted === 'failed') return handOff(slots, 'llm_failed');
@@ -213,8 +211,12 @@ function decide(input: TurnInput): TurnDecision {
       invalidPhone = merged.invalidPhone;
     }
     switch (then.kind) {
-      case 'handoff':
-        return handOff(slots, then.reason);
+      case 'answer':
+        return answerDecision(
+          input,
+          slots,
+          proceed(input, slots, classified.intent, invalidPhone, picked, true),
+        );
       case 'continue':
         break;
       default:
@@ -232,6 +234,24 @@ function decide(input: TurnInput): TurnDecision {
     picked.push(added.item);
   }
 
+  return proceed(input, slots, intent, invalidPhone, picked);
+}
+
+/**
+ * After the trigger is read: match the items and the delivery row, then ask
+ * for the next missing slot or show the summary. An answered question
+ * (`answering`) is no missed ask.
+ */
+function proceed(
+  input: TurnInput,
+  merged: CollectedSlots,
+  intent: CustomerIntent,
+  invalidPhone: boolean,
+  picked: number[],
+  answering = false,
+): TurnDecision {
+  const { catalog } = input;
+  let slots = merged;
   const resolved = resolveItems(slots.items, catalog, picked);
   slots = resolveDelivery(
     {
@@ -277,7 +297,8 @@ function decide(input: TurnInput): TurnDecision {
   const item = 'item' in missing ? missing.item : undefined;
   const last = slots.lastAsked;
   // Before any item, a greeting or a look around answers nothing, so it is no miss.
-  const missed = slots.items.length > 0 || (intent !== 'browse' && intent !== 'other');
+  const missed =
+    !answering && (slots.items.length > 0 || (intent !== 'browse' && intent !== 'other'));
   const times =
     last?.slot === missing.slot && last.item === item ? last.times + (missed ? 1 : 0) : 1;
   if (times >= MAX_ASKS) return handOff(slots, 'repeated_confusion');
@@ -669,6 +690,23 @@ export function factsOf(
 }
 
 /** An extraction that filled nothing says nothing about how sure it is. */
+/**
+ * A question the shop's facts may answer: the turn service asks
+ * ShopAnswerAgent, and hands off as `question` when it cannot. In an order the
+ * answer is followed by the next ask, or a new summary when the message
+ * changed the order; outside one it stands alone and nothing changes.
+ */
+function answerDecision(
+  input: TurnInput,
+  merged: CollectedSlots,
+  next: TurnDecision,
+): TurnDecision {
+  if (!isInOrder(input.state) || next.reply.kind === 'handoff' || next.reply.kind === 'answer') {
+    return { state: input.state, slots: merged, reply: { kind: 'answer' } };
+  }
+  return { ...next, reply: { kind: 'answer', next: next.reply } };
+}
+
 /** A route kind decideTurn has no case for fails typecheck here. */
 function unhandledRoute(then: never): never {
   throw new Error(`Unhandled route ${JSON.stringify(then)}`);

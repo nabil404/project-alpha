@@ -412,6 +412,8 @@ export class ConversationSimulator {
         })),
 
         new AssistantSettingsService(runtime, new AssistantSettingsRepository(), config),
+        // Shop answers are not simulated: a question hands off as it did before them.
+        null,
       ),
     );
   }

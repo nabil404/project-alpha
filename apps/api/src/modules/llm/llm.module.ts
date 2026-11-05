@@ -17,6 +17,7 @@ import {
   AiSdkReplyPhrasingAgent,
   REPLY_PHRASING_AGENT,
 } from './agents/reply-phrasing/reply-phrasing.agent';
+import { AiSdkShopAnswerAgent, SHOP_ANSWER_AGENT } from './agents/shop-answer/shop-answer.agent';
 import type { Model } from './runtime/structured';
 
 /** The LangSmith client, or null without LANGSMITH_API_KEY: then no call is traced. */
@@ -103,6 +104,11 @@ function agent<T>(token: symbol, build: (models: LlmModels, config: AppConfig) =
         new AiSdkReplyPhrasingAgent({ model: routing, timeoutMs, telemetry }),
     ),
     agent(
+      SHOP_ANSWER_AGENT,
+      ({ routing, timeoutMs, telemetry }) =>
+        new AiSdkShopAnswerAgent({ model: routing, timeoutMs, telemetry }),
+    ),
+    agent(
       PHOTO_MATCH_AGENT,
       ({ extraction, timeoutMs, telemetry }) =>
         new AiSdkPhotoMatchAgent({ model: extraction, timeoutMs, telemetry }),
@@ -119,6 +125,7 @@ function agent<T>(token: symbol, build: (models: LlmModels, config: AppConfig) =
     REPLY_PHRASING_AGENT,
     PHOTO_MATCH_AGENT,
     POST_IMPORT_AGENT,
+    SHOP_ANSWER_AGENT,
   ],
 })
 export class LlmModule implements OnApplicationShutdown {

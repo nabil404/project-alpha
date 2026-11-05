@@ -15,12 +15,9 @@ const inOrder = (state: ActiveState) =>
 const go = (extract: boolean): Route => ({ extract, then: { kind: 'continue' } });
 const before = (reason: 'complain' | 'request_human'): Route => ({
   extract: false,
-  then: { kind: 'handoff', reason, when: 'before_merge' },
+  then: { kind: 'handoff', reason },
 });
-const question = (extract: boolean): Route => ({
-  extract,
-  then: { kind: 'handoff', reason: 'question', when: 'after_merge' },
-});
+const question = (extract: boolean): Route => ({ extract, then: { kind: 'answer' } });
 
 /** Every cell, written out, so the table cannot drift without this spec changing. */
 const EXPECTED: Record<CustomerIntent, { outside: Route; inOrder: Route }> = {

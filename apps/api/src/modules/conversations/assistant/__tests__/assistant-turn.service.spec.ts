@@ -8,6 +8,7 @@ import {
   type ExtractedOrder,
   type IntentResult,
   type PhotoMatch,
+  type ShopAnswer,
 } from '@app/shared';
 import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
@@ -33,6 +34,7 @@ import {
 import type { ExtractionContext } from '../../../llm/agents/order-extraction/order-extraction.agent';
 import type { PhotoMatchRequest } from '../../../llm/agents/photo-match/photo-match.agent';
 import type { PhraseRequest } from '../../../llm/agents/reply-phrasing/reply-phrasing.agent';
+import type { ShopAnswerInput } from '../../../llm/agents/shop-answer/shop-answer.agent';
 import type { ChatLine, LlmPurpose, LlmResult } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { ProductPostRepository } from '../../../messenger/posts/product-post.repository';
@@ -63,6 +65,7 @@ import { InMemoryObjectStorage } from '../../../storage/__tests__/in-memory-obje
 import { MAX_ASKS } from '../conversation-machine';
 import { STALE_CHAT_DAYS } from '../turn-gate';
 import { VISION_CALLS_PER_DAY } from '../photo-turn';
+import { ANSWERS_PER_DAY } from '../shop-facts';
 import { fallbackText, REFERRAL_TEXT } from '../assistant-fallbacks';
 import { AssistantTurnService, extractionContext } from '../assistant-turn.service';
 import { LlmCallRepository } from '../llm-call.repository';
@@ -137,13 +140,22 @@ class FakeLlm {
     return this.photo(request);
   }
 
-  /** The fake as the turn service's four agents. */
+  answer: LlmResult<ShopAnswer> = ok({ kind: 'unknown', text: null, facts: [] }, 'answer');
+  answerInputs: ShopAnswerInput[] = [];
+  async answerQuestion(input: ShopAnswerInput) {
+    this.answerInputs.push(input);
+    this.calls.push('answer');
+    return this.answer;
+  }
+
+  /** The fake as the turn service's agents. */
   agents() {
     return {
       intent: { purpose: 'classify' as const, run: this.classifyIntent.bind(this) },
       extraction: { purpose: 'extract' as const, run: this.extractOrder.bind(this) },
       phrasing: { purpose: 'phrase' as const, run: this.phraseReply.bind(this) },
       photoMatch: { purpose: 'vision_match' as const, run: this.matchProductPhoto.bind(this) },
+      shopAnswer: { purpose: 'answer' as const, run: this.answerQuestion.bind(this) },
     };
   }
 }
@@ -246,6 +258,7 @@ describeDb('AssistantTurnService (app_runtime)', () => {
         download(url),
       ),
       new AssistantSettingsService(runtime.db, new AssistantSettingsRepository(), assistantConfig),
+      agents?.shopAnswer ?? null,
     );
   };
 
@@ -695,6 +708,116 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     expect(sent).toEqual([]);
     expect((await messagesOf(convo.id)).filter((m) => m.sender === 'assistant')).toEqual([]);
     expect(await llmCallsOf(convo.id)).toHaveLength(2);
+  });
+
+  describe('a question the shop has written the answer to', () => {
+    const NOTES_A = 'Cash on delivery only.';
+    const NOTES_B = 'Seller B ships by courier.';
+    const answered = (text: string, facts = [1]) =>
+      ok<ShopAnswer>({ kind: 'answered', text, facts }, 'answer');
+    beforeEach(async () => {
+      llm.intent = ok({ intent: 'ask_question', confidence: 0.9 }, 'classify');
+      await t.db.insert(schema.assistantSettings).values([
+        { merchantId: t.merchantA, tone: 'friendly', defaultLanguage: 'match', notes: NOTES_A },
+        { merchantId: t.merchantB, tone: 'friendly', defaultLanguage: 'match', notes: NOTES_B },
+      ]);
+    });
+    afterEach(async () => {
+      await t.db.delete(schema.assistantSettings);
+    });
+    const notesFact = () =>
+      llm.answerInputs[0]!.facts.findIndex((fact) => fact.about === "Seller's notes") + 1;
+
+    it("answers from the shop's own facts alone, changing nothing outside an order", async () => {
+      llm.answer = answered('We take cash on delivery.');
+      const { convo, job } = await thread();
+
+      await expect(service().run(job)).resolves.toBe('replied');
+
+      expect(llm.calls).toEqual(['classify', 'answer']);
+      expect(sent.map((message) => message.text)).toEqual(['We take cash on delivery.']);
+      const facts = llm.answerInputs[0]!.facts.map((fact) => fact.text);
+      expect(facts).toContain(NOTES_A);
+      expect(facts).not.toContain(NOTES_B);
+      expect(await conversationRow(convo.id)).toMatchObject({ state: 'browsing' });
+      expect((await llmCallsOf(convo.id)).map((call) => call.purpose).sort()).toEqual([
+        'answer',
+        'classify',
+      ]);
+    });
+
+    it('follows the answer with the next ask in an order', async () => {
+      llm.answer = answered('We take cash on delivery.');
+      const { convo, job } = await thread(t.merchantA, {
+        state: 'collecting_details',
+        collectedSlots: { items: [{ productQuery: 'red saree' }] },
+      });
+
+      await service().run(job);
+
+      expect(llm.calls).toEqual(['classify', 'extract', 'answer', 'phrase']);
+      expect(sent.map((message) => message.text)).toEqual([
+        'We take cash on delivery.',
+        'Which product would you like?',
+      ]);
+      expect(await conversationRow(convo.id)).toMatchObject({ state: 'collecting_details' });
+    });
+
+    it.each([
+      [
+        'the facts do not say',
+        ok<ShopAnswer>({ kind: 'unknown', text: null, facts: [] }, 'answer'),
+      ],
+      ['the answer has a number the facts lack', answered('Delivery is 999 taka.')],
+      ['the answer names no fact', answered('We take cash on delivery.', [])],
+      ['the answer names a fact it was not given', answered('We take cash on delivery.', [99])],
+      [
+        'the call timed out',
+        { ok: false as const, reason: 'timeout' as const, usage: usage('answer') },
+      ],
+    ])('hands off as question when %s', async (_case, result) => {
+      llm.answer = result;
+      const { convo, job } = await thread();
+
+      await expect(service().run(job)).resolves.toBe('handed_off');
+
+      expect(sent).toHaveLength(1);
+      expect(await conversationRow(convo.id)).toMatchObject({
+        state: 'handed_off',
+        handoffReason: 'question',
+      });
+      expect(notesFact()).toBeGreaterThan(0);
+    });
+
+    it('hands off without a call once the conversation used its answers for the day', async () => {
+      const { convo, job } = await thread();
+      await t.db.insert(schema.llmCall).values(
+        Array.from({ length: ANSWERS_PER_DAY }, () => ({
+          merchantId: t.merchantA,
+          conversationId: convo.id,
+          purpose: 'answer' as const,
+          model: 'fake',
+          latencyMs: 1,
+          outcome: 'ok' as const,
+        })),
+      );
+
+      await service().run(job);
+
+      expect(llm.calls).toEqual(['classify']);
+      expect(await conversationRow(convo.id)).toMatchObject({ handoffReason: 'question' });
+    });
+
+    it('hands off as question without the agent', async () => {
+      const agents = llm.agents();
+      const withoutAnswers = Object.assign(new FakeLlm(), { intent: llm.intent });
+      withoutAnswers.agents = () => ({ ...agents, shopAnswer: null as never });
+      const { convo, job } = await thread();
+
+      await service(withoutAnswers).run(job);
+
+      expect(await conversationRow(convo.id)).toMatchObject({ handoffReason: 'question' });
+    });
   });
 
   it('hands off a complaint with the fixed reply and notifies with the stored timestamp', async () => {

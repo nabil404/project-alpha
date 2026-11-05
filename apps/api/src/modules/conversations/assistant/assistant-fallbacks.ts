@@ -270,6 +270,9 @@ export function fallbackText(reply: ReplyIntent, language: ReplyLanguage): strin
         : ENTRY_TEXT[language].noOrder;
     case 'notice':
       return sentences[reply.notice]({ facts: { items: [] }, item: undefined });
+    case 'answer':
+      // The answer's own text comes from ShopAnswerAgent; one it cannot give is a hand-off.
+      return reply.next ? fallbackText(reply.next, language) : '';
     default:
       return reply satisfies never;
   }
