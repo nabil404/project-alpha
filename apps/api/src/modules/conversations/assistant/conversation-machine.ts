@@ -212,7 +212,14 @@ function decide(input: TurnInput): TurnDecision {
       slots = merged.slots;
       invalidPhone = merged.invalidPhone;
     }
-    if (then.kind === 'handoff') return handOff(slots, then.reason);
+    switch (then.kind) {
+      case 'handoff':
+        return handOff(slots, then.reason);
+      case 'continue':
+        break;
+      default:
+        return unhandledRoute(then);
+    }
     intent = classified.intent;
   } else if (trigger.kind === 'pick') {
     slots = applyPick(slots, trigger.pick);
@@ -662,6 +669,11 @@ export function factsOf(
 }
 
 /** An extraction that filled nothing says nothing about how sure it is. */
+/** A route kind decideTurn has no case for fails typecheck here. */
+function unhandledRoute(then: never): never {
+  throw new Error(`Unhandled route ${JSON.stringify(then)}`);
+}
+
 function isEmptyExtraction(extraction: ExtractedOrder): boolean {
   const { confidence: _confidence, ...fields } = extraction;
   return Object.values(fields).every((value) => value === null);
