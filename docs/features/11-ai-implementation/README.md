@@ -41,7 +41,7 @@ shipped.
 
 ## Principles every phase keeps
 
-- **Code decides, the LLM phrases.** The LLM classifies, extracts raw words and
+- **The LLM reads and writes words; code owns every decision and every fact.** The LLM classifies, extracts raw words and
   writes sentences. Code matches products, fills slots, moves the conversation
   state, and checks every number in a reply against catalog facts.
 - **Only the Confirm button confirms.** A reaction, sticker, emoji, comment,

@@ -7,7 +7,7 @@ and the MVP's [rules](../mvp/01-messenger-to-order/rules.md). This page
 describes the code that follows them. When a prompt, an output schema or a turn's path changes,
 update this page in the same change.
 
-## Code decides, the LLM phrases
+## The LLM reads and writes words; code owns every decision and every fact
 
 The LLM does six jobs and nothing else. Each job is one **agent**: one
 prompt, one output schema, one model tier and one `purpose` on `llm_call`
