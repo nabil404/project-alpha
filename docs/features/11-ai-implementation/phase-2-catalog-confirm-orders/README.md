@@ -47,7 +47,7 @@ phrased replies.
   numbers). Phase 1's `productText` is gone; an old row parses as an empty
   list.
 - **Extraction returns the whole list** (`schemas/llm.ts`,
-  `llm/prompts/extract-order.ts`). Each entry has `ref`, the index of the
+  `llm/agents/order-extraction/order-extraction.prompt.ts`). Each entry has `ref`, the index of the
   collected item it continues, or null for a new one; an item left out is
   removed. The prompt shows each collected item's catalog name beside the
   customer's earlier words, and asks for the customer's words unchanged plus

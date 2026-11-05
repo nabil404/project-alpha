@@ -43,10 +43,10 @@ set `ASSISTANT_LANGUAGES=en,ar,bn,hi,id,es,sw,ur` for that list.
 - **Defaults** apply until the first save. Reading never writes a row.
 - **`PATCH` writes only the fields it was sent.** The first write fills the
   rest from the defaults. An empty body changes nothing.
-- **Tone** goes into every `phraseReply` call as a `Tone:` line
-  ([ai.md](../../architecture/ai.md#phrasereply)). The fixed sentences
+- **Tone** goes into every `ReplyPhrasingAgent` call as a `Tone:` line
+  ([ai.md](../../architecture/ai.md#replyphrasingagent)). The fixed sentences
   (hand-off, summary, entry replies) do not change with it.
-- **Default language** is the language of every `phraseReply` reply, sent as
+- **Default language** is the language of every `ReplyPhrasingAgent` reply, sent as
   `Reply language:`, whatever the customer writes in. `match` mirrors the
   customer's language and script instead, and falls back to the region's
   language, `replyLanguage` of the shop country's prompt pack
@@ -103,7 +103,7 @@ See [database.md](../../architecture/database.md).
 | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`settings/__tests__/assistant-settings.e2e.spec.ts`](../../../apps/api/src/modules/settings/__tests__/assistant-settings.e2e.spec.ts)                 | Defaults, `supportedLanguages`, partial updates, trimmed notes, a language the env does not list, another seller's settings, the errors over HTTP |
 | [`assistant/__tests__/reply-phrasing.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/reply-phrasing.spec.ts)                 | `phraseVoice`, the reply or fallback language line, the acknowledgement skipped in the `direct` tone, the schema's literal tones                  |
-| [`assistant/__tests__/assistant-turn.service.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/assistant-turn.service.spec.ts) | A saved tone and language reach `phraseReply`, for that shop only; a code since removed falls back to the country's                               |
+| [`assistant/__tests__/assistant-turn.service.spec.ts`](../../../apps/api/src/modules/conversations/assistant/__tests__/assistant-turn.service.spec.ts) | A saved tone and language reach `ReplyPhrasingAgent`, for that shop only; a code since removed falls back to the country's                        |
 
 ## Follow-ups
 

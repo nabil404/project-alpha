@@ -97,7 +97,7 @@ across any download or call:
    appear): sellable products with a cover, narrowed to a category the
    customer's words name, with any product they name first, at most 20
    (`MAX_PHOTO_CANDIDATES`).
-4. **Ask the model.** `matchProductPhoto` ([AI](../../../architecture/ai.md#matchproductphoto))
+4. **Ask the model.** `PhotoMatchAgent` ([AI](../../../architecture/ai.md#photomatchagent))
    gets our copies of the photos and the numbered candidates' thumbnails and
    returns at most three numbers with confidence. `matchedProductIds()` maps
    them back, discards any number not shown and anything under 0.6, and
@@ -189,7 +189,7 @@ come from the catalog. Never call the model inside a transaction.
   model; a failed call hands off; the daily cap hands off.
 - **`inbound-message.ingest.spec.ts`** (DB): every customer photo queues one
   copy, on a handed-off chat too; a sticker or words queue none.
-- **`outgoing.spec.ts`**, **`llm.client.spec.ts`**,
+- **`outgoing.spec.ts`**, **`photo-match.agent.spec.ts`**,
   **`conversation-mappers.spec.ts`**, **`non-text-turn.spec.ts`**,
   **`slots.spec.ts`**: Yes / No and the carousel; images sent as links and a
   bound broken as invalid output; the viewer's link; a photo left to the

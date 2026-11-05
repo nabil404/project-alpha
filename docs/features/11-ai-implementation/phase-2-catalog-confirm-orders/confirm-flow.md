@@ -13,7 +13,7 @@ What phase 2 adds inside phase 1's turn, between the read and the write.
 flowchart TD
     msg["🌐 Customer message or quick-reply tap"]:::entry --> pick{"A tap on a<br/>candidate the last<br/>reply offered?"}:::decision
     pick -- yes --> fill["⚙️ Fill that item<br/>no LLM call"]:::work
-    pick -- no --> llm["🤖 classifyIntent, then extractOrder<br/>the whole item list with refs"]:::work
+    pick -- no --> llm["🤖 IntentAgent, then OrderExtractionAgent<br/>the whole item list with refs"]:::work
     llm --> merge["⚙️ mergeItems, mergeSameVariant<br/>item-merge.ts"]:::work
     merge --> match["⚙️ matchProduct, matchVariant per item<br/>catalog-match.ts"]:::work
     fill --> match

@@ -126,7 +126,7 @@ flowchart TD
     empty -- no --> photos["⚙️ ImportPhotos.read + store<br/>up to 8, normalize-product-image, to R2"]
 
     photos -. unreadable .-> rPhoto[/"❌ photo_unreadable"/]
-    photos --> llm["🤖 extractProductsFromPost<br/>caption + 4 photos"]
+    photos --> llm["🤖 PostImportAgent<br/>caption + 4 photos"]
     llm -. "call failed: LLM failure count +1" .-> rLlm[/"❌ llm_failed"/]
     llm --> check["⚙️ checkPostProducts<br/>drop bad names, prices, categories"]
 
