@@ -34,10 +34,11 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
    customer message, or if `turn-gate` finds an assistant reply already
    after it.
 3. **LLM**, no transaction open: `IntentAgent` on the routing model, then
-   `OrderExtractionAgent` on the extraction model when `shouldExtract` allows. That is
-   every intent except `complain` and `request_human` while
+   `OrderExtractionAgent` on the extraction model when the
+   [route table](../../../architecture/ai.md#the-route-table) (`turn-routes.ts`)
+   allows. That is every intent except `complain` and `request_human` while
    `collecting_details` or `awaiting_confirmation`, and only `order` or
-   `edit_order` while `browsing`.
+   `edit_order` while `browsing` or `abandoned`.
 4. **Decide.** `decideTurn` in `conversation-machine.ts` is pure.
 5. **Write**, in a short transaction: lock the conversation, write the
    `llm_call` rows, repeat step 2's checks plus the 24-hour window, then
@@ -201,6 +202,7 @@ old Claude model ids would make every call fail and every turn hand off.
 
 In `conversations/assistant/__tests__/` unless noted.
 
+- `turn-routes.spec.ts`: every state × intent route, written out cell by cell.
 - `conversation-machine.spec.ts`: every state × intent; null never overwrites
   a slot; the repeated-confusion hand-off, and greetings or browsing before
   any item never counting toward it; `startOver`; all slots filled →

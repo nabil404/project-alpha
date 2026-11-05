@@ -11,7 +11,6 @@ import {
 import type { CatalogView, DeliveryArea } from '../catalog-match';
 import {
   decideTurn,
-  shouldExtract,
   startOver,
   validNameTap,
   validPick,
@@ -110,21 +109,6 @@ const DETAILS = {
   phone: '+8801812000000',
   deliveryAddress: 'House 12, Dhanmondi, Dhaka',
 };
-
-describe('shouldExtract', () => {
-  it.each(activeStates.flatMap((state) => intents.map((intent) => [state, intent] as const)))(
-    '%s × %s',
-    (state, intent) => {
-      const expected =
-        intent === 'complain' || intent === 'request_human'
-          ? false
-          : state === 'collecting_details' || state === 'awaiting_confirmation'
-            ? true
-            : intent === 'order' || intent === 'edit_order';
-      expect(shouldExtract(state, intent)).toBe(expected);
-    },
-  );
-});
 
 describe('decideTurn: every state × intent', () => {
   it.each(activeStates.flatMap((state) => intents.map((intent) => [state, intent] as const)))(

@@ -58,7 +58,6 @@ import {
   isActiveState,
   LOCALES,
   readSlots,
-  shouldExtract,
   startOver,
   validNameTap,
   validPick,
@@ -76,6 +75,7 @@ import { outgoingFor } from './outgoing';
 import { phraseRequestFor, phraseVoice, type PhraseVoice } from './reply-phrasing';
 import { promptPackFor } from '../../llm/prompts/prompt-pack';
 import { askedAt, staleReply, turnGate, type TurnGate } from './turn-gate';
+import { routeFor } from './turn-routes';
 import { decideNonText } from './non-text-turn';
 import {
   matchedProductIds,
@@ -484,7 +484,7 @@ export class AssistantTurnService {
     const pack = promptPackFor(turn.country);
     const classified = record(await intent.run({ history, pack }), calls);
     const extracted =
-      classified !== 'failed' && shouldExtract(turn.state, classified.intent)
+      classified !== 'failed' && routeFor(turn.state, classified.intent).extract
         ? record(
             await extraction.run({
               history,
