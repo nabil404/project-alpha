@@ -16,7 +16,11 @@ import {
 } from '../../database/__tests__/catalog-test-db';
 import { seedFacebookPage } from '../../database/__tests__/conversation-seeds';
 import * as schema from '../../database/schema/index';
-import type { LlmClient, LlmFailure, LlmResult, PostExtractionRequest } from '../../llm/llm.types';
+import type {
+  PostExtractionRequest,
+  PostImportAgent,
+} from '../../llm/agents/post-import/post-import.agent';
+import type { LlmFailure, LlmResult } from '../../llm/llm.types';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
 import {
   GraphError,
@@ -76,13 +80,14 @@ class FakeGraph {
 }
 
 /** Reads a post by its caption: `answers` maps a caption to what the LLM says. */
-class FakeLlm implements Pick<LlmClient, 'extractProductsFromPost'> {
+class FakeLlm implements PostImportAgent {
+  readonly purpose = 'post_import' as const;
   answers = new Map<string, PostProducts | LlmFailure>();
   requests: PostExtractionRequest[] = [];
   /** Runs during a call, before it answers: a seller's click mid-post. */
   during: (() => Promise<void>) | null = null;
 
-  async extractProductsFromPost(request: PostExtractionRequest): Promise<LlmResult<PostProducts>> {
+  async run(request: PostExtractionRequest): Promise<LlmResult<PostProducts>> {
     this.requests.push(request);
     if (this.during) await this.during();
     const usage = {
@@ -221,7 +226,7 @@ describeDb('ImportRunner (app_runtime)', () => {
       } as unknown as NotificationsService,
       crypto,
       graph as unknown as MetaGraphClient,
-      llm as unknown as LlmClient,
+      llm,
     );
   });
 

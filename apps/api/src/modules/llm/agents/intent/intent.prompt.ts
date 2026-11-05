@@ -1,5 +1,5 @@
-import type { PromptPack } from './prompt-pack';
-import { DATA_RULE } from './transcript';
+import type { PromptPack } from '../../prompts/prompt-pack';
+import { DATA_RULE } from '../../prompts/transcript';
 
 export const classifyIntentSystem = (
   pack: PromptPack,

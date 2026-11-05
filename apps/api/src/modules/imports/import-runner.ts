@@ -25,7 +25,11 @@ import type { TenantScope, Transaction } from '../database/base.repository';
 import { DATABASE, type Database } from '../database/database.module';
 import type { ProductImportPostRow, ProductImportRow } from '../database/schema/index';
 import { withMerchant } from '../database/with-merchant';
-import { LLM, type LlmCallRecord, type LlmClient } from '../llm/llm.types';
+import {
+  POST_IMPORT_AGENT,
+  type PostImportAgent,
+} from '../llm/agents/post-import/post-import.agent';
+import type { LlmCallRecord } from '../llm/llm.types';
 import { FacebookPageRepository } from '../messenger/page/facebook-page.repository';
 import { META_GRAPH } from '../messenger/page/facebook-page.tokens';
 import {
@@ -127,7 +131,7 @@ export class ImportRunner {
     private readonly notifications: NotificationsService,
     private readonly crypto: CryptoService,
     @Inject(META_GRAPH) private readonly graph: MetaGraphClient | null,
-    @Inject(LLM) private readonly llm: LlmClient | null,
+    @Inject(POST_IMPORT_AGENT) private readonly postImport: PostImportAgent | null,
   ) {}
 
   /**
@@ -232,7 +236,7 @@ export class ImportRunner {
       }
       checked = checkPostProducts(parsed.data, context);
     } else {
-      const result = await this.requireLlm().extractProductsFromPost({
+      const result = await this.requirePostImport().run({
         caption: post.message,
         photos: stored.slice(0, LLM_PHOTOS_PER_POST).map((image) => image.url),
         currency: context.currency,
@@ -318,7 +322,7 @@ export class ImportRunner {
   ): Promise<{ status: RunEnd; errorCode?: ErrorCode }> {
     const context = await this.context(scope, importId);
     if (!context) return { status: 'failed', errorCode: 'FACEBOOK_PERMISSION_MISSING' };
-    if (!this.llm) return { status: 'failed', errorCode: 'IMPORT_NOT_AVAILABLE' };
+    if (!this.postImport) return { status: 'failed', errorCode: 'IMPORT_NOT_AVAILABLE' };
     const graph = this.requireGraph();
 
     for (;;) {
@@ -403,7 +407,7 @@ export class ImportRunner {
     }
     const stored = await this.photos.store(scope.merchantId, read);
 
-    const result = await this.requireLlm().extractProductsFromPost({
+    const result = await this.requirePostImport().run({
       caption: post.message,
       photos: stored.slice(0, LLM_PHOTOS_PER_POST).map((image) => image.url),
       currency: context.currency,
@@ -710,9 +714,9 @@ export class ImportRunner {
     return this.graph;
   }
 
-  private requireLlm(): LlmClient {
-    if (!this.llm) throw new Error('An import job ran without an LLM');
-    return this.llm;
+  private requirePostImport(): PostImportAgent {
+    if (!this.postImport) throw new Error('An import job ran without an LLM');
+    return this.postImport;
   }
 }
 

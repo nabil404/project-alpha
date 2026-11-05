@@ -17,14 +17,21 @@ import { defaultMerchantSettings } from '../../settings/general-settings.service
 import type { TenantScope } from '../../database/base.repository';
 import { DATABASE, type Database } from '../../database/database.module';
 import { withMerchant } from '../../database/with-merchant';
+import { INTENT_AGENT, type IntentAgent } from '../../llm/agents/intent/intent.agent';
 import {
-  LLM,
-  type ChatLine,
+  ORDER_EXTRACTION_AGENT,
   type ExtractionContext,
-  type LlmCallRecord,
-  type LlmClient,
-  type LlmResult,
-} from '../../llm/llm.types';
+  type OrderExtractionAgent,
+} from '../../llm/agents/order-extraction/order-extraction.agent';
+import {
+  PHOTO_MATCH_AGENT,
+  type PhotoMatchAgent,
+} from '../../llm/agents/photo-match/photo-match.agent';
+import {
+  REPLY_PHRASING_AGENT,
+  type ReplyPhrasingAgent,
+} from '../../llm/agents/reply-phrasing/reply-phrasing.agent';
+import type { ChatLine, LlmCallRecord, LlmResult } from '../../llm/llm.types';
 import { FacebookPageRepository } from '../../messenger/page/facebook-page.repository';
 import {
   ProductPostRepository,
@@ -114,7 +121,10 @@ export class AssistantTurnService {
     private readonly deliveryCharges: DeliveryChargesRepository,
     private readonly products: ProductsService,
     private readonly llmCalls: LlmCallRepository,
-    @Inject(LLM) private readonly llm: LlmClient | null,
+    @Inject(INTENT_AGENT) private readonly intent: IntentAgent | null,
+    @Inject(ORDER_EXTRACTION_AGENT) private readonly extraction: OrderExtractionAgent | null,
+    @Inject(REPLY_PHRASING_AGENT) private readonly phrasing: ReplyPhrasingAgent | null,
+    @Inject(PHOTO_MATCH_AGENT) private readonly photoMatch: PhotoMatchAgent | null,
     private readonly outbound: OutboundMessageSender,
     private readonly notifications: NotificationsService,
     private readonly confirmation: OrderConfirmationService,
@@ -440,7 +450,7 @@ export class AssistantTurnService {
     }
     const photos = urls.slice(0, MAX_PHOTOS_PER_TURN);
     if (photos.length === 0) return decidePhoto(turn, { kind: 'unreadable' });
-    if (!this.llm) return handOff(turn.slots, 'llm_failed');
+    if (!this.photoMatch) return handOff(turn.slots, 'llm_failed');
     const since = new Date(Date.now() - 24 * 3_600 * 1_000);
     const made = await withMerchant(this.db, scope.merchantId, (tx) =>
       this.llmCalls.countSince(tx, scope, conversationId, 'vision_match', since),
@@ -449,7 +459,7 @@ export class AssistantTurnService {
     const shortlist = photoShortlist(turn.catalog, burst.words);
     if (shortlist.length === 0) return decidePhoto(turn, { kind: 'matched', productIds: [] });
     const matched = record(
-      await this.llm.matchProductPhoto(photoMatchRequest(photos, shortlist, burst.words)),
+      await this.photoMatch.run(photoMatchRequest(photos, shortlist, burst.words)),
       calls,
     );
     if (matched === 'failed') return handOff(turn.slots, 'llm_failed');
@@ -464,19 +474,23 @@ export class AssistantTurnService {
     history: ChatLine[],
     calls: LlmCallRecord[],
   ): Promise<TurnDecision> {
-    const llm = this.llm;
-    if (!llm) {
+    const { intent, extraction } = this;
+    if (!intent || !extraction) {
       return decideTurn({
         ...turn,
         trigger: { kind: 'message', classified: 'failed', extracted: 'skipped' },
       });
     }
     const pack = promptPackFor(turn.country);
-    const classified = record(await llm.classifyIntent(history, pack), calls);
+    const classified = record(await intent.run({ history, pack }), calls);
     const extracted =
       classified !== 'failed' && shouldExtract(turn.state, classified.intent)
         ? record(
-            await llm.extractOrder(history, extractionContext(turn.slots, turn.catalog), pack),
+            await extraction.run({
+              history,
+              context: extractionContext(turn.slots, turn.catalog),
+              pack,
+            }),
             calls,
           )
         : 'skipped';
@@ -495,9 +509,13 @@ export class AssistantTurnService {
     calls: LlmCallRecord[],
   ): Promise<string> {
     const fallback = fallbackText(reply, language);
-    if (reply.kind !== 'ask_slot' || reply.offeredName !== undefined || !this.llm) return fallback;
+    const { phrasing } = this;
+    if (reply.kind !== 'ask_slot' || reply.offeredName !== undefined || !phrasing) return fallback;
     const phrased = record(
-      await this.llm.phraseReply(phraseRequestFor(reply, voice), history.slice(-PHRASE_HISTORY)),
+      await phrasing.run({
+        request: phraseRequestFor(reply, voice),
+        history: history.slice(-PHRASE_HISTORY),
+      }),
       calls,
     );
     return phrased !== 'failed' && checkReply(phrased, reply.facts).ok ? phrased.trim() : fallback;

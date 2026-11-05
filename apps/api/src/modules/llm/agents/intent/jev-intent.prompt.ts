@@ -1,7 +1,7 @@
 import type { ChoiceQuestion } from '@typesafe-ai/sdk';
 import type { CustomerIntent } from '@app/shared';
-import type { ChatLine } from '../llm.types';
-import type { PromptPack } from './prompt-pack';
+import type { ChatLine } from '../../llm.types';
+import type { PromptPack } from '../../prompts/prompt-pack';
 
 /**
  * Jev's state for intent: the customer's newest messages apart from the chat

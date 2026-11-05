@@ -1,6 +1,6 @@
 import type { FilePart, TextPart } from 'ai';
-import type { PhotoMatchRequest } from '../llm.types';
-import { asData } from './transcript';
+import type { PhotoMatchRequest } from './photo-match.agent';
+import { asData } from '../../prompts/transcript';
 
 export const MATCH_PRODUCT_PHOTO_SYSTEM = `You match a customer's photo to an online shop's products. The customer sent the photo in a Facebook Messenger chat, usually to ask "do you have this?". It may be a phone photo of the product, a photo of someone wearing or holding it, or a screenshot of a post from this or another shop.
 

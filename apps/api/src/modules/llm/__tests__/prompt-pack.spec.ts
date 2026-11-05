@@ -1,7 +1,7 @@
-import { classifyIntentSystem } from '../prompts/classify-intent';
-import { extractOrderSystem } from '../prompts/extract-order';
-import { extractProductsFromPostSystem } from '../prompts/extract-products-from-post';
-import { phraseReplySystem } from '../prompts/phrase-reply';
+import { classifyIntentSystem } from '../agents/intent/intent.prompt';
+import { extractOrderSystem } from '../agents/order-extraction/order-extraction.prompt';
+import { extractProductsFromPostSystem } from '../agents/post-import/post-import.prompt';
+import { phraseReplySystem } from '../agents/reply-phrasing/reply-phrasing.prompt';
 import { promptPackFor, type PromptPack } from '../prompts/prompt-pack';
 
 const systems = (pack: PromptPack): string[] => [

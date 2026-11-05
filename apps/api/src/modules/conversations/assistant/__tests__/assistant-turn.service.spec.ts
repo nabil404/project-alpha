@@ -30,15 +30,10 @@ import {
   seedFacebookPage,
   seedMessage,
 } from '../../../database/__tests__/conversation-seeds';
-import type {
-  ChatLine,
-  ExtractionContext,
-  LlmClient,
-  LlmPurpose,
-  LlmResult,
-  PhotoMatchRequest,
-  PhraseRequest,
-} from '../../../llm/llm.types';
+import type { ExtractionContext } from '../../../llm/agents/order-extraction/order-extraction.agent';
+import type { PhotoMatchRequest } from '../../../llm/agents/photo-match/photo-match.agent';
+import type { PhraseRequest } from '../../../llm/agents/reply-phrasing/reply-phrasing.agent';
+import type { ChatLine, LlmPurpose, LlmResult } from '../../../llm/llm.types';
 import { FacebookPageRepository } from '../../../messenger/page/facebook-page.repository';
 import { ProductPostRepository } from '../../../messenger/posts/product-post.repository';
 import type { SharedLink } from '../../../queue/queue.constants';
@@ -107,7 +102,8 @@ const NOTHING: ExtractedOrder = {
 };
 let nextMid = 1;
 
-class FakeLlm implements LlmClient {
+/** Scripted answers for the four agents a turn calls, and what each was asked. */
+class FakeLlm {
   intent: LlmResult<IntentResult> = ok({ intent: 'browse', confidence: 0.9 }, 'classify');
   extraction: LlmResult<ExtractedOrder> = ok(NOTHING, 'extract');
   phrase: LlmResult<string> = ok('Which product would you like?', 'phrase');
@@ -115,19 +111,19 @@ class FakeLlm implements LlmClient {
   extractContexts: ExtractionContext[] = [];
   onClassify: () => Promise<void> = async () => undefined;
   histories: ChatLine[][] = [];
-  async classifyIntent(history: ChatLine[]) {
+  async classifyIntent({ history }: { history: ChatLine[] }) {
     this.histories.push(history);
     this.calls.push('classify');
     await this.onClassify();
     return this.intent;
   }
-  async extractOrder(_history: ChatLine[], context: ExtractionContext) {
+  async extractOrder({ context }: { context: ExtractionContext }) {
     this.extractContexts.push(context);
     this.calls.push('extract');
     return this.extraction;
   }
   phraseRequests: PhraseRequest[] = [];
-  async phraseReply(request: PhraseRequest) {
+  async phraseReply({ request }: { request: PhraseRequest }) {
     this.phraseRequests.push(request);
     this.calls.push('phrase');
     return this.phrase;
@@ -141,8 +137,14 @@ class FakeLlm implements LlmClient {
     return this.photo(request);
   }
 
-  extractProductsFromPost(): never {
-    throw new Error('The assistant never imports posts');
+  /** The fake as the turn service's four agents. */
+  agents() {
+    return {
+      intent: { purpose: 'classify' as const, run: this.classifyIntent.bind(this) },
+      extraction: { purpose: 'extract' as const, run: this.extractOrder.bind(this) },
+      phrasing: { purpose: 'phrase' as const, run: this.phraseReply.bind(this) },
+      photoMatch: { purpose: 'vision_match' as const, run: this.matchProductPhoto.bind(this) },
+    };
   }
 }
 
@@ -196,7 +198,8 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     },
   } as unknown as MetaGraphClient;
 
-  const service = (client: LlmClient | null = llm) => {
+  const service = (client: FakeLlm | null = llm) => {
+    const agents = client?.agents();
     const publisher = { publish: async () => undefined } as unknown as ConversationEventsPublisher;
     return new AssistantTurnService(
       runtime.db,
@@ -207,7 +210,10 @@ describeDb('AssistantTurnService (app_runtime)', () => {
       new DeliveryChargesRepository(),
       productsService(runtime.db),
       new LlmCallRepository(),
-      client,
+      agents?.intent ?? null,
+      agents?.extraction ?? null,
+      agents?.phrasing ?? null,
+      agents?.photoMatch ?? null,
       new OutboundMessageSender(
         runtime.db,
         new ConversationRepository(),

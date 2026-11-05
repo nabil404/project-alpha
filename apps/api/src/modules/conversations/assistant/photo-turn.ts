@@ -1,5 +1,5 @@
 import { MAX_PHOTO_MATCHES, type PhotoMatch, type SellableProduct } from '@app/shared';
-import type { PhotoMatchRequest } from '../../llm/llm.types';
+import type { PhotoMatchRequest } from '../../llm/agents/photo-match/photo-match.agent';
 import type { MessageRow } from '../../database/schema/index';
 import { isEmojiOnly } from '../message-content';
 import { matchProduct, type CatalogView, type ProductMatch } from './catalog-match';
