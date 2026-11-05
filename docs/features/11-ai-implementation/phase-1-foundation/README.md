@@ -98,7 +98,7 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   `conversation-machine.ts`, `reply-intent.ts`, `reply-check.ts`,
   `assistant-fallbacks.ts` and `assistant.module.ts`, imported by
   `src/worker.module.ts`.
-- **Code decides, the LLM phrases.** `decideTurn` returns a typed intent, not
+- **The LLM reads and writes words; code owns every decision and every fact.** `decideTurn` returns a typed intent, not
   text: `ask_slot`, `summary` or `handoff`. Phase 1 asked product, quantity,
   name, phone, address; phase 2 added `variant` after product.
   `ReplyPhrasingAgent` (routing model) writes the intent in the customer's language,
