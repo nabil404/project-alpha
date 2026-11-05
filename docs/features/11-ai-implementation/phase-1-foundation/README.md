@@ -38,7 +38,9 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
    [route table](../../../architecture/ai.md#the-route-table) (`turn-routes.ts`)
    allows. That is every intent except `complain` and `request_human` while
    `collecting_details` or `awaiting_confirmation`, and only `order` or
-   `edit_order` while `browsing` or `abandoned`.
+   `edit_order` while `browsing` or `abandoned`. In `collecting_details` and
+   `awaiting_confirmation` the two run in parallel; a complaint there
+   discards the extraction, still recorded in `llm_call`.
 4. **Decide.** `decideTurn` in `conversation-machine.ts` is pure.
 5. **Write**, in a short transaction: lock the conversation, write the
    `llm_call` rows, repeat step 2's checks plus the 24-hour window, then
@@ -149,6 +151,10 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
 
 - **Extraction runs by state**, not only on `order` and `edit_order`, because
   a bare answer ("01812…", "Rahim") mid-flow is often classified `other`.
+- **Classify and extract run in parallel in an order.** Every route there
+  uses the extraction or hands off before the merge, so waiting for the
+  classifier only adds latency. The cost is one discarded extraction per
+  complaint or human request mid-order.
 - **`browse` and `other` ask the next slot; `ask_question` hands off**, since
   nothing answers delivery, payment or catalog questions from facts yet.
 - **The phone is strict.** `parseCustomerPhone` accepts only a number it can
@@ -221,6 +227,9 @@ In `conversations/assistant/__tests__/` unless noted.
 - `llm/agents/intent/__tests__/jev-intent.agent.spec.ts`: Jev's state and question;
   the chosen intent's probability is the confidence; timeout and provider
   errors give `ok: false`.
+- `assistant-turn.service.spec.ts`: in an order, extraction starts before the
+  classifier answers; a complaint there hands off as `complain` though
+  extraction failed, and both calls are recorded.
 - `assistant-turn.service.spec.ts`: an LLM failure hands off with a reply; a
   paused chat or stale trigger makes no LLM call; a takeover mid-turn is
   caught by the step 5 re-check; a Graph failure gives `failed` and

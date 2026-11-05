@@ -75,7 +75,7 @@ import { outgoingFor } from './outgoing';
 import { phraseRequestFor, phraseVoice, type PhraseVoice } from './reply-phrasing';
 import { promptPackFor } from '../../llm/prompts/prompt-pack';
 import { askedAt, staleReply, turnGate, type TurnGate } from './turn-gate';
-import { routeFor } from './turn-routes';
+import { extractsWhateverIntent, routeFor } from './turn-routes';
 import { decideNonText } from './non-text-turn';
 import {
   matchedProductIds,
@@ -482,17 +482,23 @@ export class AssistantTurnService {
       });
     }
     const pack = promptPackFor(turn.country);
+    const extract = () =>
+      extraction.run({ history, context: extractionContext(turn.slots, turn.catalog), pack });
+    if (extractsWhateverIntent(turn.state)) {
+      // Every route here extracts or ignores it, so extraction need not wait for the classifier.
+      // A complaint discards it; its call is still billed and recorded.
+      const [intentResult, extractResult] = await Promise.all([
+        intent.run({ history, pack }),
+        extract(),
+      ]);
+      const classified = record(intentResult, calls);
+      const extracted = record(extractResult, calls);
+      return decideTurn({ ...turn, trigger: { kind: 'message', classified, extracted } });
+    }
     const classified = record(await intent.run({ history, pack }), calls);
     const extracted =
       classified !== 'failed' && routeFor(turn.state, classified.intent).extract
-        ? record(
-            await extraction.run({
-              history,
-              context: extractionContext(turn.slots, turn.catalog),
-              pack,
-            }),
-            calls,
-          )
+        ? record(await extract(), calls)
         : 'skipped';
     return decideTurn({ ...turn, trigger: { kind: 'message', classified, extracted } });
   }

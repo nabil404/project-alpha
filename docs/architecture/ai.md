@@ -824,7 +824,8 @@ missing slot or sends the summary. A hand-off `before_merge` (`complain`,
 low-confidence extraction; one `after_merge` (`question`) keeps the extracted
 details, so it still hands off as `llm_failed` or `low_confidence` first.
 Phrasing is not in the table: it follows the reply kind (`ask_slot`), not the
-intent. A new spoke is a new `RouteThen` kind and a changed row.
+intent. In a state where every route extracts or hands off before the merge,
+the turn service starts extraction beside the classifier. A new spoke is a new `RouteThen` kind and a changed row.
 
 ### Paths per entry point
 
@@ -872,20 +873,20 @@ flowchart TD
 
 The table says what each entry point stores and gets back:
 
-| Entry point (trigger)                                                                 | Stored as                                                        | LLM calls                                                              | Reply                                                                     |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Typed text message                                                                    | `customer-message`, kind `text`                                  | classify, then extract if the route says so, then phrase if `ask_slot` | Phrased ask, fixed summary card, or fixed hand-off                        |
-| Typed message carrying a product referral (`m.me` link or mapped ad, with words)      | payload `ref-typed:product:<id>`                                 | As a typed message, after the product is added                         | Product photo, then the reply; hand-off without LLM at 10 items           |
-| Shared post or ad, with words beside it, that resolves to a product                   | message with `links`                                             | As a typed message, after the product is added                         | As above                                                                  |
-| Shared post that does not resolve to one product                                      | message with `links`                                             | None                                                                   | Fixed "Do you mean …?" with quick replies, or "type the product's name"   |
-| Photo or screenshot, before the summary card                                          | kind `image`, our copy's key in `details`                        | `PhotoMatchAgent`, once per turn                                       | Cover and "Is it this one?" with Yes / No, a carousel, or "type its name" |
-| **No** to a photo's one match                                                         | payload `photo:no`                                               | None                                                                   | Fixed "type its name"; the next miss hands off                            |
-| Get Started, Browse, a category, a carousel **Choose**, a bare referral               | payload `start`, `browse…`, `choose:…`, `ref:…`                  | None                                                                   | Fixed categories, carousel, or variant/quantity ask                       |
-| Menu: My last order / Talk to a person                                                | payload `menu:last-order` / `menu:human`                         | None                                                                   | Fixed last-order line / hand-off                                          |
-| Quick-reply pick of an offered product or variant, or the offered profile name        | payload `pick:product:<id>`, `pick:variant:<id>`, `name:profile` | None                                                                   | Fixed next ask, or the summary card                                       |
-| Summary card **Confirm** / **Change**                                                 | payload `confirm:<conversation>:<revision>` / `change:…`         | None                                                                   | `OrderConfirmationService`: order reference / reopened collection         |
-| Sticker, emoji-only text, reaction, location, video, audio, file; a photo on the card | kind `sticker`, `reaction`, `location`, …                        | None (`decideNonText`)                                                 | Fixed notice, or silent for a reaction that asks nothing                  |
-| Seller's own message from Business Suite (`page-echo`)                                | sender `seller`                                                  | None, and no turn                                                      | The bot pauses for that chat                                              |
+| Entry point (trigger)                                                                 | Stored as                                                        | LLM calls                                                                 | Reply                                                                     |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Typed text message                                                                    | `customer-message`, kind `text`                                  | classify and extract (in parallel in an order), then phrase if `ask_slot` | Phrased ask, fixed summary card, or fixed hand-off                        |
+| Typed message carrying a product referral (`m.me` link or mapped ad, with words)      | payload `ref-typed:product:<id>`                                 | As a typed message, after the product is added                            | Product photo, then the reply; hand-off without LLM at 10 items           |
+| Shared post or ad, with words beside it, that resolves to a product                   | message with `links`                                             | As a typed message, after the product is added                            | As above                                                                  |
+| Shared post that does not resolve to one product                                      | message with `links`                                             | None                                                                      | Fixed "Do you mean …?" with quick replies, or "type the product's name"   |
+| Photo or screenshot, before the summary card                                          | kind `image`, our copy's key in `details`                        | `PhotoMatchAgent`, once per turn                                          | Cover and "Is it this one?" with Yes / No, a carousel, or "type its name" |
+| **No** to a photo's one match                                                         | payload `photo:no`                                               | None                                                                      | Fixed "type its name"; the next miss hands off                            |
+| Get Started, Browse, a category, a carousel **Choose**, a bare referral               | payload `start`, `browse…`, `choose:…`, `ref:…`                  | None                                                                      | Fixed categories, carousel, or variant/quantity ask                       |
+| Menu: My last order / Talk to a person                                                | payload `menu:last-order` / `menu:human`                         | None                                                                      | Fixed last-order line / hand-off                                          |
+| Quick-reply pick of an offered product or variant, or the offered profile name        | payload `pick:product:<id>`, `pick:variant:<id>`, `name:profile` | None                                                                      | Fixed next ask, or the summary card                                       |
+| Summary card **Confirm** / **Change**                                                 | payload `confirm:<conversation>:<revision>` / `change:…`         | None                                                                      | `OrderConfirmationService`: order reference / reopened collection         |
+| Sticker, emoji-only text, reaction, location, video, audio, file; a photo on the card | kind `sticker`, `reaction`, `location`, …                        | None (`decideNonText`)                                                    | Fixed notice, or silent for a reaction that asks nothing                  |
+| Seller's own message from Business Suite (`page-echo`)                                | sender `seller`                                                  | None, and no turn                                                         | The bot pauses for that chat                                              |
 
 ### Request / response cycle: a typed message
 
@@ -910,10 +911,19 @@ sequenceDiagram
         DB-->>Turn: rows, turnGate is go
     end
     Note over Turn,LLM: No transaction open from here to the write
-    Turn->>LLM: IntentAgent.run(transcript)
-    LLM-->>Turn: intent order, confidence 0.94
-    Turn->>LLM: OrderExtractionAgent.run(Already collected + transcript)
-    LLM-->>Turn: item katan saree / lal / 2, details null, confidence 0.9
+    alt in an order: collecting_details or awaiting_confirmation
+        par
+            Turn->>LLM: IntentAgent.run(transcript)
+        and
+            Turn->>LLM: OrderExtractionAgent.run(Already collected + transcript)
+        end
+        LLM-->>Turn: intent and extraction, both awaited
+    else outside an order
+        Turn->>LLM: IntentAgent.run(transcript)
+        LLM-->>Turn: intent order, confidence 0.94
+        Turn->>LLM: OrderExtractionAgent.run(Already collected + transcript), if the route extracts
+        LLM-->>Turn: item katan saree / lal / 2, details null, confidence 0.9
+    end
     Turn->>Turn: decideTurn: merge, match Katan Saree / Red, next missing slot
     alt reply is ask_slot
         Turn->>LLM: ReplyPhrasingAgent.run(instruction, facts, last 6 lines)
@@ -937,8 +947,13 @@ sequenceDiagram
     end
 ```
 
-A turn makes at most three LLM calls, one after another, all outside a
-transaction; a photo turn makes one, `PhotoMatchAgent`. Without `LLM_API_KEY` the ingest queues no turn at all. If the
+A turn makes at most three LLM calls, all outside a transaction. In an order
+(`collecting_details`, `awaiting_confirmation`) every route either extracts
+or hands off before the merge (`extractsWhateverIntent`), so classify and
+extract run in parallel and the turn waits for the slower one, not their sum.
+A `complain` or `request_human` there discards the extraction, failed or
+not; its call is still billed and gets an `llm_call` row. Outside an order
+extraction waits for the classifier and runs only when the route says so; a photo turn makes one, `PhotoMatchAgent`. Without `LLM_API_KEY` the ingest queues no turn at all. If the
 agents are absent at run time anyway, `decideTurn` treats that as a failed
 classify and hands off, a photo turn hands off as `llm_failed`, and an ask
 goes out as its fixed sentence.
@@ -992,26 +1007,26 @@ minutes later.
 
 ## Tests
 
-| Spec                                                      | Covers                                                                                                    |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `llm/runtime/__tests__/run-llm-call.spec.ts`              | Failure mapping, the second Zod parse, usage on failure, the log line, telemetry off                      |
-| `llm/agents/*/__tests__/*.agent.spec.ts`                  | Each agent's model, purpose and prompt pack; the exact prompt it sends; photos sent as links              |
-| `llm/__tests__/llm.module.spec.ts`                        | One agent per token on its model tier, Jev when chosen, none without `LLM_API_KEY`                        |
-| `llm/__tests__/prompt-pack.spec.ts`                       | `promptPackFor` per country; Bangla only in Bangladesh's prompts; the data rule last                      |
-| `llm/__tests__/transcript.spec.ts`                        | One line per message: line breaks folded so a message cannot forge a speaker; `<` swapped                 |
-| `llm/agents/intent/__tests__/jev-intent.agent.spec.ts`    | Jev's state, the chosen option's probability as confidence, timeout and errors as failures                |
-| `llm/__tests__/intent.live-eval.spec.ts`                  | 42 labelled Bangla, Banglish and English chats against each provider with a key; opt-in: `LLM_EVAL=1`     |
-| `assistant/__tests__/photo-turn.spec.ts`                  | The burst's photos, the shortlist, numbers not shown discarded                                            |
-| `photos/__tests__/photo-download.spec.ts`                 | Meta hosts only, redirects, size cap, timeout                                                             |
-| `assistant/__tests__/reply-check.spec.ts`                 | Numbers, links, length                                                                                    |
-| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, hand-off rules                                                                              |
-| `assistant/__tests__/turn-routes.spec.ts`                 | every state × intent route, and that it matches the old extraction gate                                   |
-| `assistant/__tests__/assistant-turn.service.spec.ts` (DB) | The turn end to end with fake agents; non-text messages never create an order; photo matching             |
-| `assistant/__tests__/conversation-simulator.spec.ts`      | Multi-turn conversations through the machine                                                              |
-| `assistant/__tests__/catalog-match.eval.spec.ts`          | ≥ 90% product identification on the eval set                                                              |
-| `assistant/__tests__/catalog-match.live-eval.spec.ts`     | The same against the real model; opt-in: `LLM_EVAL=1` with `LLM_API_KEY`                                  |
-| `imports/__tests__/post-drafts.spec.ts`                   | `checkPostProducts`: names, aliases, option limits, prices, categories                                    |
-| `imports/__tests__/import-runner.spec.ts` (DB)            | A run end to end with a fake Graph and `PostImportAgent`: skips, matches, merges, failures, Import anyway |
+| Spec                                                      | Covers                                                                                                                                      |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `llm/runtime/__tests__/run-llm-call.spec.ts`              | Failure mapping, the second Zod parse, usage on failure, the log line, telemetry off                                                        |
+| `llm/agents/*/__tests__/*.agent.spec.ts`                  | Each agent's model, purpose and prompt pack; the exact prompt it sends; photos sent as links                                                |
+| `llm/__tests__/llm.module.spec.ts`                        | One agent per token on its model tier, Jev when chosen, none without `LLM_API_KEY`                                                          |
+| `llm/__tests__/prompt-pack.spec.ts`                       | `promptPackFor` per country; Bangla only in Bangladesh's prompts; the data rule last                                                        |
+| `llm/__tests__/transcript.spec.ts`                        | One line per message: line breaks folded so a message cannot forge a speaker; `<` swapped                                                   |
+| `llm/agents/intent/__tests__/jev-intent.agent.spec.ts`    | Jev's state, the chosen option's probability as confidence, timeout and errors as failures                                                  |
+| `llm/__tests__/intent.live-eval.spec.ts`                  | 42 labelled Bangla, Banglish and English chats against each provider with a key; opt-in: `LLM_EVAL=1`                                       |
+| `assistant/__tests__/photo-turn.spec.ts`                  | The burst's photos, the shortlist, numbers not shown discarded                                                                              |
+| `photos/__tests__/photo-download.spec.ts`                 | Meta hosts only, redirects, size cap, timeout                                                                                               |
+| `assistant/__tests__/reply-check.spec.ts`                 | Numbers, links, length                                                                                                                      |
+| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, hand-off rules                                                                                                                |
+| `assistant/__tests__/turn-routes.spec.ts`                 | every state × intent route, and that it matches the old extraction gate                                                                     |
+| `assistant/__tests__/assistant-turn.service.spec.ts` (DB) | The turn end to end with fake agents; classify and extract in parallel in an order; non-text messages never create an order; photo matching |
+| `assistant/__tests__/conversation-simulator.spec.ts`      | Multi-turn conversations through the machine                                                                                                |
+| `assistant/__tests__/catalog-match.eval.spec.ts`          | ≥ 90% product identification on the eval set                                                                                                |
+| `assistant/__tests__/catalog-match.live-eval.spec.ts`     | The same against the real model; opt-in: `LLM_EVAL=1` with `LLM_API_KEY`                                                                    |
+| `imports/__tests__/post-drafts.spec.ts`                   | `checkPostProducts`: names, aliases, option limits, prices, categories                                                                      |
+| `imports/__tests__/import-runner.spec.ts` (DB)            | A run end to end with a fake Graph and `PostImportAgent`: skips, matches, merges, failures, Import anyway                                   |
 
 The live eval runs only on request:
 
