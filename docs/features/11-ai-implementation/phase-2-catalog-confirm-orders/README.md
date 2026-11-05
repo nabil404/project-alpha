@@ -302,8 +302,9 @@ cycle.
   `awaiting_seller`, as in phase 1; a change sends a new card.
 - **The card's length is counted in code points**, stricter than graphemes,
   to match the Graph client's cut.
-- **`ask_question` still hands off.** Answering delivery, payment and catalog
-  questions is unplanned.
+- **`ask_question` handed off in this phase.** Delivery, payment and catalog
+  questions are now answered from the shop's facts
+  ([ai.md](../../../architecture/ai.md#shopansweragent)).
 - **The photo is not stored.** It is sent before the reply, best-effort, and
   its echo is skipped as our own.
 

@@ -13,7 +13,10 @@ are matched in code, the summary card's Confirm button creates one
 Started, the menu, a product's `m.me` link or QR code, a mapped
 click-to-Messenger ad, or a shared post. Stickers, reactions, edits and
 locations are handled without confirming anything, and a customer's photo is
-matched to the catalog and offered for them to confirm. The live runs of
+matched to the catalog and offered for them to confirm. A question is
+answered from the shop's delivery settings, notes and catalog when they cover
+it, and handed to the seller otherwise
+([ai.md](../../architecture/ai.md#shopansweragent)). The live runs of
 phases 1 to 6 on the dev Page are still to be done by the maintainer. Phases 7
 to 9 are not started.
 [Progress](progress.md) tracks each phase's "Done when" list and App Review.
