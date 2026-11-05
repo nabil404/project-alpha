@@ -607,6 +607,79 @@ describeDb('AssistantTurnService (app_runtime)', () => {
     });
   });
 
+  it('starts extraction beside the classifier in an order', async () => {
+    let extractStartedFirst = false;
+    llm.onClassify = async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      extractStartedFirst = llm.calls.includes('extract');
+    };
+    llm.intent = ok({ intent: 'other', confidence: 0.9 }, 'classify');
+    const { convo, job } = await thread(t.merchantA, {
+      state: 'collecting_details',
+      collectedSlots: { items: [{ productQuery: 'red saree' }] },
+    });
+
+    await service().run(job);
+
+    expect(extractStartedFirst).toBe(true);
+    expect((await llmCallsOf(convo.id)).map((call) => call.purpose)).toEqual(
+      expect.arrayContaining(['classify', 'extract']),
+    );
+  });
+
+  it('hands off a complaint in an order as complain, though extraction failed', async () => {
+    llm.intent = ok({ intent: 'complain', confidence: 0.9 }, 'classify');
+    llm.extraction = { ok: false, reason: 'timeout', usage: llm.extraction.usage };
+    const { convo, job } = await thread(t.merchantA, {
+      state: 'collecting_details',
+      collectedSlots: { items: [{ productQuery: 'red saree' }] },
+    });
+
+    await service().run(job);
+
+    expect(llm.calls).toEqual(['classify', 'extract']);
+    expect(await conversationRow(convo.id)).toMatchObject({
+      state: 'handed_off',
+      handoffReason: 'complain',
+    });
+    expect((await llmCallsOf(convo.id)).map((call) => [call.purpose, call.outcome])).toEqual(
+      expect.arrayContaining([
+        ['classify', 'ok'],
+        ['extract', 'timeout'],
+      ]),
+    );
+  });
+
+  it('waits for the classifier while browsing, and extracts only an order', async () => {
+    let extractStartedFirst = false;
+    llm.onClassify = async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      extractStartedFirst = llm.calls.includes('extract');
+    };
+    const { job } = await thread(t.merchantA);
+
+    await service().run(job);
+
+    expect(extractStartedFirst).toBe(false);
+    expect(llm.calls).toEqual(['classify', 'phrase']);
+  });
+
+  it('hands off as llm_failed when the classifier fails in an order, whatever extraction said', async () => {
+    llm.intent = { ok: false, reason: 'provider_error', usage: llm.intent.usage };
+    llm.extraction = ok({ ...NOTHING, customerName: 'Rahim' }, 'extract');
+    const { convo, job } = await thread(t.merchantA, {
+      state: 'awaiting_confirmation',
+      collectedSlots: { items: [{ productQuery: 'red saree' }] },
+    });
+
+    await service().run(job);
+
+    expect(await conversationRow(convo.id)).toMatchObject({
+      state: 'handed_off',
+      handoffReason: 'llm_failed',
+    });
+  });
+
   it('does nothing for a conversation on a Page the shop no longer has', async () => {
     const { job } = await thread(t.merchantA, { facebookPageId: 'old-page' });
     await expect(service().run(job)).resolves.toBe('no_page');

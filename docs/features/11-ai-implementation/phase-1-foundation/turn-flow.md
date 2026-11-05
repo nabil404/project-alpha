@@ -23,9 +23,17 @@ sequenceDiagram
     alt paused, handed_off, confirmed, stale trigger, or already answered
         Turn-->>Queue: stop, no LLM call
     else
-        Turn->>LLM: IntentAgent, routing model, no transaction open
-        opt routeFor(state, intent).extract
-            Turn->>LLM: OrderExtractionAgent, extraction model
+        alt in an order (extractsWhateverIntent)
+            par
+                Turn->>LLM: IntentAgent, routing model, no transaction open
+            and
+                Turn->>LLM: OrderExtractionAgent, extraction model
+            end
+        else outside an order
+            Turn->>LLM: IntentAgent, routing model, no transaction open
+            opt routeFor(state, intent).extract
+                Turn->>LLM: OrderExtractionAgent, extraction model
+            end
         end
         Turn->>Turn: decideTurn, pure: ask_slot, summary or handoff
         opt ask_slot or summary
