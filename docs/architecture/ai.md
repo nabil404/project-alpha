@@ -9,15 +9,21 @@ update this page in the same change.
 
 ## Code decides, the LLM phrases
 
-The LLM does five jobs and nothing else:
+The LLM does five jobs and nothing else. Each job is one **agent**: one
+prompt, one output schema, one model tier and one `purpose` on `llm_call`
+([The agent contract](#the-agent-contract)).
 
-| Call                      | Job                                                                    | Returns                  |
-| ------------------------- | ---------------------------------------------------------------------- | ------------------------ |
-| `classifyIntent`          | Name what the customer's latest message is about                       | `{ intent, confidence }` |
-| `extractOrder`            | Copy out the customer's raw words for items and details                | `ExtractedOrder` JSON    |
-| `phraseReply`             | Write one or two sentences that say what code told it to say           | Plain text               |
-| `matchProductPhoto`       | Say which numbered candidates a customer's photo shows                 | `{ matches }` JSON       |
-| `extractProductsFromPost` | Read one of the Page's posts into the products it sells, for an import | `PostProducts` JSON      |
+| Agent                  | Job                                                                    | Returns                  |
+| ---------------------- | ---------------------------------------------------------------------- | ------------------------ |
+| `IntentAgent`          | Name what the customer's latest message is about                       | `{ intent, confidence }` |
+| `OrderExtractionAgent` | Copy out the customer's raw words for items and details                | `ExtractedOrder` JSON    |
+| `ReplyPhrasingAgent`   | Write one or two sentences that say what code told it to say           | Plain text               |
+| `PhotoMatchAgent`      | Say which numbered candidates a customer's photo shows                 | `{ matches }` JSON       |
+| `PostImportAgent`      | Read one of the Page's posts into the products it sells, for an import | `PostProducts` JSON      |
+
+An agent is not a tool-calling loop. It never chooses what happens next,
+never sees a catalog id and never confirms anything: code calls it, checks
+what it returned and decides.
 
 Everything else is code: matching words to catalog products and variants
 (`catalog-match.ts`), filling slots and moving the conversation state
@@ -29,7 +35,7 @@ writes a price, and never confirms anything.
 Three checks keep model output away from prices and orders:
 
 - **Code validates output twice.** The AI SDK asks the provider for JSON that
-  fits the Zod schema, then `AiSdkLlmClient` parses the result with Zod again,
+  fits the Zod schema, then `generateStructured` parses the result with Zod again,
   because the provider's strict mode drops bounds such as `confidence ≤ 1`.
 - **Code checks every phrased reply.** `checkReply` (`reply-check.ts`) rejects
   a reply that is empty, longer than 500 graphemes, carries a link, or
@@ -43,8 +49,8 @@ flowchart TD
     chat(["🌐 Customer's typed words<br/>last 20 messages as a transcript"]) --> classify
 
     subgraph understand ["LLM: understand"]
-        classify["🤖 classifyIntent<br/>LLM_MODEL_ROUTING or Jev"]
-        extract["🤖 extractOrder<br/>LLM_MODEL_EXTRACTION<br/>raw words, never catalog ids"]
+        classify["🤖 IntentAgent<br/>LLM_MODEL_ROUTING or Jev"]
+        extract["🤖 OrderExtractionAgent<br/>LLM_MODEL_EXTRACTION<br/>raw words, never catalog ids"]
     end
 
     classify --> want{"shouldExtract<br/>state, intent?"}
@@ -63,7 +69,7 @@ flowchart TD
     next -- summary --> card["✅ summaryMessages<br/>fixed card with Confirm and Change"]
 
     subgraph word ["LLM: word it"]
-        phrase["🤖 phraseReply<br/>instruction + ReplyFacts"]
+        phrase["🤖 ReplyPhrasingAgent<br/>instruction + ReplyFacts"]
     end
 
     phrase --> check{"checkReply<br/>every number in the facts,<br/>no link, at most 500 graphemes?"}
@@ -93,53 +99,51 @@ call.
 
 ## Where the code lives
 
-| Path                                                | What                                                                                                         |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `apps/api/src/modules/llm/llm.types.ts`             | `LlmClient` interface, `LlmResult`, `ChatLine`, `PhraseRequest`, `ExtractionContext`, `PhotoMatchRequest`    |
-| `apps/api/src/modules/llm/ai-sdk-llm.client.ts`     | The only `LlmClient`: the Vercel AI SDK (`ai`, `@ai-sdk/openai`), timeouts, failure mapping                  |
-| `apps/api/src/modules/llm/llm.module.ts`            | Provides `LLM` (or `null` without `LLM_API_KEY`) and the optional LangSmith tracer                           |
-| `apps/api/src/modules/llm/jev-intent.classifier.ts` | `classifyIntent` through TypeSafe's Jev (`@typesafe-ai/sdk`), when `LLM_INTENT_PROVIDER=jev`                 |
-| `apps/api/src/modules/llm/prompts/`                 | The five system prompts and the prompt builders                                                              |
-| `apps/api/src/modules/llm/prompts/prompt-pack.ts`   | `PromptPack` and `promptPackFor`: what the shop's country changes in the prompts                             |
-| `packages/shared/src/schemas/llm.ts`                | `intentResultSchema`, `extractedOrderSchema`, `photoMatchSchema`, `postProductsSchema`: the output contracts |
-| `apps/api/src/modules/imports/`                     | The import run: reads posts, checks what `extractProductsFromPost` read, writes drafts                       |
-| `apps/api/src/modules/conversations/assistant/`     | The turn: gate, state machine, matching, phrasing request, reply check, fallbacks                            |
-| `apps/api/src/modules/conversations/ingest/`        | Stores each webhook event and decides whether to queue a turn                                                |
-| `apps/api/src/modules/conversations/photos/`        | Copies a customer's photos from Meta into our bucket, for the viewer and the vision call                     |
-| `apps/api/src/modules/database/schema/assistant.ts` | `llm_call`: one row per call, for cost per shop, per conversation and per import run                         |
+| Path                                                         | What                                                                                                                                    |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/modules/llm/llm.types.ts`                      | `LlmResult`, `LlmUsage`, `LlmCallRecord`, `ChatLine` and `LLM_PURPOSES`: what every agent shares                                        |
+| `apps/api/src/modules/llm/agents/agent.ts`                   | `Agent<I, O>`: the contract every agent implements                                                                                      |
+| `apps/api/src/modules/llm/agents/<agent>/`                   | One folder per agent: its interface, DI token, input types, AI SDK implementation, prompt and specs                                     |
+| `apps/api/src/modules/llm/agents/intent/jev-intent.agent.ts` | `JevIntentAgent`: intent through TypeSafe's Jev (`@typesafe-ai/sdk`), when `LLM_INTENT_PROVIDER=jev`                                    |
+| `apps/api/src/modules/llm/runtime/`                          | `runLlmCall` (timeout, failure mapping, the safe log line) and `generateStructured` (the second Zod parse), shared by the AI SDK agents |
+| `apps/api/src/modules/llm/llm.module.ts`                     | One provider per agent, each `null` without `LLM_API_KEY`, and the optional LangSmith tracer                                            |
+| `apps/api/src/modules/llm/prompts/`                          | `transcript.ts` and `prompt-pack.ts`: the prompt helpers the agents share                                                               |
+| `apps/api/src/modules/llm/prompts/prompt-pack.ts`            | `PromptPack` and `promptPackFor`: what the shop's country changes in the prompts                                                        |
+| `packages/shared/src/schemas/llm.ts`                         | `intentResultSchema`, `extractedOrderSchema`, `photoMatchSchema`, `postProductsSchema`: the output contracts                            |
+| `apps/api/src/modules/imports/`                              | The import run: reads posts, checks what `PostImportAgent` read, writes drafts                                                          |
+| `apps/api/src/modules/conversations/assistant/`              | The turn: gate, state machine, matching, phrasing request, reply check, fallbacks                                                       |
+| `apps/api/src/modules/conversations/ingest/`                 | Stores each webhook event and decides whether to queue a turn                                                                           |
+| `apps/api/src/modules/conversations/photos/`                 | Copies a customer's photos from Meta into our bucket, for the viewer and the vision call                                                |
+| `apps/api/src/modules/database/schema/assistant.ts`          | `llm_call`: one row per call, for cost per shop, per conversation and per import run                                                    |
 
 ## Configuration
 
 From `apps/api/src/modules/config/env.schema.ts`:
 
-| Variable               | Default                           | What                                                                                                                                             |
-| ---------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `LLM_PROVIDER`         | `openai`                          | The only provider today                                                                                                                          |
-| `LLM_MODEL_ROUTING`    | `gpt-6-luna`                      | Small, fast model: `classifyIntent` and `phraseReply`, every turn                                                                                |
-| `LLM_MODEL_EXTRACTION` | `gpt-6.1-sol`                     | Larger model: `extractOrder` when the turn needs it, `matchProductPhoto` and `extractProductsFromPost`                                           |
-| `LLM_TIMEOUT_MS`       | `15000`                           | Per call; the AI SDK's one retry (`maxRetries: 1`) happens inside it                                                                             |
-| `LLM_API_KEY`          | unset                             | Without it `LLM` is `null`: the ingest queues no assistant turns (messages are still stored), and `POST /imports` answers `IMPORT_NOT_AVAILABLE` |
-| `LLM_INTENT_PROVIDER`  | `openai`                          | Who classifies intent: `openai` (the routing model) or `jev`. `jev` fails validation without `TYPESAFE_API_KEY`                                  |
-| `TYPESAFE_MODEL`       | `jev-1.14.0`                      | A versioned id, not `jev-latest`, so an alias move never shifts answers near `CONFIDENCE_FLOOR`                                                  |
-| `TYPESAFE_API_KEY`     | unset                             | TypeSafe's key; read only when `LLM_INTENT_PROVIDER=jev`                                                                                         |
-| `ASSISTANT_LANGUAGES`  | `en,bn`                           | The default languages a seller may pick, which `phraseReply` names as its reply language                                                         |
-| `LANGSMITH_API_KEY`    | unset                             | Traces every call, prompt and output included. Development and stage only, because traces hold customer chats                                    |
-| `LANGSMITH_PROJECT`    | `social-glider-dev`               | LangSmith project name                                                                                                                           |
-| `LANGSMITH_ENDPOINT`   | `https://api.smith.langchain.com` | The EU region is `https://eu.api.smith.langchain.com`                                                                                            |
+| Variable               | Default                           | What                                                                                                                                                   |
+| ---------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `LLM_PROVIDER`         | `openai`                          | The only provider today                                                                                                                                |
+| `LLM_MODEL_ROUTING`    | `gpt-6-luna`                      | Small, fast model: `IntentAgent` and `ReplyPhrasingAgent`, every turn                                                                                  |
+| `LLM_MODEL_EXTRACTION` | `gpt-6.1-sol`                     | Larger model: `OrderExtractionAgent` when the turn needs it, `PhotoMatchAgent` and `PostImportAgent`                                                   |
+| `LLM_TIMEOUT_MS`       | `15000`                           | Per call; the AI SDK's one retry (`maxRetries: 1`) happens inside it                                                                                   |
+| `LLM_API_KEY`          | unset                             | Without it every agent is `null`: the ingest queues no assistant turns (messages are still stored), and `POST /imports` answers `IMPORT_NOT_AVAILABLE` |
+| `LLM_INTENT_PROVIDER`  | `openai`                          | Who classifies intent: `openai` (the routing model) or `jev`. `jev` fails validation without `TYPESAFE_API_KEY`                                        |
+| `TYPESAFE_MODEL`       | `jev-1.14.0`                      | A versioned id, not `jev-latest`, so an alias move never shifts answers near `CONFIDENCE_FLOOR`                                                        |
+| `TYPESAFE_API_KEY`     | unset                             | TypeSafe's key; read only when `LLM_INTENT_PROVIDER=jev`                                                                                               |
+| `ASSISTANT_LANGUAGES`  | `en,bn`                           | The default languages a seller may pick, which `ReplyPhrasingAgent` names as its reply language                                                        |
+| `LANGSMITH_API_KEY`    | unset                             | Traces every call, prompt and output included. Development and stage only, because traces hold customer chats                                          |
+| `LANGSMITH_PROJECT`    | `social-glider-dev`               | LangSmith project name                                                                                                                                 |
+| `LANGSMITH_ENDPOINT`   | `https://api.smith.langchain.com` | The EU region is `https://eu.api.smith.langchain.com`                                                                                                  |
 
-## The client contract
+## The agent contract
+
+Every agent implements one interface (`agents/agent.ts`) and is injected by
+its own token, so a caller depends only on the agents it uses:
 
 ```ts
-interface LlmClient {
-  classifyIntent(history: ChatLine[], pack: PromptPack): Promise<LlmResult<IntentResult>>;
-  extractOrder(
-    history: ChatLine[],
-    context: ExtractionContext,
-    pack: PromptPack,
-  ): Promise<LlmResult<ExtractedOrder>>;
-  phraseReply(request: PhraseRequest, history: ChatLine[]): Promise<LlmResult<string>>;
-  matchProductPhoto(request: PhotoMatchRequest): Promise<LlmResult<PhotoMatch>>;
-  extractProductsFromPost(request: PostExtractionRequest): Promise<LlmResult<PostProducts>>;
+interface Agent<I, O> {
+  readonly purpose: LlmPurpose; // stamped on every llm_call row it writes
+  run(input: I): Promise<LlmResult<O>>;
 }
 
 type LlmResult<T> =
@@ -147,7 +151,21 @@ type LlmResult<T> =
   | { ok: false; reason: 'timeout' | 'provider_error' | 'invalid_output'; usage: LlmUsage };
 ```
 
-**No call throws.** Every failure comes back as a result, and the state machine
+| Agent                  | Token                    | Input                        | Output           | Model           | Purpose        | Used by                |
+| ---------------------- | ------------------------ | ---------------------------- | ---------------- | --------------- | -------------- | ---------------------- |
+| `IntentAgent`          | `INTENT_AGENT`           | `{ history, pack }`          | `IntentResult`   | routing, or Jev | `classify`     | `AssistantTurnService` |
+| `OrderExtractionAgent` | `ORDER_EXTRACTION_AGENT` | `{ history, context, pack }` | `ExtractedOrder` | extraction      | `extract`      | `AssistantTurnService` |
+| `ReplyPhrasingAgent`   | `REPLY_PHRASING_AGENT`   | `{ request, history }`       | `string`         | routing         | `phrase`       | `AssistantTurnService` |
+| `PhotoMatchAgent`      | `PHOTO_MATCH_AGENT`      | `PhotoMatchRequest`          | `PhotoMatch`     | extraction      | `vision_match` | `AssistantTurnService` |
+| `PostImportAgent`      | `POST_IMPORT_AGENT`      | `PostExtractionRequest`      | `PostProducts`   | extraction      | `post_import`  | `ImportRunner`         |
+
+Each token resolves to the agent or to `null` when `LLM_API_KEY` is unset;
+all five are present or none is. The AI SDK agents share `runLlmCall` and
+`generateStructured` (`runtime/`), so the timeout, the one retry, the failure
+mapping and the log line are the same for every agent. `JevIntentAgent` maps
+its own SDK's errors the same way.
+
+**No agent throws.** Every failure comes back as a result, and the state machine
 turns a failed classify, extract or photo match into a hand-off (`llm_failed`)
 and a failed phrase into the fixed sentence. An import marks a post whose
 extraction failed `failed`, never a guess. How an error maps to a reason:
@@ -164,6 +182,21 @@ to `llm_call` in its write transaction. An import run writes each post's call
 in that post's write, with `import_id` in place of `conversation_id`. A failed call keeps its tokens when the
 provider billed them. Logs carry only the purpose, outcome, model, error name,
 HTTP status and latency. They never carry the chat, the prompt or the output.
+
+### Adding an agent
+
+A new LLM job is a new agent, never a new method on an existing one:
+
+1. A folder under `agents/` with the agent's interface, token, input types,
+   implementation (on `runLlmCall` and `generateStructured`), prompt and
+   specs. Its output schema goes in `packages/shared/src/schemas/llm.ts`.
+2. A provider in `LlmModule` with the `agent(...)` helper, so it is `null`
+   without `LLM_API_KEY` like the rest, and an entry in its `exports`.
+3. Its purpose in `LLM_PURPOSES` and in the literal copy `LLM_CALL_PURPOSES`
+   (`schema/assistant.ts`), then `db:generate` for the `llm_call_purpose_ck`
+   check.
+4. Its row in the tables above and its own section under
+   [The agents](#the-agents), in the same change.
 
 ## How a prompt is built
 
@@ -184,7 +217,7 @@ assembled from data (`prompts/transcript.ts`):
 - **The chat is the conversation's last 20 messages**, oldest first.
   `toChatLines` leaves out replies Messenger refused and reactions. An edited
   message reads as its latest edit, and a message with no words reads as a
-  tag such as `[sent a sticker]`. `phraseReply` sees only the last 6.
+  tag such as `[sent a sticker]`. `ReplyPhrasingAgent` sees only the last 6.
 - **A chat the shop left silent for 10 days starts over.** When the shop's
   last message came `STALE_CHAT_DAYS` (10) or more before the trigger
   (`staleReply` in `turn-gate.ts`), the calls see only the messages after it.
@@ -210,15 +243,15 @@ Customer: lal katan saree ta 2 ta lagbe
 </conversation>
 ```
 
-## The five calls
+## The agents
 
-### `classifyIntent`
+### `IntentAgent`
 
 It uses `LLM_MODEL_ROUTING` and runs on every turn that reads a customer's
 words. The user prompt is the transcript block alone, and the output must
 match `intentResultSchema`.
 
-System prompt (`prompts/classify-intent.ts`):
+System prompt (`agents/intent/intent.prompt.ts`):
 
 ```text
 You classify the latest customer message(s) in a Facebook Messenger chat with an online shop. The chat may be in {chatLanguages}.
@@ -265,11 +298,11 @@ message. A confidence under `CONFIDENCE_FLOOR` (0.6) hands off as
 
 #### Through Jev
 
-With `LLM_INTENT_PROVIDER=jev`, `AiSdkLlmClient` hands `classifyIntent` to
-`JevIntentClassifier`, and the other four calls stay on OpenAI. Jev is
+With `LLM_INTENT_PROVIDER=jev`, `LlmModule` provides `JevIntentAgent` as the
+`IntentAgent`, and the other four agents stay on OpenAI. Jev is
 TypeSafe's System One model: it answers a typed question about a state with a
 probability per option, and writes no text. The request is one Choice
-(`prompts/classify-intent-jev.ts`).
+(`agents/intent/jev-intent.prompt.ts`).
 
 State, built by `classifyIntentState(history, pack)`. The customer's messages
 after the last shop or assistant line are `latest_customer_messages`;
@@ -302,7 +335,7 @@ So the same `CONFIDENCE_FLOOR` reads as "under 60% likely". A choice outside
 the timeout. Jev reads English best; its other languages are "handled but not
 equally well", which is why `intent.live-eval` carries Bangla and Banglish.
 
-### `extractOrder`
+### `OrderExtractionAgent`
 
 It uses `LLM_MODEL_EXTRACTION` and runs only when `shouldExtract(state,
 intent)` returns true. That is every turn in `collecting_details` and
@@ -332,7 +365,7 @@ return the whole item list with each item's `ref`:
 }
 ```
 
-System prompt (`prompts/extract-order.ts`):
+System prompt (`agents/order-extraction/order-extraction.prompt.ts`):
 
 ```text
 You extract order details a customer gave in a Facebook Messenger chat with an online shop. The chat may be in {chatLanguages}. A customer may order several items.
@@ -450,7 +483,7 @@ detail only when the value is not null. `matchProduct` and `matchVariant`
 then search the catalog with both the words and their `*Alt` transliteration.
 A non-empty extraction under 0.6 confidence hands off as `low_confidence`.
 
-### `phraseReply`
+### `ReplyPhrasingAgent`
 
 It uses `LLM_MODEL_ROUTING` and runs only when the turn's decision is
 `ask_slot`, which asks for the next missing product, variant, quantity, name,
@@ -476,7 +509,7 @@ the tone is `friendly and polite`, `short and direct, with no small talk` or
   `BD`, the country's first listed language elsewhere (`Hindi` in `IN`), and
   `English` when it lists none.
 
-System prompt (`prompts/phrase-reply.ts`):
+System prompt (`agents/reply-phrasing/reply-phrasing.prompt.ts`):
 
 ```text
 You write one short Messenger reply on behalf of an online shop.
@@ -531,7 +564,7 @@ An output such as "Delivery charge 120 taka, thikana ta din" fails the check
 instead: "Please share the full delivery address, with the area and district."
 (the exact fallback lines live in `assistant-fallbacks.ts`).
 
-### `matchProductPhoto`
+### `PhotoMatchAgent`
 
 It uses `LLM_MODEL_EXTRACTION`, a model that reads images, and runs only when
 the customer's burst holds a photo before the summary card
@@ -539,7 +572,7 @@ the customer's burst holds a photo before the summary card
 It is the only call that sees images, and it never sees the chat.
 
 The request (`PhotoMatchRequest`) is one user message built by
-`matchProductPhotoContent` (`prompts/match-product-photo.ts`): each of the
+`matchProductPhotoContent` (`agents/photo-match/photo-match.prompt.ts`): each of the
 customer's photos (at most three, `MAX_PHOTOS_PER_TURN`) as a link to **our
 copy** in the bucket, the words typed beside them, then up to 20 numbered
 candidates (`MAX_PHOTO_CANDIDATES`), each a name and its cover's thumbnail.
@@ -552,7 +585,7 @@ turn's own catalog (`findSellableCatalog(merchantId)`): sellable products with
 a cover, from a category the customer named when they named one, with a
 product their words name first.
 
-System prompt (`prompts/match-product-photo.ts`):
+System prompt (`agents/photo-match/photo-match.prompt.ts`):
 
 ```text
 You match a customer's photo to an online shop's products. The customer sent the photo in a Facebook Messenger chat, usually to ask "do you have this?". It may be a phone photo of the product, a photo of someone wearing or holding it, or a screenshot of a post from this or another shop.
@@ -582,7 +615,7 @@ catalog id. `matchedProductIds` maps the numbers back to the shortlist,
 decides with `decidePhoto`: one match asks "Is it this one?", several are a
 carousel, none asks for the name.
 
-### `extractProductsFromPost`
+### `PostImportAgent`
 
 It uses `LLM_MODEL_EXTRACTION`, because it reads images, and runs only in an
 [import from Facebook posts](../features/13-facebook-post-import/README.md),
@@ -590,14 +623,14 @@ once per post the run reads. It never sees a chat. Posts skipped before the
 call (imported before, or with no caption and no photo) cost nothing.
 
 The request (`PostExtractionRequest`) is one user message built by
-`extractProductsFromPostContent` (`prompts/extract-products-from-post.ts`):
+`extractProductsFromPostContent` (`agents/post-import/post-import.prompt.ts`):
 the shop's currency, the shop's live category names, the caption, then up to four of
 the post's photos (`LLM_PHOTOS_PER_POST`) as `file` parts linking to **our
 copies** at `imageDetail: 'auto'`. Import anyway on a post read as not a
 product adds a line saying the shop says it holds one (`hint`). The caption
 and category names go through `asData`.
 
-System prompt (`prompts/extract-products-from-post.ts`):
+System prompt (`agents/post-import/post-import.prompt.ts`):
 
 ```text
 You read one post from an online shop's Facebook Page and list the products it sells, so the shop can add them to its catalog. You are shown the post's caption and its photos. The caption may be in {chatLanguages}, or another language.
@@ -656,7 +689,7 @@ generated SKU.
 Everything the assistant does starts at Meta's webhook. Only a customer's
 typed words and photos reach the LLM. Code alone handles taps, referrals,
 stickers, reactions and seller messages. The one call outside the assistant,
-`extractProductsFromPost`, starts at `POST /imports` instead
+`PostImportAgent`, starts at `POST /imports` instead
 ([From an import run](#from-an-import-run)).
 
 ### From an import run
@@ -670,7 +703,7 @@ worker consumes (`ImportRunner.run`). For each post Graph returns, in order:
    (`no_caption_or_photo`).
 2. **Photos.** Up to 8 are downloaded from Meta, re-encoded and stored under
    `m/`, with no transaction open.
-3. **`extractProductsFromPost`**, then `checkPostProducts`.
+3. **`PostImportAgent`**, then `checkPostProducts`.
 4. **Match** each product's name and aliases with `productScores` (the
    assistant's matching) at a score of 1: against the shop's other products,
    any status, for `in_catalog`, and against this run's drafts for `merged`.
@@ -783,7 +816,7 @@ flowchart TD
     share -- "resolves to a product" --> product
     share -- "candidates or unreadable" --> askpost["⚙️ decideSharedPost<br/>Do you mean …? no LLM"]
     share -- no --> photo{"Photo<br/>in the burst?"}
-    photo -- yes --> vision["🤖 copy, then matchProductPhoto<br/>decidePhoto: Is it this one?"]
+    photo -- yes --> vision["🤖 copy, then PhotoMatchAgent<br/>decidePhoto: Is it this one?"]
     photo -- no --> kind{"Our payload<br/>on the trigger?"}
     kind -- "pick:…, name:profile, photo:no" --> pick["⚙️ decideTurn pick or name, decideNotIt<br/>fixed next ask, no LLM"]
     kind -- "start, browse, choose, ref, menu" --> entry["⚙️ decideTurn entry<br/>fixed reply, no LLM"]
@@ -818,7 +851,7 @@ The table says what each entry point stores and gets back:
 | Typed message carrying a product referral (`m.me` link or mapped ad, with words)      | payload `ref-typed:product:<id>`                                 | As a typed message, after the product is added                       | Product photo, then the reply; hand-off without LLM at 10 items           |
 | Shared post or ad, with words beside it, that resolves to a product                   | message with `links`                                             | As a typed message, after the product is added                       | As above                                                                  |
 | Shared post that does not resolve to one product                                      | message with `links`                                             | None                                                                 | Fixed "Do you mean …?" with quick replies, or "type the product's name"   |
-| Photo or screenshot, before the summary card                                          | kind `image`, our copy's key in `details`                        | `matchProductPhoto`, once per turn                                   | Cover and "Is it this one?" with Yes / No, a carousel, or "type its name" |
+| Photo or screenshot, before the summary card                                          | kind `image`, our copy's key in `details`                        | `PhotoMatchAgent`, once per turn                                     | Cover and "Is it this one?" with Yes / No, a carousel, or "type its name" |
 | **No** to a photo's one match                                                         | payload `photo:no`                                               | None                                                                 | Fixed "type its name"; the next miss hands off                            |
 | Get Started, Browse, a category, a carousel **Choose**, a bare referral               | payload `start`, `browse…`, `choose:…`, `ref:…`                  | None                                                                 | Fixed categories, carousel, or variant/quantity ask                       |
 | Menu: My last order / Talk to a person                                                | payload `menu:last-order` / `menu:human`                         | None                                                                 | Fixed last-order line / hand-off                                          |
@@ -840,7 +873,7 @@ sequenceDiagram
     participant Meta as 🌐 Meta
     participant Turn as ⚙️ AssistantTurnService
     participant DB as 💾 Postgres
-    participant LLM as 🤖 LlmClient
+    participant LLM as 🤖 Agents
     participant Out as ⚙️ OutboundMessageSender
 
     C->>Meta: lal katan saree ta 2 ta lagbe
@@ -850,13 +883,13 @@ sequenceDiagram
         DB-->>Turn: rows, turnGate is go
     end
     Note over Turn,LLM: No transaction open from here to the write
-    Turn->>LLM: classifyIntent(transcript)
+    Turn->>LLM: IntentAgent.run(transcript)
     LLM-->>Turn: intent order, confidence 0.94
-    Turn->>LLM: extractOrder(Already collected + transcript)
+    Turn->>LLM: OrderExtractionAgent.run(Already collected + transcript)
     LLM-->>Turn: item katan saree / lal / 2, details null, confidence 0.9
     Turn->>Turn: decideTurn: merge, match Katan Saree / Red, next missing slot
     alt reply is ask_slot
-        Turn->>LLM: phraseReply(instruction, facts, last 6 lines)
+        Turn->>LLM: ReplyPhrasingAgent.run(instruction, facts, last 6 lines)
         LLM-->>Turn: reply text
         Turn->>Turn: checkReply, else fallbackText
     else summary or hand-off
@@ -878,9 +911,10 @@ sequenceDiagram
 ```
 
 A turn makes at most three LLM calls, one after another, all outside a
-transaction; a photo turn makes one, `matchProductPhoto`. Without `LLM_API_KEY` the ingest queues no turn at all. If the
-client is absent at run time anyway, `decideTurn` treats that as a failed
-classify and hands off.
+transaction; a photo turn makes one, `PhotoMatchAgent`. Without `LLM_API_KEY` the ingest queues no turn at all. If the
+agents are absent at run time anyway, `decideTurn` treats that as a failed
+classify and hands off, a photo turn hands off as `llm_failed`, and an ask
+goes out as its fixed sentence.
 
 ### Hand-offs
 
@@ -890,7 +924,7 @@ when:
 
 | Reason               | Cause                                                                                                                |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `llm_failed`         | classify, extract or `matchProductPhoto` returned `timeout`, `provider_error` or `invalid_output`                    |
+| `llm_failed`         | classify, extract or `PhotoMatchAgent` returned `timeout`, `provider_error` or `invalid_output`                      |
 | `low_confidence`     | classify, or a non-empty extract, under 0.6                                                                          |
 | `complain`           | intent `complain`                                                                                                    |
 | `request_human`      | intent `request_human`, or the menu's Talk to a person                                                               |
@@ -931,23 +965,25 @@ minutes later.
 
 ## Tests
 
-| Spec                                                      | Covers                                                                                                |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `llm/__tests__/llm.client.spec.ts`                        | Failure mapping, the second Zod parse, usage on failure; photos sent as links                         |
-| `llm/__tests__/prompt-pack.spec.ts`                       | `promptPackFor` per country; Bangla only in Bangladesh's prompts; the data rule last                  |
-| `llm/__tests__/transcript.spec.ts`                        | One line per message: line breaks folded so a message cannot forge a speaker; `<` swapped             |
-| `llm/__tests__/jev-intent.classifier.spec.ts`             | Jev's state, the chosen option's probability as confidence, timeout and errors as failures            |
-| `llm/__tests__/intent.live-eval.spec.ts`                  | 42 labelled Bangla, Banglish and English chats against each provider with a key; opt-in: `LLM_EVAL=1` |
-| `assistant/__tests__/photo-turn.spec.ts`                  | The burst's photos, the shortlist, numbers not shown discarded                                        |
-| `photos/__tests__/photo-download.spec.ts`                 | Meta hosts only, redirects, size cap, timeout                                                         |
-| `assistant/__tests__/reply-check.spec.ts`                 | Numbers, links, length                                                                                |
-| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, `shouldExtract`, hand-off rules                                                         |
-| `assistant/__tests__/assistant-turn.service.spec.ts` (DB) | The turn end to end with a fake `LlmClient`; non-text messages never create an order; photo matching  |
-| `assistant/__tests__/conversation-simulator.spec.ts`      | Multi-turn conversations through the machine                                                          |
-| `assistant/__tests__/catalog-match.eval.spec.ts`          | ≥ 90% product identification on the eval set                                                          |
-| `assistant/__tests__/catalog-match.live-eval.spec.ts`     | The same against the real model; opt-in: `LLM_EVAL=1` with `LLM_API_KEY`                              |
-| `imports/__tests__/post-drafts.spec.ts`                   | `checkPostProducts`: names, aliases, option limits, prices, categories                                |
-| `imports/__tests__/import-runner.spec.ts` (DB)            | A run end to end with a fake Graph and `LlmClient`: skips, matches, merges, failures, Import anyway   |
+| Spec                                                      | Covers                                                                                                    |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `llm/runtime/__tests__/run-llm-call.spec.ts`              | Failure mapping, the second Zod parse, usage on failure, the log line, telemetry off                      |
+| `llm/agents/*/__tests__/*.agent.spec.ts`                  | Each agent's model, purpose and prompt pack; the exact prompt it sends; photos sent as links              |
+| `llm/__tests__/llm.module.spec.ts`                        | One agent per token on its model tier, Jev when chosen, none without `LLM_API_KEY`                        |
+| `llm/__tests__/prompt-pack.spec.ts`                       | `promptPackFor` per country; Bangla only in Bangladesh's prompts; the data rule last                      |
+| `llm/__tests__/transcript.spec.ts`                        | One line per message: line breaks folded so a message cannot forge a speaker; `<` swapped                 |
+| `llm/agents/intent/__tests__/jev-intent.agent.spec.ts`    | Jev's state, the chosen option's probability as confidence, timeout and errors as failures                |
+| `llm/__tests__/intent.live-eval.spec.ts`                  | 42 labelled Bangla, Banglish and English chats against each provider with a key; opt-in: `LLM_EVAL=1`     |
+| `assistant/__tests__/photo-turn.spec.ts`                  | The burst's photos, the shortlist, numbers not shown discarded                                            |
+| `photos/__tests__/photo-download.spec.ts`                 | Meta hosts only, redirects, size cap, timeout                                                             |
+| `assistant/__tests__/reply-check.spec.ts`                 | Numbers, links, length                                                                                    |
+| `assistant/__tests__/conversation-machine.spec.ts`        | `decideTurn`, `shouldExtract`, hand-off rules                                                             |
+| `assistant/__tests__/assistant-turn.service.spec.ts` (DB) | The turn end to end with fake agents; non-text messages never create an order; photo matching             |
+| `assistant/__tests__/conversation-simulator.spec.ts`      | Multi-turn conversations through the machine                                                              |
+| `assistant/__tests__/catalog-match.eval.spec.ts`          | ≥ 90% product identification on the eval set                                                              |
+| `assistant/__tests__/catalog-match.live-eval.spec.ts`     | The same against the real model; opt-in: `LLM_EVAL=1` with `LLM_API_KEY`                                  |
+| `imports/__tests__/post-drafts.spec.ts`                   | `checkPostProducts`: names, aliases, option limits, prices, categories                                    |
+| `imports/__tests__/import-runner.spec.ts` (DB)            | A run end to end with a fake Graph and `PostImportAgent`: skips, matches, merges, failures, Import anyway |
 
 The live eval runs only on request:
 
@@ -974,10 +1010,10 @@ acted on; Jev's median latency was about 0.4 s against 2 s.
   region would repeat the shared rules. `promptPackFor` is the one lookup a
   stored source would replace. More hand-written packs (Hinglish for `IN`,
   Urdu in Latin letters for `PK`) go in `PACKS` beside Bangladesh's.
-- **An import evaluation set.** `extractProductsFromPost` has no eval yet;
+- **An import evaluation set.** `PostImportAgent` has no eval yet;
   the first runs on the dev Page give its accuracy and real cost per post.
 
-- **A photo evaluation set.** `matchProductPhoto` has no eval yet; the hit
+- **A photo evaluation set.** `PhotoMatchAgent` has no eval yet; the hit
   rate on the dev Page is still to record
   ([phase 6](../features/11-ai-implementation/phase-6-product-photos/README.md#done-when)).
 - **Comments and live-sale comments** ([phases 7](../features/11-ai-implementation/phase-7-comments-to-messenger/README.md)

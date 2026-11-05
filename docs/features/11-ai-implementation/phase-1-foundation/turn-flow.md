@@ -12,7 +12,7 @@ sequenceDiagram
     participant Queue as 📬 assistant-turns
     participant Turn as ⚙️ AssistantTurnService
     participant DB as 💾 Postgres
-    participant LLM as 🤖 LlmClient
+    participant LLM as 🤖 Agents
     participant Sender as ⚙️ OutboundMessageSender
     participant Meta as 🌐 Graph API
 
@@ -23,13 +23,13 @@ sequenceDiagram
     alt paused, handed_off, confirmed, stale trigger, or already answered
         Turn-->>Queue: stop, no LLM call
     else
-        Turn->>LLM: classifyIntent, routing model, no transaction open
+        Turn->>LLM: IntentAgent, routing model, no transaction open
         opt shouldExtract(state, intent)
-            Turn->>LLM: extractOrder, extraction model
+            Turn->>LLM: OrderExtractionAgent, extraction model
         end
         Turn->>Turn: decideTurn, pure: ask_slot, summary or handoff
         opt ask_slot or summary
-            Turn->>LLM: phraseReply, then checkReply against the facts
+            Turn->>LLM: ReplyPhrasingAgent, then checkReply against the facts
             Note over Turn: A failed phrasing or check uses the fixed fallback sentence
         end
         Turn->>DB: lock the conversation, write llm_call rows, re-check the gate and the 24-hour window

@@ -198,7 +198,7 @@ For each post, in order:
 3. **Photos.** Up to 8 of the post's photos are downloaded from Meta's URLs
    outside any transaction, with a size limit and a timeout, and re-encoded
    with `normalize-product-image`. Videos are not imported.
-4. **The LLM call** (`extractProductsFromPost`, [below](#llm-call)) returns
+4. **The LLM call** (`PostImportAgent`, [below](#llm-call)) returns
    `not_product` with a few words on what the post is, or up to 10
    products.
 5. **Already in the catalog.** Each product is matched by name
@@ -370,10 +370,9 @@ three.
 
 ## LLM call
 
-`extractProductsFromPost`, a fifth method on `LlmClient`, on
-`LLM_MODEL_EXTRACTION` because it reads images. When it is built,
-[ai.md](../../architecture/ai.md) gains its prompt, schema and path in the
-same change.
+`PostImportAgent` (`llm/agents/post-import/`), on `LLM_MODEL_EXTRACTION`
+because it reads images. Its prompt, schema and path are in
+[ai.md](../../architecture/ai.md#postimportagent).
 
 - **Input:** the caption and up to 4 of the post's photos (our copies, as
   `file` parts with a URL), the shop's currency and country (for the alias
@@ -383,7 +382,7 @@ same change.
   `{ kind: 'products' | 'not_product', reason, products: [{ name, description, aliases, options: [{ name, values }], prices: [{ values, price }] | null, category: { kind: 'existing' | 'suggested', name } | null }] }`.
   Every field is present, null where empty, which OpenAI's strict mode needs.
   Prices are numbers in major units as the post shows them, and code converts
-  them. The prompt and the checks are in [ai.md](../../architecture/ai.md#extractproductsfrompost).
+  them. The prompt and the checks are in [ai.md](../../architecture/ai.md#postimportagent).
 - **Code checks the output:** an `existing` category not in the list is
   dropped, a price that is not a positive number is dropped, option limits
   are applied, and a product with no name is dropped.
@@ -567,7 +566,7 @@ Under `apps/api/src/modules/` unless noted:
 - [`imports/import-runner.ts`](../../../apps/api/src/modules/imports/import-runner.ts), [`imports.processor.ts`](../../../apps/api/src/modules/imports/imports.processor.ts) and [`import-photos.ts`](../../../apps/api/src/modules/imports/import-photos.ts): the run, in `ImportsWorkerModule`, which only `WorkerModule` imports
 - [`imports/post-drafts.ts`](../../../apps/api/src/modules/imports/post-drafts.ts): checking the LLM's output into drafts
 - [`imports/import.repository.ts`](../../../apps/api/src/modules/imports/import.repository.ts): runs, posts, the skip check and the tabs
-- [`llm/prompts/extract-products-from-post.ts`](../../../apps/api/src/modules/llm/prompts/extract-products-from-post.ts): the prompt
+- [`llm/agents/post-import/`](../../../apps/api/src/modules/llm/agents/post-import/): `PostImportAgent` and its prompt
 - [`messenger/page/meta-graph.client.ts`](../../../apps/api/src/modules/messenger/page/meta-graph.client.ts): `listPublishedPosts` and `getImportPost`
 - [`packages/shared/src/schemas/imports.ts`](../../../packages/shared/src/schemas/imports.ts): the shared contract
 - [`apps/web/src/features/imports/`](../../../apps/web/src/features/imports/): the dialog, the history, the run page and the edit page's panel, with routes under `apps/web/src/routes/_app/catalog/imports/`

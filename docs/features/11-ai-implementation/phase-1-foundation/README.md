@@ -33,8 +33,8 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
    `handed_off` or `confirmed`, if the trigger is no longer the latest
    customer message, or if `turn-gate` finds an assistant reply already
    after it.
-3. **LLM**, no transaction open: `classifyIntent` on the routing model, then
-   `extractOrder` on the extraction model when `shouldExtract` allows. That is
+3. **LLM**, no transaction open: `IntentAgent` on the routing model, then
+   `OrderExtractionAgent` on the extraction model when `shouldExtract` allows. That is
    every intent except `complain` and `request_human` while
    `collecting_details` or `awaiting_confirmation`, and only `order` or
    `edit_order` while `browsing`.
@@ -65,14 +65,17 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
   | `LANGSMITH_PROJECT`    | `social-glider-dev` | The LangSmith project                                     |
   | `LANGSMITH_ENDPOINT`   | US API              | The EU region's URL for an EU workspace                   |
 
-- **`src/modules/llm/`**: `LlmClient` with `classifyIntent(history)`,
-  `extractOrder(history, slots)` and `phraseReply(request, history)`,
-  validated by `intentResultSchema` and `extractedOrderSchema` from
-  `packages/shared/src/schemas/llm.ts`. It never throws: it returns
-  `{ ok: true, value, usage }` or `{ ok: false, reason, usage }`, with the
-  billed tokens on a failure too when the provider reported them. Message
-  text is never logged. Provider token `LLM`, so tests inject a fake; one
-  prompt file per call in `prompts/`.
+- **`src/modules/llm/`**: one agent per call, each with `run(input)`:
+  `IntentAgent` (`{ history, pack }`), `OrderExtractionAgent`
+  (`{ history, context, pack }`) and `ReplyPhrasingAgent`
+  (`{ request, history }`), validated by `intentResultSchema` and
+  `extractedOrderSchema` from `packages/shared/src/schemas/llm.ts`
+  ([the agent contract](../../../architecture/ai.md#the-agent-contract)). No
+  agent throws: each returns `{ ok: true, value, usage }` or
+  `{ ok: false, reason, usage }`, with the billed tokens on a failure too
+  when the provider reported them. Message text is never logged. Each agent
+  has its own provider token (`INTENT_AGENT`, …), so tests inject fakes; its
+  prompt sits beside it in `agents/<agent>/`.
 - **Tracing.** With `LANGSMITH_API_KEY` set, `LlmModule` passes
   `LangSmithTelemetry` to every `generateText` call, named by its purpose.
   Without it, each call sets `isEnabled: false`, so a globally registered
@@ -95,7 +98,7 @@ existed ([04 · Conversations](../../04-conversations/README.md)).
 - **Code decides, the LLM phrases.** `decideTurn` returns a typed intent, not
   text: `ask_slot`, `summary` or `handoff`. Phase 1 asked product, quantity,
   name, phone, address; phase 2 added `variant` after product.
-  `phraseReply` (routing model) writes the intent in the customer's language,
+  `ReplyPhrasingAgent` (routing model) writes the intent in the customer's language,
   in the tone the seller picked, falling back to the seller's default
   language when the customer's is unclear
   ([Settings – Order assistant](../../12-settings-assistant/README.md)). `checkReply(text, facts)` then requires every number in the reply
@@ -208,10 +211,12 @@ In `conversations/assistant/__tests__/` unless noted.
   gets a fresh order, and the LLM sees only the new messages.
 - `reply-check.spec.ts`: an invented price or quantity is rejected in Latin
   and Bangla digits; allowed facts pass; URLs and long replies are rejected.
-- `llm/__tests__/llm.client.spec.ts`: the AI SDK's mock model; timeout,
-  invalid JSON and provider errors give `ok: false`; each call reaches the
-  telemetry integration under its purpose, and none does without one.
-- `llm/__tests__/jev-intent.classifier.spec.ts`: Jev's state and question;
+- `llm/runtime/__tests__/run-llm-call.spec.ts` and
+  `llm/agents/*/__tests__/*.agent.spec.ts`: the AI SDK's mock model; timeout,
+  invalid JSON and provider errors give `ok: false`; each agent sends its
+  exact prompt and reaches the telemetry integration under its purpose, and
+  none does without one.
+- `llm/agents/intent/__tests__/jev-intent.agent.spec.ts`: Jev's state and question;
   the chosen intent's probability is the confidence; timeout and provider
   errors give `ok: false`.
 - `assistant-turn.service.spec.ts`: an LLM failure hands off with a reply; a
